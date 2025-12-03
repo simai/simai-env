@@ -89,7 +89,9 @@ create_nginx_site() {
 ensure_project_permissions() {
   local project_path="$1"
   chown -R "$SIMAI_USER":www-data "$project_path"
-  find "$project_path/storage" "$project_path/bootstrap/cache" -type d -print0 2>/dev/null | xargs -0 chmod 775 || true
+  if [[ -d "$project_path/storage" || -d "$project_path/bootstrap/cache" ]]; then
+    find "$project_path/storage" "$project_path/bootstrap/cache" -type d -print0 2>/dev/null | xargs -0 -r chmod 775 || true
+  fi
 }
 
 require_laravel_structure() {

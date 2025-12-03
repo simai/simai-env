@@ -19,7 +19,9 @@ site_add_handler() {
     info "Project path not found, creating: $path"
     mkdir -p "$path"
   fi
-  require_laravel_structure "$path"
+  if ! require_laravel_structure "$path"; then
+    return 1
+  fi
   ensure_project_permissions "$path"
 
   create_php_pool "$project" "$php_version" "$path"
