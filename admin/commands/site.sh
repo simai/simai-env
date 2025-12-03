@@ -41,7 +41,19 @@ site_add_handler() {
     create_placeholder_if_missing "$path"
   else
     if ! require_laravel_structure "$path"; then
-      return 1
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        local choice
+        choice=$(select_from_list "Laravel structure not found. Use generic profile with placeholder?" "yes" "yes" "no")
+        if [[ "$choice" == "yes" ]]; then
+          profile="generic"
+          template_path="$NGINX_TEMPLATE_GENERIC"
+          create_placeholder_if_missing "$path"
+        else
+          return 1
+        fi
+      else
+        return 1
+      fi
     fi
   fi
   ensure_project_permissions "$path"
