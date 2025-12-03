@@ -18,10 +18,10 @@ select_from_list() {
     echo ""
     return 1
   fi
-  echo "$prompt"
+  echo "$prompt" >&2
   local i=1
   for opt in "${options[@]}"; do
-    echo "  [$i] $opt"
+    echo "  [$i] $opt" >&2
     ((i++))
   done
   if [[ -n "$default" ]]; then
