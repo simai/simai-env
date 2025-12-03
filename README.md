@@ -19,6 +19,21 @@
 
 ## Usage (run as root)
 
+### Quick install
+Download and unpack the latest version to `/root/simai-env`, then run the installer:
+```bash
+curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | sudo bash
+sudo /root/simai-env/simai-env.sh --domain example.com --project-name myapp --db-pass secret
+```
+To pin a specific branch or tag, override `VERSION` (branch) or `REF` (tag), or change `INSTALL_DIR`:
+```bash
+curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | \
+  VERSION=main INSTALL_DIR=/opt/simai-env sudo -E bash
+# or pin a tag
+curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | \
+  REF=refs/tags/v1.0.0 sudo -E bash
+```
+
 ### New project (mode A)
 ```bash
 ./simai-env.sh --domain example.com --project-name myapp \
