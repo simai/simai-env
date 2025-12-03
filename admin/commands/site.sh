@@ -105,10 +105,33 @@ site_remove_handler() {
 
 site_set_php_handler() {
   parse_kv_args "$@"
-  require_args "project-name php"
+  local project="${PARSED_ARGS[project-name]:-}"
+  local domain="${PARSED_ARGS[domain]:-}"
+  local php_version="${PARSED_ARGS[php]:-}"
 
-  local project="${PARSED_ARGS[project-name]}"
-  local php_version="${PARSED_ARGS[php]}"
+  if [[ -z "$project" && -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local sites=()
+    mapfile -t sites < <(list_sites)
+    domain=$(select_from_list "Select site" "" "${sites[@]}")
+  fi
+  if [[ -z "$project" ]]; then
+    if [[ -n "$domain" ]]; then
+      project=$(project_slug_from_domain "$domain")
+      info "project-name not provided; using ${project}"
+    fi
+  fi
+  if [[ -z "$project" ]]; then
+    require_args "project-name"
+  fi
+
+  if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local versions=()
+    mapfile -t versions < <(installed_php_versions)
+    php_version=$(select_from_list "Select PHP version" "${versions[0]:-}" "${versions[@]}")
+  fi
+  if [[ -z "$php_version" ]]; then
+    require_args "php"
+  fi
 
   info "Site PHP switch (stub): project=${project}, php=${php_version}"
   info "TODO: update PHP-FPM pool and nginx upstream."
@@ -120,6 +143,6 @@ site_list_handler() {
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile="
-register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "domain" "project-name= path= remove-files=0 drop-db=0 drop-db-user=0 db-name= db-user="
-register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "project-name php" ""
+register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files=0 drop-db=0 drop-db-user=0 db-name= db-user="
+register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
