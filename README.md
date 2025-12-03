@@ -53,6 +53,7 @@ curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/update.sh | 
 sudo /root/simai-env/simai-admin.sh site add --domain example.com --project-name myapp --php 8.2
 sudo /root/simai-env/simai-admin.sh db create --name simai_app --user simai --pass secret
 sudo /root/simai-env/simai-admin.sh ssl issue --domain example.com --email admin@example.com
+sudo /root/simai-env/simai-admin.sh php list
 ```
 - Interactive menu:
 ```bash
@@ -65,6 +66,7 @@ sudo /root/simai-env/simai-admin.sh self update
 
 Implemented:
 - `site add` — creates PHP-FPM pool and nginx vhost for an existing Laravel project path. If `--project-name` is omitted, it is derived from the domain (dots replaced with hyphens).
+- `php list` — shows installed PHP versions and FPM status.
 
 Other commands remain as scaffolding stubs; extend `admin/commands/*.sh` to implement them. The registry-based design allows adding sections/commands by registering them in new modules.
 

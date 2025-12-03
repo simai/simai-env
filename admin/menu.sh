@@ -80,7 +80,13 @@ run_menu() {
         args+=("--$key" "$val")
       done
 
+      set +e
       run_command "$section" "$cmd" "${args[@]}"
+      rc=$?
+      set -e
+      if [[ $rc -ne 0 ]]; then
+        warn "Command failed with exit code ${rc}"
+      fi
     done
   done
 }

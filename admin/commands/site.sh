@@ -16,8 +16,8 @@ site_add_handler() {
 
   ensure_user
   if [[ ! -d "$path" ]]; then
-    error "Project path not found: $path"
-    exit 1
+    info "Project path not found, creating: $path"
+    mkdir -p "$path"
   fi
   require_laravel_structure "$path"
   ensure_project_permissions "$path"
