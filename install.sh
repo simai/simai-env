@@ -32,6 +32,7 @@ fi
 mkdir -p "$INSTALL_DIR"
 cp -R "${SRC_DIR}/." "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/simai-env.sh"
+chmod +x "$INSTALL_DIR/simai-admin.sh"
 
 echo "Installed to $INSTALL_DIR"
 echo "Run: sudo $INSTALL_DIR/simai-env.sh --domain example.com --project-name myapp --db-pass secret"

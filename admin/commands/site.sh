@@ -3,11 +3,15 @@ set -euo pipefail
 
 site_add_handler() {
   parse_kv_args "$@"
-  require_args "domain project-name"
+  require_args "domain"
 
   local domain="${PARSED_ARGS[domain]}"
-  local project="${PARSED_ARGS[project-name]}"
+  local project="${PARSED_ARGS[project-name]:-}"
   local php_version="${PARSED_ARGS[php]:-8.2}"
+  if [[ -z "$project" ]]; then
+    project=$(project_slug_from_domain "$domain")
+    info "project-name not provided; using ${project}"
+  fi
   local path="${PARSED_ARGS[path]:-${WWW_ROOT}/${project}}"
 
   ensure_user
@@ -49,6 +53,6 @@ site_set_php_handler() {
   info "TODO: update PHP-FPM pool and nginx upstream."
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain project-name" "path= php=8.2"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php=8.2"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "domain project-name" "remove-files=0 drop-db=0 drop-db-user=0"
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "project-name php" ""

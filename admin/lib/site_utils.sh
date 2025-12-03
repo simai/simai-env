@@ -5,6 +5,14 @@ SIMAI_USER=${SIMAI_USER:-simai}
 WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_USER}/www}
 NGINX_TEMPLATE=${NGINX_TEMPLATE:-${SCRIPT_DIR}/templates/nginx-laravel.conf}
 
+project_slug_from_domain() {
+  local domain="$1"
+  local slug
+  slug=$(echo "$domain" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/-\\+/-/g' -e 's/^-//' -e 's/-$//')
+  [[ -z "$slug" ]] && slug="site"
+  echo "$slug"
+}
+
 ensure_user() {
   if ! id -u "$SIMAI_USER" >/dev/null 2>&1; then
     info "Creating user ${SIMAI_USER}"
