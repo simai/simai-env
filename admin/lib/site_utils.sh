@@ -120,12 +120,14 @@ create_placeholder_if_missing() {
   if [[ -f "$index_php" || -f "$public_index" ]]; then
     return
   fi
+  mkdir -p "${project_path}"
   mkdir -p "${project_path}/public"
-  cat >"$public_index" <<'EOF'
+  cat >"$index_php" <<'EOF'
 <?php
 http_response_code(200);
 echo "Placeholder: site is configured.";
 EOF
+  cp "$index_php" "$public_index" 2>/dev/null || true
 }
 
 remove_nginx_site() {
