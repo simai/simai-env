@@ -29,6 +29,7 @@ main() {
   fi
 
   ensure_root
+  require_supported_os
 
   local cmd="$1"
   shift

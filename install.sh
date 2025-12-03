@@ -11,6 +11,24 @@ if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   exit 1
 fi
 
+check_supported_os() {
+  if [[ ! -f /etc/os-release ]]; then
+    echo "Cannot detect OS" >&2
+    exit 1
+  fi
+  . /etc/os-release
+  if [[ ${ID} != "ubuntu" ]]; then
+    echo "Supported only on Ubuntu 20.04/22.04/24.04" >&2
+    exit 1
+  fi
+  case ${VERSION_ID} in
+    "20.04"|"22.04"|"24.04") ;;
+    *) echo "Unsupported Ubuntu version ${VERSION_ID}" >&2; exit 1 ;;
+  esac
+}
+
+check_supported_os
+
 TMP_DIR=$(mktemp -d)
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT

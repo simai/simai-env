@@ -30,6 +30,22 @@ ensure_root() {
   fi
 }
 
+require_supported_os() {
+  if [[ ! -f /etc/os-release ]]; then
+    echo "Cannot detect OS" >&2
+    exit 1
+  fi
+  . /etc/os-release
+  if [[ ${ID} != "ubuntu" ]]; then
+    echo "Supported only on Ubuntu 20.04/22.04/24.04" >&2
+    exit 1
+  fi
+  case ${VERSION_ID} in
+    "20.04"|"22.04"|"24.04") ;;
+    *) echo "Unsupported Ubuntu version ${VERSION_ID}" >&2; exit 1 ;;
+  esac
+}
+
 register_cmd() {
   local section="$1" name="$2" desc="$3" handler="$4" required="$5" optional="$6"
   local key="${section}:${name}"
