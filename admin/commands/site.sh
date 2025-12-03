@@ -87,13 +87,13 @@ site_remove_handler() {
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "0" "0" "1")
-    [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "0" "0" "1")
-    [[ -z "$drop_user" ]] && drop_user=$(select_from_list "Drop DB user?" "0" "0" "1")
+    [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
+    [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
+    [[ -z "$drop_user" ]] && drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
   fi
-  [[ -z "$remove_files" ]] && remove_files=0
-  [[ -z "$drop_db" ]] && drop_db=0
-  [[ -z "$drop_user" ]] && drop_user=0
+  [[ "$remove_files" == "yes" ]] && remove_files=1 || remove_files=0
+  [[ "$drop_db" == "yes" ]] && drop_db=1 || drop_db=0
+  [[ "$drop_user" == "yes" ]] && drop_user=1 || drop_user=0
   [[ -z "$db_name" ]] && db_name="simai_${project}"
   [[ -z "$db_user" ]] && db_user="simai"
 
