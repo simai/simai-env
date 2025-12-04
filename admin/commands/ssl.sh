@@ -64,6 +64,8 @@ ssl_issue_handler() {
   [[ -z "$hsts" ]] && hsts="no"
   [[ -z "$staging" ]] && staging="no"
 
+  PARSED_ARGS[domain]="$domain"
+  PARSED_ARGS[email]="$email"
   require_args "domain email"
 
   if [[ -z "$domain" || -z "$email" ]]; then
