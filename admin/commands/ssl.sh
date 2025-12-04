@@ -210,8 +210,8 @@ ssl_status_handler() {
   printf "%s\n" "${sep}+"
 }
 
-register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "domain email" "redirect=no hsts=no staging=no"
-register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "domain" "cert= key= chain= redirect=no hsts=no"
-register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "domain" ""
-register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "domain" "delete-cert=no"
-register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "domain" ""
+register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect=no hsts=no staging=no"
+register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect=no hsts=no"
+register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
+register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert=no"
+register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain="
