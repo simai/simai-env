@@ -257,7 +257,7 @@ site_list_handler() {
   printf "%s\n" "$sep"
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile=generic create-db= db-name= db-user= db-pass="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" ""
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
