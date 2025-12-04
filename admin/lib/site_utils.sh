@@ -25,6 +25,16 @@ list_sites() {
   shopt -u nullglob
 }
 
+detect_pool_for_project() {
+  local project="$1"
+  shopt -s nullglob
+  local pools=(/etc/php/*/fpm/pool.d/${project}.conf)
+  if [[ ${#pools[@]} -gt 0 ]]; then
+    echo "${pools[0]}"
+  fi
+  shopt -u nullglob
+}
+
 ensure_user() {
   if ! id -u "$SIMAI_USER" >/dev/null 2>&1; then
     info "Creating user ${SIMAI_USER}"
