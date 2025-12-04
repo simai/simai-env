@@ -81,6 +81,22 @@ site_add_handler() {
   fi
 
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
+
+  # Print summary to stdout (avoid logging secrets)
+  echo "===== Site summary ====="
+  echo "Domain      : ${domain}"
+  echo "Project     : ${project}"
+  echo "Profile     : ${profile}"
+  echo "PHP version : ${php_version}"
+  echo "Path        : ${path}"
+  echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
+  echo "PHP-FPM pool: /etc/php/${php_version}/fpm/pool.d/${project}.conf"
+  if [[ "$create_db" == "yes" ]]; then
+    echo "DB name     : ${db_name}"
+    echo "DB user     : ${db_user}"
+    echo "DB password : ${db_pass} (not logged)"
+  fi
+  echo "Log file    : ${LOG_FILE}"
 }
 
 site_remove_handler() {
