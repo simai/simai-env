@@ -49,6 +49,8 @@ mkdir -p "$INSTALL_DIR"
 cp -R "${SRC_DIR}/." "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/simai-env.sh"
 chmod +x "$INSTALL_DIR/simai-admin.sh"
+# Clean up deprecated files
+rm -f "$INSTALL_DIR/admin/commands/alias.sh"
 
 echo "Updated to ${REF} at ${INSTALL_DIR}"
 echo "Run scripts from ${INSTALL_DIR} as usual."

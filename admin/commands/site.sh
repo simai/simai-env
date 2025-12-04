@@ -236,7 +236,10 @@ site_set_php_handler() {
 }
 
 site_list_handler() {
-  printf "%-30s %-10s %-8s %-40s\n" "Domain" "Profile" "PHP" "Root/Target"
+  local sep="+------------------------------+------------+----------+------------------------------------------+"
+  printf "%s\n" "$sep"
+  printf "| %-28s | %-10s | %-8s | %-40s |\n" "Domain" "Profile" "PHP" "Root/Target"
+  printf "%s\n" "$sep"
   local s
   while IFS= read -r s; do
     [[ -z "$s" ]] && continue
@@ -249,8 +252,9 @@ site_list_handler() {
     if [[ "$profile" == "alias" && -n "$target" ]]; then
       summary="alias -> ${target}"
     fi
-    printf "%-30s %-10s %-8s %-40s\n" "$s" "$profile" "$php" "$summary"
+    printf "| %-28s | %-10s | %-8s | %-40s |\n" "$s" "$profile" "$php" "$summary"
   done < <(list_sites)
+  printf "%s\n" "$sep"
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile=generic create-db= db-name= db-user= db-pass="
