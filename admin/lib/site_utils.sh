@@ -5,6 +5,7 @@ SIMAI_USER=${SIMAI_USER:-simai}
 WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_USER}/www}
 NGINX_TEMPLATE=${NGINX_TEMPLATE:-${SCRIPT_DIR}/templates/nginx-laravel.conf}
 NGINX_TEMPLATE_GENERIC=${NGINX_TEMPLATE_GENERIC:-${SCRIPT_DIR}/templates/nginx-generic.conf}
+HEALTHCHECK_TEMPLATE=${HEALTHCHECK_TEMPLATE:-${SCRIPT_DIR}/templates/healthcheck.php}
 
 project_slug_from_domain() {
   local domain="$1"
@@ -180,4 +181,15 @@ remove_project_files() {
     return
   fi
   rm -rf "$path"
+}
+
+install_healthcheck() {
+  local project_path="$1"
+  if [[ ! -f "$HEALTHCHECK_TEMPLATE" ]]; then
+    warn "Healthcheck template not found at ${HEALTHCHECK_TEMPLATE}"
+    return
+  fi
+  mkdir -p "$project_path" "$project_path/public"
+  cp "$HEALTHCHECK_TEMPLATE" "$project_path/healthcheck.php"
+  cp "$HEALTHCHECK_TEMPLATE" "$project_path/public/healthcheck.php"
 }

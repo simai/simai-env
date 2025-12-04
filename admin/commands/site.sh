@@ -74,6 +74,7 @@ site_add_handler() {
 
   create_php_pool "$project" "$php_version" "$path"
   create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path"
+  install_healthcheck "$path"
 
   if [[ "$create_db" == "yes" ]]; then
     info "Creating database ${db_name} with user ${db_user}"
@@ -96,6 +97,7 @@ site_add_handler() {
     echo "DB user     : ${db_user}"
     echo "DB password : ${db_pass} (not logged)"
   fi
+  echo "Healthcheck : http://${domain}/healthcheck.php"
   echo "Log file    : ${LOG_FILE}"
 }
 
