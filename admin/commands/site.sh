@@ -206,11 +206,18 @@ site_set_php_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local domain="${PARSED_ARGS[domain]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
+  local profile=""
 
   if [[ -z "$project" && -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    local sites=()
+    local sites=() filtered=()
     mapfile -t sites < <(list_sites)
-    domain=$(select_from_list "Select site" "" "${sites[@]}")
+    for s in "${sites[@]}"; do
+      read_site_metadata "$s"
+      if [[ "${SITE_META[profile]:-}" != "alias" ]]; then
+        filtered+=("$s")
+      fi
+    done
+    domain=$(select_from_list "Select site" "" "${filtered[@]}")
   fi
   if [[ -z "$project" ]]; then
     if [[ -n "$domain" ]]; then
@@ -220,6 +227,15 @@ site_set_php_handler() {
   fi
   if [[ -z "$project" ]]; then
     require_args "project-name"
+  fi
+
+  if [[ -n "$domain" ]]; then
+    read_site_metadata "$domain"
+    profile="${SITE_META[profile]:-}"
+    if [[ "$profile" == "alias" ]]; then
+      error "Cannot change PHP version for alias site ${domain}; change the target site instead."
+      return 1
+    fi
   fi
 
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
