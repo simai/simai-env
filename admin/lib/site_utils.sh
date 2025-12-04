@@ -129,6 +129,7 @@ create_nginx_site() {
   if [[ -f /etc/nginx/sites-enabled/default ]]; then
     rm -f /etc/nginx/sites-enabled/default
   fi
+  ensure_nginx_catchall
   nginx -t >>"$LOG_FILE" 2>&1 || { error "nginx config test failed"; exit 1; }
   systemctl reload nginx >>"$LOG_FILE" 2>&1 || systemctl restart nginx >>"$LOG_FILE" 2>&1 || true
 }
@@ -172,6 +173,22 @@ remove_nginx_site() {
     nginx -t >>"$LOG_FILE" 2>&1 || warn "nginx test failed after removing ${domain}"
     systemctl reload nginx >>"$LOG_FILE" 2>&1 || true
   fi
+}
+
+en sure_nginx_catchall() {
+  local catchall_avail="/etc/nginx/sites-available/000-catchall.conf"
+  local catchall_enabled="/etc/nginx/sites-enabled/000-catchall.conf"
+  if [[ -f "$catchall_avail" && -L "$catchall_enabled" ]]; then
+    return
+  fi
+  cat >"$catchall_avail" <<'EOF'
+server {
+    listen 80 default_server;
+    server_name _;
+    return 444;
+}
+EOF
+  ln -sf "$catchall_avail" "$catchall_enabled"
 }
 
 remove_php_pools() {
