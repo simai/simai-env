@@ -193,3 +193,17 @@ install_healthcheck() {
   cp "$HEALTHCHECK_TEMPLATE" "$project_path/healthcheck.php"
   cp "$HEALTHCHECK_TEMPLATE" "$project_path/public/healthcheck.php"
 }
+
+write_generic_env() {
+  local project_path="$1" db_name="$2" db_user="$3" db_pass="$4"
+  local env_file="${project_path}/.env"
+  cat >"$env_file" <<EOF
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=${db_name}
+DB_USERNAME=${db_user}
+DB_PASSWORD=${db_pass}
+EOF
+  chown "$SIMAI_USER":www-data "$env_file" 2>/dev/null || true
+}

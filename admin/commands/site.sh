@@ -79,6 +79,9 @@ site_add_handler() {
   if [[ "$create_db" == "yes" ]]; then
     info "Creating database ${db_name} with user ${db_user}"
     create_mysql_db_user "$db_name" "$db_user" "$db_pass"
+    if [[ "$profile" == "generic" ]]; then
+      write_generic_env "$path" "$db_name" "$db_user" "$db_pass"
+    fi
   fi
 
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
