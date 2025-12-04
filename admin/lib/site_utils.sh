@@ -208,6 +208,26 @@ remove_php_pools() {
   done
 }
 
+remove_cron_file() {
+  local project="$1"
+  local cron_file="/etc/cron.d/${project}"
+  if [[ -f "$cron_file" ]]; then
+    rm -f "$cron_file"
+    info "Removed cron file ${cron_file}"
+  fi
+}
+
+remove_queue_unit() {
+  local project="$1"
+  local unit="/etc/systemd/system/laravel-queue-${project}.service"
+  if [[ -f "$unit" ]]; then
+    systemctl disable --now "laravel-queue-${project}.service" >>"$LOG_FILE" 2>&1 || true
+    rm -f "$unit"
+    systemctl daemon-reload >>"$LOG_FILE" 2>&1 || true
+    info "Removed queue unit laravel-queue-${project}.service"
+  fi
+}
+
 remove_php_pool_version() {
   local project="$1" version="$2"
   local pool="/etc/php/${version}/fpm/pool.d/${project}.conf"

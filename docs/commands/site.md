@@ -32,7 +32,7 @@ Options:
 - `--drop-db-user` (`yes|no`, default user from project)
 - `--db-name`, `--db-user`
 
-Removes nginx config and PHP-FPM pools. Files/DB/user are removed only when confirmed/flagged.
+Removes nginx config, PHP-FPM pools (all versions), cron file (`/etc/cron.d/<project>`), and queue systemd unit (`laravel-queue-<project>.service`). Files/DB/user are removed only when confirmed/flagged. Alias profile removes only nginx/service stubs (no files/DB/pools).
 
 ## list
 List domains from nginx sites-available with profile, PHP version, and root/alias target.

@@ -184,9 +184,12 @@ site_remove_handler() {
   [[ -z "$db_user" ]] && db_user="${project}"
 
   info "Removing site: domain=${domain}, project=${project}, path=${path}"
+  local removed_queue=0 removed_cron=0
   remove_nginx_site "$domain"
   if [[ "$profile" != "alias" ]]; then
     remove_php_pools "$project"
+    remove_cron_file "$project" && removed_cron=1 || removed_cron=0
+    remove_queue_unit "$project" && removed_queue=1 || removed_queue=0
   fi
   # TODO: remove cron/queue resources when implemented
   if [[ "$remove_files" == "1" ]]; then
@@ -199,6 +202,16 @@ site_remove_handler() {
     mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'%';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${db_user}"
   fi
   info "Site remove completed for ${domain}"
+  echo "===== Site remove summary ====="
+  echo "Domain     : ${domain}"
+  echo "Profile    : ${profile}"
+  echo "Nginx      : removed"
+  echo "PHP-FPM    : removed (${project})"
+  echo "Cron       : $([[ $removed_cron -eq 1 ]] && echo removed || echo none)"
+  echo "Queue unit : $([[ $removed_queue -eq 1 ]] && echo removed || echo none)"
+  echo "Files      : $([[ $remove_files -eq 1 ]] && echo removed || echo kept)"
+  echo "Database   : $([[ $drop_db -eq 1 ]] && echo dropped || echo kept)"
+  echo "DB user    : $([[ $drop_user -eq 1 ]] && echo dropped || echo kept)"
 }
 
 site_set_php_handler() {

@@ -20,7 +20,7 @@
   - Select PHP version from installed `/etc/php/*` when not provided.
   - Optional DB creation (`create-db=yes`); defaults `db-name`/`db-user` from project slug, generates password; writes `.env` for generic profile; shows summary with credentials (not logged).
   - Copies `templates/healthcheck.php` to `public/healthcheck.php` (non-alias).
-- `site remove`: choose domain from list if missing; yes/no prompts for removing files/DB/user; removes nginx/site configs, php-fpm pools, optional files/db/user; stays in menu on errors (alias removal only drops nginx).
+- `site remove`: choose domain from list if missing; yes/no prompts for removing files/DB/user; removes nginx/site configs, php-fpm pools (all versions), cron file `/etc/cron.d/<project>`, queue unit `laravel-queue-<project>.service`; alias removal drops nginx/service stubs only.
 - `site list`: prints table with domain, profile, PHP version, root/alias target (uses metadata comments in nginx configs).
 - `site set-php`: choose site (aliases filtered out), switch PHP version by recreating pool and nginx upstream; optional `keep-old-pool` flag (default no).
 - `php list`/`php reload`: list installed PHP versions, reload FPM; menu selection when needed.
