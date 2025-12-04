@@ -40,7 +40,7 @@ print_version_banner() {
   printf "%s\n" "$sep"
   printf "| %-20s | %-20s |\n" "Local version" "$local_version"
   printf "| %-20s | %-20s |\n" "Remote version" "$remote_version"
-  printf "| %-20s | %s|\n" "Status" "$status_colored"
+  printf "| %-20s | %-20s |\n" "Status" "$status_colored"
   printf "%s\n" "$sep"
 }
 
