@@ -9,6 +9,10 @@ site_add_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
+  local create_db="${PARSED_ARGS[create-db]:-}"
+  local db_name="${PARSED_ARGS[db-name]:-}"
+  local db_user="${PARSED_ARGS[db-user]:-}"
+  local db_pass="${PARSED_ARGS[db-pass]:-}"
   if [[ -z "$project" ]]; then
     project=$(project_slug_from_domain "$domain")
     info "project-name not provided; using ${project}"
@@ -36,6 +40,16 @@ site_add_handler() {
   fi
   [[ -z "$php_version" ]] && php_version="8.2"
 
+  if [[ -z "$create_db" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    create_db=$(select_from_list "Create MySQL database and user?" "no" "no" "yes")
+  fi
+  [[ -z "$create_db" ]] && create_db="no"
+  if [[ "$create_db" == "yes" ]]; then
+    [[ -z "$db_name" ]] && db_name="${project}"
+    [[ -z "$db_user" ]] && db_user="${project}"
+    [[ -z "$db_pass" ]] && db_pass=$(generate_password)
+  fi
+
   if [[ "$profile" == "generic" ]]; then
     template_path="$NGINX_TEMPLATE_GENERIC"
     create_placeholder_if_missing "$path"
@@ -60,6 +74,11 @@ site_add_handler() {
 
   create_php_pool "$project" "$php_version" "$path"
   create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path"
+
+  if [[ "$create_db" == "yes" ]]; then
+    info "Creating database ${db_name} with user ${db_user}"
+    create_mysql_db_user "$db_name" "$db_user" "$db_pass"
+  fi
 
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
 }
@@ -94,8 +113,8 @@ site_remove_handler() {
   [[ "$remove_files" == "yes" ]] && remove_files=1 || remove_files=0
   [[ "$drop_db" == "yes" ]] && drop_db=1 || drop_db=0
   [[ "$drop_user" == "yes" ]] && drop_user=1 || drop_user=0
-  [[ -z "$db_name" ]] && db_name="simai_${project}"
-  [[ -z "$db_user" ]] && db_user="simai"
+  [[ -z "$db_name" ]] && db_name="${project}"
+  [[ -z "$db_user" ]] && db_user="${project}"
 
   info "Removing site: domain=${domain}, project=${project}, path=${path}"
   remove_nginx_site "$domain"
@@ -152,7 +171,7 @@ site_list_handler() {
   list_sites
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" ""
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

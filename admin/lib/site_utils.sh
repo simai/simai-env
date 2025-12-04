@@ -54,6 +54,21 @@ installed_php_versions() {
   printf "%s\n" "${versions[@]}"
 }
 
+generate_password() {
+  head -c 24 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20
+}
+
+create_mysql_db_user() {
+  local db_name="$1" db_user="$2" db_pass="$3"
+  if ! command -v mysql >/dev/null 2>&1; then
+    warn "mysql client not found; skip DB creation"
+    return 1
+  fi
+  mysql -uroot -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >>"$LOG_FILE" 2>&1 || warn "Failed to create database ${db_name}"
+  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'%' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}"
+  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'%'; FLUSH PRIVILEGES;" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}"
+}
+
 create_php_pool() {
   local project="$1" php_version="$2" project_path="$3"
   local pool_dir="/etc/php/${php_version}/fpm/pool.d"
