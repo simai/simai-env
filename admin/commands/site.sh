@@ -13,6 +13,7 @@ site_add_handler() {
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
   local db_pass="${PARSED_ARGS[db-pass]:-}"
+  local target_domain="" target_path="" target_project="" target_php=""
   if [[ -z "$project" ]]; then
     project=$(project_slug_from_domain "$domain")
     info "project-name not provided; using ${project}"
@@ -20,16 +21,48 @@ site_add_handler() {
   local path="${PARSED_ARGS[path]:-${WWW_ROOT}/${project}}"
 
   ensure_user
+  if [[ -z "$profile" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    profile=$(select_from_list "Select profile" "generic" "generic" "laravel" "alias")
+    [[ -z "$profile" ]] && profile="generic"
+  fi
+  [[ -z "$profile" ]] && profile="generic"
+
+  if [[ "$profile" == "alias" ]]; then
+    local sites=()
+    mapfile -t sites < <(list_sites)
+    if [[ ${#sites[@]} -eq 0 ]]; then
+      error "No existing sites to alias"
+      return 1
+    fi
+    target_domain=$(select_from_list "Select target site for alias" "" "${sites[@]}")
+    if [[ -z "$target_domain" ]]; then
+      error "Target site is required for alias"
+      return 1
+    fi
+    read_site_metadata "$target_domain"
+    target_path="${SITE_META[root]}"
+    target_project="${SITE_META[project]}"
+    target_php="${SITE_META[php]}"
+    php_version="$target_php"
+    create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$NGINX_TEMPLATE_GENERIC" "$profile" "$target_domain" "$target_project"
+    info "Alias added: domain=${domain}, target=${target_domain}, php=${php_version}"
+    echo "===== Site summary ====="
+    echo "Domain      : ${domain}"
+    echo "Project     : ${project}"
+    echo "Profile     : ${profile}"
+    echo "Target site : ${target_domain}"
+    echo "PHP version : ${php_version}"
+    echo "Root path   : ${target_path}"
+    echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
+    echo "Log file    : ${LOG_FILE}"
+    return
+  fi
+
   if [[ ! -d "$path" ]]; then
     info "Project path not found, creating: $path"
     mkdir -p "$path"
   fi
   local template_path="$NGINX_TEMPLATE"
-  if [[ -z "$profile" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    profile=$(select_from_list "Select profile" "generic" "generic" "laravel")
-    [[ -z "$profile" ]] && profile="generic"
-  fi
-  [[ -z "$profile" ]] && profile="generic"
 
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local versions=()
@@ -73,7 +106,7 @@ site_add_handler() {
   ensure_project_permissions "$path"
 
   create_php_pool "$project" "$php_version" "$path"
-  create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path"
+  create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project"
   install_healthcheck "$path"
 
   if [[ "$create_db" == "yes" ]]; then
@@ -126,10 +159,23 @@ site_remove_handler() {
   local drop_user="${PARSED_ARGS[drop-db-user]:-}"
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
+  local profile="generic"
+  if [[ -n "$domain" ]]; then
+    read_site_metadata "$domain"
+    profile="${SITE_META[profile]:-generic}"
+    [[ -z "$project" ]] && project="${SITE_META[project]:-$project}"
+    path="${PARSED_ARGS[path]:-${SITE_META[root]:-$path}}"
+  fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
-    [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
-    [[ -z "$drop_user" ]] && drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
+    if [[ "$profile" == "alias" ]]; then
+      remove_files=0
+      drop_db=0
+      drop_user=0
+    else
+      [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
+      [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
+      [[ -z "$drop_user" ]] && drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
+    fi
   fi
   [[ "$remove_files" == "yes" ]] && remove_files=1 || remove_files=0
   [[ "$drop_db" == "yes" ]] && drop_db=1 || drop_db=0
@@ -139,7 +185,9 @@ site_remove_handler() {
 
   info "Removing site: domain=${domain}, project=${project}, path=${path}"
   remove_nginx_site "$domain"
-  remove_php_pools "$project"
+  if [[ "$profile" != "alias" ]]; then
+    remove_php_pools "$project"
+  fi
   # TODO: remove cron/queue resources when implemented
   if [[ "$remove_files" == "1" ]]; then
     remove_project_files "$path"
@@ -188,8 +236,21 @@ site_set_php_handler() {
 }
 
 site_list_handler() {
-  info "Sites (nginx sites-available):"
-  list_sites
+  printf "%-30s %-10s %-8s %-40s\n" "Domain" "Profile" "PHP" "Root/Target"
+  local s
+  while IFS= read -r s; do
+    [[ -z "$s" ]] && continue
+    read_site_metadata "$s"
+    local profile="${SITE_META[profile]:-generic}"
+    local php="${SITE_META[php]:-}"
+    local root="${SITE_META[root]:-}"
+    local target="${SITE_META[target]:-}"
+    local summary="$root"
+    if [[ "$profile" == "alias" && -n "$target" ]]; then
+      summary="alias -> ${target}"
+    fi
+    printf "%-30s %-10s %-8s %-40s\n" "$s" "$profile" "$php" "$summary"
+  done < <(list_sites)
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile=generic create-db= db-name= db-user= db-pass="

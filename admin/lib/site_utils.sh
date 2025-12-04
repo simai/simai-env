@@ -104,17 +104,27 @@ EOF
 }
 
 create_nginx_site() {
-  local domain="$1" project="$2" project_path="$3" php_version="$4" template_path="${5:-$NGINX_TEMPLATE}"
+  local domain="$1" project="$2" project_path="$3" php_version="$4" template_path="${5:-$NGINX_TEMPLATE}" profile="${6:-}" target="${7:-}" php_socket_project="${8:-$project}"
   if [[ ! -f "$template_path" ]]; then
     error "nginx template not found at ${template_path}"
     exit 1
   fi
   local site_available="/etc/nginx/sites-available/${domain}.conf"
   local site_enabled="/etc/nginx/sites-enabled/${domain}.conf"
-  sed -e "s#{{SERVER_NAME}}#${domain}#g" \
+  {
+    echo "# simai-domain: ${domain}"
+    echo "# simai-profile: ${profile}"
+    echo "# simai-project: ${project}"
+    echo "# simai-root: ${project_path}"
+    echo "# simai-php: ${php_version}"
+    echo "# simai-target: ${target}"
+    echo "# simai-php-socket-project: ${php_socket_project}"
+    sed -e "s#{{SERVER_NAME}}#${domain}#g" \
       -e "s#{{PROJECT_ROOT}}#${project_path}#g" \
       -e "s#{{PROJECT_NAME}}#${project}#g" \
-      -e "s#{{PHP_VERSION}}#${php_version}#g" "$template_path" > "$site_available"
+      -e "s#{{PHP_VERSION}}#${php_version}#g" \
+      -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" "$template_path"
+  } > "$site_available"
   ln -sf "$site_available" "$site_enabled"
   if [[ -f /etc/nginx/sites-enabled/default ]]; then
     rm -f /etc/nginx/sites-enabled/default
@@ -212,4 +222,49 @@ DB_USERNAME=${db_user}
 DB_PASSWORD=${db_pass}
 EOF
   chown "$SIMAI_USER":www-data "$env_file" 2>/dev/null || true
+}
+
+read_site_metadata() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  declare -gA SITE_META=(
+    ["domain"]="$domain"
+    ["profile"]="generic"
+    ["project"]="$(project_slug_from_domain "$domain")"
+    ["root"]="${WWW_ROOT}/$(project_slug_from_domain "$domain")"
+    ["php"]=""
+    ["target"]=""
+    ["php_socket_project"]=""
+  )
+  if [[ -f "$cfg" ]]; then
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^\#\ simai-([a-z-]+):[[:space:]]*(.*)$ ]]; then
+        local key="${BASH_REMATCH[1]}"
+        local val="${BASH_REMATCH[2]}"
+        case "$key" in
+          domain) SITE_META["domain"]="$val" ;;
+          profile) SITE_META["profile"]="$val" ;;
+          project) SITE_META["project"]="$val" ;;
+          root) SITE_META["root"]="$val" ;;
+          php) SITE_META["php"]="$val" ;;
+          target) SITE_META["target"]="$val" ;;
+          php-socket-project) SITE_META["php_socket_project"]="$val" ;;
+        esac
+      fi
+    done <"$cfg"
+  fi
+  if [[ -z "${SITE_META[php]}" ]]; then
+    local pool
+    pool=$(detect_pool_for_project "${SITE_META[php_socket_project]:-${SITE_META[project]}}")
+    if [[ -n "$pool" ]]; then
+      SITE_META["php"]="$(echo "$pool" | awk -F'/' '{print $4}')"
+    fi
+  fi
+  if [[ -z "${SITE_META[php_socket_project]}" ]]; then
+    SITE_META["php_socket_project"]="${SITE_META[project]}"
+  fi
+  if [[ -z "${SITE_META[php]}" ]]; then
+    mapfile -t _vers < <(installed_php_versions)
+    SITE_META["php"]="${_vers[0]:-8.2}"
+  fi
 }

@@ -65,8 +65,7 @@ sudo /root/simai-env/simai-admin.sh self update
 ```
 
 Implemented:
-- `site add` — creates PHP-FPM pool and nginx vhost for an existing Laravel project path. If `--project-name` is omitted, it is derived from the domain (dots replaced with hyphens).
-- `site add --profile generic` — uses a generic nginx template and creates a placeholder if no Laravel structure is present.
+- `site add` — profiles: `generic` (default placeholder), `laravel` (requires `artisan`), `alias` (points a new domain to an existing site and reuses its PHP-FPM pool).
 - `php list` — shows installed PHP versions and FPM status.
 
 Other commands remain as scaffolding stubs; extend `admin/commands/*.sh` to implement them. The registry-based design allows adding sections/commands by registering them in new modules.
@@ -107,7 +106,7 @@ Removes nginx config and symlink, the php-fpm pool for the project, cron entry, 
 - `--log-file` — custom log path (default `/var/log/simai-env.log`)
 
 ## Templates
-- `templates/nginx-laravel.conf` — nginx vhost template (`{{SERVER_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_VERSION}}`, `{{PROJECT_NAME}}`)
+- `templates/nginx-laravel.conf` — nginx vhost template (`{{SERVER_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_VERSION}}`, `{{PROJECT_NAME}}`, `{{PHP_SOCKET_PROJECT}}`)
 - `systemd/laravel-queue.service` — queue worker unit (`{{PROJECT_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_BIN}}`, `{{USER}}`)
 
 ## Logging and cron
