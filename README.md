@@ -20,29 +20,29 @@
 ## Usage (run as root)
 
 ### Quick install
-- One-liner (default path `/root/simai-env`):
-```bash
-curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | sudo bash && \
-sudo /root/simai-env/simai-env.sh --domain example.com --project-name myapp --db-pass secret --php 8.2 --run-migrations --optimize
-```
-- Two-step variant:
-```bash
-curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | sudo bash
-sudo /root/simai-env/simai-env.sh --domain example.com --project-name myapp --db-pass secret
-```
-To pin a specific branch or tag, override `VERSION` (branch) or `REF` (tag), or change `INSTALL_DIR`:
-```bash
-curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | \
-  VERSION=main INSTALL_DIR=/opt/simai-env sudo -E bash
-# or pin a tag
-curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/install.sh | \
-  REF=refs/tags/v1.0.0 sudo -E bash
-```
+ - One-liner (default path `/root/simai-env`):
+ ```bash
+ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash && \
+ sudo /root/simai-env/simai-env.sh --domain example.com --project-name myapp --db-pass secret --php 8.2 --run-migrations --optimize
+ ```
+ - Two-step variant:
+ ```bash
+ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash
+ sudo /root/simai-env/simai-env.sh --domain example.com --project-name myapp --db-pass secret
+ ```
+ To pin a specific branch or tag, override `VERSION` (branch) or `REF` (tag), or change `INSTALL_DIR`:
+ ```bash
+ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | \
+   VERSION=main INSTALL_DIR=/opt/simai-env sudo -E bash
+ # or pin a tag
+ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | \
+   REF=refs/tags/v1.0.0 sudo -E bash
+ ```
 
 ### Update scripts only
 Refresh to the latest main (or set `REF`/`VERSION`):
 ```bash
-curl -fsSL https://raw.githubusercontent.com/simai/laravel-env/main/update.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/update.sh | sudo bash
 ```
 
 ## Admin CLI (maintenance)

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL=${REPO_URL:-https://github.com/simai/laravel-env}
+REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 VERSION=${VERSION:-main}           # branch name
 REF=${REF:-refs/heads/${VERSION}}  # override to pin a tag: REF=refs/tags/v1.0.0
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
@@ -40,7 +40,7 @@ curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 
 echo "Unpacking..."
 tar -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
-SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "laravel-env-*" | head -n 1)
+SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
   echo "Could not locate extracted sources" >&2

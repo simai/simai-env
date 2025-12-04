@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL=${REPO_URL:-https://github.com/simai/laravel-env}
+REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 VERSION=${VERSION:-main}
 REF=${REF:-refs/heads/${VERSION}}
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
@@ -38,7 +38,7 @@ TARBALL_URL="${REPO_URL}/archive/${REF}.tar.gz"
 echo "Updating simai-env (${REF}) into ${INSTALL_DIR}..."
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 tar -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
-SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "laravel-env-*" | head -n 1)
+SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
   echo "Could not locate extracted sources" >&2
