@@ -9,6 +9,9 @@ ssl_select_domain() {
     filtered=("${sites[@]}")
     domain=$(select_from_list "Select domain" "" "${filtered[@]}")
   fi
+  if [[ -z "$domain" ]]; then
+    domain=$(prompt "domain")
+  fi
   echo "$domain"
 }
 
