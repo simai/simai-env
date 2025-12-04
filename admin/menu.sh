@@ -13,8 +13,31 @@ prompt() {
   echo "$value"
 }
 
+print_version_banner() {
+  local local_version="(unknown)"
+  local remote_version="(unavailable)"
+  [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"
+  remote_version=$(curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/VERSION 2>/dev/null || true)
+  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  local status="n/a"
+  if [[ "$remote_version" != "(unavailable)" ]]; then
+    if [[ "$local_version" == "$remote_version" ]]; then
+      status="up to date"
+    else
+      status="update available"
+    fi
+  fi
+  local sep="+----------------------+----------------------+"
+  printf "%s\n" "$sep"
+  printf "| %-20s | %-20s |\n" "Local version" "$local_version"
+  printf "| %-20s | %-20s |\n" "Remote version" "$remote_version"
+  printf "| %-20s | %-20s |\n" "Status" "$status"
+  printf "%s\n" "$sep"
+}
+
 run_menu() {
   export SIMAI_ADMIN_MENU=1
+  print_version_banner
   while true; do
     echo
     echo "Select section:"
