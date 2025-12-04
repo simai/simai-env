@@ -256,7 +256,7 @@ install_packages() {
   info "Installing base utilities"
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
     software-properties-common ca-certificates curl gnupg lsb-release sudo \
-    git unzip htop rsyslog logrotate >>"$LOG_FILE" 2>&1
+    git unzip htop rsyslog logrotate certbot >>"$LOG_FILE" 2>&1
 }
 
 install_php_stack() {

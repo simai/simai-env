@@ -9,7 +9,7 @@
 - redis
 - Node.js (NodeSource; version via `--node-version`, default 20)
 - composer
-- utilities: git, curl, unzip, htop, rsyslog, logrotate, sudo
+- utilities: git, curl, unzip, htop, rsyslog, logrotate, sudo, certbot
 
 ## Default layout
 - user: `simai`
