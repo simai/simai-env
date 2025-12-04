@@ -25,6 +25,7 @@
 - `php list`/`php reload`: list installed PHP versions, reload FPM; menu selection when needed.
 - `ssl` commands: select domain from existing sites when not provided (handlers are stubs).
 - Menu uses `select_from_list` for choices; prints separators before/after commands; respects `SIMAI_ADMIN_MENU` flag for reload after self-update.
+  - Prompt rule: when a parameter has a finite set of values, always show a numbered list, a title `Select <param>`, and an `Enter choice [<default>]:` line. Accept either a number or an exact value; empty input picks the default. For binary questions use `yes`/`no` (still numbered).
 
 ## Templates
 - `templates/nginx-laravel.conf`: root `{{PROJECT_ROOT}}/public`, PHP-FPM socket per project (`{{PHP_SOCKET_PROJECT}}` allows aliasing to an existing pool).
