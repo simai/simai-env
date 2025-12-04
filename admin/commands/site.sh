@@ -206,6 +206,7 @@ site_set_php_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local domain="${PARSED_ARGS[domain]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
+  local keep_old_pool="${PARSED_ARGS[keep-old-pool]:-}"
   local profile=""
 
   if [[ -z "$project" && -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -225,8 +226,8 @@ site_set_php_handler() {
       info "project-name not provided; using ${project}"
     fi
   fi
-  if [[ -z "$project" ]]; then
-    require_args "project-name"
+  if [[ -z "$domain" ]]; then
+    require_args "domain"
   fi
 
   if [[ -n "$domain" ]]; then
@@ -247,8 +248,16 @@ site_set_php_handler() {
     require_args "php"
   fi
 
-  info "Site PHP switch (stub): project=${project}, php=${php_version}"
-  info "TODO: update PHP-FPM pool and nginx upstream."
+  if [[ -z "$keep_old_pool" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    keep_old_pool=$(select_from_list "Keep old PHP-FPM pool?" "no" "no" "yes")
+  fi
+  [[ "$keep_old_pool" == "yes" ]] && keep_old_pool="yes" || keep_old_pool="no"
+
+  switch_site_php "$domain" "$php_version" "$keep_old_pool"
+  echo "===== PHP switch summary ====="
+  echo "Domain : ${domain}"
+  echo "PHP    : ${php_version}"
+  echo "Keep old pool: ${keep_old_pool}"
 }
 
 site_list_handler() {
@@ -275,5 +284,5 @@ site_list_handler() {
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" ""
-register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php="
+register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

@@ -38,4 +38,14 @@ Removes nginx config and PHP-FPM pools. Files/DB/user are removed only when conf
 List domains from nginx sites-available with profile, PHP version, and root/alias target.
 
 ## set-php
-Stub: choose site and target PHP version; handler to be implemented (update pool/nginx).
+Switch site to a different PHP version.
+
+Options:
+- `--domain` (required; aliases are not allowed)
+- `--php` (target version, must be installed)
+- `--keep-old-pool` (`yes|no`, default `no`; if `no`, removes old PHP-FPM pool)
+- `--project-name` (optional; inferred from domain)
+
+Behavior:
+- Recreates PHP-FPM pool for the target version, updates nginx upstream and metadata, reloads services.
+- Refuses to run for alias profile (change PHP on the target site instead).

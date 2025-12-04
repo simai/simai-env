@@ -22,7 +22,7 @@
   - Copies `templates/healthcheck.php` to `public/healthcheck.php` (non-alias).
 - `site remove`: choose domain from list if missing; yes/no prompts for removing files/DB/user; removes nginx/site configs, php-fpm pools, optional files/db/user; stays in menu on errors (alias removal only drops nginx).
 - `site list`: prints table with domain, profile, PHP version, root/alias target (uses metadata comments in nginx configs).
-- `site set-php`: choose site/PHP version (stubbed for now).
+- `site set-php`: choose site (aliases filtered out), switch PHP version by recreating pool and nginx upstream; optional `keep-old-pool` flag (default no).
 - `php list`/`php reload`: list installed PHP versions, reload FPM; menu selection when needed.
 - `ssl` commands: select domain from existing sites when not provided (handlers are stubs).
 - Menu uses `select_from_list` for choices; prints separators before/after commands; respects `SIMAI_ADMIN_MENU` flag for reload after self-update.

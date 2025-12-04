@@ -208,6 +208,15 @@ remove_php_pools() {
   done
 }
 
+remove_php_pool_version() {
+  local project="$1" version="$2"
+  local pool="/etc/php/${version}/fpm/pool.d/${project}.conf"
+  if [[ -f "$pool" ]]; then
+    rm -f "$pool"
+    systemctl reload "php${version}-fpm" >>"$LOG_FILE" 2>&1 || systemctl restart "php${version}-fpm" >>"$LOG_FILE" 2>&1 || true
+  fi
+}
+
 remove_project_files() {
   local path="$1"
   if [[ -z "$path" || "$path" == "/" ]]; then
@@ -239,6 +248,43 @@ DB_USERNAME=${db_user}
 DB_PASSWORD=${db_pass}
 EOF
   chown "$SIMAI_USER":www-data "$env_file" 2>/dev/null || true
+}
+
+switch_site_php() {
+  local domain="$1" new_php="$2" keep_old="${3:-no}"
+  read_site_metadata "$domain"
+  local profile="${SITE_META[profile]:-generic}"
+  if [[ "$profile" == "alias" ]]; then
+    error "Cannot change PHP version for alias site ${domain}; update target site instead."
+    return 1
+  fi
+  local project="${SITE_META[project]}"
+  local root="${SITE_META[root]}"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local old_php="${SITE_META[php]}"
+
+  if [[ "$new_php" == "$old_php" ]]; then
+    info "PHP version for ${domain} is already ${new_php}; nothing to do."
+    return 0
+  fi
+  if [[ ! -d "/etc/php/${new_php}" ]]; then
+    error "PHP ${new_php} is not installed."
+    return 1
+  fi
+
+  local template="$NGINX_TEMPLATE"
+  if [[ "$profile" == "generic" ]]; then
+    template="$NGINX_TEMPLATE_GENERIC"
+  fi
+
+  create_php_pool "$project" "$new_php" "$root"
+  create_nginx_site "$domain" "$project" "$root" "$new_php" "$template" "$profile" "" "$socket_project"
+
+  if [[ "$keep_old" != "yes" && -n "$old_php" && "$old_php" != "$new_php" ]]; then
+    remove_php_pool_version "$project" "$old_php"
+  fi
+
+  info "PHP version switched for ${domain}: ${old_php} -> ${new_php}"
 }
 
 read_site_metadata() {
