@@ -112,6 +112,9 @@ create_nginx_site() {
   fi
   local site_available="/etc/nginx/sites-available/${domain}.conf"
   local site_enabled="/etc/nginx/sites-enabled/${domain}.conf"
+  local ssl_flag="off"
+  [[ -n "$ssl_cert" && -n "$ssl_key" ]] && ssl_flag="on"
+
   {
     echo "# simai-domain: ${domain}"
     echo "# simai-profile: ${profile}"
@@ -120,7 +123,7 @@ create_nginx_site() {
     echo "# simai-php: ${php_version}"
     echo "# simai-target: ${target}"
     echo "# simai-php-socket-project: ${php_socket_project}"
-    echo "# simai-ssl: $([[ -n "$ssl_cert" && -n "$ssl_key" ]] && echo on || echo off)"
+    echo "# simai-ssl: ${ssl_flag}"
     sed -e "s#{{SERVER_NAME}}#${domain}#g" \
       -e "s#{{PROJECT_ROOT}}#${project_path}#g" \
       -e "s#{{PROJECT_NAME}}#${project}#g" \
