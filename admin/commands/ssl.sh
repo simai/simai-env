@@ -12,6 +12,7 @@ ssl_select_domain() {
   if [[ -z "$domain" ]]; then
     domain=$(prompt "domain")
   fi
+  [[ -z "$domain" ]] && return 1
   PARSED_ARGS[domain]="$domain"
   echo "$domain"
 }
@@ -212,8 +213,11 @@ ssl_status_handler() {
   parse_kv_args "$@"
   local domain
   domain=$(ssl_select_domain)
-  local domain="${PARSED_ARGS[domain]:-$domain}"
-  require_args "domain"
+  domain="${PARSED_ARGS[domain]:-$domain}"
+  if [[ -z "$domain" ]]; then
+    error "domain is required"
+    return 1
+  fi
   local le_cert="/etc/letsencrypt/live/${domain}/fullchain.pem"
   local le_key="/etc/letsencrypt/live/${domain}/privkey.pem"
   local custom_cert="/etc/nginx/ssl/${domain}/fullchain.pem"
