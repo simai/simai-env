@@ -10,9 +10,8 @@ LETSENCRYPT_LOG=${LETSENCRYPT_LOG:-/var/log/letsencrypt/letsencrypt.log}
 logs_tail_file() {
   local file="$1" lines="$2"
   if [[ ! -f "$file" ]]; then
-    warn "Log file not found, creating empty file: ${file}"
-    mkdir -p "$(dirname "$file")"
-    touch "$file"
+    warn "Log file not found: ${file}"
+    return 1
   fi
   info "Showing last ${lines} lines of ${file}"
   tail -n "$lines" "$file"
@@ -58,7 +57,23 @@ logs_nginx_handler() {
     access|error) ;;
     *) kind="access" ;;
   esac
-  local file="/var/log/nginx/${domain}.$kind.log"
+  local file=""
+  read_site_metadata "$domain"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local candidates=(
+    "/var/log/nginx/${domain}.${kind}.log"
+    "/var/log/nginx/${project}.${kind}.log"
+  )
+  for f in "${candidates[@]}"; do
+    if [[ -f "$f" ]]; then
+      file="$f"
+      break
+    fi
+  done
+  if [[ -z "$file" ]]; then
+    warn "No ${kind} log found for ${domain} (checked: ${candidates[*]})"
+    return 1
+  fi
   logs_tail_file "$file" "$lines"
 }
 
