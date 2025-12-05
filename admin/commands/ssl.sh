@@ -134,7 +134,7 @@ ssl_install_custom_handler() {
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     cert_src=${cert_src:-$raw_cert_dst}
-    chain_src=${chain_src:-}
+    chain_src=${chain_src:-$raw_chain_dst}
     key_src=${key_src:-${dest_dir}/private.key}
     cert_src=$(prompt "Path to certificate (certificate.crt)" "$cert_src")
     chain_src=$(prompt "Path to CA bundle (certificate_ca.crt, optional)" "$chain_src")
