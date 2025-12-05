@@ -16,8 +16,11 @@ Supported OS: Ubuntu 20.04/22.04/24.04. Run as root.
 - PHP version selection from installed `/etc/php/*` when not passed.
 - Healthcheck copied to `public/healthcheck.php` (non-alias profiles).
 - Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
-- Site list shows domain, profile, PHP version, and root/alias target.
-- Logs: `/var/log/simai-admin.log`.
+- Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
+- Logging:
+  - Admin log: `/var/log/simai-admin.log`.
+  - Audit log: `/var/log/simai-audit.log` records command start/finish with user, section/command, redacted args, exit code, and correlation ID.
+  - Installer log: `/var/log/simai-env.log`.
 
 ## Self commands
 - `self update`: update scripts in place (reloads menu when invoked from menu).

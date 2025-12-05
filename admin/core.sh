@@ -2,6 +2,7 @@
 set -euo pipefail
 
 LOG_FILE=${LOG_FILE:-/var/log/simai-admin.log}
+AUDIT_LOG_FILE=${AUDIT_LOG_FILE:-/var/log/simai-audit.log}
 ADMIN_USER=${ADMIN_USER:-simai}
 
 declare -Ag CMD_HANDLERS=()
@@ -145,8 +146,20 @@ run_command() {
     error "Unknown command: ${section} ${name}"
     exit 1
   fi
-  info "Running command ${section} ${name}"
+  ensure_audit_log
+  local corr_id
+  corr_id=$(uuidgen 2>/dev/null || date +"%Y%m%d%H%M%S%N")
+  local caller="${SUDO_USER:-$USER}"
+  local args_redacted
+  args_redacted=$(redact_args "$@")
+  audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id"
+  info "Running command ${section} ${name} (corr_id=${corr_id})"
+  set +e
   "$handler" "$@"
+  local rc=$?
+  set -e
+  audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id"
+  return $rc
 }
 
 parse_kv_args() {
@@ -190,4 +203,57 @@ require_args() {
 run_as_simai() {
   local cmd="$1"
   sudo -u "$ADMIN_USER" -H bash -lc "$cmd"
+}
+
+ensure_audit_log() {
+  local dir
+  dir=$(dirname "$AUDIT_LOG_FILE")
+  mkdir -p "$dir"
+  touch "$AUDIT_LOG_FILE"
+  chmod 640 "$AUDIT_LOG_FILE" 2>/dev/null || true
+  chown root:root "$AUDIT_LOG_FILE" 2>/dev/null || true
+}
+
+redact_by_key() {
+  local key="$1" value="$2"
+  if [[ "$key" =~ (pass|password|secret|token|key|cert) ]]; then
+    echo "***"
+  else
+    echo "$value"
+  fi
+}
+
+redact_args() {
+  local out=()
+  while [[ $# -gt 0 ]]; do
+    local arg="$1"
+    shift
+    if [[ "$arg" == --* ]]; then
+      if [[ "$arg" =~ ^--([^=]+)=(.*)$ ]]; then
+        local k="${BASH_REMATCH[1]}" v="${BASH_REMATCH[2]}"
+        out+=("--${k}=$(redact_by_key "$k" "$v")")
+      else
+        local k="${arg#--}"
+        local v="${1:-}"
+        if [[ -n "$v" && "$v" != --* ]]; then
+          v=$(redact_by_key "$k" "$v")
+          out+=("--${k} ${v}")
+          shift
+        else
+          out+=("$arg")
+        fi
+      fi
+    else
+      out+=("$arg")
+    fi
+  done
+  echo "${out[*]}"
+}
+
+audit_log() {
+  local phase="$1" user="$2" section="$3" cmd="$4" args="$5" exit_code="${6:-}" corr_id="${7:-}"
+  local ts
+  ts=$(date +"%Y-%m-%dT%H:%M:%S%z")
+  ensure_audit_log
+  echo "${ts} user=${user} section=${section} cmd=${cmd} phase=${phase} exit=${exit_code:-n/a} corr_id=${corr_id:-n/a} args=\"${args}\"" >>"$AUDIT_LOG_FILE"
 }

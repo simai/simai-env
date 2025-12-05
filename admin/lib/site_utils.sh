@@ -135,9 +135,9 @@ create_nginx_site() {
     rm -f /etc/nginx/sites-enabled/default
   fi
   if [[ -n "$ssl_cert" && -n "$ssl_key" ]]; then
-    perl -0pi -e 's/^(\\s*listen 80;.*)$/\1\n    listen 443 ssl;/m' "$site_available"
-    perl -0pi -e "s/^(\\s*server_name\\s+.*;)/\\1\\n    ssl_certificate ${ssl_cert};\\n    ssl_certificate_key ${ssl_key};/m" "$site_available"
-    [[ -n "$ssl_chain" ]] && perl -0pi -e "s/^(\\s*ssl_certificate_key.*;)/\\1\\n    ssl_trusted_certificate ${ssl_chain};/m" "$site_available"
+    perl -0pi -e 'if ($_ !~ /listen 443 ssl;/) { s/^(\\s*listen 80;.*)$/\\1\n    listen 443 ssl;/m }' "$site_available"
+    perl -0pi -e "if ($_ !~ /ssl_certificate /) { s/^(\\s*server_name\\s+.*;)/\\1\\n    ssl_certificate ${ssl_cert};\\n    ssl_certificate_key ${ssl_key};/m }" "$site_available"
+    [[ -n "$ssl_chain" ]] && perl -0pi -e "if ($_ !~ /ssl_trusted_certificate /) { s/^(\\s*ssl_certificate_key.*;)/\\1\\n    ssl_trusted_certificate ${ssl_chain};/m }" "$site_available"
     if [[ "$ssl_hsts" == "yes" ]]; then
       perl -0pi -e 's/^}\\s*$//m; print "    add_header Strict-Transport-Security \"max-age=31536000\" always;\\n}\n" unless /Strict-Transport-Security/' "$site_available"
     fi

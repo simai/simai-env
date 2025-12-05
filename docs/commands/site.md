@@ -35,7 +35,7 @@ Options:
 Removes nginx config, PHP-FPM pools (all versions), cron file (`/etc/cron.d/<project>`), and queue systemd unit (`laravel-queue-<project>.service`). Files/DB/user are removed only when confirmed/flagged. Alias profile removes only nginx/service stubs (no files/DB/pools).
 
 ## list
-List domains from nginx sites-available with profile, PHP version, and root/alias target.
+List domains from nginx sites-available with profile, PHP version, root/alias target, and brief SSL status (off/LE:YYYY-MM-DD/custom).
 
 ## set-php
 Switch site to a different PHP version.

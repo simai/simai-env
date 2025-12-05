@@ -52,8 +52,9 @@ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/update.sh | su
 ```bash
 sudo /root/simai-env/simai-admin.sh site add --domain example.com --project-name myapp --php 8.2
 sudo /root/simai-env/simai-admin.sh db create --name simai_app --user simai --pass secret
-sudo /root/simai-env/simai-admin.sh ssl issue --domain example.com --email admin@example.com
+sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain example.com --email admin@example.com
 sudo /root/simai-env/simai-admin.sh php list
+sudo /root/simai-env/simai-admin.sh logs admin --lines 200
 ```
 - Interactive menu:
 ```bash
@@ -70,6 +71,7 @@ Implemented:
 - `self version` — shows local/remote versions.
 - `site set-php` — switches PHP version for a site (excludes aliases), recreates pool/nginx upstream.
 - `ssl letsencrypt/install/renew/remove/status` — manage Let's Encrypt or custom certificates and nginx HTTPS setup.
+- `logs admin/env/audit/nginx/letsencrypt` — tail key logs (default 200 lines); nginx requires domain selection.
 
 Other commands remain as scaffolding stubs; extend `admin/commands/*.sh` to implement them. The registry-based design allows adding sections/commands by registering them in new modules.
 
@@ -113,7 +115,9 @@ Removes nginx config and symlink, the php-fpm pool for the project, cron entry, 
 - `systemd/laravel-queue.service` — queue worker unit (`{{PROJECT_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_BIN}}`, `{{USER}}`)
 
 ## Logging and cron
-- Logs: `/var/log/simai-env.log` (override via `--log-file`)
+- Installer: `/var/log/simai-env.log` (override via `--log-file`)
+- Admin CLI: `/var/log/simai-admin.log`
+- Audit: `/var/log/simai-audit.log` (command start/finish with correlation IDs, secrets redacted)
 - Cron: `* * * * * php /home/simai/www/<project>/artisan schedule:run >> /dev/null 2>&1`
 
 ## Notes

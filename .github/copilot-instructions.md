@@ -25,11 +25,13 @@
 - `site set-php`: choose site (aliases filtered out), switch PHP version by recreating pool and nginx upstream; optional `keep-old-pool` flag (default no).
 - `ssl letsencrypt/install/renew/remove/status`: manage LE or custom certs for existing sites (aliases allowed, catch-all excluded); custom certs live in `/etc/nginx/ssl/<domain>/`, LE in `/etc/letsencrypt/live/<domain>/`; webroot = `<project>/public`; renew cron at `/etc/cron.d/simai-certbot`.
 - `php list`/`php reload`: list installed PHP versions, reload FPM; menu selection when needed.
+- `logs admin/env/audit/nginx/letsencrypt`: tail key logs (default 200 lines, `--lines` override); nginx log requires domain selection; audit log at `/var/log/simai-audit.log`.
 - `ssl` commands: select domain from existing sites when not provided (handlers are stubs).
 - Menu uses `select_from_list` for choices; prints separators before/after commands; respects `SIMAI_ADMIN_MENU` flag for reload after self-update.
   - Prompt rule: when a parameter has a finite set of values, always show a numbered list, a title `Select <param>`, and an `Enter choice [<default>]:` line. Accept either a number or an exact value; empty input picks the default. For binary questions use `yes`/`no` (still numbered).
 - Table rule: when showing existing entities (sites, SSL certs, PHP versions/pools, cron jobs, queues, DBs/users), render a bordered table (`+---+` separators, header row, closing border) with only the key columns for quick diagnostics. Example columns: sites → domain/profile/PHP/root-or-alias; SSL → domain/status/notBefore/notAfter/issuer; PHP → version/status/pool count; cron → project/schedule/command; queues → project/unit/status; DB → name/owner/host/encoding.
 - Color rule: colors only in interactive output. Define ANSI codes as `GREEN=$'\e[32m'`, etc. First pad text to fixed width, then wrap with color to keep table alignment. Use `%s` (not `%b`) when printing colored strings. Do not color logs. If needed, disable colors when stdout is not a TTY (`[[ -t 1 ]]`).
+- Audit rule: every admin command logs start/finish to `/var/log/simai-audit.log` with timestamp, user (`$SUDO_USER` fallback `$USER`), section, command, redacted args (mask keys containing pass/password/secret/token/key/cert), exit code, and correlation ID (`uuidgen` fallback timestamp). Keep file perms 640 root:root; never log secrets to admin log.
 
 ## Templates
 - `templates/nginx-laravel.conf`: root `{{PROJECT_ROOT}}/public`, PHP-FPM socket per project (`{{PHP_SOCKET_PROJECT}}` allows aliasing to an existing pool).
