@@ -10,8 +10,9 @@ LETSENCRYPT_LOG=${LETSENCRYPT_LOG:-/var/log/letsencrypt/letsencrypt.log}
 logs_tail_file() {
   local file="$1" lines="$2"
   if [[ ! -f "$file" ]]; then
-    error "Log file not found: ${file}"
-    return 1
+    warn "Log file not found, creating empty file: ${file}"
+    mkdir -p "$(dirname "$file")"
+    touch "$file"
   fi
   info "Showing last ${lines} lines of ${file}"
   tail -n "$lines" "$file"
