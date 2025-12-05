@@ -127,18 +127,18 @@ ssl_install_custom_handler() {
   local dest_dir
   dest_dir=$(ensure_ssl_dir "$domain")
   local cert_dst="${dest_dir}/fullchain.pem"
+  local raw_cert_dst="${dest_dir}/certificate.crt"
+  local raw_chain_dst="${dest_dir}/certificate_ca.crt"
   local key_dst="${dest_dir}/privkey.pem"
   local chain_dst="${dest_dir}/chain.pem"
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    cert_src=${cert_src:-$cert_dst}
-    key_src=${key_src:-$key_dst}
+    cert_src=${cert_src:-$raw_cert_dst}
     chain_src=${chain_src:-}
-    cert_src=$(prompt "Path to certificate" "$cert_src")
-    key_src=$(prompt "Path to private key" "$key_src")
-    if [[ -n "$chain_src" ]]; then
-      chain_src=$(prompt "Path to chain (optional)" "$chain_src")
-    fi
+    key_src=${key_src:-${dest_dir}/private.key}
+    cert_src=$(prompt "Path to certificate (certificate.crt)" "$cert_src")
+    chain_src=$(prompt "Path to CA bundle (certificate_ca.crt, optional)" "$chain_src")
+    key_src=$(prompt "Path to private key (private.key)" "$key_src")
     redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
     hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
   fi
@@ -148,16 +148,26 @@ ssl_install_custom_handler() {
     return 1
   fi
 
-  if [[ "$cert_src" != "$cert_dst" ]]; then
-    cp -f "$cert_src" "$cert_dst"
+  if [[ "$cert_src" != "$raw_cert_dst" ]]; then
+    cp -f "$cert_src" "$raw_cert_dst"
   fi
   if [[ "$key_src" != "$key_dst" ]]; then
     cp -f "$key_src" "$key_dst"
   fi
-  if [[ -n "$chain_src" && -f "$chain_src" && "$chain_src" != "$chain_dst" ]]; then
-    cp -f "$chain_src" "$chain_dst"
+  if [[ -n "$chain_src" && -f "$chain_src" && "$chain_src" != "$raw_chain_dst" ]]; then
+    cp -f "$chain_src" "$raw_chain_dst"
   fi
-  chmod 640 "$cert_dst" "$key_dst" 2>/dev/null || true
+
+  # build fullchain
+  if [[ -f "$raw_chain_dst" && -s "$raw_chain_dst" ]]; then
+    cat "$raw_cert_dst" "$raw_chain_dst" >"$cert_dst"
+  else
+    cp -f "$raw_cert_dst" "$cert_dst"
+  fi
+  [[ -f "$raw_chain_dst" ]] && cp -f "$raw_chain_dst" "$chain_dst" || rm -f "$chain_dst" 2>/dev/null || true
+
+  chmod 640 "$cert_dst" "$key_dst" "$raw_cert_dst" 2>/dev/null || true
+  [[ -f "$raw_chain_dst" ]] && chmod 640 "$raw_chain_dst" 2>/dev/null || true
   [[ -f "$chain_dst" ]] && chmod 640 "$chain_dst" 2>/dev/null || true
 
   local chain_arg=""
