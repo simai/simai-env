@@ -148,9 +148,15 @@ ssl_install_custom_handler() {
     return 1
   fi
 
-  cp "$cert_src" "$cert_dst"
-  cp "$key_src" "$key_dst"
-  [[ -n "$chain_src" && -f "$chain_src" ]] && cp "$chain_src" "$chain_dst"
+  if [[ "$cert_src" != "$cert_dst" ]]; then
+    cp -f "$cert_src" "$cert_dst"
+  fi
+  if [[ "$key_src" != "$key_dst" ]]; then
+    cp -f "$key_src" "$key_dst"
+  fi
+  if [[ -n "$chain_src" && -f "$chain_src" && "$chain_src" != "$chain_dst" ]]; then
+    cp -f "$chain_src" "$chain_dst"
+  fi
   chmod 640 "$cert_dst" "$key_dst" 2>/dev/null || true
   [[ -f "$chain_dst" ]] && chmod 640 "$chain_dst" 2>/dev/null || true
 
