@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.17] - 2025-12-29
+### Added
+- Static site profile (nginx-only) with placeholder index and local healthcheck; appears first in profile menu, skips PHP/DB prompts, and aliases inherit static template when targeting static sites.
+
+### Fixed
+- SSL apply respects static template selection; set-php refuses static sites.
+
 ## [0.7.16] - 2025-12-29
 ### Changed
 - Default site directory naming now uses the domain (`/home/simai/www/<domain>`); slug paths remain available via `--path-style slug` and slug stays the ID for pools/cron/queue/socket names.

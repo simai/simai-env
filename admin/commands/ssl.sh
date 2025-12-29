@@ -31,14 +31,22 @@ ssl_site_context() {
   SITE_SSL_PROFILE="${SITE_META[profile]}"
   SITE_SSL_PHP="${SITE_META[php]}"
   SITE_SSL_SOCKET_PROJECT="${SITE_META[php_socket_project]:-${SITE_META[project]}}"
-  [[ -z "$SITE_SSL_PHP" ]] && SITE_SSL_PHP="8.2"
+  if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
+    [[ -z "$SITE_SSL_PHP" ]] && SITE_SSL_PHP="none"
+  else
+    [[ -z "$SITE_SSL_PHP" ]] && SITE_SSL_PHP="8.2"
+  fi
 }
 
 ssl_apply_nginx() {
   local domain="$1" cert="$2" key="$3" chain="$4" redirect="$5" hsts="$6"
   ssl_site_context "$domain" || return 1
   local template="$NGINX_TEMPLATE"
-  [[ "$SITE_SSL_PROFILE" == "generic" ]] && template="$NGINX_TEMPLATE_GENERIC"
+  if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
+    template="$NGINX_TEMPLATE_STATIC"
+  elif [[ "$SITE_SSL_PROFILE" == "generic" ]]; then
+    template="$NGINX_TEMPLATE_GENERIC"
+  fi
   create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "$cert" "$key" "$chain" "$redirect" "$hsts"
 }
 

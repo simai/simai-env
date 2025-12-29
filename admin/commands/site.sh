@@ -65,10 +65,43 @@ site_add_handler() {
 
   ensure_user
   if [[ -z "$profile" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    profile=$(select_from_list "Select profile" "generic" "generic" "laravel" "alias")
+    profile=$(select_from_list "Select profile" "generic" "static" "generic" "laravel" "alias")
     [[ -z "$profile" ]] && profile="generic"
   fi
   [[ -z "$profile" ]] && profile="generic"
+
+  if [[ "$profile" == "static" ]]; then
+    if [[ -n "$php_version" && "$php_version" != "none" ]]; then
+      warn "--php is ignored for static profile"
+    fi
+    if [[ "$create_db" == "yes" || -n "$db_name" || -n "$db_user" || -n "$db_pass" ]]; then
+      warn "Database options are ignored for static profile"
+    fi
+    php_version="none"
+    create_db="no"
+    if [[ ! -d "$path" ]]; then
+      info "Project path not found, creating: $path"
+      mkdir -p "$path"
+    fi
+    local template_path="$NGINX_TEMPLATE_STATIC"
+    create_static_placeholder_if_missing "$path"
+    ensure_project_permissions "$path"
+    create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "no" "no"
+    local cron_summary="none"
+    info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
+    echo "===== Site summary ====="
+    echo "Domain      : ${domain}"
+    echo "Project     : ${project}"
+    echo "Profile     : ${profile}"
+    echo "PHP version : none"
+    echo "Path        : ${path}"
+    echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
+    echo "PHP-FPM pool: none"
+    echo "Cron file   : ${cron_summary}"
+    echo "Healthcheck : curl -i -H \"Host: ${domain}\" http://127.0.0.1/healthcheck"
+    echo "Log file    : ${LOG_FILE}"
+    return
+  fi
 
   if [[ "$profile" == "alias" ]]; then
     local sites=()
@@ -87,7 +120,12 @@ site_add_handler() {
     target_project="${SITE_META[project]}"
     target_php="${SITE_META[php]}"
     php_version="$target_php"
-    create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$NGINX_TEMPLATE_GENERIC" "$profile" "$target_domain" "$target_project"
+    local alias_template="$NGINX_TEMPLATE_GENERIC"
+    if [[ "${SITE_META[profile]}" == "static" ]]; then
+      alias_template="$NGINX_TEMPLATE_STATIC"
+      php_version="none"
+    fi
+    create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$alias_template" "$profile" "$target_domain" "$target_project"
     info "Alias added: domain=${domain}, target=${target_domain}, php=${php_version}"
     echo "===== Site summary ====="
     echo "Domain      : ${domain}"
@@ -301,7 +339,7 @@ site_set_php_handler() {
     mapfile -t sites < <(list_sites)
     for s in "${sites[@]}"; do
       read_site_metadata "$s"
-      if [[ "${SITE_META[profile]:-}" != "alias" ]]; then
+      if [[ "${SITE_META[profile]:-}" != "alias" && "${SITE_META[profile]:-}" != "static" ]]; then
         filtered+=("$s")
       fi
     done
@@ -323,10 +361,16 @@ site_set_php_handler() {
     fi
     read_site_metadata "$domain"
     profile="${SITE_META[profile]:-}"
-    if [[ "$profile" == "alias" ]]; then
-      error "Cannot change PHP version for alias site ${domain}; change the target site instead."
-      return 1
-    fi
+    case "$profile" in
+      alias)
+        error "Cannot change PHP version for alias site ${domain}; change the target site instead."
+        return 1
+        ;;
+      static)
+        error "Cannot change PHP version for static site ${domain}."
+        return 1
+        ;;
+    esac
   fi
 
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then

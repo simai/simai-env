@@ -3,21 +3,22 @@
 Run with `sudo /root/simai-env/simai-admin.sh site <command> [options]` or via menu.
 
 ## add
-Create nginx vhost and PHP-FPM pool for an existing project path.
+Create nginx vhost and project root for an existing path.
 
 Options:
 - `--domain` (required)
 - `--project-name` (optional; derived from domain if missing)
  - `--path` (optional; default uses path style under `/home/simai/www/`)
  - `--path-style` (`slug`|`domain`) controls default path when `--path` is not set. Default is `domain` (e.g., `/home/simai/www/example.com`). Use `--path-style slug` to restore legacy slug paths or set `/etc/simai-env.conf` with `SIMAI_DEFAULT_PATH_STYLE=domain|slug`.
-- `--profile` (`generic`|`laravel`|`alias`, default `generic`)
+- `--profile` (`generic`|`laravel`|`static`|`alias`, default `generic`)
 - `--php` (optional; choose from installed if omitted)
 - DB (optional): `--create-db=yes|no`, `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated)
 
 Behavior:
-- Generic uses placeholder and `public` root; Laravel requires `artisan`. Alias points the domain to an existing site (reuses its PHP-FPM pool/root, no DB/pool creation).
-- Creates PHP-FPM pool and nginx vhost; installs `public/healthcheck.php` (non-alias).
+- Generic uses placeholder and `public` root; Laravel requires `artisan`. Static is nginx-only (no PHP/DB) with `public/index.html` placeholder and `/healthcheck` (localhost-only). Alias points the domain to an existing site (reuses its root, no DB/pool creation).
+- Creates PHP-FPM pool and nginx vhost for non-static profiles; installs `public/healthcheck.php` (non-alias, non-static).
 - If `create-db=yes`, creates DB/user, writes `.env` for generic profile, prints summary with credentials (not logged).
+ - For static profile, `--php` and DB flags are ignored (with warnings); no PHP-FPM pool or cron is created.
  - Project ID (slug) is still used for pools/cron/queue/sockets/logs even if the path style uses the domain.
  - If an existing slug/domain directory is found, the tool reuses it to avoid duplicates and warns accordingly.
 - `/healthcheck.php` is localhost-only by default; test with `curl -i -H "Host: <domain>" http://127.0.0.1/healthcheck.php`.
@@ -65,4 +66,4 @@ Options:
 Behavior:
 - Recreates PHP-FPM pool for the target version, patches nginx upstream sockets in-place (preserves SSL/custom edits), updates metadata, and reloads services after backing up nginx config.
 - Laravel profile also refreshes `/etc/cron.d/<project>` and updates/restarts the queue unit if present.
-- Refuses to run for alias profile (change PHP on the target site instead).
+- Refuses to run for alias or static profiles (change PHP on the target site instead).

@@ -5,6 +5,7 @@ SIMAI_USER=${SIMAI_USER:-simai}
 WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_USER}/www}
 NGINX_TEMPLATE=${NGINX_TEMPLATE:-${SCRIPT_DIR}/templates/nginx-laravel.conf}
 NGINX_TEMPLATE_GENERIC=${NGINX_TEMPLATE_GENERIC:-${SCRIPT_DIR}/templates/nginx-generic.conf}
+NGINX_TEMPLATE_STATIC=${NGINX_TEMPLATE_STATIC:-${SCRIPT_DIR}/templates/nginx-static.conf}
 HEALTHCHECK_TEMPLATE=${HEALTHCHECK_TEMPLATE:-${SCRIPT_DIR}/templates/healthcheck.php}
 
 project_slug_from_domain() {
@@ -275,6 +276,29 @@ create_placeholder_if_missing() {
 <?php
 http_response_code(200);
 echo "Placeholder: site is configured.";
+EOF
+}
+
+create_static_placeholder_if_missing() {
+  local project_path="$1"
+  local public_index="${project_path}/public/index.html"
+  if [[ -f "$public_index" ]]; then
+    return
+  fi
+  mkdir -p "${project_path}/public"
+  cat >"$public_index" <<'EOF'
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Static site</title>
+</head>
+<body>
+  <h1>It works</h1>
+  <p>Static site is configured.</p>
+</body>
+</html>
 EOF
 }
 
@@ -636,18 +660,22 @@ read_site_metadata() {
       fi
     done <"$cfg"
   fi
-  if [[ -z "${SITE_META[php]}" ]]; then
-    local pool
-    pool=$(detect_pool_for_project "${SITE_META[php_socket_project]:-${SITE_META[project]}}")
-    if [[ -n "$pool" ]]; then
-      SITE_META["php"]="$(echo "$pool" | awk -F'/' '{print $4}')"
+  if [[ "${SITE_META[profile]}" == "static" ]]; then
+    [[ -z "${SITE_META[php]}" ]] && SITE_META["php"]="none"
+  else
+    if [[ -z "${SITE_META[php]}" ]]; then
+      local pool
+      pool=$(detect_pool_for_project "${SITE_META[php_socket_project]:-${SITE_META[project]}}")
+      if [[ -n "$pool" ]]; then
+        SITE_META["php"]="$(echo "$pool" | awk -F'/' '{print $4}')"
+      fi
     fi
-  fi
-  if [[ -z "${SITE_META[php_socket_project]}" ]]; then
-    SITE_META["php_socket_project"]="${SITE_META[project]}"
-  fi
-  if [[ -z "${SITE_META[php]}" ]]; then
-    mapfile -t _vers < <(installed_php_versions)
-    SITE_META["php"]="${_vers[0]:-8.2}"
+    if [[ -z "${SITE_META[php_socket_project]}" ]]; then
+      SITE_META["php_socket_project"]="${SITE_META[project]}"
+    fi
+    if [[ -z "${SITE_META[php]}" ]]; then
+      mapfile -t _vers < <(installed_php_versions)
+      SITE_META["php"]="${_vers[0]:-8.2}"
+    fi
   fi
 }
