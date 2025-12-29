@@ -26,6 +26,20 @@ list_sites() {
   shopt -u nullglob
 }
 
+require_site_exists() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ "$domain" == "000-catchall" ]]; then
+    error "Domain 000-catchall is reserved"
+    return 1
+  fi
+  if [[ ! -f "$cfg" ]]; then
+    error "Domain is not configured as a site. Create it first: simai-admin.sh site add --domain ${domain} ..."
+    return 1
+  fi
+  return 0
+}
+
 detect_pool_for_project() {
   local project="$1"
   shopt -s nullglob
@@ -70,6 +84,70 @@ generate_password() {
   head -c 24 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20
 }
 
+validate_domain() {
+  local domain="$1"
+  local domain_lc
+  domain_lc=$(echo "$domain" | tr '[:upper:]' '[:lower:]')
+  if [[ -z "$domain_lc" ]]; then
+    error "Domain is required"
+    return 1
+  fi
+  if [[ "$domain_lc" =~ [[:space:]] ]]; then
+    error "Domain must not contain whitespace"
+    return 1
+  fi
+  if [[ "$domain_lc" =~ [^a-z0-9.-] ]]; then
+    error "Domain contains invalid characters"
+    return 1
+  fi
+  if [[ "$domain_lc" =~ \.\. ]]; then
+    error "Domain must not contain consecutive dots"
+    return 1
+  fi
+  if [[ "$domain_lc" == *"/"* || "$domain_lc" == *"\\"* || "$domain_lc" == *"\""* || "$domain_lc" == *"'"* || "$domain_lc" == *"$"* || "$domain_lc" == *";"* || "$domain_lc" == *"&"* || "$domain_lc" == *"|"* ]]; then
+    error "Domain contains forbidden characters"
+    return 1
+  fi
+  if [[ "$domain_lc" != *.* ]]; then
+    error "Domain must contain at least one dot (e.g. example.com)"
+    return 1
+  fi
+  return 0
+}
+
+validate_path() {
+  local path="$1"
+  if [[ -z "$path" || "$path" == "/" ]]; then
+    error "Path must not be empty or root"
+    return 1
+  fi
+  if [[ "$path" != /* ]]; then
+    error "Path must be absolute"
+    return 1
+  fi
+  if [[ "$path" =~ [[:space:]] || "$path" =~ [[:cntrl:]] ]]; then
+    error "Path must not contain whitespace or control characters"
+    return 1
+  fi
+  if [[ "$path" == *".."* ]]; then
+    error "Path must not contain '..'"
+    return 1
+  fi
+  if command -v realpath >/dev/null 2>&1; then
+    local normalized
+    normalized=$(realpath -m "$path" 2>/dev/null || true)
+    if [[ -z "$normalized" || "$normalized" == "/" || "$normalized" != /* ]]; then
+      error "Path normalization failed for ${path}"
+      return 1
+    fi
+    if [[ "$normalized" == *".."* ]]; then
+      error "Normalized path is unsafe: ${normalized}"
+      return 1
+    fi
+  fi
+  return 0
+}
+
 create_mysql_db_user() {
   local db_name="$1" db_user="$2" db_pass="$3"
   if ! command -v mysql >/dev/null 2>&1; then
@@ -77,8 +155,10 @@ create_mysql_db_user() {
     return 1
   fi
   mysql -uroot -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >>"$LOG_FILE" 2>&1 || warn "Failed to create database ${db_name}"
-  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'%' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}"
-  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'%'; FLUSH PRIVILEGES;" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}"
+  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}@127.0.0.1"
+  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}@localhost"
+  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}@127.0.0.1"
+  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost'; FLUSH PRIVILEGES;" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}@localhost"
 }
 
 create_php_pool() {
@@ -114,6 +194,16 @@ create_nginx_site() {
   local site_enabled="/etc/nginx/sites-enabled/${domain}.conf"
   local ssl_flag="off"
   [[ -n "$ssl_cert" && -n "$ssl_key" ]] && ssl_flag="on"
+  if [[ -f "$site_available" ]]; then
+    local ts backup
+    ts=$(date +%Y%m%d%H%M%S)
+    backup="${site_available}.bak.${ts}"
+    if cp -p "$site_available" "$backup" >>"$LOG_FILE" 2>&1; then
+      info "Backed up existing nginx config to ${backup}"
+    else
+      warn "Failed to backup existing nginx config ${site_available}"
+    fi
+  fi
 
   {
     echo "# simai-domain: ${domain}"
@@ -224,11 +314,37 @@ remove_php_pools() {
   done
 }
 
+reload_cron_daemon() {
+  systemctl reload cron >>"$LOG_FILE" 2>&1 || systemctl restart cron >>"$LOG_FILE" 2>&1 || service cron reload >>"$LOG_FILE" 2>&1 || true
+}
+
+ensure_project_cron() {
+  local project="$1" profile="$2" project_path="$3" php_version="$4"
+  if [[ "$profile" != "laravel" ]]; then
+    return
+  fi
+  local cron_file="/etc/cron.d/${project}"
+  local php_cli
+  php_cli=$(command -v "php${php_version}" || true)
+  [[ -z "$php_cli" ]] && php_cli="/usr/bin/php"
+  cat >"$cron_file" <<EOF
+# simai-project: ${project}
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+* * * * * ${SIMAI_USER} cd ${project_path} && ${php_cli} artisan schedule:run >> /dev/null 2>&1
+EOF
+  chmod 644 "$cron_file" 2>/dev/null || true
+  chown root:root "$cron_file" 2>/dev/null || true
+  reload_cron_daemon
+}
+
 remove_cron_file() {
   local project="$1"
   local cron_file="/etc/cron.d/${project}"
   if [[ -f "$cron_file" ]]; then
     rm -f "$cron_file"
+    reload_cron_daemon
     info "Removed cron file ${cron_file}"
   fi
 }

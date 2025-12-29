@@ -6,6 +6,9 @@ site_add_handler() {
   require_args "domain"
 
   local domain="${PARSED_ARGS[domain]}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
   local project="${PARSED_ARGS[project-name]:-}"
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
@@ -19,6 +22,9 @@ site_add_handler() {
     info "project-name not provided; using ${project}"
   fi
   local path="${PARSED_ARGS[path]:-${WWW_ROOT}/${project}}"
+  if ! validate_path "$path"; then
+    return 1
+  fi
 
   ensure_user
   if [[ -z "$profile" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -108,6 +114,11 @@ site_add_handler() {
   create_php_pool "$project" "$php_version" "$path"
   create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "no" "no"
   install_healthcheck "$path"
+  local cron_summary="none"
+  if [[ "$profile" == "laravel" ]]; then
+    ensure_project_cron "$project" "$profile" "$path" "$php_version"
+    cron_summary="/etc/cron.d/${project} (created/updated)"
+  fi
 
   if [[ "$create_db" == "yes" ]]; then
     info "Creating database ${db_name} with user ${db_user}"
@@ -128,12 +139,13 @@ site_add_handler() {
   echo "Path        : ${path}"
   echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
   echo "PHP-FPM pool: /etc/php/${php_version}/fpm/pool.d/${project}.conf"
+  echo "Cron file   : ${cron_summary}"
   if [[ "$create_db" == "yes" ]]; then
     echo "DB name     : ${db_name}"
     echo "DB user     : ${db_user}"
     echo "DB password : ${db_pass} (not logged)"
   fi
-  echo "Healthcheck : http://${domain}/healthcheck.php"
+  echo "Healthcheck (local): curl -i -H \"Host: ${domain}\" http://127.0.0.1/healthcheck.php"
   echo "Log file    : ${LOG_FILE}"
 }
 
@@ -141,6 +153,7 @@ site_remove_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   local project="${PARSED_ARGS[project-name]:-}"
+  local confirm="${PARSED_ARGS[confirm]:-}"
   if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local sites=()
     mapfile -t sites < <(list_sites)
@@ -149,11 +162,16 @@ site_remove_handler() {
   if [[ -z "$domain" ]]; then
     require_args "domain"
   fi
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
   if [[ -z "$project" ]]; then
     project=$(project_slug_from_domain "$domain")
     info "project-name not provided; using ${project}"
   fi
   local path="${PARSED_ARGS[path]:-${WWW_ROOT}/${project}}"
+  local path_provided=0
+  [[ -n "${PARSED_ARGS[path]:-}" ]] && path_provided=1
   local remove_files="${PARSED_ARGS[remove-files]:-}"
   local drop_db="${PARSED_ARGS[drop-db]:-}"
   local drop_user="${PARSED_ARGS[drop-db-user]:-}"
@@ -165,6 +183,18 @@ site_remove_handler() {
     profile="${SITE_META[profile]:-generic}"
     [[ -z "$project" ]] && project="${SITE_META[project]:-$project}"
     path="${PARSED_ARGS[path]:-${SITE_META[root]:-$path}}"
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" ]]; then
+    local destructive=0
+    [[ "${remove_files,,}" == "yes" ]] && destructive=1
+    [[ "${drop_db,,}" == "yes" ]] && destructive=1
+    [[ "${drop_user,,}" == "yes" ]] && destructive=1
+    if [[ $destructive -eq 1 ]]; then
+      case "${confirm,,}" in
+        yes|true|1) ;;
+        *) error "Destructive flags set; add --confirm yes"; return 1 ;;
+      esac
+    fi
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     if [[ "$profile" == "alias" ]]; then
@@ -182,6 +212,11 @@ site_remove_handler() {
   [[ "$drop_user" == "yes" ]] && drop_user=1 || drop_user=0
   [[ -z "$db_name" ]] && db_name="${project}"
   [[ -z "$db_user" ]] && db_user="${project}"
+  if [[ "$remove_files" -eq 1 || "$path_provided" -eq 1 ]]; then
+    if ! validate_path "$path"; then
+      return 1
+    fi
+  fi
 
   info "Removing site: domain=${domain}, project=${project}, path=${path}"
   local removed_queue=0 removed_cron=0
@@ -199,7 +234,9 @@ site_remove_handler() {
     mysql -uroot -e "DROP DATABASE IF EXISTS \`${db_name}\`;" >>"$LOG_FILE" 2>&1 || warn "Failed to drop database ${db_name}"
   fi
   if [[ "$drop_user" == "1" ]]; then
-    mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'%';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${db_user}"
+    mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'127.0.0.1';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${db_user}@127.0.0.1"
+    mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'localhost';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${db_user}@localhost"
+    mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'%';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop legacy wildcard user ${db_user}@%"
   fi
   info "Site remove completed for ${domain}"
   echo "===== Site remove summary ====="
@@ -244,6 +281,9 @@ site_set_php_handler() {
   fi
 
   if [[ -n "$domain" ]]; then
+    if ! validate_domain "$domain"; then
+      return 1
+    fi
     read_site_metadata "$domain"
     profile="${SITE_META[profile]:-}"
     if [[ "$profile" == "alias" ]]; then
@@ -298,6 +338,6 @@ site_list_handler() {
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass="
-register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" ""
+register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "project-name= domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

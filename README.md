@@ -95,15 +95,16 @@ Actions: validates Laravel structure, runs `composer install`, creates/updates `
 ### Cleanup mode
 ```bash
 ./simai-env.sh clean --project-name myapp --domain example.com \
-  --remove-files --drop-db --drop-db-user
+  --remove-files --drop-db --drop-db-user --confirm
 ```
-Removes nginx config and symlink, the php-fpm pool for the project, cron entry, queue systemd unit, database/user (when flags are set), and the project directory (when flagged).
+Removes nginx config and symlink, the php-fpm pool for the project, cron entry, queue systemd unit, database/user (when flags are set), and the project directory (when flagged). Cleanup requires the `--confirm` flag to run.
 
 ## Key flags
 - `--domain` — required for install and clean
 - `--project-name` — project identifier used in paths/services
 - `--path` + `--existing` — switch to existing-project flow
 - `--php` — PHP version (8.1/8.2/8.3)
+- `--confirm` — required for `clean` operations (explicit confirmation)
 - `--mysql` — `mysql` (default) or `percona`
 - `--node-version` — Node.js version (NodeSource)
 - `--run-migrations`, `--optimize` — run `migrate` and `config:cache/route:cache/view:cache`

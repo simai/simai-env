@@ -13,6 +13,12 @@ ssl_select_domain() {
     domain=$(prompt "domain")
   fi
   [[ -z "$domain" ]] && return 1
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
   PARSED_ARGS[domain]="$domain"
   echo "$domain"
 }
@@ -39,8 +45,10 @@ ssl_apply_nginx() {
 ssl_issue_handler() {
   parse_kv_args "$@"
   local domain
-  domain=$(ssl_select_domain)
-  local domain="${PARSED_ARGS[domain]:-$domain}"
+  if ! domain=$(ssl_select_domain); then
+    return 1
+  fi
+  domain="${PARSED_ARGS[domain]:-$domain}"
   local email="${PARSED_ARGS[email]:-}"
   local redirect="${PARSED_ARGS[redirect]:-}"
   local hsts="${PARSED_ARGS[hsts]:-}"
@@ -68,9 +76,12 @@ ssl_issue_handler() {
   PARSED_ARGS[domain]="$domain"
   PARSED_ARGS[email]="$email"
   require_args "domain email"
-
-  if [[ -z "$domain" || -z "$email" ]]; then
-    error "domain and email are required"
+  domain="${PARSED_ARGS[domain]}"
+  email="${PARSED_ARGS[email]}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
     return 1
   fi
   if ! command -v certbot >/dev/null 2>&1; then
@@ -106,7 +117,9 @@ ssl_issue_handler() {
 ssl_install_custom_handler() {
   parse_kv_args "$@"
   local domain
-  domain=$(ssl_select_domain)
+  if ! domain=$(ssl_select_domain); then
+    return 1
+  fi
   local redirect="${PARSED_ARGS[redirect]:-no}"
   local hsts="${PARSED_ARGS[hsts]:-no}"
   local cert_src="${PARSED_ARGS[cert]:-}"
@@ -124,6 +137,12 @@ ssl_install_custom_handler() {
   domain="${PARSED_ARGS[domain]:-$domain}"
   require_args "domain"
   domain="${PARSED_ARGS[domain]}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
   local dest_dir
   dest_dir=$(ensure_ssl_dir "$domain")
   local cert_dst="${dest_dir}/fullchain.pem"
@@ -186,9 +205,18 @@ ssl_install_custom_handler() {
 ssl_renew_handler() {
   parse_kv_args "$@"
   local domain
-  domain=$(ssl_select_domain)
-  local domain="${PARSED_ARGS[domain]:-$domain}"
+  if ! domain=$(ssl_select_domain); then
+    return 1
+  fi
+  domain="${PARSED_ARGS[domain]:-$domain}"
   require_args "domain"
+  domain="${PARSED_ARGS[domain]}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
   if ! command -v certbot >/dev/null 2>&1; then
     error "certbot is not installed"
     return 1
@@ -207,10 +235,26 @@ ssl_renew_handler() {
 ssl_remove_handler() {
   parse_kv_args "$@"
   local domain
-  domain=$(ssl_select_domain)
-  local domain="${PARSED_ARGS[domain]:-$domain}"
+  if ! domain=$(ssl_select_domain); then
+    return 1
+  fi
+  domain="${PARSED_ARGS[domain]:-$domain}"
   require_args "domain"
+  domain="${PARSED_ARGS[domain]}"
   local delete_cert="${PARSED_ARGS[delete-cert]:-no}"
+  local confirm="${PARSED_ARGS[confirm]:-}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "${delete_cert,,}" == "yes" ]]; then
+    case "${confirm,,}" in
+      yes|true|1) ;;
+      *) error "Deleting certificate requires --confirm yes"; return 1 ;;
+    esac
+  fi
   ssl_site_context "$domain" || return 1
   local template="$NGINX_TEMPLATE"
   [[ "$SITE_SSL_PROFILE" == "generic" ]] && template="$NGINX_TEMPLATE_GENERIC"
@@ -231,10 +275,17 @@ ssl_remove_handler() {
 ssl_status_handler() {
   parse_kv_args "$@"
   local domain
-  domain=$(ssl_select_domain)
+  if ! domain=$(ssl_select_domain); then
+    return 1
+  fi
   domain="${PARSED_ARGS[domain]:-$domain}"
-  if [[ -z "$domain" ]]; then
-    error "domain is required"
+  PARSED_ARGS[domain]="$domain"
+  require_args "domain"
+  domain="${PARSED_ARGS[domain]}"
+  if ! validate_domain "$domain"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
     return 1
   fi
   local le_cert="/etc/letsencrypt/live/${domain}/fullchain.pem"
@@ -270,5 +321,5 @@ ssl_status_handler() {
 register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging="
 register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect= hsts="
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
-register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert="
+register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert= confirm="
 register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain="
