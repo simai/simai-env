@@ -26,17 +26,25 @@ ssl_select_domain() {
 
 ssl_site_context() {
   local domain="$1"
-  read_site_metadata "$domain"
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
   SITE_SSL_PROJECT="${SITE_META[project]}"
   SITE_SSL_ROOT="${SITE_META[root]}"
   SITE_SSL_PROFILE="${SITE_META[profile]}"
   SITE_SSL_PHP="${SITE_META[php]}"
   SITE_SSL_SOCKET_PROJECT="${SITE_META[php_socket_project]:-${SITE_META[project]}}"
   if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
-    [[ -z "$SITE_SSL_PHP" ]] && SITE_SSL_PHP="none"
+    if [[ -z "$SITE_SSL_PHP" ]]; then
+      SITE_SSL_PHP="none"
+    fi
   else
-    [[ -z "$SITE_SSL_PHP" ]] && SITE_SSL_PHP="8.2"
+    if [[ -z "$SITE_SSL_PHP" ]]; then
+      SITE_SSL_PHP="8.2"
+    fi
   fi
+  return 0
 }
 
 ssl_apply_nginx() {

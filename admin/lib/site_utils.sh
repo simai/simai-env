@@ -667,7 +667,12 @@ read_site_metadata() {
     done <"$cfg"
   fi
   if [[ "${SITE_META[profile]}" == "static" ]]; then
-    [[ -z "${SITE_META[php]}" ]] && SITE_META["php"]="none"
+    if [[ -z "${SITE_META[php]}" ]]; then
+      SITE_META["php"]="none"
+    fi
+    if [[ -z "${SITE_META[php_socket_project]}" ]]; then
+      SITE_META["php_socket_project"]="${SITE_META[project]}"
+    fi
   else
     if [[ -z "${SITE_META[php]}" ]]; then
       local pool
@@ -684,4 +689,5 @@ read_site_metadata() {
       SITE_META["php"]="${_vers[0]:-8.2}"
     fi
   fi
+  return 0
 }

@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.22] - 2025-12-29
+### Fixed
+- ssl letsencrypt now reaches certbot for static sites; helpers return success explicitly to avoid false exits under `set -e`.
+- read_site_metadata and ssl_site_context avoid non-zero returns on normal paths.
+
 ## [0.7.21] - 2025-12-29
 ### Fixed
 - Menu no longer exits when handlers call exit; handlers are sandboxed and errors are reported with exit codes.
