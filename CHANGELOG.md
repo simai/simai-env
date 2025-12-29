@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.12] - 2025-12-29
+### Fixed
+- Robust insertion of `# simai-php` metadata when patching nginx sockets during PHP switches.
+- `php list` table accommodates longer FPM status values.
+
 ## [0.7.11] - 2025-12-29
 ### Fixed
 - `php list` now shows a bordered table with FPM status and pool counts.

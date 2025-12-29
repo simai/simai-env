@@ -9,9 +9,9 @@ php_list_handler() {
     return
   fi
 
-  local border="+----------+------------+------------+"
+  local border="+----------+--------------+------------+"
   printf "%s\n" "$border"
-  printf "| %-8s | %-10s | %-10s |\n" "Version" "FPM status" "Pool count"
+  printf "| %-8s | %-12s | %-10s |\n" "Version" "FPM status" "Pool count"
   printf "%s\n" "$border"
   for v in "${versions[@]}"; do
     local svc="php${v}-fpm"

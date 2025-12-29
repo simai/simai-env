@@ -387,9 +387,9 @@ nginx_patch_php_socket() {
     perl -pi -e "s|^(# simai-php: ).*|\\1${new_php}|" "$cfg"
   else
     if grep -q "^# simai-root:" "$cfg"; then
-      perl -0pi -e "s/(^# simai-root:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
+      perl -0pi -e "s/(# simai-root:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
     else
-      perl -0pi -e "s/(^# simai-project:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
+      perl -0pi -e "s/(# simai-project:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
     fi
   fi
   if ! grep -q "${new_socket}" "$cfg"; then
