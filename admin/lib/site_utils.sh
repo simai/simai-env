@@ -203,7 +203,7 @@ create_nginx_site() {
   local domain="$1" project="$2" project_path="$3" php_version="$4" template_path="${5:-$NGINX_TEMPLATE}" profile="${6:-}" target="${7:-}" php_socket_project="${8:-$project}" ssl_cert="${9:-}" ssl_key="${10:-}" ssl_chain="${11:-}" ssl_redirect="${12:-no}" ssl_hsts="${13:-no}"
   if [[ ! -f "$template_path" ]]; then
     error "nginx template not found at ${template_path}"
-    exit 1
+    return 1
   fi
   local site_available="/etc/nginx/sites-available/${domain}.conf"
   local site_enabled="/etc/nginx/sites-enabled/${domain}.conf"
@@ -251,7 +251,7 @@ create_nginx_site() {
     fi
   fi
   ensure_nginx_catchall
-  nginx -t >>"$LOG_FILE" 2>&1 || { error "nginx config test failed"; exit 1; }
+  nginx -t >>"$LOG_FILE" 2>&1 || { error "nginx config test failed"; return 1; }
   systemctl reload nginx >>"$LOG_FILE" 2>&1 || systemctl restart nginx >>"$LOG_FILE" 2>&1 || true
 }
 

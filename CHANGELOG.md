@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.21] - 2025-12-29
+### Fixed
+- Menu no longer exits when handlers call exit; handlers are sandboxed and errors are reported with exit codes.
+- require_args and create_nginx_site now return errors instead of exiting, preserving menu flow.
+- SSL status/remove honor reserved-domain allow policy without re-blocking.
+
 ## [0.7.20] - 2025-12-29
 ### Fixed
 - Site add menu no longer prompts for path style; default directory uses the domain with dots unless overridden via CLI/config.

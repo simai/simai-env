@@ -148,7 +148,7 @@ run_command() {
   local handler="${CMD_HANDLERS[$key]:-}"
   if [[ -z $handler ]]; then
     error "Unknown command: ${section} ${name}"
-    exit 1
+    return 1
   fi
   ensure_audit_log
   local corr_id
@@ -200,7 +200,7 @@ require_args() {
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
     error "Missing required options: ${missing[*]}"
-    exit 1
+    return 1
   fi
 }
 
