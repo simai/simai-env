@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.10] - 2025-12-29
+### Fixed
+- Ensure cron is installed/started during simai-env installs and improve cron removal UX (project-name or path).
+- Added cron command documentation and clearer cron service handling in admin helpers.
+
+### Security
+- Admin cron helpers warn when cron is missing/inactive to prevent silent scheduler failures.
+
 ## [0.7.9] - 2025-12-29
 ### Fixed
 - Standardized Laravel scheduler to `/etc/cron.d/<project>` and implemented cron add/remove commands.

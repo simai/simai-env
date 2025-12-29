@@ -16,6 +16,7 @@
 - home: `/home/simai/`
 - projects: `/home/simai/www/<project>/`
 - optional: cron for scheduler and a systemd unit for queues
+- Laravel scheduler uses `/etc/cron.d/<project>` (cron service must be running)
 
 ## Usage (run as root)
 

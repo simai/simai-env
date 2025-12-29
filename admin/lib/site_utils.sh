@@ -315,7 +315,26 @@ remove_php_pools() {
 }
 
 reload_cron_daemon() {
+  ensure_cron_service
   systemctl reload cron >>"$LOG_FILE" 2>&1 || systemctl restart cron >>"$LOG_FILE" 2>&1 || service cron reload >>"$LOG_FILE" 2>&1 || true
+}
+
+ensure_cron_service() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    warn "cron service check skipped (systemctl not available)"
+    return
+  fi
+  if ! systemctl list-unit-files | grep -q '^cron\\.service'; then
+    warn "cron service not found. Install: apt-get install cron; then: systemctl enable --now cron"
+    return
+  fi
+  if systemctl is-active --quiet cron; then
+    return
+  fi
+  systemctl enable --now cron >>"$LOG_FILE" 2>&1 || systemctl restart cron >>"$LOG_FILE" 2>&1 || true
+  if ! systemctl is-active --quiet cron; then
+    warn "cron service is inactive; ensure cron is installed and run: systemctl enable --now cron"
+  fi
 }
 
 ensure_project_cron() {
