@@ -54,7 +54,24 @@ chmod +x "$INSTALL_DIR/simai-admin.sh"
 chmod +x "$INSTALL_DIR/update.sh"
 
 echo "Installed to $INSTALL_DIR"
-echo "Next: create your first site (installer does NOT create any sites automatically)."
-echo "Example:"
-echo "  sudo $INSTALL_DIR/simai-admin.sh site add --domain <your-domain> --profile generic --php 8.2 --path /home/simai/www/<project>"
-echo "Note: Existing nginx configs in /etc/nginx/sites-available stay untouched."
+
+if [[ "${SIMAI_INSTALL_NO_BOOTSTRAP:-0}" != "1" && "${SIMAI_INSTALL_MODE:-scripts}" != "scripts" ]]; then
+  echo "[1/3] Running bootstrap (packages and services)..."
+  export DEBIAN_FRONTEND=noninteractive
+  if ! sudo "${INSTALL_DIR}/simai-env.sh" bootstrap --php 8.2 --mysql percona --node-version 20 --silent; then
+    echo "Bootstrap failed. Check /var/log/simai-env.log for details." >&2
+    exit 1
+  fi
+  echo "[2/3] Bootstrap steps complete."
+  echo "[3/3] Bootstrap finished."
+else
+  echo "Bootstrap skipped (SIMAI_INSTALL_MODE=scripts or SIMAI_INSTALL_NO_BOOTSTRAP=1)."
+  echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 20"
+fi
+
+if [[ "${SIMAI_INSTALL_NO_MENU:-0}" != "1" && -t 0 ]]; then
+  echo "Launching admin menu..."
+  exec "${INSTALL_DIR}/simai-admin.sh" menu </dev/tty >/dev/tty 2>/dev/tty
+fi
+
+echo "Next: open the admin menu: sudo ${INSTALL_DIR}/simai-admin.sh menu"

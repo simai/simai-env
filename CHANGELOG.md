@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.27] - 2025-12-30
+### Added/Changed
+- Installer now runs a full bootstrap (packages/services) by default and can launch the admin menu; opt out via SIMAI_INSTALL_MODE=scripts or SIMAI_INSTALL_NO_BOOTSTRAP=1.
+- README quick start simplified; scripts-only install documented.
+### Improved
+- Bootstrap call is non-interactive with clear progress; no sites are created during install.
+
 ## [0.7.25] - 2025-12-30
 ### Added/Changed
 - Bootstrap mode installs the base stack without creating sites; admin menu runs a preflight and can trigger bootstrap on fresh servers.
