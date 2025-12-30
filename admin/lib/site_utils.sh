@@ -249,61 +249,69 @@ create_nginx_site() {
       my $hsts     = lc($ENV{SSL_HSTS} // "no");
       my $redirect = lc($ENV{SSL_REDIRECT} // "no");
 
-      sub insert_before_closing {
+      sub insert_before_server_closing {
         my ($block) = @_;
-        my $inserted = 0;
-        $_ =~ s/^(\\s*}\\s*)$/ $inserted=1; "$block\n$1"/egm;
-        if (!$inserted) {
-          $_ .= "\n$block\n";
+        $block .= "\n" unless $block =~ /\n\z/;
+        if ($_ =~ s/(\n}\s*\z)/"\n$block$1"/se) {
+          return;
         }
+        $_ .= "\n$block\n";
       }
 
       if ($cert && $key) {
-        if ($_ !~ /listen\\s+443\\s+ssl;/) {
-          if ($_ =~ s/(\\s*listen\\s+80[^\\n]*;\\s*\\n)/$1    listen 443 ssl;\\n/) {
-          } elsif ($_ =~ s/(server_name\\s+.*;\\s*\\n)/$1    listen 443 ssl;\\n/) {
+        if ($_ !~ /listen\s+443\s+ssl;/) {
+          if ($_ =~ s/(^[ \t]*listen\s+80[^\n]*;\s*\n)/$1    listen 443 ssl;\n/m) {
+          } elsif ($_ =~ s/(^[ \t]*server_name\s+.*;\s*\n)/$1    listen 443 ssl;\n/m) {
           } else {
-            insert_before_closing("    listen 443 ssl;");
+            insert_before_server_closing("    listen 443 ssl;");
           }
         }
 
-        if ($_ =~ /ssl_certificate\\s+/) {
-          s/(ssl_certificate\\s+).*/${1}$cert;/;
+        if ($_ =~ /ssl_certificate\s+/) {
+          s/(ssl_certificate\s+).*/${1}$cert;/;
         } else {
-          insert_before_closing("    ssl_certificate $cert;");
+          insert_before_server_closing("    ssl_certificate $cert;");
         }
 
-        if ($_ =~ /ssl_certificate_key\\s+/) {
-          s/(ssl_certificate_key\\s+).*/${1}$key;/;
+        if ($_ =~ /ssl_certificate_key\s+/) {
+          s/(ssl_certificate_key\s+).*/${1}$key;/;
         } else {
-          insert_before_closing("    ssl_certificate_key $key;");
+          insert_before_server_closing("    ssl_certificate_key $key;");
         }
 
         if (length $chain) {
-          if ($_ =~ /ssl_trusted_certificate\\s+/) {
-            s/(ssl_trusted_certificate\\s+).*/${1}$chain;/;
+          if ($_ =~ /ssl_trusted_certificate\s+/) {
+            s/(ssl_trusted_certificate\s+).*/${1}$chain;/;
           } else {
-            insert_before_closing("    ssl_trusted_certificate $chain;");
+            insert_before_server_closing("    ssl_trusted_certificate $chain;");
           }
         }
 
         if ($hsts eq "yes" && $_ !~ /Strict-Transport-Security/) {
-          insert_before_closing("    add_header Strict-Transport-Security \\\"max-age=31536000\\\" always;");
+          insert_before_server_closing("    add_header Strict-Transport-Security \\\"max-age=31536000\\\" always;");
         }
 
         if ($redirect eq "yes" && $_ !~ /simai-ssl-redirect/) {
           my $block = "    # simai-ssl-redirect-start\n    if (\\$scheme != \\\"https\\\") { return 301 https://\\$host\\$request_uri; }\n    # simai-ssl-redirect-end";
-          insert_before_closing($block);
+          insert_before_server_closing($block);
         }
       }
     ' "$site_available" || { restore_nginx_backup "$site_available" "$site_enabled" "$backup"; return 1; }
   fi
   ensure_nginx_catchall
-  if ! nginx -t >>"$LOG_FILE" 2>&1; then
-    error "nginx config test failed"
+  local nginx_test_output
+  if ! nginx_test_output=$(nginx -t 2>&1); then
+    echo "$nginx_test_output" >>"$LOG_FILE"
+    local failure_ts
+    failure_ts=$(date +%Y%m%d%H%M%S)
+    if [[ -n "$backup" && -f "$site_available" ]]; then
+      cp -p "$site_available" "${site_available}.failed.${failure_ts}" >>"$LOG_FILE" 2>&1 || true
+    fi
+    error "$(printf "nginx config test failed:\n%s" "$(echo "$nginx_test_output" | tail -n 8)")"
     restore_nginx_backup "$site_available" "$site_enabled" "$backup"
     return 1
   fi
+  echo "$nginx_test_output" >>"$LOG_FILE"
   systemctl reload nginx >>"$LOG_FILE" 2>&1 || systemctl restart nginx >>"$LOG_FILE" 2>&1 || true
 }
 

@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.24] - 2025-12-30
+### Fixed
+- SSL nginx patch now inserts directives in the server block (no more placement inside location blocks causing invalid configs).
+- On nginx -t failures during SSL apply, a tail of the nginx error output is shown for easier diagnostics.
+### Improved
+- SSL nginx apply remains transactional: failed applies save the generated file for debugging, restore the prior config, and avoid nginx reload.
+
 ## [0.7.23] - 2025-12-30
 ### Fixed
 - Robust SSL nginx config injection: safer perl patching with no shell expansion issues for certificate/key paths.
