@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SIMAI_ENV_ROOT="$SCRIPT_DIR"
 LOG_FILE=${LOG_FILE:-/var/log/simai-env.log}
 SILENT=0
 ACTION=install
@@ -32,6 +33,7 @@ PHP_BIN=""
 QUEUE_TEMPLATE="${SCRIPT_DIR}/systemd/laravel-queue.service"
 NGINX_TEMPLATE="${SCRIPT_DIR}/templates/nginx-laravel.conf"
 ALLOW_RESERVED_DOMAIN=0
+source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 
 usage() {
   cat <<USAGE
@@ -178,17 +180,9 @@ require_root() {
 }
 
 require_supported_os() {
-  if [[ ! -f /etc/os-release ]]; then
-    fail "Cannot detect OS"
+  if ! platform_assert_supported_os; then
+    fail "Unsupported OS. Supported only on $(platform_supported_matrix_string)"
   fi
-  . /etc/os-release
-  if [[ ${ID} != "ubuntu" ]]; then
-    fail "Supported only on Ubuntu 20.04/22.04/24.04"
-  fi
-  case ${VERSION_ID} in
-    "20.04"|"22.04"|"24.04") ;;
-    *) fail "Unsupported Ubuntu version ${VERSION_ID}";;
-  esac
 }
 
 validate_domain() {
@@ -883,7 +877,10 @@ clean_flow() {
 
 bootstrap_flow() {
   info "Starting bootstrap (no sites will be created)"
-  progress_init 8
+  progress_init 9
+  progress_step "Checking OS compatibility"
+  platform_detect_os
+  platform_print_os_support_status || fail "Unsupported OS. Supported only on $(platform_supported_matrix_string)"
   progress_step "Ensuring simai user and base directories"
   ensure_user
   mkdir -p "$WWW_ROOT"

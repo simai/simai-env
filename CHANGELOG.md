@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2025-12-30
+### Added/Changed
+- Added OS compatibility preflight with clear TTY status output (Ubuntu 20.04/22.04/24.04 supported), shared via platform helpers and used before bootstrap/update/install.
+### Improved
+- Colored OS status goes only to TTY; logs remain clean of ANSI codes.
+
 ## [0.8.0] - 2025-12-30
 ### Added/Changed
 - Admin CLI now has a unified spinner/timing `run_long` helper for long-running commands; SSL/certbot operations use it with progress steps.

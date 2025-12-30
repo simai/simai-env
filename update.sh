@@ -12,19 +12,27 @@ if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
 fi
 
 check_supported_os() {
+  local GREEN="" RED="" RESET=""
+  if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
+    GREEN=$'\e[32m'; RED=$'\e[31m'; RESET=$'\e[0m'
+  fi
   if [[ ! -f /etc/os-release ]]; then
-    echo "Cannot detect OS" >&2
+    printf "%s[ERROR] Cannot detect OS%s\n" "$RED" "$RESET" >&2
     exit 1
   fi
+  # shellcheck disable=SC1091
   . /etc/os-release
-  if [[ ${ID} != "ubuntu" ]]; then
-    echo "Supported only on Ubuntu 20.04/22.04/24.04" >&2
-    exit 1
+  local matrix="Ubuntu 20.04/22.04/24.04"
+  if [[ ${ID} == "ubuntu" ]]; then
+    case ${VERSION_ID} in
+      "20.04"|"22.04"|"24.04")
+        printf "%s[OK] OS: %s (%s %s %s) — supported%s\n" "$GREEN" "${PRETTY_NAME:-Ubuntu}" "${ID}" "${VERSION_ID}" "${VERSION_CODENAME:-}" "$RESET" >&2
+        return
+        ;;
+    esac
   fi
-  case ${VERSION_ID} in
-    "20.04"|"22.04"|"24.04") ;;
-    *) echo "Unsupported Ubuntu version ${VERSION_ID}" >&2; exit 1 ;;
-  esac
+  printf "%s[ERROR] OS: %s (%s %s %s) — unsupported. Supported: %s%s\n" "$RED" "${PRETTY_NAME:-Unknown}" "${ID:-unknown}" "${VERSION_ID:-unknown}" "${VERSION_CODENAME:-}" "${matrix}" "$RESET" >&2
+  exit 1
 }
 
 check_supported_os

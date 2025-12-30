@@ -5,6 +5,8 @@ LOG_FILE=${LOG_FILE:-/var/log/simai-admin.log}
 AUDIT_LOG_FILE=${AUDIT_LOG_FILE:-/var/log/simai-audit.log}
 ADMIN_USER=${ADMIN_USER:-simai}
 SIMAI_RC_MENU_RELOAD=88
+SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 if [[ -f /etc/simai-env.conf ]]; then
   # shellcheck disable=SC1091
   source /etc/simai-env.conf
@@ -82,7 +84,7 @@ run_long() {
     "$@" >>"$LOG_FILE" 2>&1 &
   fi
   local cmd_pid=$!
-  local spinner='|/-\'
+  local spinner='|/-\\'
   local i=0
   local interrupted=0
   trap 'interrupted=1; kill '"$cmd_pid"' 2>/dev/null || true' INT TERM
@@ -126,19 +128,12 @@ ensure_root() {
 }
 
 require_supported_os() {
-  if [[ ! -f /etc/os-release ]]; then
-    echo "Cannot detect OS" >&2
+  platform_detect_os
+  if ! platform_is_supported_os; then
+    platform_print_os_support_status
+    echo "Unsupported OS. Supported: $(platform_supported_matrix_string)" >&2
     exit 1
   fi
-  . /etc/os-release
-  if [[ ${ID} != "ubuntu" ]]; then
-    echo "Supported only on Ubuntu 20.04/22.04/24.04" >&2
-    exit 1
-  fi
-  case ${VERSION_ID} in
-    "20.04"|"22.04"|"24.04") ;;
-    *) echo "Unsupported Ubuntu version ${VERSION_ID}" >&2; exit 1 ;;
-  esac
 }
 
 register_cmd() {
