@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.2] - 2025-12-30
+### Fixed
+- Site list output is responsive to terminal width, truncates safely, and avoids wrapping on narrow displays.
+- Site remove prompts now respect static profile (no DB prompts) and skip PHP/cron/queue removal for static/alias sites with summaries showing none/n/a.
+
 ## [0.8.1] - 2025-12-30
 ### Added/Changed
 - Added OS compatibility preflight with clear TTY status output (Ubuntu 20.04/22.04/24.04 supported), shared via platform helpers and used before bootstrap/update/install.

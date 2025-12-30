@@ -256,6 +256,10 @@ site_remove_handler() {
       remove_files=0
       drop_db=0
       drop_user=0
+    elif [[ "$profile" == "static" ]]; then
+      [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
+      [[ -z "$drop_db" ]] && drop_db="no"
+      [[ -z "$drop_user" ]] && drop_user="no"
     else
       [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
       [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
@@ -276,7 +280,7 @@ site_remove_handler() {
   info "Removing site: domain=${domain}, project=${project}, path=${path}"
   local removed_queue=0 removed_cron=0
   remove_nginx_site "$domain"
-  if [[ "$profile" != "alias" ]]; then
+  if [[ "$profile" != "alias" && "$profile" != "static" ]]; then
     remove_php_pools "$project"
     remove_cron_file "$project" && removed_cron=1 || removed_cron=0
     remove_queue_unit "$project" && removed_queue=1 || removed_queue=0
@@ -294,16 +298,28 @@ site_remove_handler() {
     mysql -uroot -e "DROP USER IF EXISTS '${db_user}'@'%';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop legacy wildcard user ${db_user}@%"
   fi
   info "Site remove completed for ${domain}"
+  local php_summary="removed (${project})"
+  local cron_summary="$([[ $removed_cron -eq 1 ]] && echo removed || echo none)"
+  local queue_summary="$([[ $removed_queue -eq 1 ]] && echo removed || echo none)"
+  local db_summary="$([[ $drop_db -eq 1 ]] && echo dropped || echo kept)"
+  local db_user_summary="$([[ $drop_user -eq 1 ]] && echo dropped || echo kept)"
+  if [[ "$profile" == "static" || "$profile" == "alias" ]]; then
+    php_summary="none"
+    cron_summary="none"
+    queue_summary="none"
+    db_summary="n/a"
+    db_user_summary="n/a"
+  fi
   echo "===== Site remove summary ====="
   echo "Domain     : ${domain}"
   echo "Profile    : ${profile}"
   echo "Nginx      : removed"
-  echo "PHP-FPM    : removed (${project})"
-  echo "Cron       : $([[ $removed_cron -eq 1 ]] && echo removed || echo none)"
-  echo "Queue unit : $([[ $removed_queue -eq 1 ]] && echo removed || echo none)"
+  echo "PHP-FPM    : ${php_summary}"
+  echo "Cron       : ${cron_summary}"
+  echo "Queue unit : ${queue_summary}"
   echo "Files      : $([[ $remove_files -eq 1 ]] && echo removed || echo kept)"
-  echo "Database   : $([[ $drop_db -eq 1 ]] && echo dropped || echo kept)"
-  echo "DB user    : $([[ $drop_user -eq 1 ]] && echo dropped || echo kept)"
+  echo "Database   : ${db_summary}"
+  echo "DB user    : ${db_user_summary}"
 }
 
 site_set_php_handler() {
@@ -371,9 +387,86 @@ site_set_php_handler() {
 }
 
 site_list_handler() {
-  local sep="+------------------------------+------------+----------+----------------------+------------------------------------------+"
+  repeat() {
+    local char="$1" count="$2"
+    printf "%*s" "$count" "" | tr ' ' "$char"
+  }
+  truncate_cell() {
+    local width="$1" text="$2"
+    local len=${#text}
+    if (( len <= width )); then
+      printf "%s" "$text"
+    else
+      local cut=$((width-3))
+      ((cut<0)) && cut=0
+      printf "%s..." "${text:0:cut}"
+    fi
+  }
+
+  local is_tty=0
+  [[ -t 1 ]] && is_tty=1
+  local cols
+  cols=$(tput cols 2>/dev/null || echo 120)
+
+  local domain_w=28 profile_w=10 php_w=6 ssl_w=12 root_w=40
+  local min_domain=15 min_profile=8 min_php=4 min_ssl=10 min_root=20
+  if [[ $is_tty -eq 1 ]]; then
+    domain_w=$min_domain; profile_w=$min_profile; php_w=$min_php; ssl_w=$min_ssl; root_w=$min_root
+    local ncols=5
+    local total=$((domain_w+profile_w+php_w+ssl_w+root_w + 3*ncols + 1))
+    if (( cols > total )); then
+      local extra=$((cols - total))
+      root_w=$((root_w + extra))
+    else
+      # compact mode
+      local compact=1
+      local compact_domain=$min_domain compact_profile=$min_profile compact_php=$min_php compact_ssl=$min_ssl
+      local available=$((cols - (3*4 + 1)))
+      if (( available < compact_profile+compact_php+compact_ssl+8 )); then
+        compact_domain=8
+      else
+        compact_domain=$((available - (compact_profile+compact_php+compact_ssl)))
+      fi
+      ((compact_domain<8)) && compact_domain=8
+      local sep="+$(repeat '-' $((compact_domain+2)))+$(repeat '-' $((compact_profile+2)))+$(repeat '-' $((compact_php+2)))+$(repeat '-' $((compact_ssl+2)))+"
+      printf "%s\n" "$sep"
+      printf "| %-*s | %-*s | %-*s | %-*s |\n" \
+        "$compact_domain" "Domain" "$compact_profile" "Profile" "$compact_php" "PHP" "$compact_ssl" "SSL"
+      printf "%s\n" "$sep"
+      while IFS= read -r s; do
+        [[ -z "$s" ]] && continue
+        read_site_metadata "$s"
+        local profile="${SITE_META[profile]:-generic}"
+        local php="${SITE_META[php]:-}"
+        local root="${SITE_META[root]:-}"
+        local target="${SITE_META[target]:-}"
+        local ssl_info
+        ssl_info=$(site_ssl_brief "$s")
+        local summary="$root"
+        if [[ "$profile" == "alias" && -n "$target" ]]; then
+          summary="alias -> ${target}"
+        fi
+        printf "| %-*s | %-*s | %-*s | %-*s |\n" \
+          "$compact_domain" "$(truncate_cell "$compact_domain" "$s")" \
+          "$compact_profile" "$(truncate_cell "$compact_profile" "$profile")" \
+          "$compact_php" "$(truncate_cell "$compact_php" "$php")" \
+          "$compact_ssl" "$(truncate_cell "$compact_ssl" "$ssl_info")"
+        local label="Root/Target"
+        local max_summary=$((cols-4-${#label}))
+        ((max_summary<0)) && max_summary=0
+        printf "  %s: %s\n" "$label" "$(truncate_cell "$max_summary" "$summary")"
+      done < <(list_sites)
+      printf "%s\n" "$sep"
+      return
+    fi
+  fi
+
+  local ncols=5
+  local total=$((domain_w+profile_w+php_w+ssl_w+root_w + 3*ncols + 1))
+  local sep="+$(repeat '-' $((domain_w+2)))+$(repeat '-' $((profile_w+2)))+$(repeat '-' $((php_w+2)))+$(repeat '-' $((ssl_w+2)))+$(repeat '-' $((root_w+2)))+"
   printf "%s\n" "$sep"
-  printf "| %-28s | %-10s | %-8s | %-20s | %-40s |\n" "Domain" "Profile" "PHP" "SSL" "Root/Target"
+  printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    "$domain_w" "Domain" "$profile_w" "Profile" "$php_w" "PHP" "$ssl_w" "SSL" "$root_w" "Root/Target"
   printf "%s\n" "$sep"
   local s
   while IFS= read -r s; do
@@ -389,7 +482,12 @@ site_list_handler() {
     if [[ "$profile" == "alias" && -n "$target" ]]; then
       summary="alias -> ${target}"
     fi
-    printf "| %-28s | %-10s | %-8s | %-20s | %-40s |\n" "$s" "$profile" "$php" "$ssl_info" "$summary"
+    printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+      "$domain_w" "$(truncate_cell "$domain_w" "$s")" \
+      "$profile_w" "$(truncate_cell "$profile_w" "$profile")" \
+      "$php_w" "$(truncate_cell "$php_w" "$php")" \
+      "$ssl_w" "$(truncate_cell "$ssl_w" "$ssl_info")" \
+      "$root_w" "$(truncate_cell "$root_w" "$summary")"
   done < <(list_sites)
   printf "%s\n" "$sep"
 }
