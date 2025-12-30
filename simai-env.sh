@@ -92,6 +92,51 @@ info() { log "INFO" "$@"; }
 warn() { log "WARN" "$@"; }
 error() { log "ERROR" "$@"; }
 
+run_long() {
+  local desc="$1"; shift
+  local has_tty=0
+  [[ -t 1 && -r /dev/tty && -w /dev/tty ]] && has_tty=1
+  local start
+  start=$(date +%s)
+  info "$desc"
+  "$@" >>"$LOG_FILE" 2>&1 &
+  local cmd_pid=$!
+  local spinner='|/-\\'
+  local i=0
+  local interrupted=0
+  trap 'interrupted=1; kill '"$cmd_pid"' 2>/dev/null || true' INT TERM
+  while kill -0 "$cmd_pid" 2>/dev/null; do
+    if [[ $has_tty -eq 1 ]]; then
+      local elapsed=$(( $(date +%s) - start ))
+      printf "\r[%s] %s... %ss" "${spinner:i%4:1}" "$desc" "$elapsed" >/dev/tty
+      i=$((i+1))
+    fi
+    sleep 1
+  done
+  wait "$cmd_pid"
+  local rc=$?
+  trap - INT TERM
+  local elapsed=$(( $(date +%s) - start ))
+  if [[ $has_tty -eq 1 ]]; then
+    printf "\r" >/dev/tty
+  fi
+  if [[ $interrupted -eq 1 ]]; then
+    [[ $has_tty -eq 1 ]] && echo "Interrupted" >/dev/tty || echo "Interrupted"
+    return 130
+  fi
+  if [[ $rc -ne 0 ]]; then
+    [[ $has_tty -eq 1 ]] && echo "[ERROR] ${desc} failed" >/dev/tty || echo "[ERROR] ${desc} failed"
+    tail -n 80 "$LOG_FILE" 2>/dev/null || true
+    return $rc
+  fi
+  if [[ $has_tty -eq 1 ]]; then
+    printf "[OK] %s (%.0fs)\n" "$desc" "$elapsed" >/dev/tty
+  else
+    info "$desc completed in ${elapsed}s"
+  fi
+  return 0
+}
+
 progress_init() {
   PROGRESS_TOTAL=$1
   PROGRESS_CURRENT=0
@@ -383,18 +428,20 @@ ensure_defaults() {
 
 apt_update_once() {
   if [[ $APT_UPDATED -eq 0 ]]; then
-    info "Running apt-get update"
-    apt-get update -y >>"$LOG_FILE" 2>&1
+    if ! run_long "Running apt-get update" apt-get update -y; then
+      fail "apt-get update failed"
+    fi
     APT_UPDATED=1
   fi
 }
 
 install_packages() {
   apt_update_once
-  info "Installing base utilities"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  if ! run_long "Installing base utilities" DEBIAN_FRONTEND=noninteractive apt-get install -y \
     software-properties-common ca-certificates curl gnupg lsb-release sudo cron \
-    git unzip htop rsyslog logrotate certbot >>"$LOG_FILE" 2>&1
+    git unzip htop rsyslog logrotate certbot; then
+    fail "Failed to install base utilities"
+  fi
   systemctl enable --now cron >>"$LOG_FILE" 2>&1 || true
 }
 
@@ -411,8 +458,9 @@ install_php_stack() {
     "php${PHP_VERSION}-intl" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" "php${PHP_VERSION}-xml"
     "php${PHP_VERSION}-gd" "php${PHP_VERSION}-imagick" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-opcache"
   )
-  info "Installing PHP ${PHP_VERSION} stack"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}" >>"$LOG_FILE" 2>&1 || fail "Failed to install PHP ${PHP_VERSION}"
+  if ! run_long "Installing PHP ${PHP_VERSION} stack" DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"; then
+    fail "Failed to install PHP ${PHP_VERSION}"
+  fi
   PHP_BIN=$(command -v "php${PHP_VERSION}" || true)
   if [[ -z $PHP_BIN ]]; then
     warn "php${PHP_VERSION} binary not found; falling back to php"
@@ -423,8 +471,7 @@ install_php_stack() {
 
 install_nginx() {
   apt_update_once
-  info "Installing nginx"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y nginx >>"$LOG_FILE" 2>&1
+  run_long "Installing nginx" DEBIAN_FRONTEND=noninteractive apt-get install -y nginx || fail "Failed to install nginx"
   systemctl enable --now nginx >>"$LOG_FILE" 2>&1 || true
 }
 
@@ -455,25 +502,23 @@ install_mysql() {
   if [[ $MYSQL_FLAVOR == "percona" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/percona-release.list ]]; then
       info "Adding Percona repository"
-      curl -fsSL -o /tmp/percona-release.deb https://repo.percona.com/apt/percona-release_latest.generic_all.deb >>"$LOG_FILE" 2>&1 || fail "Cannot download Percona release package"
-      dpkg -i /tmp/percona-release.deb >>"$LOG_FILE" 2>&1 || fail "Failed to install Percona release package"
-      percona-release setup ps80 -y >>"$LOG_FILE" 2>&1 || fail "Failed to configure Percona repo"
+      run_long "Downloading Percona release package" curl -fsSL -o /tmp/percona-release.deb https://repo.percona.com/apt/percona-release_latest.generic_all.deb || fail "Cannot download Percona release package"
+      run_long "Installing Percona release package" dpkg -i /tmp/percona-release.deb || fail "Failed to install Percona release package"
+      run_long "Configuring Percona repo" percona-release setup ps80 -y || fail "Failed to configure Percona repo"
       APT_UPDATED=0
     fi
     apt_update_once
     info "Installing Percona Server 8.0"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y percona-server-server percona-server-client >>"$LOG_FILE" 2>&1
+    run_long "Installing Percona Server 8.0" DEBIAN_FRONTEND=noninteractive apt-get install -y percona-server-server percona-server-client || fail "Failed to install Percona Server 8.0"
   else
-    info "Installing MySQL Server"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server >>"$LOG_FILE" 2>&1
+    run_long "Installing MySQL Server" DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server || fail "Failed to install MySQL Server"
   fi
   systemctl enable --now mysql >>"$LOG_FILE" 2>&1 || true
 }
 
 install_redis() {
   apt_update_once
-  info "Installing redis-server"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server >>"$LOG_FILE" 2>&1
+  run_long "Installing redis-server" DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server || fail "Failed to install redis-server"
   systemctl enable --now redis-server >>"$LOG_FILE" 2>&1 || true
 }
 
@@ -486,9 +531,8 @@ install_node() {
       return
     fi
   fi
-  info "Installing Node.js ${NODE_VERSION} via NodeSource"
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - >>"$LOG_FILE" 2>&1 || fail "Failed to add NodeSource"
-  DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs >>"$LOG_FILE" 2>&1
+  run_long "Adding NodeSource repo for Node.js ${NODE_VERSION}" bash -c "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -" || fail "Failed to add NodeSource"
+  run_long "Installing Node.js ${NODE_VERSION}" DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs || fail "Failed to install Node.js ${NODE_VERSION}"
 }
 
 install_composer() {
@@ -501,11 +545,10 @@ install_composer() {
   php_cmd=${php_cmd:-$(command -v php || echo "/usr/bin/php")}
   local sig
   sig=$(curl -fsSL https://composer.github.io/installer.sig)
-  info "Installing Composer"
-  $php_cmd -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" >>"$LOG_FILE" 2>&1
-  $php_cmd -r "if (hash_file('SHA384', 'composer-setup.php') !== '$sig') { echo 'Installer corrupt'; exit(1); }" >>"$LOG_FILE" 2>&1 || fail "Composer installer checksum failed"
-  $php_cmd composer-setup.php --install-dir=/usr/local/bin --filename=composer >>"$LOG_FILE" 2>&1 || fail "Composer install failed"
-  $php_cmd -r "unlink('composer-setup.php');" >>"$LOG_FILE" 2>&1
+  run_long "Downloading Composer installer" $php_cmd -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" || fail "Failed to download Composer installer"
+  run_long "Verifying Composer installer checksum" $php_cmd -r "if (hash_file('SHA384', 'composer-setup.php') !== '$sig') { echo 'Installer corrupt'; exit(1); }" || fail "Composer installer checksum failed"
+  run_long "Installing Composer" $php_cmd composer-setup.php --install-dir=/usr/local/bin --filename=composer || fail "Composer install failed"
+  run_long "Cleaning up Composer installer" $php_cmd -r "unlink('composer-setup.php');" || true
 }
 
 ensure_user() {

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.7.29] - 2025-12-30
+### Improved
+- Bootstrap and installer long-running steps now show a spinner with elapsed time on interactive terminals while logging to /var/log/simai-env.log, preventing “silent freeze” during apt installs.
+
 ## [0.7.28] - 2025-12-30
 ### Fixed
 - Installer defaults now run bootstrap (packages/services) unless explicitly skipped; scripts-only no longer the default.
