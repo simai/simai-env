@@ -156,7 +156,15 @@ run_menu() {
       set -e
       if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
         info "Restarting menu..."
-        exec "${SCRIPT_DIR}/simai-admin.sh" menu
+        set +e
+        "${SCRIPT_DIR}/simai-admin.sh" menu
+        menu_rc=$?
+        set -e
+        if [[ $menu_rc -ne 0 ]]; then
+          warn "Failed to restart menu (exit=${menu_rc}). Staying in current menu."
+          continue
+        fi
+        return 0
       fi
       echo "---- done (${section} ${cmd}), exit=${rc} ----"
       if [[ $rc -ne 0 ]]; then

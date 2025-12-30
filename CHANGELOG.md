@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.3] - 2025-12-30
+### Changed
+- self bootstrap menu label now reads “Repair Environment …” to clarify it repairs/installs the base stack without touching sites.
+### Fixed
+- self update no longer drops the user to shell; menu restart is safe and stays open if restart fails.
+
 ## [0.8.2] - 2025-12-30
 ### Fixed
 - Site list output is responsive to terminal width, truncates safely, and avoids wrapping on narrow displays.

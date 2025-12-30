@@ -25,6 +25,7 @@ self_bootstrap_handler() {
   local php="${PARSED_ARGS[php]:-8.2}"
   local mysql="${PARSED_ARGS[mysql]:-mysql}"
   local node="${PARSED_ARGS[node-version]:-20}"
+  info "Repair Environment: installs/repairs base packages and may reload services; sites are not removed."
   progress_init 2
   progress_step "Running bootstrap (php=${php}, mysql=${mysql}, node=${node})"
   if ! "${SCRIPT_DIR}/simai-env.sh" bootstrap --php "$php" --mysql "$mysql" --node-version "$node"; then
@@ -72,4 +73,4 @@ self_version_handler() {
 
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
-register_cmd "self" "bootstrap" "Install base stack (nginx/php/mysql/certbot/etc.) without creating sites" "self_bootstrap_handler" "" "php= mysql= node-version="
+register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
