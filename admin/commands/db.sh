@@ -43,27 +43,46 @@ db_drop_handler() {
   require_args "name"
 
   local name="${PARSED_ARGS[name]}"
-  local drop_user="${PARSED_ARGS[drop-user]:-0}"
+  local drop_user="${PARSED_ARGS[drop-user]:-no}"
   local user="${PARSED_ARGS[user]:-}"
   local confirm="${PARSED_ARGS[confirm]:-}"
+  case "${drop_user,,}" in
+    1|yes|true) drop_user="yes" ;;
+    0|no|false|"") drop_user="no" ;;
+    *) drop_user="no" ;;
+  esac
   if ! db_validate_db_name "$name"; then
     return 1
-  fi
-  [[ -z "$user" ]] && user="$name"
-  if [[ "$drop_user" == "1" ]]; then
-    if ! db_validate_db_user "$user"; then
-      return 1
-    fi
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" ]]; then
     if [[ "${confirm,,}" != "yes" ]]; then
       error "Destructive action; add --confirm yes"
       return 1
     fi
+    if [[ "$drop_user" == "yes" && -z "$user" ]]; then
+      error "When --drop-user yes, you must provide --user <db_user> (or set --drop-user no)."
+      return 1
+    fi
   else
     local sure
     sure=$(select_from_list "Drop database ${name}?" "no" "no" "yes")
     [[ "$sure" != "yes" ]] && return 0
+    if [[ -z "${PARSED_ARGS[drop-user]:-}" ]]; then
+      drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
+      [[ -z "$drop_user" ]] && drop_user="no"
+    fi
+    if [[ "$drop_user" == "yes" && -z "$user" ]]; then
+      read -r -p "DB user to drop: " user || true
+      if [[ -z "$user" ]]; then
+        warn "DB user will be kept"
+        drop_user="no"
+      fi
+    fi
+  fi
+  if [[ "$drop_user" == "yes" ]]; then
+    if ! db_validate_db_user "$user"; then
+      return 1
+    fi
   fi
   progress_init 3
   progress_step "Checking MySQL availability and root access"
@@ -73,7 +92,7 @@ db_drop_handler() {
   fi
   progress_step "Dropping database ${name}"
   mysql_root_exec "DROP DATABASE IF EXISTS \\\`${name}\\\`;"
-  if [[ "$drop_user" == "1" ]]; then
+  if [[ "$drop_user" == "yes" ]]; then
     progress_step "Dropping user ${user}"
     mysql_root_exec "DROP USER IF EXISTS '${user}'@'127.0.0.1';"
     mysql_root_exec "DROP USER IF EXISTS '${user}'@'localhost';"
@@ -83,7 +102,11 @@ db_drop_handler() {
   progress_done "DB drop completed"
   echo "===== DB drop summary ====="
   echo "Database : ${name}"
-  echo "User     : $([[ "$drop_user" == "1" ]] && echo dropped || echo kept)"
+  if [[ "$drop_user" == "yes" ]]; then
+    echo "User     : dropped (${user})"
+  else
+    echo "User     : kept"
+  fi
 }
 
 db_pass_handler() {

@@ -24,6 +24,7 @@ SIMAI_INSTALL_MODE=scripts curl -fsSL https://raw.githubusercontent.com/simai/si
 - Profiles: generic, laravel, static, alias (set via admin CLI).
 - Healthcheck endpoints are local-only by default.
 - Reserved domains (RFC 2606) are blocked unless explicitly allowed.
+- Bash history note: if your password/command contains `!`, wrap it in single quotes (e.g., `--pass 'S3cret!pass'`) to avoid history expansion, or disable history expansion (`set +H`).
 
 ## More docs
 - Admin commands: `docs/commands/`

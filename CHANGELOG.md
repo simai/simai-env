@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.6] - 2025-12-31
+### Changed
+- db drop no longer assumes user=db_name; requires explicit --user in non-interactive mode, with interactive prompt fallback.
+- Added README note about quoting passwords containing `!` to avoid bash history expansion.
+
 ## [0.8.5] - 2025-12-31
 ### Added
 - DB commands (create/drop/set-pass) implemented with safe MySQL root detection, validation, and progress steps.
