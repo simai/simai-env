@@ -240,6 +240,12 @@ site_remove_handler() {
     path="${PARSED_ARGS[path]:-${SITE_META[root]:-$path}}"
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" ]]; then
+    if [[ "$profile" == "static" || "$profile" == "alias" ]]; then
+      if [[ "${drop_db,,}" == "yes" || "${drop_user,,}" == "yes" ]]; then
+        error "This site profile (${profile}) does not manage database resources. Refusing to drop DB/DB user."
+        return 1
+      fi
+    fi
     local destructive=0
     [[ "${remove_files,,}" == "yes" ]] && destructive=1
     [[ "${drop_db,,}" == "yes" ]] && destructive=1
@@ -258,12 +264,20 @@ site_remove_handler() {
       drop_user=0
     elif [[ "$profile" == "static" ]]; then
       [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
-      [[ -z "$drop_db" ]] && drop_db="no"
-      [[ -z "$drop_user" ]] && drop_user="no"
+      drop_db="no"
+      drop_user="no"
     else
       [[ -z "$remove_files" ]] && remove_files=$(select_from_list "Remove project files?" "no" "no" "yes")
-      [[ -z "$drop_db" ]] && drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
-      [[ -z "$drop_user" ]] && drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
+      if [[ -z "$drop_db" ]]; then
+        drop_db=$(select_from_list "Drop database?" "no" "no" "yes")
+      fi
+      if [[ "${drop_db,,}" == "yes" ]]; then
+        if [[ -z "$drop_user" ]]; then
+          drop_user=$(select_from_list "Drop DB user?" "no" "no" "yes")
+        fi
+      else
+        drop_user="no"
+      fi
     fi
   fi
   [[ "$remove_files" == "yes" ]] && remove_files=1 || remove_files=0
@@ -318,8 +332,13 @@ site_remove_handler() {
   echo "Cron       : ${cron_summary}"
   echo "Queue unit : ${queue_summary}"
   echo "Files      : $([[ $remove_files -eq 1 ]] && echo removed || echo kept)"
-  echo "Database   : ${db_summary}"
-  echo "DB user    : ${db_user_summary}"
+  if [[ "$profile" == "static" || "$profile" == "alias" ]]; then
+    echo "Database   : skipped (profile=${profile})"
+    echo "DB user    : skipped (profile=${profile})"
+  else
+    echo "Database   : ${db_summary}"
+    echo "DB user    : ${db_user_summary}"
+  fi
 }
 
 site_set_php_handler() {

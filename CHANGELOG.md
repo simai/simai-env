@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.7] - 2025-12-31
+### Changed
+- site remove is now profile-aware: static/alias sites no longer prompt for DB/user drops, and CLI rejects DB drop flags for those profiles; summaries show DB actions as skipped for static/alias.
+
 ## [0.8.6] - 2025-12-31
 ### Changed
 - db drop no longer assumes user=db_name; requires explicit --user in non-interactive mode, with interactive prompt fallback.
