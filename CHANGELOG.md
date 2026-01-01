@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [0.8.5] - 2025-12-31
+### Added
+- DB commands (create/drop/set-pass) implemented with safe MySQL root detection, validation, and progress steps.
+
 ## [0.8.4] - 2025-12-31
 ### Added
 - Installer prints a retro “SIMAI ENV” banner at startup (interactive terminals only, with safe fallback for narrow/non-UTF-8 environments).

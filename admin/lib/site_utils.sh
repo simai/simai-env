@@ -169,11 +169,17 @@ create_mysql_db_user() {
     warn "mysql client not found; skip DB creation"
     return 1
   fi
-  mysql -uroot -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" >>"$LOG_FILE" 2>&1 || warn "Failed to create database ${db_name}"
-  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}@127.0.0.1"
-  mysql -uroot -e "CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${db_user}@localhost"
-  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}@127.0.0.1"
-  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost'; FLUSH PRIVILEGES;" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${db_user}@localhost"
+  mysql_root_detect_cli || { warn "Cannot connect to MySQL as root"; return 1; }
+  local esc_pass
+  esc_pass=$(db_sql_escape "$db_pass")
+  mysql_root_exec "CREATE DATABASE IF NOT EXISTS \\\`${db_name}\\\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+  mysql_root_exec "CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${esc_pass}';"
+  mysql_root_exec "CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${esc_pass}';"
+  mysql_root_exec "ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${esc_pass}';"
+  mysql_root_exec "ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${esc_pass}';"
+  mysql_root_exec "GRANT ALL PRIVILEGES ON \\\`${db_name}\\\`.* TO '${db_user}'@'127.0.0.1';"
+  mysql_root_exec "GRANT ALL PRIVILEGES ON \\\`${db_name}\\\`.* TO '${db_user}'@'localhost';"
+  mysql_root_exec "FLUSH PRIVILEGES;"
 }
 
 create_php_pool() {
@@ -650,6 +656,63 @@ has_simai_metadata() {
   local domain="$1"
   local cfg="/etc/nginx/sites-available/${domain}.conf"
   [[ -f "$cfg" ]] && grep -q "^# simai-" "$cfg"
+}
+
+mysql_root_detect_cli() {
+  if [[ -n "${MYSQL_ROOT_CLI:-}" ]]; then
+    return 0
+  fi
+  local cli
+  cli=(mysql -uroot)
+  if "${cli[@]}" -e "SELECT 1;" >>"$LOG_FILE" 2>&1; then
+    MYSQL_ROOT_CLI=("${cli[@]}")
+    return 0
+  fi
+  if [[ -n "${SIMAI_MYSQL_ROOT_PASSWORD:-}" ]]; then
+    cli=(mysql -uroot -p"${SIMAI_MYSQL_ROOT_PASSWORD}")
+    if "${cli[@]}" -e "SELECT 1;" >>"$LOG_FILE" 2>&1; then
+      MYSQL_ROOT_CLI=("${cli[@]}")
+      return 0
+    fi
+  fi
+  if [[ -f /root/.my.cnf ]]; then
+    cli=(mysql --defaults-extra-file=/root/.my.cnf)
+    if "${cli[@]}" -e "SELECT 1;" >>"$LOG_FILE" 2>&1; then
+      MYSQL_ROOT_CLI=("${cli[@]}")
+      return 0
+    fi
+  fi
+  error "Cannot connect to MySQL as root. Check that Percona/MySQL is installed and root auth is configured."
+  return 1
+}
+
+mysql_root_exec() {
+  local sql="$1"
+  mysql_root_detect_cli || return 1
+  "${MYSQL_ROOT_CLI[@]}" -e "$sql" >>"$LOG_FILE" 2>&1
+}
+
+db_sql_escape() {
+  local input="$1"
+  input=${input//\\/\\\\}
+  input=${input//\'/\\\'}
+  echo "$input"
+}
+
+db_validate_db_name() {
+  local name="$1"
+  if [[ -z "$name" || ${#name} -gt 64 || ! "$name" =~ ^[a-z0-9_-]+$ ]]; then
+    error "Invalid database name: ${name}"
+    return 1
+  fi
+}
+
+db_validate_db_user() {
+  local user="$1"
+  if [[ -z "$user" || ${#user} -gt 32 || ! "$user" =~ ^[a-z0-9_-]+$ ]]; then
+    error "Invalid database user: ${user}"
+    return 1
+  fi
 }
 
 switch_site_php() {
