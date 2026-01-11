@@ -2,8 +2,8 @@
 
 ## Project scope
 - Ubuntu-only installer and admin CLI for PHP sites (generic by default, Laravel optional, alias profile for extra domains).
-- Supported OS: Ubuntu 20.04/22.04/24.04 only.
-- Default user: `simai`; projects live under `/home/simai/www/<project>/`.
+- Supported OS: Ubuntu 22.04/24.04 only.
+- Default user: `simai`; projects live under `/home/simai/www/<domain>/` (web root `<project-root>/public`).
 - Services: nginx, PHP-FPM (8.1/8.2/8.3 via `ppa:ondrej/php`), MySQL/Percona, Redis, Node.js, Composer.
 
 ## Key scripts
@@ -20,10 +20,10 @@
   - Select PHP version from installed `/etc/php/*` when not provided.
   - Optional DB creation (`create-db=yes`); defaults `db-name`/`db-user` from project slug, generates password; writes `.env` for generic profile; shows summary with credentials (not logged).
   - Copies `templates/healthcheck.php` to `public/healthcheck.php` (non-alias).
-- `site remove`: choose domain from list if missing; yes/no prompts for removing files/DB/user; removes nginx/site configs, php-fpm pools (all versions), cron file `/etc/cron.d/<project>`, queue unit `laravel-queue-<project>.service`; alias removal drops nginx/service stubs only.
+- `site remove`: choose domain from list if missing; yes/no prompts for removing files/DB/user; removes nginx/site configs, php-fpm pools (all versions), cron file `/etc/cron.d/<project-slug>`, queue unit `laravel-queue-<project-slug>.service`; alias removal drops nginx/service stubs only.
 - `site list`: prints table with domain, profile, PHP version, root/alias target (uses metadata comments in nginx configs).
 - `site set-php`: choose site (aliases filtered out), switch PHP version by recreating pool and nginx upstream; optional `keep-old-pool` flag (default no).
-- `ssl letsencrypt/install/renew/remove/status`: manage LE or custom certs for existing sites (aliases allowed, catch-all excluded); custom certs live in `/etc/nginx/ssl/<domain>/`, LE in `/etc/letsencrypt/live/<domain>/`; webroot = `<project>/public`; renew cron at `/etc/cron.d/simai-certbot`.
+- `ssl letsencrypt/install/renew/remove/status`: manage LE or custom certs for existing sites (aliases allowed, catch-all excluded); custom certs live in `/etc/nginx/ssl/<domain>/`, LE in `/etc/letsencrypt/live/<domain>/`; webroot = `<project-root>/public`; renew cron at `/etc/cron.d/simai-certbot`.
 - `php list`/`php reload`: list installed PHP versions, reload FPM; menu selection when needed.
 - `logs admin/env/audit/nginx/letsencrypt`: tail key logs (default 200 lines, `--lines` override); nginx log requires domain selection; audit log at `/var/log/simai-audit.log`.
 - `ssl` commands: select domain from existing sites when not provided (handlers are stubs).

@@ -35,6 +35,11 @@ ssl_site_context() {
   SITE_SSL_PROFILE="${SITE_META[profile]}"
   SITE_SSL_PHP="${SITE_META[php]}"
   SITE_SSL_SOCKET_PROJECT="${SITE_META[php_socket_project]:-${SITE_META[project]}}"
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    SITE_SSL_PUBLIC_DIR="public"
+  else
+    SITE_SSL_PUBLIC_DIR="${SITE_META[public_dir]}"
+  fi
   if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
     if [[ -z "$SITE_SSL_PHP" ]]; then
       SITE_SSL_PHP="none"
@@ -50,13 +55,47 @@ ssl_site_context() {
 ssl_apply_nginx() {
   local domain="$1" cert="$2" key="$3" chain="$4" redirect="$5" hsts="$6"
   ssl_site_context "$domain" || return 1
+  local template_id="${SITE_META[nginx_template]:-${SITE_SSL_PROFILE}}"
   local template="$NGINX_TEMPLATE"
-  if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
-    template="$NGINX_TEMPLATE_STATIC"
-  elif [[ "$SITE_SSL_PROFILE" == "generic" ]]; then
-    template="$NGINX_TEMPLATE_GENERIC"
+  if [[ "$SITE_SSL_PROFILE" == "alias" ]]; then
+    if [[ -z "$template_id" || "$template_id" == "unknown" ]]; then
+      error "Alias nginx template is unknown; refusing to regenerate nginx config safely."
+      echo "Fix target metadata first: simai-admin.sh site drift --domain ${SITE_META[target]:-<target>} --fix yes (or restore # simai-* header manually)"
+      return 1
+    fi
   fi
-  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "$cert" "$key" "$chain" "$redirect" "$hsts"
+  case "$template_id" in
+    static) template="$NGINX_TEMPLATE_STATIC" ;;
+    generic) template="$NGINX_TEMPLATE_GENERIC" ;;
+    laravel) template="$NGINX_TEMPLATE" ;;
+    alias)
+      error "Alias nginx template id is insufficient to regenerate config; template for target site is required."
+      echo "Fix target metadata first: simai-admin.sh site drift --domain ${SITE_META[target]:-<target>} --fix yes (or restore # simai-* header manually)"
+      return 1
+      ;;
+    *)
+      if [[ "$SITE_SSL_PROFILE" == "alias" ]]; then
+        error "Unsupported alias nginx template ${template_id}"
+        return 1
+      fi
+      ;;
+  esac
+
+  local pd_val
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    pd_val="public"
+  else
+    pd_val="${SITE_META[public_dir]}"
+  fi
+  if ! create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "${SITE_META[target]:-}" "$SITE_SSL_SOCKET_PROJECT" "$cert" "$key" "$chain" "$redirect" "$hsts" "$template_id" "$pd_val"; then
+    return 1
+  fi
+  local ssl_type="custom"
+  if [[ "$cert" == "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
+    ssl_type="letsencrypt"
+  fi
+  site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "${SITE_META[project]}" "${SITE_META[profile]}" "${SITE_META[root]}" "${SITE_META[project]}" "${SITE_META[php]}" "$ssl_type" "" "${SITE_META[target]:-}" "${SITE_META[php_socket_project]:-${SITE_META[project]}}" "$template_id" "${pd_val}" >/dev/null 2>&1 || true
+  return 0
 }
 
 ssl_issue_handler() {
@@ -112,7 +151,12 @@ ssl_issue_handler() {
     error "Failed to read site context for ${domain}. Check nginx config metadata headers (simai-*)."
     return 1
   fi
-  local webroot="${SITE_SSL_ROOT}/public"
+  local webroot=""
+  local pd="${SITE_SSL_PUBLIC_DIR}"
+  webroot=$(site_compute_doc_root "$SITE_SSL_ROOT" "$pd") || return 1
+  if ! validate_path "$webroot"; then
+    return 1
+  fi
   mkdir -p "$webroot"
   progress_step "Preparing ACME webroot at ${webroot}"
 
@@ -271,14 +315,19 @@ ssl_renew_handler() {
   fi
   ssl_site_context "$domain" || return 1
   progress_step "Preparing ACME webroot"
-  local webroot="${SITE_SSL_ROOT}/public"
+  local pd="${SITE_SSL_PUBLIC_DIR}"
+  local webroot=""
+  webroot=$(site_compute_doc_root "$SITE_SSL_ROOT" "$pd") || return 1
+  if ! validate_path "$webroot"; then
+    return 1
+  fi
   progress_step "Requesting renewal from Let's Encrypt"
   if ! run_long "Renewing certificate for ${domain}" certbot certonly --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain"; then
     error "Renew failed for ${domain}; see ${LOG_FILE}"
     return 1
   fi
   progress_step "Reloading nginx"
-  systemctl reload nginx >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload nginx >>"$LOG_FILE" 2>&1 || true
   echo "Renewed certificate for ${domain}"
   progress_done "Done"
 }
@@ -314,7 +363,8 @@ ssl_remove_handler() {
     template="$NGINX_TEMPLATE_GENERIC"
   fi
   info "Removing SSL config for ${domain}"
-  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no"
+  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "" "${SITE_SSL_PUBLIC_DIR}"
+  site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "${SITE_META[project]}" "${SITE_META[profile]}" "${SITE_META[root]}" "${SITE_META[project]}" "${SITE_META[php]}" "none" "" "${SITE_META[target]:-}" "${SITE_META[php_socket_project]:-${SITE_META[project]}}" "${SITE_META[nginx_template]:-${SITE_META[profile]}}" "${SITE_SSL_PUBLIC_DIR}" >/dev/null 2>&1 || true
   if [[ "$delete_cert" == "yes" ]]; then
     if command -v certbot >/dev/null 2>&1; then
       run_long "Deleting certbot certificate for ${domain}" certbot delete --cert-name "$domain" --non-interactive || true

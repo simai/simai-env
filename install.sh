@@ -5,6 +5,8 @@ REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 VERSION=${VERSION:-main}           # branch name
 REF=${REF:-refs/heads/${VERSION}}  # override to pin a tag: REF=refs/tags/vX.Y.Z (see GitHub releases/tags)
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/lib/platform.sh"
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
@@ -44,26 +46,15 @@ BANNER
 }
 
 check_supported_os() {
-  local GREEN="" RED="" RESET=""
-  if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
-    GREEN=$'\e[32m'; RED=$'\e[31m'; RESET=$'\e[0m'
+  platform_detect_os
+  local matrix
+  matrix=$(platform_supported_matrix_string)
+  if platform_is_supported_os; then
+    echo "OS: ${PLATFORM_OS_PRETTY} — supported"
+    return
   fi
-  if [[ ! -f /etc/os-release ]]; then
-    printf "%s[ERROR] Cannot detect OS%s\n" "$RED" "$RESET" >&2
-    exit 1
-  fi
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  local matrix="Ubuntu 20.04/22.04/24.04"
-  if [[ ${ID} == "ubuntu" ]]; then
-    case ${VERSION_ID} in
-      "20.04"|"22.04"|"24.04")
-        printf "%s[OK] OS: %s (%s %s %s) — supported%s\n" "$GREEN" "${PRETTY_NAME:-Ubuntu}" "${ID}" "${VERSION_ID}" "${VERSION_CODENAME:-}" "$RESET" >&2
-        return
-        ;;
-    esac
-  fi
-  printf "%s[ERROR] OS: %s (%s %s %s) — unsupported. Supported: %s%s\n" "$RED" "${PRETTY_NAME:-Unknown}" "${ID:-unknown}" "${VERSION_ID:-unknown}" "${VERSION_CODENAME:-}" "${matrix}" "$RESET" >&2
+  echo "OS: ${PLATFORM_OS_PRETTY} — NOT supported"
+  echo "Supported OS: ${matrix}"
   exit 1
 }
 
@@ -112,6 +103,31 @@ if [[ "$NO_BOOT" != "1" && "$MODE" != "scripts" ]]; then
 else
   echo "Bootstrap skipped (SIMAI_INSTALL_MODE=${MODE}, SIMAI_INSTALL_NO_BOOTSTRAP=${NO_BOOT})."
   echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 20"
+fi
+
+if [[ "$MODE" != "scripts" ]]; then
+  if [[ $EUID -eq 0 ]]; then
+    if [[ ! -f /etc/simai-env/profiles.enabled ]]; then
+      has_simai=0
+      if find /etc/nginx/sites-available -maxdepth 1 -type f -name "*.conf" -print -quit 2>/dev/null | grep -q .; then
+        if grep -qE '^[[:space:]]*# simai-domain:' /etc/nginx/sites-available/*.conf 2>/dev/null; then
+          has_simai=1
+        fi
+      fi
+      if [[ $has_simai -eq 0 ]]; then
+        echo "Initializing profile activation (core profiles enabled by default)..."
+        if ! "${INSTALL_DIR}/simai-admin.sh" profile init --mode core; then
+          echo "WARNING: Profile activation init failed. You can run later:"
+          echo "  sudo ${INSTALL_DIR}/simai-admin.sh profile init --mode core"
+        fi
+      else
+        echo "Detected existing simai-managed sites; skipping profile activation init (legacy mode kept)."
+      fi
+    fi
+  else
+    echo "Skipping profile activation init (not running as root). Run later as root:"
+    echo "  sudo ${INSTALL_DIR}/simai-admin.sh profile init --mode core"
+  fi
 fi
 
 if [[ "${SIMAI_INSTALL_NO_MENU:-0}" != "1" && -t 1 && -r /dev/tty && -w /dev/tty ]]; then

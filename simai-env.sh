@@ -28,27 +28,45 @@ DROP_DB=0
 DROP_DB_USER=0
 CONFIRM=0
 FORCE=0
+
+mysql_root_exec_stdin() {
+  local sql="$1"
+  printf "%s
+" "$sql" | mysql -uroot >>"$LOG_FILE" 2>&1
+}
+
+
 APT_UPDATED=0
 PHP_BIN=""
 QUEUE_TEMPLATE="${SCRIPT_DIR}/systemd/laravel-queue.service"
 NGINX_TEMPLATE="${SCRIPT_DIR}/templates/nginx-laravel.conf"
 ALLOW_RESERVED_DOMAIN=0
+source "${SCRIPT_DIR}/lib/site_metadata.sh"
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
+source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
+
+project_slug_from_domain() {
+  local domain="$1"
+  local slug
+  slug=$(echo "$domain" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9]/-/g' -e 's/-\\+/-/g' -e 's/^-//' -e 's/-$//')
+  [[ -z "$slug" ]] && slug="site"
+  echo "$slug"
+}
 
 usage() {
   cat <<USAGE
 Usage:
-  simai-env.sh [install] --domain <domain> --project-name <project> [options]
-  simai-env.sh --existing --path /home/simai/www/<project> --domain <domain> [options]
-  simai-env.sh clean --project-name <project> --domain <domain> [clean options]
+  simai-env.sh [install] --domain <domain> --project-name <project-slug> [options]
+  simai-env.sh --existing --path <project-root> --domain <domain> [options]
+  simai-env.sh clean --project-name <project-slug> --domain <domain> [clean options]
   simai-env.sh bootstrap [--php 8.2] [--mysql mysql|percona] [--node-version 20] [--silent]
 
 Install options:
   --domain <fqdn>            Server name for nginx
-  --project-name <name>      Project name (used for paths and services)
+  --project-name <name>      Project slug (used for pools/cron/queue/socket/log IDs)
   --path <dir>               Existing project path (sets --existing automatically)
   --existing                 Configure an existing Laravel project
-  --db-name <name>           Database name (default: simai_<project>)
+  --db-name <name>           Database name (default: simai_<project-slug>)
   --db-user <name>           Database user (default: simai)
   --db-pass <pass>           Database password (generated if empty)
   --db-host <host>           Database host (default: 127.0.0.1)
@@ -73,7 +91,7 @@ Clean options:
 
 Examples:
   simai-env.sh --domain <domain> --project-name blog --db-name blogdb --php 8.3
-  simai-env.sh --existing --path /home/simai/www/app --domain app.local --php 8.1
+  simai-env.sh --existing --path /home/simai/www/<domain> --domain app.local --php 8.1
   simai-env.sh clean --project-name blog --domain <domain> --remove-files --drop-db --confirm
 USAGE
 }
@@ -183,6 +201,9 @@ require_supported_os() {
   if ! platform_assert_supported_os; then
     fail "Unsupported OS. Supported only on $(platform_supported_matrix_string)"
   fi
+  if ! os_adapter_init; then
+    fail "Failed to initialize OS adapter"
+  fi
 }
 
 validate_domain() {
@@ -217,10 +238,23 @@ validate_domain() {
     example.com|example.net|example.org)
       warn "Domain ${domain_lc} is reserved for documentation/tests (RFC 2606)."
       if [[ "${ALLOW_RESERVED_DOMAIN:-0}" != "1" ]]; then
-        fail "Set --allow-reserved-domain yes to continue with reserved domains (not recommended)."
+      fail "Set --allow-reserved-domain yes to continue with reserved domains (not recommended)."
       fi
       ;;
   esac
+  return 0
+}
+
+validate_project_slug() {
+  local slug="$1"
+  if [[ -z "$slug" ]]; then
+    error "Project slug must not be empty"
+    return 1
+  fi
+  if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+    error "Invalid project slug '${slug}'. Use lowercase letters, numbers, and dashes only (1-63 chars, must start with alphanumeric)."
+    return 1
+  fi
   return 0
 }
 
@@ -242,6 +276,14 @@ validate_path() {
     error "Path must not contain '..'"
     return 1
   fi
+  if [[ "$path" == *"//"* ]]; then
+    error "Path must not contain double slashes"
+    return 1
+  fi
+  if [[ ! "$path" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+    error "Path contains invalid characters; allowed: A-Za-z0-9._/-"
+    return 1
+  fi
   if command -v realpath >/dev/null 2>&1; then
     local normalized
     normalized=$(realpath -m "$path" 2>/dev/null || true)
@@ -253,6 +295,19 @@ validate_path() {
       error "Normalized path is unsafe: ${normalized}"
       return 1
     fi
+  fi
+  return 0
+}
+
+validate_project_slug() {
+  local slug="$1"
+  if [[ -z "$slug" ]]; then
+    error "Project slug must not be empty"
+    return 1
+  fi
+  if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+    error "Invalid project slug '${slug}'. Use lowercase letters, numbers, and dashes only (1-63 chars, must start with alphanumeric)."
+    return 1
   fi
   return 0
 }
@@ -398,6 +453,9 @@ ensure_defaults() {
   if [[ -z $PROJECT_NAME ]]; then
     fail "--project-name is required"
   fi
+  if ! validate_project_slug "$PROJECT_NAME"; then
+    return 1
+  fi
   if [[ -z $DOMAIN ]]; then
     fail "--domain is required for install and clean"
   fi
@@ -426,7 +484,8 @@ ensure_defaults() {
 
 apt_update_once() {
   if [[ $APT_UPDATED -eq 0 ]]; then
-    if ! run_long "Running apt-get update" apt-get update -y; then
+    os_cmd_pkg_update
+    if ! run_long "Running apt-get update" "${OS_CMD[@]}"; then
       fail "apt-get update failed"
     fi
     APT_UPDATED=1
@@ -435,19 +494,21 @@ apt_update_once() {
 
 install_packages() {
   apt_update_once
-  if ! run_long "Installing base utilities" DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  os_cmd_pkg_install \
     software-properties-common ca-certificates curl gnupg lsb-release sudo cron \
-    git unzip htop rsyslog logrotate certbot; then
-    fail "Failed to install base utilities"
-  fi
-  systemctl enable --now cron >>"$LOG_FILE" 2>&1 || true
+    git unzip htop rsyslog logrotate certbot
+  run_long "Installing base utilities" "${OS_CMD[@]}" || fail "Failed to install base utilities"
+  os_svc_enable_now cron || true
 }
 
 install_php_stack() {
   apt_update_once
   if ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q ondrej; then
     info "Adding ondrej/php PPA"
-    DEBIAN_FRONTEND=noninteractive add-apt-repository -y ppa:ondrej/php >>"$LOG_FILE" 2>&1 || fail "Failed to add ondrej/php"
+    os_cmd_pkg_add_ppa "ppa:ondrej/php"
+    if ! run_long "Adding ondrej/php" "${OS_CMD[@]}"; then
+      fail "Failed to add ondrej/php"
+    fi
     APT_UPDATED=0
   fi
   apt_update_once
@@ -456,7 +517,8 @@ install_php_stack() {
     "php${PHP_VERSION}-intl" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" "php${PHP_VERSION}-xml"
     "php${PHP_VERSION}-gd" "php${PHP_VERSION}-imagick" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-opcache"
   )
-  if ! run_long "Installing PHP ${PHP_VERSION} stack" DEBIAN_FRONTEND=noninteractive apt-get install -y "${pkgs[@]}"; then
+  os_cmd_pkg_install "${pkgs[@]}"
+  if ! run_long "Installing PHP ${PHP_VERSION} stack" "${OS_CMD[@]}"; then
     fail "Failed to install PHP ${PHP_VERSION}"
   fi
   PHP_BIN=$(command -v "php${PHP_VERSION}" || true)
@@ -464,13 +526,14 @@ install_php_stack() {
     warn "php${PHP_VERSION} binary not found; falling back to php"
     PHP_BIN=$(command -v php || echo "/usr/bin/php")
   fi
-  systemctl enable --now "php${PHP_VERSION}-fpm" >>"$LOG_FILE" 2>&1 || true
+  os_svc_enable_now "php${PHP_VERSION}-fpm" || true
 }
 
 install_nginx() {
   apt_update_once
-  run_long "Installing nginx" DEBIAN_FRONTEND=noninteractive apt-get install -y nginx || fail "Failed to install nginx"
-  systemctl enable --now nginx >>"$LOG_FILE" 2>&1 || true
+  os_cmd_pkg_install nginx
+  run_long "Installing nginx" "${OS_CMD[@]}" || fail "Failed to install nginx"
+  os_svc_enable_now nginx || true
 }
 
 ensure_nginx_catchall_safe() {
@@ -501,23 +564,27 @@ install_mysql() {
     if [[ ! -f /etc/apt/sources.list.d/percona-release.list ]]; then
       info "Adding Percona repository"
       run_long "Downloading Percona release package" curl -fsSL -o /tmp/percona-release.deb https://repo.percona.com/apt/percona-release_latest.generic_all.deb || fail "Cannot download Percona release package"
-      run_long "Installing Percona release package" dpkg -i /tmp/percona-release.deb || fail "Failed to install Percona release package"
+        os_cmd_pkg_install_deb "/tmp/percona-release.deb"
+        run_long "Installing Percona release package" "${OS_CMD[@]}" || fail "Failed to install Percona release package"
       run_long "Configuring Percona repo" percona-release setup ps80 -y || fail "Failed to configure Percona repo"
       APT_UPDATED=0
     fi
     apt_update_once
     info "Installing Percona Server 8.0"
-    run_long "Installing Percona Server 8.0" DEBIAN_FRONTEND=noninteractive apt-get install -y percona-server-server percona-server-client || fail "Failed to install Percona Server 8.0"
+    os_cmd_pkg_install percona-server-server percona-server-client
+    run_long "Installing Percona Server 8.0" "${OS_CMD[@]}" || fail "Failed to install Percona Server 8.0"
   else
-    run_long "Installing MySQL Server" DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server || fail "Failed to install MySQL Server"
+    os_cmd_pkg_install mysql-server
+    run_long "Installing MySQL Server" "${OS_CMD[@]}" || fail "Failed to install MySQL Server"
   fi
-  systemctl enable --now mysql >>"$LOG_FILE" 2>&1 || true
+  os_svc_enable_now mysql || true
 }
 
 install_redis() {
   apt_update_once
-  run_long "Installing redis-server" DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server || fail "Failed to install redis-server"
-  systemctl enable --now redis-server >>"$LOG_FILE" 2>&1 || true
+  os_cmd_pkg_install redis-server
+  run_long "Installing redis-server" "${OS_CMD[@]}" || fail "Failed to install redis-server"
+  os_svc_enable_now redis-server || true
 }
 
 install_node() {
@@ -530,7 +597,8 @@ install_node() {
     fi
   fi
   run_long "Adding NodeSource repo for Node.js ${NODE_VERSION}" bash -c "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -" || fail "Failed to add NodeSource"
-  run_long "Installing Node.js ${NODE_VERSION}" DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs || fail "Failed to install Node.js ${NODE_VERSION}"
+  os_cmd_pkg_install nodejs
+  run_long "Installing Node.js ${NODE_VERSION}" "${OS_CMD[@]}" || fail "Failed to install Node.js ${NODE_VERSION}"
 }
 
 install_composer() {
@@ -571,12 +639,11 @@ prepare_project_paths() {
 
 create_database() {
   info "Configuring database ${DB_NAME}"
-  local sql="CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-  mysql -uroot -e "$sql" >>"$LOG_FILE" 2>&1 || warn "Failed to create database ${DB_NAME}"
-  mysql -uroot -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${DB_USER}@127.0.0.1"
-  mysql -uroot -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';" >>"$LOG_FILE" 2>&1 || warn "Failed to create user ${DB_USER}@localhost"
-  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${DB_USER}@127.0.0.1"
-  mysql -uroot -e "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost'; FLUSH PRIVILEGES;" >>"$LOG_FILE" 2>&1 || warn "Failed to grant privileges to ${DB_USER}@localhost"
+  mysql_root_exec_stdin "CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" || warn "Failed to create database ${DB_NAME}"
+  mysql_root_exec_stdin "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';" || warn "Failed to create user ${DB_USER}@127.0.0.1"
+  mysql_root_exec_stdin "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';" || warn "Failed to create user ${DB_USER}@localhost"
+  mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';" || warn "Failed to grant privileges to ${DB_USER}@127.0.0.1"
+  mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost'; FLUSH PRIVILEGES;" || warn "Failed to grant privileges to ${DB_USER}@localhost"
 }
 
 copy_env_if_needed() {
@@ -694,7 +761,7 @@ chdir = ${PROJECT_PATH}
 php_admin_value[error_log] = /var/log/php${PHP_VERSION}-fpm-${PROJECT_NAME}.log
 php_admin_flag[log_errors] = on
 EOF
-  systemctl reload "php${PHP_VERSION}-fpm" >>"$LOG_FILE" 2>&1 || systemctl restart "php${PHP_VERSION}-fpm" >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload_or_restart "php${PHP_VERSION}-fpm" || true
 }
 
 configure_nginx_site() {
@@ -714,17 +781,23 @@ configure_nginx_site() {
     fi
   fi
   local simai_profile="laravel"
+  local slug="${PROJECT_NAME}"
+  if [[ -z "$slug" ]] || ! validate_project_slug "$slug"; then
+    slug="$(project_slug_from_domain "$DOMAIN")"
+  fi
+  local public_dir="public"
+  local doc_root="${PROJECT_PATH}/${public_dir}"
+  local template_id="laravel"
+  mkdir -p "$doc_root"
+  chown -R "$SIMAI_USER":www-data "$doc_root" 2>/dev/null || true
+  local meta_block
+  meta_block=$(site_nginx_metadata_render "$DOMAIN" "$slug" "$simai_profile" "$PROJECT_PATH" "$PROJECT_NAME" "$PHP_VERSION" "none" "" "" "$slug" "$template_id" "$public_dir")
   {
-    echo "# simai-domain: ${DOMAIN}"
-    echo "# simai-profile: ${simai_profile}"
-    echo "# simai-project: ${PROJECT_NAME}"
-    echo "# simai-root: ${PROJECT_PATH}"
-    echo "# simai-php: ${PHP_VERSION}"
-    echo "# simai-target: "
-    echo "# simai-php-socket-project: ${PROJECT_NAME}"
-    echo "# simai-ssl: off"
+    printf "%s" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${DOMAIN}#g" \
         -e "s#{{PROJECT_ROOT}}#${PROJECT_PATH}#g" \
+        -e "s#{{DOC_ROOT}}#${doc_root}#g" \
+        -e "s#{{ACME_ROOT}}#${doc_root}#g" \
         -e "s#{{PROJECT_NAME}}#${PROJECT_NAME}#g" \
         -e "s#{{PHP_VERSION}}#${PHP_VERSION}#g" \
         -e "s#{{PHP_SOCKET_PROJECT}}#${PROJECT_NAME}#g" "$NGINX_TEMPLATE"
@@ -734,20 +807,26 @@ configure_nginx_site() {
     rm -f /etc/nginx/sites-enabled/default
   fi
   nginx -t >>"$LOG_FILE" 2>&1 || fail "nginx config test failed"
-  systemctl reload nginx >>"$LOG_FILE" 2>&1 || systemctl restart nginx >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload_or_restart nginx || true
 }
 
 reload_cron_daemon() {
-  systemctl reload cron >>"$LOG_FILE" 2>&1 || systemctl restart cron >>"$LOG_FILE" 2>&1 || service cron reload >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload_or_restart cron || true
 }
 
 configure_cron() {
-  local cron_file="/etc/cron.d/${PROJECT_NAME}"
+  local slug="$PROJECT_NAME"
+  if ! validate_project_slug "$slug"; then
+    slug="$(project_slug_from_domain "$DOMAIN")"
+  fi
+  local cron_file="/etc/cron.d/${slug}"
   local php_cli
   php_cli=$(command -v "php${PHP_VERSION}" || true)
   [[ -z "$php_cli" ]] && php_cli="${PHP_BIN:-$(command -v php || echo "/usr/bin/php")}"
   cat >"$cron_file" <<EOF
-# simai-project: ${PROJECT_NAME}
+# simai-managed: yes
+# simai-domain: ${DOMAIN}
+# simai-slug: ${slug}
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 MAILTO=""
@@ -768,8 +847,8 @@ configure_queue_service() {
       -e "s#{{PROJECT_ROOT}}#${PROJECT_PATH}#g" \
       -e "s#{{PHP_BIN}}#${PHP_BIN:-/usr/bin/php}#g" \
       -e "s#{{USER}}#${SIMAI_USER}#g" "$QUEUE_TEMPLATE" > "$unit_path"
-  systemctl daemon-reload >>"$LOG_FILE" 2>&1
-  systemctl enable --now "$unit_name" >>"$LOG_FILE" 2>&1 || warn "Failed to enable ${unit_name}"
+  os_svc_daemon_reload || true
+  os_svc_enable_now "$unit_name" || warn "Failed to enable ${unit_name}"
 }
 
 install_stack() {
@@ -783,7 +862,11 @@ install_stack() {
 }
 
 clean_cron() {
-  local cron_file="/etc/cron.d/${PROJECT_NAME}"
+  local slug="${PROJECT_NAME}"
+  if ! validate_project_slug "$slug"; then
+    slug="$(project_slug_from_domain "$DOMAIN")"
+  fi
+  local cron_file="/etc/cron.d/${slug}"
   if [[ -f "$cron_file" ]]; then
     rm -f "$cron_file"
     reload_cron_daemon
@@ -793,9 +876,9 @@ clean_cron() {
 clean_queue() {
   local unit_path="/etc/systemd/system/laravel-queue-${PROJECT_NAME}.service"
   if [[ -f $unit_path ]]; then
-    systemctl disable --now "laravel-queue-${PROJECT_NAME}.service" >>"$LOG_FILE" 2>&1 || true
+    os_svc_disable_now "laravel-queue-${PROJECT_NAME}.service" || true
     rm -f "$unit_path"
-    systemctl daemon-reload >>"$LOG_FILE" 2>&1 || true
+    os_svc_daemon_reload || true
   fi
 }
 
@@ -805,31 +888,31 @@ clean_nginx() {
   rm -f "$site_enabled" "$site_available"
   if command -v nginx >/dev/null 2>&1; then
     nginx -t >>"$LOG_FILE" 2>&1 || warn "nginx test failed after cleanup"
-    systemctl reload nginx >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload nginx || true
   fi
 }
 
 clean_php_pool() {
   shopt -s nullglob
-  local pools=(/etc/php/*/fpm/pool.d/${PROJECT_NAME}.conf)
+  local pools=(/etc/php/*/fpm/pool.d/"${PROJECT_NAME}.conf")
   if [[ -n ${pools[*]:-} ]]; then
     rm -f "${pools[@]}"
   fi
-  systemctl reload "php${PHP_VERSION}-fpm" >>"$LOG_FILE" 2>&1 || true
+  os_svc_reload "php${PHP_VERSION}-fpm" || true
   for svc in /etc/init.d/php*fpm; do
-    systemctl reload "$(basename "$svc" .service)" >>"$LOG_FILE" 2>&1 || true
+    os_svc_reload "$(basename "$svc" .service)" || true
   done
   shopt -u nullglob
 }
 
 clean_database() {
   if [[ $DROP_DB -eq 1 ]]; then
-    mysql -uroot -e "DROP DATABASE IF EXISTS \`${DB_NAME}\`;" >>"$LOG_FILE" 2>&1 || warn "Failed to drop database ${DB_NAME}"
+    mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${DB_NAME}\`;" || warn "Failed to drop database ${DB_NAME}"
   fi
   if [[ $DROP_DB_USER -eq 1 ]]; then
-    mysql -uroot -e "DROP USER IF EXISTS '${DB_USER}'@'127.0.0.1';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${DB_USER}@127.0.0.1"
-    mysql -uroot -e "DROP USER IF EXISTS '${DB_USER}'@'localhost';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop user ${DB_USER}@localhost"
-    mysql -uroot -e "DROP USER IF EXISTS '${DB_USER}'@'%';" >>"$LOG_FILE" 2>&1 || warn "Failed to drop legacy wildcard user ${DB_USER}@%"
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${DB_USER}'@'127.0.0.1';" || warn "Failed to drop user ${DB_USER}@127.0.0.1"
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${DB_USER}'@'localhost';" || warn "Failed to drop user ${DB_USER}@localhost"
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${DB_USER}'@'%';" || warn "Failed to drop legacy wildcard user ${DB_USER}@%"
   fi
 }
 

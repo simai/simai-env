@@ -4,9 +4,11 @@ set -euo pipefail
 LOG_FILE=${LOG_FILE:-/var/log/simai-admin.log}
 AUDIT_LOG_FILE=${AUDIT_LOG_FILE:-/var/log/simai-audit.log}
 ADMIN_USER=${ADMIN_USER:-simai}
+# shellcheck disable=SC2034 # used by sourced command handlers
 SIMAI_RC_MENU_RELOAD=88
 SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
+source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
 if [[ -f /etc/simai-env.conf ]]; then
   # shellcheck disable=SC1091
   source /etc/simai-env.conf
@@ -134,6 +136,10 @@ require_supported_os() {
     echo "Unsupported OS. Supported: $(platform_supported_matrix_string)" >&2
     exit 1
   fi
+  if ! os_adapter_init; then
+    error "Failed to initialize OS adapter"
+    exit 1
+  fi
 }
 
 register_cmd() {
@@ -155,7 +161,7 @@ load_command_modules() {
 }
 
 list_sections() {
-  local keys section
+  local section
   for key in "${!CMD_HANDLERS[@]}"; do
     section="${key%%:*}"
     echo "$section"
@@ -291,7 +297,7 @@ ensure_audit_log() {
 
 redact_by_key() {
   local key="$1" value="$2"
-  if [[ "$key" =~ (pass|password|secret|token|key|cert) ]]; then
+  if [[ "$key" =~ (pass|password|secret|token|key|cert|value) ]]; then
     echo "***"
   else
     echo "$value"

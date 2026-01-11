@@ -10,7 +10,7 @@ Request a certificate via webroot.
 - `--hsts yes|no` (default no) — add HSTS header.
 - `--staging yes|no` (default no) — use LE staging.
 
-Uses site webroot `<project>/public`, updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
+Uses site docroot (based on profile `PROFILE_PUBLIC_DIR`, recorded as `simai-public-dir` in nginx metadata), updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
 
 ## renew
 Force renew LE cert for domain, reload nginx.

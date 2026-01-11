@@ -5,6 +5,8 @@ REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 VERSION=${VERSION:-main}
 REF=${REF:-refs/heads/${VERSION}}
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+source "${SCRIPT_DIR}/lib/platform.sh"
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
@@ -12,26 +14,15 @@ if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
 fi
 
 check_supported_os() {
-  local GREEN="" RED="" RESET=""
-  if [[ -t 1 && -r /dev/tty && -w /dev/tty ]]; then
-    GREEN=$'\e[32m'; RED=$'\e[31m'; RESET=$'\e[0m'
+  platform_detect_os
+  local matrix
+  matrix=$(platform_supported_matrix_string)
+  if platform_is_supported_os; then
+    echo "OS: ${PLATFORM_OS_PRETTY} — supported"
+    return
   fi
-  if [[ ! -f /etc/os-release ]]; then
-    printf "%s[ERROR] Cannot detect OS%s\n" "$RED" "$RESET" >&2
-    exit 1
-  fi
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  local matrix="Ubuntu 20.04/22.04/24.04"
-  if [[ ${ID} == "ubuntu" ]]; then
-    case ${VERSION_ID} in
-      "20.04"|"22.04"|"24.04")
-        printf "%s[OK] OS: %s (%s %s %s) — supported%s\n" "$GREEN" "${PRETTY_NAME:-Ubuntu}" "${ID}" "${VERSION_ID}" "${VERSION_CODENAME:-}" "$RESET" >&2
-        return
-        ;;
-    esac
-  fi
-  printf "%s[ERROR] OS: %s (%s %s %s) — unsupported. Supported: %s%s\n" "$RED" "${PRETTY_NAME:-Unknown}" "${ID:-unknown}" "${VERSION_ID:-unknown}" "${VERSION_CODENAME:-}" "${matrix}" "$RESET" >&2
+  echo "OS: ${PLATFORM_OS_PRETTY} — NOT supported"
+  echo "Supported OS: ${matrix}"
   exit 1
 }
 

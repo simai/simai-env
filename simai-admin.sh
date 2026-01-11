@@ -7,7 +7,14 @@ LOG_FILE=${LOG_FILE:-/var/log/simai-admin.log}
 
 source "${ADMIN_DIR}/core.sh"
 source "${ADMIN_DIR}/menu.sh"
+source "${ADMIN_DIR}/lib/profile_utils.sh"
 source "${ADMIN_DIR}/lib/site_utils.sh"
+source "${ADMIN_DIR}/lib/profile_apply.sh"
+source "${ADMIN_DIR}/lib/apt_utils.sh"
+source "${ADMIN_DIR}/lib/php_utils.sh"
+source "${ADMIN_DIR}/lib/fix_utils.sh"
+source "${ADMIN_DIR}/lib/doctor_utils.sh"
+source "${ADMIN_DIR}/lib/db_utils.sh"
 
 load_command_modules "${ADMIN_DIR}/commands"
 

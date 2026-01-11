@@ -2,23 +2,24 @@
 
 Run with `sudo /root/simai-env/simai-admin.sh cron <command> [options]` or via menu.
 
-Scheduler entries are written to `/etc/cron.d/<project>` and require the `cron` service to be installed and running (`systemctl enable --now cron`).
+Scheduler entries are written to `/etc/cron.d/<slug>` using site metadata (`simai-slug` in nginx config). `cron` service must be installed and running (`systemctl enable --now cron`).
 
 ## add
-Create/refresh the Laravel scheduler entry.
-- `--project-path` (required)
-- `--php` (optional, default `8.2`)
+Create/refresh the Laravel scheduler entry for an existing site (laravel profile only).
+- `--domain <fqdn>` (required)
 - `--user` (optional, default `simai`)
-- `--project-name` (optional; defaults to basename of project-path)
+
+Behavior:
+- Reads nginx site metadata (`# simai-*`); requires slug/profile/root/php to be present.
+- Refuses to guess slug/root/php; fix metadata first if missing (site doctor/repair).
+- Fails for unsupported profiles (static/generic/alias) or missing metadata.
 
 Example:
-`simai-admin.sh cron add --project-path /home/simai/www/app --php 8.3`
+`simai-admin.sh cron add --domain example.com`
 
 ## remove
-Remove the scheduler entry.
-- Either `--project-name <name>` or `--project-path <path>` (from which the name is derived)
-- `--user` is accepted but not needed for removal.
+Remove the scheduler entry for a site.
+- `--domain <fqdn>` (required)
 
-Examples:
-- By name: `simai-admin.sh cron remove --project-name app`
-- By path: `simai-admin.sh cron remove --project-path /home/simai/www/app`
+Example:
+`simai-admin.sh cron remove --domain example.com`

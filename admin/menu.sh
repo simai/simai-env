@@ -78,9 +78,14 @@ preflight_bootstrap() {
 
 run_menu() {
   export SIMAI_ADMIN_MENU=1
-  print_version_banner
-  preflight_bootstrap
+  local reload_requested=1
   while true; do
+    if [[ $reload_requested -eq 1 ]]; then
+      reload_requested=0
+      SIMAI_PREFLIGHT_DONE=0
+      print_version_banner
+      preflight_bootstrap
+    fi
     echo
     echo "Select section:"
     local sections=()
@@ -112,7 +117,11 @@ run_menu() {
       idx=1
       while IFS= read -r c; do
         commands+=("$c")
-        echo "  [$idx] $c - $(get_command_desc "$section" "$c")"
+        local label="$c"
+        if [[ "$section" == "self" && "$c" == "bootstrap" ]]; then
+          label="Repair Environment ..."
+        fi
+        echo "  [$idx] $label - $(get_command_desc "$section" "$c")"
         ((idx++))
       done < <(list_commands_for_section "$section")
       echo "  [0] Back"
@@ -156,15 +165,8 @@ run_menu() {
       set -e
       if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
         info "Restarting menu..."
-        set +e
-        "${SCRIPT_DIR}/simai-admin.sh" menu
-        menu_rc=$?
-        set -e
-        if [[ $menu_rc -ne 0 ]]; then
-          warn "Failed to restart menu (exit=${menu_rc}). Staying in current menu."
-          continue
-        fi
-        return 0
+        reload_requested=1
+        break
       fi
       echo "---- done (${section} ${cmd}), exit=${rc} ----"
       if [[ $rc -ne 0 ]]; then

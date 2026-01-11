@@ -6,8 +6,9 @@
 - Always respond in the language used by the user’s message.
 
 ## Scope and knowledge
-- Supported OS: Ubuntu 20.04/22.04/24.04.
-- Default user/paths: `simai`, projects in `/home/simai/www/<project>/`.
+- Supported OS: Ubuntu 22.04/24.04.
+- Default user/paths: `simai`, projects in `/home/simai/www/<domain>/` (web root `<project-root>/public`; slug used for IDs like pools/cron/unit/socket/logs).
+- Profiles include: generic, laravel, static (no PHP/DB, healthcheck disabled), alias (points to existing site).
 - Key scripts: `simai-env.sh` (installer/clean), `simai-admin.sh` (admin CLI + menu), `install.sh`, `update.sh`, `VERSION`.
 - Admin commands: site add/remove/list/set-php, php list/reload, ssl (stubs), queue/cron/db (some stubs), self update/version. Profiles: generic (default), laravel, alias.
 - Templates: nginx (laravel/generic, `{{PHP_SOCKET_PROJECT}}`), healthcheck.php, queue systemd template.
