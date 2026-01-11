@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.11] - 2026-01-11
+### Fixed
+- Restored access to self update, cache, and php install commands in the new interactive menu via a dedicated Tools section.
+
+## [1.7.10] - 2026-01-11
+### Changed
+- Reworked admin interactive menu structure for usability: separated Sites lifecycle, SSL, Diagnose, Maintenance, Logs, Backup/Migrate, Workers, Scheduler, Profiles, and Advanced Tools with an Advanced toggle in the main menu.
+
 ## [1.7.9] - 2026-01-11
 ### Fixed
 - Self update no longer drops to shell: menu restart uses a fresh process with safe fallback and respects non-zero handler exits.
