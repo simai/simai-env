@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.8] - 2026-01-11
+### Fixed
+- Self update no longer drops users to shell: menu restarts via a fresh process with safe fallback and depth guard.
+
 ## [1.7.7] - 2026-01-11
 ### Fixed
 - Fixed nginx config generation with simai metadata: ensured newline separation so `server {` cannot be commented out.

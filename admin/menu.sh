@@ -76,6 +76,18 @@ preflight_bootstrap() {
   fi
 }
 
+menu_spawn_restart() {
+  local depth="${SIMAI_MENU_RESTART_DEPTH:-0}"
+  depth=$((depth + 1))
+  export SIMAI_MENU_RESTART_DEPTH="$depth"
+  if [[ $depth -gt 2 ]]; then
+    warn "Menu restart depth limit reached; staying in current menu."
+    return 1
+  fi
+  info "Starting fresh admin menu process..."
+  bash "${SCRIPT_DIR}/simai-admin.sh" menu
+}
+
 run_menu() {
   export SIMAI_ADMIN_MENU=1
   if [[ ! -t 0 ]]; then
@@ -219,7 +231,11 @@ run_menu() {
       rc=$?
       set -e
       if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
-        info "Restarting menu..."
+        info "Restarting menu after update..."
+        if menu_spawn_restart; then
+          exit 0
+        fi
+        warn "Menu restart failed; continuing current session."
         reload_requested=1
         break
       fi
