@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.3] - 2026-01-11
+### Fixed
+- Fixed stdin installer failure caused by legacy platform-based OS checks overriding the self-contained /etc/os-release validation.
+
 ## [1.7.2] - 2026-01-11
 ### Fixed
 - install.sh now works when run via stdin (`curl | bash`), performs self-contained OS checks, and no longer depends on local platform files before download.

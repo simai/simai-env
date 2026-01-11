@@ -72,19 +72,6 @@ print_banner() {
 BANNER
 }
 
-check_supported_os() {
-  platform_detect_os
-  local matrix
-  matrix=$(platform_supported_matrix_string)
-  if platform_is_supported_os; then
-    echo "OS: ${PLATFORM_OS_PRETTY} — supported"
-    return
-  fi
-  echo "OS: ${PLATFORM_OS_PRETTY} — NOT supported"
-  echo "Supported OS: ${matrix}"
-  exit 1
-}
-
 print_banner
 check_supported_os
 

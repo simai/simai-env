@@ -59,6 +59,7 @@ rm -rf "$tmp_backup_dir"
 [[ -f install.sh ]] || fail "Missing install.sh"
 grep -q "BASH_SOURCE" install.sh && fail "install.sh must not use BASH_SOURCE (stdin regression)"
 grep -qE 'source[[:space:]]+.*platform\.sh' install.sh && fail "install.sh must not source platform.sh before download"
+grep -q "platform_" install.sh && fail "install.sh must not call platform_* (stdin regression)"
 
 # 2) Catch-all default_server deny present
 grep -q "listen 80 default_server" simai-env.sh || fail "simai-env.sh missing listen 80 default_server"
