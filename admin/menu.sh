@@ -78,6 +78,14 @@ preflight_bootstrap() {
 
 run_menu() {
   export SIMAI_ADMIN_MENU=1
+  if [[ ! -t 0 ]]; then
+    if [[ -e /dev/tty && -r /dev/tty && -w /dev/tty ]]; then
+      exec </dev/tty >/dev/tty 2>/dev/tty
+    else
+      error "Interactive TTY required for menu"
+      return 1
+    fi
+  fi
   local reload_requested=1
   local show_advanced="${SIMAI_MENU_SHOW_ADVANCED:-0}"
   case "${show_advanced,,}" in
@@ -132,8 +140,11 @@ run_menu() {
     done < <(list_sections)
     echo "  [0] Exit"
     read -r -p "Enter choice: " choice || true
-    if [[ "$choice" == "0" || -z "$choice" ]]; then
+    if [[ "$choice" == "0" ]]; then
       exit 0
+    fi
+    if [[ -z "$choice" ]]; then
+      continue
     fi
     local section="${sections[$((choice-1))]:-}"
     if [[ -z "$section" ]]; then
@@ -161,8 +172,10 @@ run_menu() {
       printf "  [99] Toggle advanced commands (currently: %s)\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       echo "  [0] Back"
       read -r -p "Enter choice: " cchoice || true
-      if [[ "$cchoice" == "0" || -z "$cchoice" ]]; then
+      if [[ "$cchoice" == "0" ]]; then
         break
+      elif [[ -z "$cchoice" ]]; then
+        continue
       elif [[ "$cchoice" == "99" ]]; then
         if [[ $show_advanced -eq 1 ]]; then
           show_advanced=0

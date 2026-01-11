@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.7] - 2026-01-11
+### Fixed
+- Fixed nginx config generation with simai metadata: ensured newline separation so `server {` cannot be commented out.
+- `site add` now fails when nginx config test fails (no false success), preventing empty site lists after failed adds.
+- Hardened admin menu input handling: menu switches to TTY when needed and empty section choice no longer exits unexpectedly (including after self update).
+
 ## [1.7.6] - 2026-01-11
 ### Improved
 - Menu now hides advanced/legacy commands by default; a toggle shows advanced items. Legacy DB commands remain available via CLI but are hidden from the menu.

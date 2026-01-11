@@ -172,7 +172,10 @@ site_add_handler() {
     else
       target_public_dir="${target_meta[public_dir]}"
     fi
-    create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$alias_template" "alias" "$target_domain" "$target_socket_project" "" "" "" "no" "no" "$template_id" "$target_public_dir"
+    if ! create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$alias_template" "alias" "$target_domain" "$target_socket_project" "" "" "" "no" "no" "$template_id" "$target_public_dir"; then
+      error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
+      return 1
+    fi
     site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "$project" "alias" "$target_path" "$project" "$php_version" "none" "" "$target_domain" "$target_socket_project" "$template_id" "$target_public_dir" >/dev/null 2>&1 || true
     info "Alias added: domain=${domain}, target=${target_domain}, php=${php_version}"
     echo "===== Site summary ====="
@@ -254,7 +257,10 @@ site_add_handler() {
   local ssl_redirect="no" ssl_hsts="no"
   local doc_root
   doc_root=$(site_compute_doc_root "$path" "$public_dir") || return 1
-  create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir"
+  if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir"; then
+    error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
+    return 1
+  fi
 
   local healthcheck_summary="disabled"
   if [[ "${PROFILE_HEALTHCHECK_ENABLED:-no}" == "yes" ]]; then

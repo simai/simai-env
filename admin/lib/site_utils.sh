@@ -809,7 +809,7 @@ create_nginx_site() {
   fi
 
   {
-    printf "%s" "$meta_block"
+    printf "%s\n" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${domain}#g" \
       -e "s#{{PROJECT_ROOT}}#${project_path}#g" \
       -e "s#{{DOC_ROOT}}#${doc_root}#g" \
@@ -1308,7 +1308,7 @@ site_nginx_metadata_upsert() {
       meta=0
       print
     }' "$cfg" 2>/dev/null || true)
-  local new_content="${block}${body}"
+  local new_content="${block}"$'\n'"${body}"
   nginx_safe_write_config "$cfg" "$new_content"
 }
 

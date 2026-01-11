@@ -793,7 +793,7 @@ configure_nginx_site() {
   local meta_block
   meta_block=$(site_nginx_metadata_render "$DOMAIN" "$slug" "$simai_profile" "$PROJECT_PATH" "$PROJECT_NAME" "$PHP_VERSION" "none" "" "" "$slug" "$template_id" "$public_dir")
   {
-    printf "%s" "$meta_block"
+    printf "%s\n" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${DOMAIN}#g" \
         -e "s#{{PROJECT_ROOT}}#${PROJECT_PATH}#g" \
         -e "s#{{DOC_ROOT}}#${doc_root}#g" \
