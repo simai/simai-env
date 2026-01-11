@@ -226,10 +226,12 @@ run_menu() {
       done
 
       echo "---- running ${section} ${cmd} ----"
-      set +e
-      run_command "$section" "$cmd" "${args[@]}"
-      rc=$?
-      set -e
+      local rc=0
+      if run_command "$section" "$cmd" "${args[@]}"; then
+        rc=0
+      else
+        rc=$?
+      fi
       if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
         info "Restarting menu after update..."
         if menu_spawn_restart; then

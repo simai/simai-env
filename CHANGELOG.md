@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.9] - 2026-01-11
+### Fixed
+- Self update no longer drops to shell: menu restart uses a fresh process with safe fallback and respects non-zero handler exits.
+- run_command no longer leaks errexit state; the interactive menu stays alive on command errors.
+
 ## [1.7.8] - 2026-01-11
 ### Fixed
 - Self update no longer drops users to shell: menu restarts via a fresh process with safe fallback and depth guard.

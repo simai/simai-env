@@ -227,10 +227,12 @@ run_command() {
   args_redacted=$(redact_args "$@")
   audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id"
   info "Running command ${section} ${name} (corr_id=${corr_id})"
-  set +e
-  ( "$handler" "$@" )
-  local rc=$?
-  set -e
+  local rc=0
+  if ( "$handler" "$@" ); then
+    rc=0
+  else
+    rc=$?
+  fi
   audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id"
   return $rc
 }
