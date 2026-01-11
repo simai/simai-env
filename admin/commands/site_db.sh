@@ -291,7 +291,7 @@ site_db_rotate_handler() {
   echo "DB_HOST=localhost"
 }
 
-register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain="
-register_cmd "site" "db-create" "Create DB + user for a site" "site_db_create_handler" "" "domain= dry_run= confirm="
-register_cmd "site" "db-drop" "Drop DB + user for a site" "site_db_drop_handler" "" "domain= dry_run= confirm= remove_files="
-register_cmd "site" "db-rotate" "Rotate DB user password for a site" "site_db_rotate_handler" "" "domain= dry_run= confirm="
+register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced"
+register_cmd "site" "db-create" "Create DB + user for a site" "site_db_create_handler" "" "domain= dry_run= confirm=" "tier:advanced"
+register_cmd "site" "db-drop" "Drop DB + user for a site" "site_db_drop_handler" "" "domain= dry_run= confirm= remove_files=" "tier:advanced"
+register_cmd "site" "db-rotate" "Rotate DB user password for a site" "site_db_rotate_handler" "" "domain= dry_run= confirm=" "tier:advanced"

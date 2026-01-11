@@ -79,6 +79,25 @@ preflight_bootstrap() {
 run_menu() {
   export SIMAI_ADMIN_MENU=1
   local reload_requested=1
+  local show_advanced="${SIMAI_MENU_SHOW_ADVANCED:-0}"
+  case "${show_advanced,,}" in
+    1|yes|true) show_advanced=1 ;;
+    *) show_advanced=0 ;;
+  esac
+
+  menu_is_visible_cmd() {
+    local section="$1" cmd="$2"
+    local flags
+    flags="$(get_command_flags "$section" "$cmd")"
+    if [[ ",${flags}," == *",menu:hidden,"* ]]; then
+      return 1
+    fi
+    if [[ $show_advanced -ne 1 && ",${flags}," == *",tier:advanced,"* ]]; then
+      return 1
+    fi
+    return 0
+  }
+
   while true; do
     if [[ $reload_requested -eq 1 ]]; then
       reload_requested=0
@@ -91,6 +110,18 @@ run_menu() {
     local sections=()
     local idx=1
     while IFS= read -r s; do
+      local cmds=()
+      mapfile -t cmds < <(list_commands_for_section "$s")
+      local visible_in_section=0
+      for c in "${cmds[@]}"; do
+        if menu_is_visible_cmd "$s" "$c"; then
+          visible_in_section=1
+          break
+        fi
+      done
+      if [[ $visible_in_section -eq 0 ]]; then
+        continue
+      fi
       sections+=("$s")
       local label="$s"
       if [[ "$s" == "backup" ]]; then
@@ -116,6 +147,9 @@ run_menu() {
       local commands=()
       idx=1
       while IFS= read -r c; do
+        if ! menu_is_visible_cmd "$section" "$c"; then
+          continue
+        fi
         commands+=("$c")
         local label="$c"
         if [[ "$section" == "self" && "$c" == "bootstrap" ]]; then
@@ -124,10 +158,18 @@ run_menu() {
         echo "  [$idx] $label - $(get_command_desc "$section" "$c")"
         ((idx++))
       done < <(list_commands_for_section "$section")
+      printf "  [99] Toggle advanced commands (currently: %s)\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       echo "  [0] Back"
       read -r -p "Enter choice: " cchoice || true
       if [[ "$cchoice" == "0" || -z "$cchoice" ]]; then
         break
+      elif [[ "$cchoice" == "99" ]]; then
+        if [[ $show_advanced -eq 1 ]]; then
+          show_advanced=0
+        else
+          show_advanced=1
+        fi
+        continue
       fi
       local cmd="${commands[$((cchoice-1))]:-}"
       if [[ -z "$cmd" ]]; then

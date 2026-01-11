@@ -350,4 +350,4 @@ site_fix_handler() {
   return $exit_code
 }
 
-register_cmd "site" "fix" "Fix site PHP requirements by profile (extensions/ini) — plan by default" "site_fix_handler" "" "domain= apply= include-recommended= confirm="
+register_cmd "site" "fix" "Fix site PHP requirements by profile (extensions/ini) — plan by default" "site_fix_handler" "" "domain= apply= include-recommended= confirm=" "tier:advanced"

@@ -135,6 +135,6 @@ db_pass_handler() {
   echo "User     : ${user}"
 }
 
-register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" ""
-register_cmd "db" "drop" "Legacy: Drop database (use 'site db-drop')" "db_drop_handler" "name" "drop-user=0 user= confirm="
-register_cmd "db" "set-pass" "Legacy: Change DB user password (use 'site db-rotate')" "db_pass_handler" "user pass" ""
+register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" "" "menu:hidden"
+register_cmd "db" "drop" "Legacy: Drop database (use 'site db-drop')" "db_drop_handler" "name" "drop-user=0 user= confirm=" "menu:hidden"
+register_cmd "db" "set-pass" "Legacy: Change DB user password (use 'site db-rotate')" "db_pass_handler" "user pass" "" "menu:hidden"

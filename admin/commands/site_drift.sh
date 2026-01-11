@@ -106,4 +106,4 @@ site_drift_handler() {
   progress_done "Drift fixes completed"
 }
 
-register_cmd "site" "drift" "Check site metadata/cron drift (plan/apply)" "site_drift_handler" "domain" "fix=no"
+register_cmd "site" "drift" "Check site metadata/cron drift (plan/apply)" "site_drift_handler" "domain" "fix=no" "tier:advanced"

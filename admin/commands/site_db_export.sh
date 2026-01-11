@@ -42,4 +42,4 @@ site_db_export_handler() {
   echo "DB credentials written to ${project_dir}/${target} (owner ${SIMAI_USER}, mode 0640)"
 }
 
-register_cmd "site" "db-export" "Export DB creds into project .env" "site_db_export_handler" "" "domain= target= confirm="
+register_cmd "site" "db-export" "Export DB creds into project .env" "site_db_export_handler" "" "domain= target= confirm=" "tier:advanced"

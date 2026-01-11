@@ -18,6 +18,7 @@ declare -Ag CMD_HANDLERS=()
 declare -Ag CMD_DESCRIPTIONS=()
 declare -Ag CMD_REQUIRED=()
 declare -Ag CMD_OPTIONAL=()
+declare -Ag CMD_FLAGS=()
 
 select_from_list() {
   local prompt="$1"
@@ -149,6 +150,7 @@ register_cmd() {
   local handler="${4-}"
   local required="${5-}"
   local optional="${6-}"
+  local flags="${7-}"
   if [[ -z "$section" || -z "$name" || -z "$handler" ]]; then
     error "register_cmd: missing required args (section/name/handler)"
     return 1
@@ -158,6 +160,12 @@ register_cmd() {
   CMD_DESCRIPTIONS["$key"]="$desc"
   CMD_REQUIRED["$key"]="${required:-}"
   CMD_OPTIONAL["$key"]="${optional:-}"
+  CMD_FLAGS["$key"]="${flags:-}"
+}
+
+get_command_flags() {
+  local section="$1" name="$2"
+  echo "${CMD_FLAGS["${section}:${name}"]:-}"
 }
 
 load_command_modules() {

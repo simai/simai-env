@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.6] - 2026-01-11
+### Improved
+- Menu now hides advanced/legacy commands by default; a toggle shows advanced items. Legacy DB commands remain available via CLI but are hidden from the menu.
+
 ## [1.7.5] - 2026-01-11
 ### Fixed
 - Prevented /etc/os-release from overwriting installer/update variables; installers now use REPO_BRANCH and read os-release in a subshell.
