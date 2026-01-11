@@ -1,6 +1,21 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.2] - 2026-01-11
+### Fixed
+- install.sh now works when run via stdin (`curl | bash`), performs self-contained OS checks, and no longer depends on local platform files before download.
+
+## [1.7.1] - 2026-01-11
+### Fixed
+- Backup manifest is now valid JSON (enabled boolean) and import robustly handles empty `public_dir`.
+- Hardened archive extraction against path traversal and improved rollback (including sites-enabled symlink) on reload failures.
+
+## [1.7.0] - 2026-01-09
+### Added
+- Config-only backup/migrate commands: backup export/inspect/import for nginx/php-fpm/cron/queue configs with safe defaults and rollback.
+### Security
+- Backups exclude secrets (no SSL private keys, no .env contents); cron import only for SIMAI-managed files.
+
 ## [1.6.1] - 2026-01-09
 ### Fixed
 - Removed direct systemctl usage from cron service checks by routing unit detection through the OS adapter.

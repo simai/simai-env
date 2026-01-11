@@ -43,6 +43,22 @@ grep -q "os_adapter_init" lib/os_adapter.sh || fail "os_adapter_init missing in 
 # 7) No direct systemctl list-unit-files in admin/lib|admin/commands (must go via adapter)
 bad_list_units=$(grep -RIn "systemctl list-unit-files" admin/lib admin/commands 2>/dev/null | grep -v "lib/os_adapter.sh" || true)
 [[ -n "$bad_list_units" ]] && fail "direct systemctl list-unit-files usage found:\n${bad_list_units}"
+# 8) Backup command/docs present
+[[ -f admin/commands/backup.sh ]] || fail "Missing admin/commands/backup.sh"
+[[ -f docs/commands/backup.md ]] || fail "Missing docs/commands/backup.md"
+grep -q 'register_cmd "backup"' admin/commands/backup.sh || fail "Backup commands not registered"
+# 9) Backup manifest is valid JSON (selftest)
+tmp_backup_dir=$(mktemp -d)
+echo "x" >"${tmp_backup_dir}/a"
+# shellcheck source=admin/lib/backup_utils.sh
+source admin/lib/backup_utils.sh
+backup_write_manifest "$tmp_backup_dir" "example.com" "example-com" "generic" "8.2" "" "/home/simai/www/example.com" "true"
+python3 -c 'import json,sys; json.load(open(sys.argv[1],encoding="utf-8"))' "${tmp_backup_dir}/manifest.json" || fail "manifest.json not valid JSON"
+rm -rf "$tmp_backup_dir"
+# 10) install.sh guards (stdin-safe, no platform source)
+[[ -f install.sh ]] || fail "Missing install.sh"
+grep -q "BASH_SOURCE" install.sh && fail "install.sh must not use BASH_SOURCE (stdin regression)"
+grep -qE 'source[[:space:]]+.*platform\.sh' install.sh && fail "install.sh must not source platform.sh before download"
 
 # 2) Catch-all default_server deny present
 grep -q "listen 80 default_server" simai-env.sh || fail "simai-env.sh missing listen 80 default_server"

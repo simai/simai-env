@@ -5,13 +5,40 @@ REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 VERSION=${VERSION:-main}           # branch name
 REF=${REF:-refs/heads/${VERSION}}  # override to pin a tag: REF=refs/tags/vX.Y.Z (see GitHub releases/tags)
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
-SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-source "${SCRIPT_DIR}/lib/platform.sh"
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
   exit 1
 fi
+
+read_os_release() {
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    source /etc/os-release
+  fi
+  OS_ID="${ID:-unknown}"
+  OS_VERSION_ID="${VERSION_ID:-unknown}"
+  OS_PRETTY="${PRETTY_NAME:-${OS_ID} ${OS_VERSION_ID}}"
+}
+
+supported_matrix_string() {
+  echo "Ubuntu 22.04 LTS, Ubuntu 24.04 LTS"
+}
+
+is_supported_os() {
+  [[ "$OS_ID" == "ubuntu" && ( "$OS_VERSION_ID" == "22.04" || "$OS_VERSION_ID" == "24.04" ) ]]
+}
+
+check_supported_os() {
+  read_os_release
+  if is_supported_os; then
+    echo "OS: ${OS_PRETTY} — supported"
+    return
+  fi
+  echo "OS: ${OS_PRETTY} — NOT supported"
+  echo "Supported OS: $(supported_matrix_string)"
+  exit 1
+}
 
 print_banner() {
   if [[ "${SIMAI_INSTALL_NO_BANNER:-0}" == "1" ]]; then
@@ -71,7 +98,7 @@ echo "Downloading simai-env (${VERSION})..."
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 
 echo "Unpacking..."
-tar -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
+tar --no-same-owner --no-same-permissions -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
 SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
