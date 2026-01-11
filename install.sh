@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
-VERSION=${VERSION:-main}           # branch name
-REF=${REF:-refs/heads/${VERSION}}  # override to pin a tag: REF=refs/tags/vX.Y.Z (see GitHub releases/tags)
+REPO_BRANCH=${REPO_BRANCH:-${VERSION:-main}}           # branch name (VERSION kept for backward compatibility override)
+REF=${REF:-refs/heads/${REPO_BRANCH}}  # override to pin a tag: REF=refs/tags/vX.Y.Z (see GitHub releases/tags)
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
@@ -13,12 +13,21 @@ fi
 
 read_os_release() {
   if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    source /etc/os-release
+    mapfile -t _os < <(
+      ( . /etc/os-release
+        printf '%s\n' "${ID:-unknown}" "${VERSION_ID:-unknown}" "${PRETTY_NAME:-}" )
+      )
+    OS_ID="${_os[0]:-unknown}"
+    OS_VERSION_ID="${_os[1]:-unknown}"
+    OS_PRETTY="${_os[2]:-}"
+  else
+    OS_ID="unknown"
+    OS_VERSION_ID="unknown"
+    OS_PRETTY=""
   fi
-  OS_ID="${ID:-unknown}"
-  OS_VERSION_ID="${VERSION_ID:-unknown}"
-  OS_PRETTY="${PRETTY_NAME:-${OS_ID} ${OS_VERSION_ID}}"
+  if [[ -z "$OS_PRETTY" ]]; then
+    OS_PRETTY="${OS_ID} ${OS_VERSION_ID}"
+  fi
 }
 
 supported_matrix_string() {
@@ -81,7 +90,7 @@ trap cleanup EXIT
 
 TARBALL_URL="${REPO_URL}/archive/${REF}.tar.gz"
 
-echo "Downloading simai-env (${VERSION})..."
+echo "Downloading simai-env (branch: ${REPO_BRANCH})..."
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 
 echo "Unpacking..."

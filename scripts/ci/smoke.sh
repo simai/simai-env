@@ -60,6 +60,13 @@ rm -rf "$tmp_backup_dir"
 grep -q "BASH_SOURCE" install.sh && fail "install.sh must not use BASH_SOURCE (stdin regression)"
 grep -qE 'source[[:space:]]+.*platform\.sh' install.sh && fail "install.sh must not source platform.sh before download"
 grep -q "platform_" install.sh && fail "install.sh must not call platform_* (stdin regression)"
+# 12) install/platform must not source /etc/os-release directly
+grep -qE '^[[:space:]]*(source|\.)[[:space:]]+/etc/os-release' install.sh && fail "install.sh must not source /etc/os-release directly (env pollution regression)"
+grep -qE '^[[:space:]]*(source|\.)[[:space:]]+/etc/os-release' lib/platform.sh && fail "platform_detect_os must not source /etc/os-release directly (env pollution regression)"
+grep -q "REPO_BRANCH" install.sh || fail "install.sh must define REPO_BRANCH (VERSION collision regression)"
+# 11) register_cmd must not use raw $6
+grep -q 'optional="$6"' admin/core.sh && fail "register_cmd uses raw \$6 (set -u regression)"
+grep -q 'optional="\${6-' admin/core.sh || fail "register_cmd should default optional via \${6-}"
 
 # 2) Catch-all default_server deny present
 grep -q "listen 80 default_server" simai-env.sh || fail "simai-env.sh missing listen 80 default_server"

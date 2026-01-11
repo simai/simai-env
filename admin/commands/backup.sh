@@ -261,5 +261,5 @@ backup_import_handler() {
 }
 
 register_cmd "backup" "export" "Export site configs to tar.gz (config-only)" "backup_export_handler" "domain" "out="
-register_cmd "backup" "inspect" "Inspect backup archive" "backup_inspect_handler" "file"
+register_cmd "backup" "inspect" "Inspect backup archive" "backup_inspect_handler" "file" ""
 register_cmd "backup" "import" "Import site configs from backup (dry-run by default)" "backup_import_handler" "file" "apply= enable= reload="

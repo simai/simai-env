@@ -143,7 +143,16 @@ require_supported_os() {
 }
 
 register_cmd() {
-  local section="$1" name="$2" desc="$3" handler="$4" required="$5" optional="$6"
+  local section="${1-}"
+  local name="${2-}"
+  local desc="${3-}"
+  local handler="${4-}"
+  local required="${5-}"
+  local optional="${6-}"
+  if [[ -z "$section" || -z "$name" || -z "$handler" ]]; then
+    error "register_cmd: missing required args (section/name/handler)"
+    return 1
+  fi
   local key="${section}:${name}"
   CMD_HANDLERS["$key"]="$handler"
   CMD_DESCRIPTIONS["$key"]="$desc"

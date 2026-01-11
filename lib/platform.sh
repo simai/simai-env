@@ -2,12 +2,18 @@
 
 platform_detect_os() {
   if [[ -f /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    PLATFORM_OS_ID="${ID:-unknown}"
-    PLATFORM_OS_VERSION_ID="${VERSION_ID:-unknown}"
-    PLATFORM_OS_PRETTY="${PRETTY_NAME:-${ID:-unknown}}"
-    PLATFORM_OS_CODENAME="${VERSION_CODENAME:-unknown}"
+    mapfile -t _os < <(
+      ( . /etc/os-release
+        printf '%s\n' \
+          "${ID:-unknown}" \
+          "${VERSION_ID:-unknown}" \
+          "${PRETTY_NAME:-Unknown OS}" \
+          "${VERSION_CODENAME:-unknown}" )
+    )
+    PLATFORM_OS_ID="${_os[0]:-unknown}"
+    PLATFORM_OS_VERSION_ID="${_os[1]:-unknown}"
+    PLATFORM_OS_PRETTY="${_os[2]:-Unknown OS}"
+    PLATFORM_OS_CODENAME="${_os[3]:-unknown}"
   else
     PLATFORM_OS_ID="unknown"
     PLATFORM_OS_VERSION_ID="unknown"

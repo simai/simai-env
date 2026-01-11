@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.5] - 2026-01-11
+### Fixed
+- Prevented /etc/os-release from overwriting installer/update variables; installers now use REPO_BRANCH and read os-release in a subshell.
+
+## [1.7.4] - 2026-01-11
+### Fixed
+- Fixed admin CLI crash under `set -u` when registering commands without optional args; installer now retains profile init/menu flow without set -u failures.
+
 ## [1.7.3] - 2026-01-11
 ### Fixed
 - Fixed stdin installer failure caused by legacy platform-based OS checks overriding the self-contained /etc/os-release validation.

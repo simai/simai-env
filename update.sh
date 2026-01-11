@@ -2,8 +2,8 @@
 set -euo pipefail
 
 REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
-VERSION=${VERSION:-main}
-REF=${REF:-refs/heads/${VERSION}}
+REPO_BRANCH=${REPO_BRANCH:-${VERSION:-main}}
+REF=${REF:-refs/heads/${REPO_BRANCH}}
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 source "${SCRIPT_DIR}/lib/platform.sh"
@@ -34,9 +34,9 @@ trap cleanup EXIT
 
 TARBALL_URL="${REPO_URL}/archive/${REF}.tar.gz"
 
-echo "Updating simai-env (${REF}) into ${INSTALL_DIR}..."
+echo "Updating simai-env (branch: ${REPO_BRANCH}, ref: ${REF}) into ${INSTALL_DIR}..."
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
-tar -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
+tar --no-same-owner --no-same-permissions -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
 SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
