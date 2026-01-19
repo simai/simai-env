@@ -105,11 +105,40 @@ run_menu() {
     *) show_advanced=0 ;;
   esac
 
+  menu_args_has_key() {
+    local key="$1"; shift
+    local a
+    for a in "$@"; do
+      if [[ "$a" == "--${key}" || "$a" == "--${key}="* ]]; then
+        return 0
+      fi
+    done
+    return 1
+  }
+
   run_menu_command() {
     local section="$1" cmd="$2"; shift 2
     echo "---- running ${section} ${cmd} ----"
     local rc=0
-    if run_command "$section" "$cmd" "$@"; then
+    local required
+    required="$(get_required_opts "$section" "$cmd")"
+    local -a args=("$@")
+    if [[ -n "$required" ]]; then
+      local key val
+      for key in $required; do
+        if menu_args_has_key "$key" "${args[@]}"; then
+          continue
+        fi
+        val=$(prompt "$key")
+        if [[ -z "$val" ]]; then
+          warn "Cancelled."
+          echo "---- done (${section} ${cmd}), exit=0 ----"
+          return 0
+        fi
+        args+=("--$key" "$val")
+      done
+    fi
+    if run_command "$section" "$cmd" "${args[@]}"; then
       rc=0
     else
       rc=$?
@@ -122,13 +151,13 @@ run_menu() {
       warn "Menu restart failed; continuing current session."
       reload_requested=1
       echo "---- done (${section} ${cmd}), exit=${rc} ----"
-      return $rc
+      return 0
     fi
     echo "---- done (${section} ${cmd}), exit=${rc} ----"
     if [[ $rc -ne 0 ]]; then
       warn "Command failed with exit code ${rc}"
     fi
-    return $rc
+    return 0
   }
 
   sites_menu() {
