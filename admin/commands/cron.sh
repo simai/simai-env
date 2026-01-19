@@ -3,11 +3,8 @@ set -euo pipefail
 
 cron_add_handler() {
   parse_kv_args "$@"
+  require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if [[ -z "$domain" ]]; then
-    error "domain is required"
-    return 1
-  fi
   if ! validate_domain "$domain"; then
     return 1
   fi
@@ -46,11 +43,8 @@ cron_add_handler() {
 
 cron_remove_handler() {
   parse_kv_args "$@"
+  require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if [[ -z "$domain" ]]; then
-    error "domain is required"
-    return 1
-  fi
   if ! validate_domain "$domain"; then
     return 1
   fi

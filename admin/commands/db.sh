@@ -3,11 +3,11 @@ set -euo pipefail
 
 db_create_handler() {
   parse_kv_args "$@"
-  require_args "name user pass"
+  require_args "name user pass" || return 1
 
-  local name="${PARSED_ARGS[name]}"
-  local user="${PARSED_ARGS[user]}"
-  local pass="${PARSED_ARGS[pass]}"
+  local name="${PARSED_ARGS[name]:-}"
+  local user="${PARSED_ARGS[user]:-}"
+  local pass="${PARSED_ARGS[pass]:-}"
   if ! db_validate_db_name "$name"; then
     return 1
   fi
@@ -40,9 +40,9 @@ db_create_handler() {
 
 db_drop_handler() {
   parse_kv_args "$@"
-  require_args "name"
+  require_args "name" || return 1
 
-  local name="${PARSED_ARGS[name]}"
+  local name="${PARSED_ARGS[name]:-}"
   local drop_user="${PARSED_ARGS[drop-user]:-no}"
   local user="${PARSED_ARGS[user]:-}"
   local confirm="${PARSED_ARGS[confirm]:-}"
@@ -111,10 +111,10 @@ db_drop_handler() {
 
 db_pass_handler() {
   parse_kv_args "$@"
-  require_args "user pass"
+  require_args "user pass" || return 1
 
-  local user="${PARSED_ARGS[user]}"
-  local pass="${PARSED_ARGS[pass]}"
+  local user="${PARSED_ARGS[user]:-}"
+  local pass="${PARSED_ARGS[pass]:-}"
   if ! db_validate_db_user "$user"; then
     return 1
   fi

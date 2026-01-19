@@ -132,9 +132,9 @@ ssl_issue_handler() {
 
   PARSED_ARGS[domain]="$domain"
   PARSED_ARGS[email]="$email"
-  require_args "domain email"
-  domain="${PARSED_ARGS[domain]}"
-  email="${PARSED_ARGS[email]}"
+  require_args "domain email" || return 1
+  domain="${PARSED_ARGS[domain]:-}"
+  email="${PARSED_ARGS[email]:-}"
   progress_step "Validating domain and loading site metadata"
   if ! validate_domain "$domain"; then
     return 1
@@ -210,8 +210,8 @@ ssl_install_custom_handler() {
     fi
   fi
   domain="${PARSED_ARGS[domain]:-$domain}"
-  require_args "domain"
-  domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  domain="${PARSED_ARGS[domain]:-}"
   progress_step "Validating domain and loading site metadata"
   if ! validate_domain "$domain"; then
     return 1
@@ -299,8 +299,8 @@ ssl_renew_handler() {
   fi
   progress_init 5
   domain="${PARSED_ARGS[domain]:-$domain}"
-  require_args "domain"
-  domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  domain="${PARSED_ARGS[domain]:-}"
   progress_step "Validating domain and loading site metadata"
   if ! validate_domain "$domain"; then
     return 1
@@ -339,8 +339,8 @@ ssl_remove_handler() {
     return 1
   fi
   domain="${PARSED_ARGS[domain]:-$domain}"
-  require_args "domain"
-  domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  domain="${PARSED_ARGS[domain]:-}"
   local delete_cert="${PARSED_ARGS[delete-cert]:-no}"
   local confirm="${PARSED_ARGS[confirm]:-}"
   if ! validate_domain "$domain" "allow"; then
@@ -385,8 +385,8 @@ ssl_status_handler() {
   fi
   domain="${PARSED_ARGS[domain]:-$domain}"
   PARSED_ARGS[domain]="$domain"
-  require_args "domain"
-  domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  domain="${PARSED_ARGS[domain]:-}"
   if ! validate_domain "$domain" "allow"; then
     return 1
   fi

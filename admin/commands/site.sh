@@ -3,9 +3,9 @@ set -euo pipefail
 
 site_add_handler() {
   parse_kv_args "$@"
-  require_args "domain"
+  require_args "domain" || return 1
 
-  local domain="${PARSED_ARGS[domain]}"
+  local domain="${PARSED_ARGS[domain]:-}"
   local path_style="${SIMAI_DEFAULT_PATH_STYLE:-domain}"
   if [[ -n "${PARSED_ARGS[path-style]:-}" ]]; then
     path_style="${PARSED_ARGS[path-style]}"
@@ -378,7 +378,7 @@ site_remove_handler() {
     domain=$(select_from_list "Select domain to remove" "" "${sites[@]}")
   fi
   if [[ -z "$domain" ]]; then
-    require_args "domain"
+    require_args "domain" || return 1
   fi
   if ! validate_domain "$domain" "allow"; then
     return 1
@@ -740,7 +740,7 @@ site_set_php_handler() {
     domain=$(select_from_list "Select site" "" "${filtered[@]}")
   fi
   if [[ -z "$domain" ]]; then
-    require_args "domain"
+    require_args "domain" || return 1
   fi
 
   if ! validate_domain "$domain"; then

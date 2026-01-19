@@ -6,8 +6,8 @@ source "${SCRIPT_DIR}/admin/lib/backup_utils.sh"
 
 backup_export_handler() {
   parse_kv_args "$@"
-  require_args "domain"
-  local domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
   local out="${PARSED_ARGS[out]:-}"
 
   if ! require_site_exists "$domain"; then
@@ -132,8 +132,8 @@ backup_export_handler() {
 
 backup_inspect_handler() {
   parse_kv_args "$@"
-  require_args "file"
-  local file="${PARSED_ARGS[file]}"
+  require_args "file" || return 1
+  local file="${PARSED_ARGS[file]:-}"
   if [[ ! -f "$file" ]]; then
     error "Backup file not found: ${file}"
     return 1
@@ -165,8 +165,8 @@ backup_inspect_handler() {
 
 backup_import_handler() {
   parse_kv_args "$@"
-  require_args "file"
-  local file="${PARSED_ARGS[file]}"
+  require_args "file" || return 1
+  local file="${PARSED_ARGS[file]:-}"
   local apply="${PARSED_ARGS[apply]:-no}"
   local enable="${PARSED_ARGS[enable]:-no}"
   local reload="${PARSED_ARGS[reload]:-no}"

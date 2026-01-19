@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.7.12] - 2026-01-19
+### Fixed
+- Interactive menu no longer exits on failed commands; required options are prompted in menu before execution.
+
 ## [1.7.11] - 2026-01-11
 ### Fixed
 - Restored access to self update, cache, and php install commands in the new interactive menu via a dedicated Tools section.
