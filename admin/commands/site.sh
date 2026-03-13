@@ -206,22 +206,20 @@ site_add_handler() {
   fi
 
   if [[ ${#PROFILE_REQUIRED_MARKERS[@]} -gt 0 ]]; then
-    if ! ensure_profile_required_markers "$path"; then
-      if [[ $path_created -eq 1 || $path_empty -eq 1 ]]; then
-        need_post_bootstrap_marker_check=1
-      else
-        if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-          local choice
-          choice=$(select_from_list "Required files not found for profile ${profile}. Fallback to generic?" "yes" "yes" "no")
-          if [[ "$choice" == "yes" ]]; then
-            profile="generic"
-            load_profile "$profile" || return 1
-          else
-            return 1
-          fi
+    if [[ $path_created -eq 1 || $path_empty -eq 1 ]]; then
+      need_post_bootstrap_marker_check=1
+    elif ! ensure_profile_required_markers "$path"; then
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        local choice
+        choice=$(select_from_list "Required files not found for profile ${profile}. Fallback to generic?" "yes" "yes" "no")
+        if [[ "$choice" == "yes" ]]; then
+          profile="generic"
+          load_profile "$profile" || return 1
         else
           return 1
         fi
+      else
+        return 1
       fi
     fi
   fi

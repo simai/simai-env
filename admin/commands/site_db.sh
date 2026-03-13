@@ -287,8 +287,8 @@ site_db_rotate_handler() {
   echo "Password rotated for ${db_user}"
   echo "DB_NAME=${db_name}"
   echo "DB_USER=${db_user}"
-  echo "DB_PASS=${new_pass}"
   echo "DB_HOST=localhost"
+  echo "DB_PASS=updated (hidden)"
 }
 
 register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced"

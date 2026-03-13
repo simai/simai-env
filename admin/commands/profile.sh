@@ -50,7 +50,7 @@ profile_validate_file() {
   fi
 
   local non_profile_vars
-  non_profile_vars=$(bash -c 'set -a; before=$(compgen -v | sort); source "$1"; after=$(compgen -v | sort); comm -13 <(echo "$before") <(echo "$after")' bash "$file" 2>/dev/null) || {
+  non_profile_vars=$(bash -c 'set -a; __simai_before_vars=$(compgen -v | sort); source "$1"; __simai_after_vars=$(compgen -v | sort); comm -13 <(echo "$__simai_before_vars") <(echo "$__simai_after_vars")' bash "$file" 2>/dev/null) || {
     profile_add_result "FAIL" "$id" "Failed to source profile for variable diff"
     failures=1
   }
