@@ -564,7 +564,7 @@ ssl_list_handler() {
     rows+=("${domain}|${type}|${expires}|${days}|${staging}|${redirect}|${hsts}")
   done
 
-  local domain_w=${#Domain} type_w=${#Type} exp_w=${#Expires} days_w=${#Days} staging_w=${#Staging} redirect_w=${#Redirect} hsts_w=${#HSTS}
+  local domain_w=6 type_w=4 exp_w=7 days_w=4 staging_w=7 redirect_w=8 hsts_w=4
   local row
   for row in "${rows[@]}"; do
     IFS='|' read -r domain type expires days staging redirect hsts <<<"$row"
