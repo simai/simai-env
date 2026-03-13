@@ -104,6 +104,7 @@ run_menu() {
     1|yes|true) show_advanced=1 ;;
     *) show_advanced=0 ;;
   esac
+  export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
 
   menu_args_has_key() {
     local key="$1"; shift
@@ -159,24 +160,41 @@ run_menu() {
     fi
     return 0
   }
+  not_implemented() {
+    warn "Not implemented yet."
+  }
 
   sites_menu() {
     while true; do
       echo
       echo "Sites"
       cat <<'EOF'
-  [1] list
-  [2] add
-  [3] set-php
-  [4] remove
+  [1] List sites
+  [2] Create site
+  [3] Site info
+  [4] Change site PHP
+EOF
+      if [[ $show_advanced -eq 1 ]]; then
+        echo "  [5] Change site profile"
+      fi
+      cat <<'EOF'
+  [6] Remove site
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
       case "$ch" in
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
-        3) run_menu_command site set-php ;;
-        4) run_menu_command site remove ;;
+        3) run_menu_command site info ;;
+        4) run_menu_command site set-php ;;
+        5)
+          if [[ $show_advanced -eq 1 ]]; then
+            not_implemented
+          else
+            echo "Invalid choice"
+          fi
+          ;;
+        6) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -189,20 +207,22 @@ EOF
       echo
       echo "SSL"
       cat <<'EOF'
-  [1] status
-  [2] letsencrypt
-  [3] renew
-  [4] remove
-  [5] install
+  [1] List SSL
+  [2] SSL status
+  [3] Issue Let's Encrypt
+  [4] Install custom certificate
+  [5] Renew certificate
+  [6] Remove SSL
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
       case "$ch" in
-        1) run_menu_command ssl status ;;
-        2) run_menu_command ssl letsencrypt ;;
-        3) run_menu_command ssl renew ;;
-        4) run_menu_command ssl remove ;;
-        5) run_menu_command ssl install ;;
+        1) run_menu_command ssl list ;;
+        2) run_menu_command ssl status ;;
+        3) run_menu_command ssl letsencrypt ;;
+        4) run_menu_command ssl install ;;
+        5) run_menu_command ssl renew ;;
+        6) run_menu_command ssl remove ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -210,21 +230,37 @@ EOF
     done
   }
 
-  diagnose_menu() {
+  php_menu() {
     while true; do
       echo
-      echo "Diagnose"
-      printf "  [1] site doctor\n"
+      echo "PHP"
+      printf "  [1] List PHP versions\n"
+      printf "  [2] Install PHP version\n"
+      printf "  [3] Manage PHP extensions\n"
+      printf "  [4] Manage PHP parameters (FPM/CLI)\n"
+      printf "  [5] Reload / restart PHP-FPM\n"
       if [[ $show_advanced -eq 1 ]]; then
-        printf "  [2] site drift\n"
+        printf "  [6] Reset PHP parameters\n"
+        printf "  [7] Remove PHP version\n"
       fi
-      echo "  [0] Back"
+      printf "  [0] Back\n"
       read -r -p "Enter choice: " ch || true
       case "$ch" in
-        1) run_menu_command site doctor ;;
-        2)
+        1) run_menu_command php list ;;
+        2) run_menu_command php install ;;
+        3) not_implemented ;;
+        4) not_implemented ;;
+        5) run_menu_command php reload ;;
+        6)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site drift
+            not_implemented
+          else
+            echo "Invalid choice"
+          fi
+          ;;
+        7)
+          if [[ $show_advanced -eq 1 ]]; then
+            not_implemented
           else
             echo "Invalid choice"
           fi
@@ -236,23 +272,77 @@ EOF
     done
   }
 
-  maintenance_menu() {
+  db_menu() {
     while true; do
       echo
-      echo "Maintenance"
+      echo "Database"
       cat <<'EOF'
-  [1] Repair Environment ...
-  [2] PHP list
-  [3] PHP reload
-  [4] Update simai-env
+  [1] List databases
+  [2] MySQL status
+  [3] Create DB + user (for site)
+  [4] Write DB credentials to project
+  [5] Rotate DB user password
+  [6] Export DB dump
+EOF
+      if [[ $show_advanced -eq 1 ]]; then
+        echo "  [7] Import DB dump"
+        echo "  [8] Drop DB + user"
+      fi
+      cat <<'EOF'
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
       case "$ch" in
-        1) run_menu_command self bootstrap ;;
-        2) run_menu_command php list ;;
-        3) run_menu_command php reload ;;
-        4) run_menu_command self update ;;
+        1) run_menu_command db list ;;
+        2) run_menu_command db status ;;
+        3) run_menu_command site db-create ;;
+        4) run_menu_command site db-export ;;
+        5) run_menu_command site db-rotate ;;
+        6) not_implemented ;;
+        7)
+          if [[ $show_advanced -eq 1 ]]; then
+            not_implemented
+          else
+            echo "Invalid choice"
+          fi
+          ;;
+        8)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site db-drop
+          else
+            echo "Invalid choice"
+          fi
+          ;;
+        0) break ;;
+        "") continue ;;
+        *) echo "Invalid choice" ;;
+      esac
+    done
+  }
+
+  diagnostics_menu() {
+    while true; do
+      echo
+      echo "Diagnostics"
+      printf "  [1] Site doctor\n"
+      printf "  [2] Drift plan\n"
+      if [[ $show_advanced -eq 1 ]]; then
+        printf "  [3] Drift apply\n"
+      fi
+      printf "  [4] Platform status\n"
+      printf "  [0] Back\n"
+      read -r -p "Enter choice: " ch || true
+      case "$ch" in
+        1) run_menu_command site doctor ;;
+        2) run_menu_command site drift ;;
+        3)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site drift --fix yes
+          else
+            echo "Invalid choice"
+          fi
+          ;;
+        4) run_menu_command self platform-status ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -265,11 +355,13 @@ EOF
       echo
       echo "Logs"
       cat <<'EOF'
-  [1] admin
-  [2] env
-  [3] audit
-  [4] nginx
-  [5] letsencrypt
+  [1] Admin log
+  [2] Environment log
+  [3] Audit log
+  [4] Nginx access log (by domain)
+  [5] Nginx error log (by domain)
+  [6] Let's Encrypt log
+  [7] Laravel worker log (by domain)
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
@@ -277,8 +369,10 @@ EOF
         1) run_menu_command logs admin ;;
         2) run_menu_command logs env ;;
         3) run_menu_command logs audit ;;
-        4) run_menu_command logs nginx ;;
-        5) run_menu_command logs letsencrypt ;;
+        4) run_menu_command logs nginx --kind access ;;
+        5) run_menu_command logs nginx --kind error ;;
+        6) run_menu_command logs letsencrypt ;;
+        7) not_implemented ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -291,16 +385,28 @@ EOF
       echo
       echo "Backup / Migrate"
       cat <<'EOF'
-  [1] export
-  [2] inspect
-  [3] import
+  [1] Export site config
+  [2] Inspect archive
+  [3] Import plan (dry-run)
+EOF
+      if [[ $show_advanced -eq 1 ]]; then
+        echo "  [4] Import apply"
+      fi
+      cat <<'EOF'
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
       case "$ch" in
         1) run_menu_command backup export ;;
         2) run_menu_command backup inspect ;;
-        3) run_menu_command backup import ;;
+        3) run_menu_command backup import --apply no ;;
+        4)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command backup import --apply yes
+          else
+            echo "Invalid choice"
+          fi
+          ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -308,41 +414,27 @@ EOF
     done
   }
 
-  workers_menu() {
+  laravel_menu() {
     while true; do
       echo
-      echo "Workers"
+      echo "Laravel"
       cat <<'EOF'
-  [1] status
-  [2] restart
-  [3] logs
+  [1] Clear cache
+  [2] Scheduler add (schedule:run)
+  [3] Scheduler remove (schedule:run)
+  [4] Worker status
+  [5] Worker restart
+  [6] Worker logs
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
       case "$ch" in
-        1) run_menu_command queue status ;;
-        2) run_menu_command queue restart ;;
-        3) run_menu_command queue logs ;;
-        0) break ;;
-        "") continue ;;
-        *) echo "Invalid choice" ;;
-      esac
-    done
-  }
-
-  scheduler_menu() {
-    while true; do
-      echo
-      echo "Scheduler"
-      cat <<'EOF'
-  [1] add
-  [2] remove
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
-      case "$ch" in
-        1) run_menu_command cron add ;;
-        2) run_menu_command cron remove ;;
+        1) run_menu_command cache clear ;;
+        2) run_menu_command cron add ;;
+        3) run_menu_command cron remove ;;
+        4) run_menu_command queue status ;;
+        5) run_menu_command queue restart ;;
+        6) run_menu_command queue logs ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -355,13 +447,13 @@ EOF
       echo
       echo "Profiles"
       cat <<'EOF'
-  [1] list
-  [2] used-by
-  [3] used-by-one
-  [4] validate
-  [5] enable
-  [6] disable
-  [7] init
+  [1] List profiles
+  [2] Used by (summary)
+  [3] Used by (one profile)
+  [4] Validate profiles
+  [5] Enable profile
+  [6] Disable profile
+  [7] Init allowlist
   [0] Back
 EOF
       read -r -p "Enter choice: " ch || true
@@ -380,117 +472,30 @@ EOF
     done
   }
 
-  adv_db_menu() {
+  system_menu() {
     while true; do
       echo
-      echo "Advanced Tools / Database"
-      cat <<'EOF'
-  [1] status
-  [2] create
-  [3] export
-  [4] rotate
-  [5] drop
-  [0] Back
-EOF
+      echo "System"
+      printf "  [1] System status\n"
+      printf "  [2] Repair environment\n"
+      printf "  [3] Update simai-env\n"
+      printf "  [4] Version\n"
+      printf "  [5] Advanced mode (currently: %s)\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
+      printf "  [0] Back\n"
       read -r -p "Enter choice: " ch || true
       case "$ch" in
-        1) run_menu_command site db-status ;;
-        2) run_menu_command site db-create ;;
-        3) run_menu_command site db-export ;;
-        4) run_menu_command site db-rotate ;;
-        5) run_menu_command site db-drop ;;
-        0) break ;;
-        "") continue ;;
-        *) echo "Invalid choice" ;;
-      esac
-    done
-  }
-
-  adv_php_menu() {
-    while true; do
-      echo
-      echo "Advanced Tools / PHP Tuning"
-      cat <<'EOF'
-  [1] ini list
-  [2] ini set
-  [3] ini unset
-  [4] ini apply
-  [5] site fix
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
-      case "$ch" in
-        1) run_menu_command site php-ini-list ;;
-        2) run_menu_command site php-ini-set ;;
-        3) run_menu_command site php-ini-unset ;;
-        4) run_menu_command site php-ini-apply ;;
-        5) run_menu_command site fix ;;
-        0) break ;;
-        "") continue ;;
-        *) echo "Invalid choice" ;;
-      esac
-    done
-  }
-
-  adv_consistency_menu() {
-    while true; do
-      echo
-      echo "Advanced Tools / Consistency"
-      cat <<'EOF'
-  [1] drift
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
-      case "$ch" in
-        1) run_menu_command site drift ;;
-        0) break ;;
-        "") continue ;;
-        *) echo "Invalid choice" ;;
-      esac
-    done
-  }
-
-  advanced_menu() {
-    if [[ $show_advanced -ne 1 ]]; then
-      warn "Advanced commands are hidden; enable Advanced to view."
-      return
-    fi
-    while true; do
-      echo
-      echo "Advanced Tools"
-      cat <<'EOF'
-  [1] Database
-  [2] PHP Tuning
-  [3] Consistency
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
-      case "$ch" in
-        1) adv_db_menu ;;
-        2) adv_php_menu ;;
-        3) adv_consistency_menu ;;
-        0) break ;;
-        "") continue ;;
-        *) echo "Invalid choice" ;;
-      esac
-    done
-  }
-
-  tools_menu() {
-    while true; do
-      echo
-      echo "Tools"
-      cat <<'EOF'
-  [1] Cache clear
-  [2] Cache run
-  [3] PHP install
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
-      case "$ch" in
-        1) run_menu_command cache clear ;;
-        2) run_menu_command cache run ;;
-        3) run_menu_command php install ;;
+        1) run_menu_command self status ;;
+        2) run_menu_command self bootstrap ;;
+        3) run_menu_command self update ;;
+        4) run_menu_command self version ;;
+        5)
+          if [[ $show_advanced -eq 1 ]]; then
+            show_advanced=0
+          else
+            show_advanced=1
+          fi
+          export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+          ;;
         0) break ;;
         "") continue ;;
         *) echo "Invalid choice" ;;
@@ -503,51 +508,34 @@ EOF
       reload_requested=0
       SIMAI_PREFLIGHT_DONE=0
       print_version_banner
+      printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       preflight_bootstrap
     fi
     echo
     echo "Select section:"
     printf "  [1] Sites\n"
     printf "  [2] SSL\n"
-    printf "  [3] Diagnose\n"
-    printf "  [4] Maintenance\n"
-    printf "  [5] Logs\n"
-    printf "  [6] Backup / Migrate\n"
-    printf "  [7] Workers\n"
-    printf "  [8] Scheduler\n"
+    printf "  [3] PHP\n"
+    printf "  [4] Database\n"
+    printf "  [5] Diagnostics\n"
+    printf "  [6] Logs\n"
+    printf "  [7] Backup / Migrate\n"
+    printf "  [8] Laravel\n"
     printf "  [9] Profiles\n"
-    printf "  [10] Tools\n"
-    if [[ $show_advanced -eq 1 ]]; then
-      printf "  [11] Advanced Tools\n"
-    fi
-    printf "  [99] Toggle advanced commands (currently: %s)\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
+    printf "  [10] System\n"
     echo "  [0] Exit"
     read -r -p "Enter choice: " choice || true
     case "$choice" in
       1) sites_menu ;;
       2) ssl_menu ;;
-      3) diagnose_menu ;;
-      4) maintenance_menu ;;
-      5) logs_menu ;;
-      6) backup_menu ;;
-      7) workers_menu ;;
-      8) scheduler_menu ;;
+      3) php_menu ;;
+      4) db_menu ;;
+      5) diagnostics_menu ;;
+      6) logs_menu ;;
+      7) backup_menu ;;
+      8) laravel_menu ;;
       9) profiles_menu ;;
-      10) tools_menu ;;
-      11)
-        if [[ $show_advanced -eq 1 ]]; then
-          advanced_menu
-        else
-          warn "Advanced commands are hidden; toggle advanced to show."
-        fi
-        ;;
-      99)
-        if [[ $show_advanced -eq 1 ]]; then
-          show_advanced=0
-        else
-          show_advanced=1
-        fi
-        ;;
+      10) system_menu ;;
       0) exit 0 ;;
       "") continue ;;
       *) echo "Invalid choice" ;;

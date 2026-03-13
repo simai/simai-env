@@ -75,6 +75,227 @@ self_version_handler() {
   printf "%s\n" "$sep"
 }
 
+self_status_handler() {
+  platform_detect_os
+  local os_name="${PLATFORM_OS_PRETTY:-unknown}"
+  local supported="no"
+  if platform_is_supported_os; then
+    supported="yes"
+  fi
+  local install_dir="${SIMAI_ENV_ROOT:-${SCRIPT_DIR:-unknown}}"
+
+  local svc_state
+  svc_state() {
+    local svc="$1"
+    if ! os_svc_has_unit "$svc"; then
+      echo "not installed"
+      return
+    fi
+    if os_svc_is_active "$svc"; then
+      echo "active"
+    else
+      echo "inactive"
+    fi
+  }
+
+  local nginx_state mysql_state redis_state
+  nginx_state=$(svc_state "nginx")
+  mysql_state=$(svc_state "mysql")
+  redis_state=$(svc_state "redis-server")
+
+  local nginx_version="unknown"
+  if command -v nginx >/dev/null 2>&1; then
+    nginx_version=$(nginx -v 2>&1 | sed 's/^nginx version: //')
+  fi
+  local php_cli_version="unknown"
+  if command -v php >/dev/null 2>&1; then
+    php_cli_version=$(php -v 2>/dev/null | head -n1)
+  fi
+  local mysql_version="unknown"
+  if command -v mysql >/dev/null 2>&1; then
+    mysql_version=$(mysql --version 2>/dev/null)
+  elif command -v mysqld >/dev/null 2>&1; then
+    mysql_version=$(mysqld --version 2>/dev/null)
+  fi
+  local redis_version="unknown"
+  if command -v redis-server >/dev/null 2>&1; then
+    redis_version=$(redis-server --version 2>/dev/null)
+  elif command -v redis-cli >/dev/null 2>&1; then
+    redis_version=$(redis-cli --version 2>/dev/null)
+  fi
+  local certbot_version="unknown"
+  if command -v certbot >/dev/null 2>&1; then
+    certbot_version=$(certbot --version 2>/dev/null)
+  fi
+  local certbot_timer="unknown"
+  if command -v systemctl >/dev/null 2>&1; then
+    local load_state
+    load_state=$(systemctl show -p LoadState --value certbot.timer 2>/dev/null || true)
+    if [[ "$load_state" == "loaded" ]]; then
+      if systemctl is-active --quiet certbot.timer; then
+        certbot_timer="active"
+      else
+        certbot_timer="inactive"
+      fi
+    else
+      certbot_timer="missing"
+    fi
+  fi
+
+  local php_status="not installed"
+  if command -v systemctl >/dev/null 2>&1; then
+    local units=()
+    mapfile -t units < <(systemctl list-units --type=service --no-legend "php*-fpm.service" 2>/dev/null | awk '{print $1}')
+    if [[ ${#units[@]} -gt 0 ]]; then
+      local entries=()
+      local unit ver state
+      for unit in "${units[@]}"; do
+        ver="${unit#php}"
+        ver="${ver%-fpm.service}"
+        state="inactive"
+        if systemctl is-active --quiet "$unit"; then
+          state="active"
+        fi
+        entries+=("${ver}(${state})")
+      done
+      php_status=$(IFS=', '; echo "${entries[*]}")
+    fi
+  fi
+  if [[ "$php_status" == "not installed" ]]; then
+    local vers=()
+    if compgen -G "/etc/php/*/fpm/php-fpm.conf" >/dev/null 2>&1; then
+      local dir ver
+      for dir in /etc/php/*/fpm; do
+        [[ -d "$dir" ]] || continue
+        ver="${dir#/etc/php/}"
+        ver="${ver%/fpm}"
+        vers+=("$ver")
+      done
+      if [[ ${#vers[@]} -gt 0 ]]; then
+        php_status=$(IFS=', '; echo "${vers[*]}")
+      fi
+    fi
+  fi
+
+  print_kv_table \
+    "Install dir|${install_dir}" \
+    "OS|${os_name}" \
+    "Supported|${supported}" \
+    "nginx|${nginx_state}" \
+    "nginx version|${nginx_version}" \
+    "mysql|${mysql_state}" \
+    "mysql version|${mysql_version}" \
+    "redis|${redis_state}" \
+    "redis version|${redis_version}" \
+    "php-fpm|${php_status}" \
+    "php cli|${php_cli_version}" \
+    "certbot version|${certbot_version}" \
+    "certbot timer|${certbot_timer}"
+}
+
+self_platform_status_handler() {
+  local svc_state
+  svc_state() {
+    local svc="$1"
+    if ! os_svc_has_unit "$svc"; then
+      echo "missing"
+      return
+    fi
+    if os_svc_is_active "$svc"; then
+      echo "active"
+    else
+      echo "inactive"
+    fi
+  }
+
+  local nginx_state mysql_state redis_state
+  nginx_state=$(svc_state "nginx")
+  mysql_state=$(svc_state "mysql")
+  redis_state=$(svc_state "redis-server")
+
+  local nginx_test="unknown"
+  if command -v nginx >/dev/null 2>&1; then
+    if nginx -t >/dev/null 2>&1; then
+      nginx_test="ok"
+    else
+      nginx_test="fail"
+    fi
+  fi
+
+  local php_units="unknown"
+  if command -v systemctl >/dev/null 2>&1; then
+    local units=()
+    mapfile -t units < <(systemctl list-units --type=service --no-legend "php*-fpm.service" 2>/dev/null | awk '{print $1}')
+    local active_units=()
+    local unit
+    for unit in "${units[@]}"; do
+      if systemctl is-active --quiet "$unit"; then
+        active_units+=("$unit")
+      fi
+    done
+    if [[ ${#units[@]} -eq 0 ]]; then
+      php_units="missing"
+    elif [[ ${#active_units[@]} -eq 0 ]]; then
+      php_units="inactive"
+    else
+      php_units=$(IFS=', '; echo "${active_units[*]}")
+    fi
+  fi
+
+  local disk_root="unknown"
+  disk_root=$(df -h / 2>/dev/null | awk 'NR==2{print $4}')
+  [[ -z "$disk_root" ]] && disk_root="unknown"
+  local disk_var="unknown"
+  if [[ -d /var/lib/mysql ]]; then
+    disk_var=$(df -h /var/lib/mysql 2>/dev/null | awk 'NR==2{print $4}')
+  elif [[ -d /var ]]; then
+    disk_var=$(df -h /var 2>/dev/null | awk 'NR==2{print $4}')
+  fi
+  [[ -z "$disk_var" ]] && disk_var="unknown"
+
+  local inodes_root="unknown"
+  inodes_root=$(df -hi / 2>/dev/null | awk 'NR==2{print $4}')
+  [[ -z "$inodes_root" ]] && inodes_root="unknown"
+
+  local mem_summary="unknown"
+  if command -v free >/dev/null 2>&1; then
+    local total used free
+    read -r total used free < <(free -h 2>/dev/null | awk 'NR==2{print $2, $3, $4}')
+    if [[ -n "${total:-}" ]]; then
+      mem_summary="${total}/${used}/${free}"
+    fi
+  fi
+
+  local certbot_timer="unknown"
+  if command -v systemctl >/dev/null 2>&1; then
+    local load_state
+    load_state=$(systemctl show -p LoadState --value certbot.timer 2>/dev/null || true)
+    if [[ "$load_state" == "loaded" ]]; then
+      if systemctl is-active --quiet certbot.timer; then
+        certbot_timer="active"
+      else
+        certbot_timer="inactive"
+      fi
+    else
+      certbot_timer="missing"
+    fi
+  fi
+
+  print_kv_table \
+    "nginx|${nginx_state}" \
+    "nginx test|${nginx_test}" \
+    "mysql|${mysql_state}" \
+    "redis|${redis_state}" \
+    "php-fpm units|${php_units}" \
+    "disk free /|${disk_root}" \
+    "disk free /var|${disk_var}" \
+    "inodes free /|${inodes_root}" \
+    "memory (total/used/free)|${mem_summary}" \
+    "certbot timer|${certbot_timer}"
+}
+
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
+register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
+register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""

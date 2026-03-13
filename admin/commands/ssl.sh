@@ -100,6 +100,14 @@ ssl_apply_nginx() {
 
 ssl_issue_handler() {
   parse_kv_args "$@"
+  local is_advanced=0
+  local advanced_flag="${SIMAI_MENU_SHOW_ADVANCED:-0}"
+  advanced_flag="${advanced_flag,,}"
+  case "$advanced_flag" in
+    1|yes|true|on) is_advanced=1 ;;
+    *) is_advanced=0 ;;
+  esac
+  local staging_warned=0
   local domain
   if ! domain=$(ssl_select_domain); then
     return 1
@@ -123,12 +131,31 @@ ssl_issue_handler() {
       PARSED_ARGS[email]="$email"
     fi
     [[ -z "$redirect" ]] && redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
-    [[ -z "$hsts" ]] && hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
-    [[ -z "$staging" ]] && staging=$(select_from_list "Use Let's Encrypt staging?" "no" "no" "yes")
+    if [[ -z "$staging" ]]; then
+      if [[ $is_advanced -eq 1 ]]; then
+        staging=$(select_from_list "Use Let's Encrypt staging? (testing/diagnostics; avoids rate limits)" "no" "no" "yes")
+      else
+        info "Staging mode is hidden in Advanced; defaulting to production Let's Encrypt."
+        staging="no"
+      fi
+    fi
+    if [[ "$staging" == "yes" ]]; then
+      warn "Let's Encrypt STAGING issues certificates that are NOT trusted by browsers. Use only for testing/diagnostics."
+      warn "HSTS will be forced to NO in staging mode."
+      hsts="no"
+      staging_warned=1
+    else
+      [[ -z "$hsts" ]] && hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
+    fi
   fi
   [[ -z "$redirect" ]] && redirect="no"
-  [[ -z "$hsts" ]] && hsts="no"
   [[ -z "$staging" ]] && staging="no"
+  if [[ "$staging" == "yes" && $staging_warned -eq 0 ]]; then
+    warn "Let's Encrypt STAGING issues certificates that are NOT trusted by browsers. Use only for testing/diagnostics."
+    warn "HSTS will be forced to NO in staging mode."
+    hsts="no"
+  fi
+  [[ -z "$hsts" ]] && hsts="no"
 
   PARSED_ARGS[domain]="$domain"
   PARSED_ARGS[email]="$email"
@@ -183,8 +210,13 @@ ssl_issue_handler() {
   echo "Cert     : ${cert}"
   echo "Key      : ${key}"
   echo "Chain    : ${chain}"
+  echo "Staging  : ${staging}"
   echo "Redirect : ${redirect}"
-  echo "HSTS     : ${hsts}"
+  if [[ "$staging" == "yes" ]]; then
+    echo "HSTS     : ${hsts} (forced)"
+  else
+    echo "HSTS     : ${hsts}"
+  fi
   progress_done "Done"
 }
 
@@ -334,13 +366,20 @@ ssl_renew_handler() {
 
 ssl_remove_handler() {
   parse_kv_args "$@"
-  local domain
-  if ! domain=$(ssl_select_domain "allow"); then
-    return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    if ! domain=$(ssl_select_domain "allow"); then
+      warn "Cancelled."
+      return 0
+    fi
   fi
-  domain="${PARSED_ARGS[domain]:-$domain}"
-  require_args "domain" || return 1
-  domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    warn "Cancelled."
+    return 0
+  fi
+  if [[ -z "${PARSED_ARGS[domain]:-}" ]]; then
+    PARSED_ARGS[domain]="$domain"
+  fi
   local delete_cert="${PARSED_ARGS[delete-cert]:-no}"
   local confirm="${PARSED_ARGS[confirm]:-}"
   if ! validate_domain "$domain" "allow"; then
@@ -381,9 +420,14 @@ ssl_status_handler() {
   parse_kv_args "$@"
   local domain
   if ! domain=$(ssl_select_domain "allow"); then
-    return 1
+    warn "Cancelled."
+    return 0
   fi
   domain="${PARSED_ARGS[domain]:-$domain}"
+  if [[ -z "$domain" ]]; then
+    warn "Cancelled."
+    return 0
+  fi
   PARSED_ARGS[domain]="$domain"
   require_args "domain" || return 1
   domain="${PARSED_ARGS[domain]:-}"
@@ -398,7 +442,25 @@ ssl_status_handler() {
   local custom_cert="/etc/nginx/ssl/${domain}/fullchain.pem"
   local custom_key="/etc/nginx/ssl/${domain}/privkey.pem"
   local cert_path="" key_path="" type="none"
-  if [[ -f "$le_cert" && -f "$le_key" ]]; then
+  local not_after="(unknown)" not_before="(unknown)"
+  local issuer="(none)" staging="n/a" san="unknown"
+  local nginx_cert="" nginx_key=""
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+
+  if [[ -f "$cfg" ]]; then
+    nginx_cert=$(awk '/^\s*ssl_certificate\s+/ {print $2; exit}' "$cfg" | sed 's/;$//')
+    nginx_key=$(awk '/^\s*ssl_certificate_key\s+/ {print $2; exit}' "$cfg" | sed 's/;$//')
+  fi
+
+  if [[ -n "$nginx_cert" && -n "$nginx_key" && -f "$nginx_cert" && -f "$nginx_key" ]]; then
+    cert_path="$nginx_cert"
+    key_path="$nginx_key"
+    if [[ "$cert_path" == "/etc/letsencrypt/live/${domain}/"* ]]; then
+      type="letsencrypt"
+    else
+      type="custom"
+    fi
+  elif [[ -f "$le_cert" && -f "$le_key" ]]; then
     cert_path="$le_cert"
     key_path="$le_key"
     type="letsencrypt"
@@ -407,20 +469,125 @@ ssl_status_handler() {
     key_path="$custom_key"
     type="custom"
   fi
-  local not_after="(unknown)" not_before="(unknown)"
+
   if [[ -n "$cert_path" ]]; then
-    not_after=$(openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2 || true)
-    not_before=$(openssl x509 -startdate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2 || true)
+    if command -v openssl >/dev/null 2>&1; then
+      not_after=$(openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2 || true)
+      not_before=$(openssl x509 -startdate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2 || true)
+      issuer=$(openssl x509 -issuer -noout -in "$cert_path" 2>/dev/null | sed 's/^issuer= *//')
+      [[ -z "$issuer" ]] && issuer="(unknown)"
+      san=$(openssl x509 -in "$cert_path" -noout -ext subjectAltName 2>/dev/null | tr '\n' ' ')
+      if [[ -n "$san" ]]; then
+        san=$(echo "$san" | sed -n 's/.*Subject Alternative Name: *//p' | sed 's/DNS://g; s/IP Address://g; s/ *, */, /g' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+      fi
+      [[ -z "$san" ]] && san="unknown"
+    else
+      issuer="(unavailable)"
+      san="unknown"
+    fi
+    if [[ "$type" == "letsencrypt" ]]; then
+      if ssl_cert_is_staging "$cert_path"; then
+        staging="yes"
+      else
+        staging="no"
+      fi
+    fi
   fi
-  local sep="+----------------------+----------------------"
-  printf "%s\n" "${sep}+"
-  printf "| %-20s | %-20s |\n" "Domain" "$domain"
-  printf "| %-20s | %-20s |\n" "Type" "$type"
-  printf "| %-20s | %-20s |\n" "Cert" "${cert_path:-none}"
-  printf "| %-20s | %-20s |\n" "Key" "${key_path:-none}"
-  printf "| %-20s | %-20s |\n" "Not before" "$not_before"
-  printf "| %-20s | %-20s |\n" "Not after" "$not_after"
-  printf "%s\n" "${sep}+"
+
+  local -a rows=(
+    "Domain|${domain}"
+    "Type|${type}"
+  )
+  if [[ -n "$nginx_cert" ]]; then
+    rows+=("Nginx cert|${nginx_cert}")
+  fi
+  if [[ -n "$nginx_key" ]]; then
+    rows+=("Nginx key|${nginx_key}")
+  fi
+  rows+=(
+    "Cert|${cert_path:-none}"
+    "Key|${key_path:-none}"
+    "Not before|${not_before}"
+    "Not after|${not_after}"
+    "Issuer|${issuer}"
+    "SAN|${san}"
+    "Staging|${staging}"
+  )
+  if [[ "$staging" == "yes" ]]; then
+    rows+=("Note|staging cert is NOT trusted by browsers")
+  fi
+
+  print_kv_table "${rows[@]}"
+}
+
+ssl_list_handler() {
+  local sites=()
+  mapfile -t sites < <(list_sites)
+  if [[ ${#sites[@]} -eq 0 ]]; then
+    warn "No sites found"
+    return 0
+  fi
+  local -a rows=()
+  local domain ssl_info type expires staging days redirect hsts
+  for domain in "${sites[@]}"; do
+    read_site_metadata "$domain" >/dev/null 2>&1 || true
+    ssl_info=$(site_ssl_brief "$domain")
+    type="$ssl_info"
+    expires="n/a"
+    if [[ "$ssl_info" == *:* ]]; then
+      type="${ssl_info%%:*}"
+      expires="${ssl_info#*:}"
+    fi
+    days="n/a"
+    if [[ "$expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+      local exp_ts now_ts
+      exp_ts=$(date -d "$expires" +%s 2>/dev/null || echo "")
+      now_ts=$(date +%s)
+      if [[ -n "$exp_ts" ]]; then
+        days=$(( (exp_ts - now_ts) / 86400 ))
+      fi
+    fi
+    case "$type" in
+      LE-stg)
+        type="LE"
+        staging="yes"
+        ;;
+      LE)
+        staging="no"
+        ;;
+      *)
+        staging="n/a"
+        ;;
+    esac
+    redirect=$(site_nginx_ssl_redirect_enabled "$domain")
+    hsts=$(site_nginx_hsts_enabled "$domain")
+    rows+=("${domain}|${type}|${expires}|${days}|${staging}|${redirect}|${hsts}")
+  done
+
+  local domain_w=${#Domain} type_w=${#Type} exp_w=${#Expires} days_w=${#Days} staging_w=${#Staging} redirect_w=${#Redirect} hsts_w=${#HSTS}
+  local row
+  for row in "${rows[@]}"; do
+    IFS='|' read -r domain type expires days staging redirect hsts <<<"$row"
+    [[ ${#domain} -gt $domain_w ]] && domain_w=${#domain}
+    [[ ${#type} -gt $type_w ]] && type_w=${#type}
+    [[ ${#expires} -gt $exp_w ]] && exp_w=${#expires}
+    [[ ${#days} -gt $days_w ]] && days_w=${#days}
+    [[ ${#staging} -gt $staging_w ]] && staging_w=${#staging}
+    [[ ${#redirect} -gt $redirect_w ]] && redirect_w=${#redirect}
+    [[ ${#hsts} -gt $hsts_w ]] && hsts_w=${#hsts}
+  done
+  local sep
+  sep="+$(printf '%*s' "$((domain_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((type_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((exp_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((days_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((staging_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((redirect_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((hsts_w+2))" "" | tr ' ' '-')+"
+  printf "%s\n" "$sep"
+  printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    "$domain_w" "Domain" "$type_w" "Type" "$exp_w" "Expires" "$days_w" "Days" "$staging_w" "Staging" "$redirect_w" "Redirect" "$hsts_w" "HSTS"
+  printf "%s\n" "$sep"
+  for row in "${rows[@]}"; do
+    IFS='|' read -r domain type expires days staging redirect hsts <<<"$row"
+    printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+      "$domain_w" "$domain" "$type_w" "$type" "$exp_w" "$expires" "$days_w" "$days" "$staging_w" "$staging" "$redirect_w" "$redirect" "$hsts_w" "$hsts"
+  done
+  printf "%s\n" "$sep"
 }
 
 register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging="
@@ -428,3 +595,4 @@ register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_ha
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
 register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert= confirm="
 register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain="
+register_cmd "ssl" "list" "List SSL status for sites" "ssl_list_handler" "" ""

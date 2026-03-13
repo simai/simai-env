@@ -1,6 +1,62 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.1] - 2026-01-20
+### Fixed
+- SSL status output formatting and nginx-cert detection.
+- Cancel is not treated as error in menu flows.
+- Platform-status disk free shows /var/lib/mysql when available.
+
+## [1.8.0] - 2026-01-20
+### Added
+- SSL status now shows SAN and nginx-config certificate paths (when available).
+- Added diagnostics command `self platform-status` with disk/inodes/memory and nginx config test.
+### Changed
+- Diagnostics "Platform status" now uses `self platform-status`, while System "System status" remains `self status`.
+### Fixed
+- Improved robustness of SSL status output (best-effort, no crashes when data missing).
+
+## [1.7.17] - 2026-01-20
+### Changed
+- Enhanced site info card with nginx healthcheck/logs/SSL flags and cron/worker status.
+- SSL list now shows days remaining plus redirect and HSTS status.
+- Self status includes component versions and certbot timer state; db status adds socket/port/datadir/disk info.
+
+## [1.7.16] - 2026-01-19
+### Changed
+- Wired menu items to site info/ssl list/db status+list/drift apply/platform status.
+- Let's Encrypt staging is now shown as LE-stg in site and SSL summaries.
+### Added
+- `site info`, `ssl list`, `db status`, `db list`, and `self status` commands.
+### Test
+- `sudo /root/simai-env/simai-admin.sh menu`
+- Sites -> list (SSL shows LE-stg for staging)
+- Sites -> info (select domain)
+- SSL -> list
+- SSL -> status (Issuer + Staging shown)
+- Database -> MySQL status
+- Database -> List databases
+- Database -> Create DB + user / Rotate / Write creds
+- Diagnostics -> Drift apply (ADV on)
+- System -> System status
+
+## [1.7.15] - 2026-01-19
+### Changed
+- Reworked simai-admin menu structure (Sites/SSL/PHP/Database/Diagnostics/Logs/Backup/Laravel/Profiles/System).
+### Fixed
+- Menu no longer exits to shell on command failures; required arguments are prompted interactively.
+- Advanced toggle moved into System section.
+
+## [1.7.14] - 2026-01-19
+### Changed
+- Let's Encrypt staging mode is now available only in Advanced mode.
+### Fixed
+- Prevented enabling HSTS with staging certificates (forced off) and added warnings to avoid browser trust confusion.
+
+## [1.7.13] - 2026-01-19
+### Fixed
+- Fixed `ssl remove` in interactive menu: selected domain is now used correctly (no missing --domain error).
+
 ## [1.7.12] - 2026-01-19
 ### Fixed
 - Interactive menu no longer exits on failed commands; required options are prompted in menu before execution.

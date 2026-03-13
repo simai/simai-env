@@ -1017,7 +1017,104 @@ site_list_handler() {
   printf "%s\n" "$sep"
 }
 
+site_info_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      local sites=()
+      mapfile -t sites < <(list_sites)
+      if [[ ${#sites[@]} -eq 0 ]]; then
+        warn "No sites found"
+        return 1
+      fi
+      domain=$(select_from_list "Select site" "" "${sites[@]}")
+    else
+      read -r -p "domain: " domain || true
+    fi
+  fi
+  if [[ -z "$domain" ]]; then
+    warn "Cancelled."
+    return 0
+  fi
+  if ! validate_domain "$domain" "allow"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
+
+  local profile="${SITE_META[profile]:-unknown}"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local slug="${SITE_META[slug]:-$project}"
+  local root="${SITE_META[root]:-${WWW_ROOT}/${domain}}"
+  local public_dir="${SITE_META[public_dir]:-public}"
+  local nginx_conf="/etc/nginx/sites-available/${domain}.conf"
+  local nginx_enabled
+  nginx_enabled=$(site_nginx_is_enabled "$domain")
+  local healthcheck
+  healthcheck=$(site_nginx_healthcheck_endpoint "$domain")
+  local ssl_redirect
+  ssl_redirect=$(site_nginx_ssl_redirect_enabled "$domain")
+  local ssl_hsts
+  ssl_hsts=$(site_nginx_hsts_enabled "$domain")
+  local logs
+  logs=$(site_expected_nginx_logs "$project")
+  local access_log="${logs%%|*}"
+  local error_log="${logs#*|}"
+  local cron_file="/etc/cron.d/${slug}"
+  local cron_status
+  cron_status=$(site_cron_file_status "$slug")
+  local worker_unit="laravel-queue-${project}.service"
+  local worker_status
+  worker_status=$(site_worker_status "$project")
+  local php="${SITE_META[php]:-}"
+  [[ -z "$php" ]] && php="none"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local php_socket="n/a"
+  if [[ "$php" != "none" && -n "$socket_project" ]]; then
+    php_socket="/run/php/php${php}-fpm-${socket_project}.sock"
+  fi
+  local ssl_brief
+  ssl_brief=$(site_ssl_brief "$domain")
+  local target="${SITE_META[target]:-}"
+  [[ -z "$target" ]] && target="n/a"
+  local updated_at="${SITE_META[updated_at]:-}"
+  [[ -z "$updated_at" ]] && updated_at="n/a"
+
+  local -a rows=(
+    "Domain|${domain}"
+    "Slug|${slug}"
+    "Profile|${profile}"
+    "Project|${project}"
+    "Root|${root}"
+    "Public dir|${public_dir}"
+    "Nginx conf|${nginx_conf}"
+    "Nginx enabled|${nginx_enabled}"
+    "Healthcheck|${healthcheck}"
+    "Access log|${access_log}"
+    "Error log|${error_log}"
+    "PHP|${php}"
+    "PHP socket|${php_socket}"
+    "SSL|${ssl_brief}"
+    "Redirect|${ssl_redirect}"
+    "HSTS|${ssl_hsts}"
+    "Cron file|${cron_file}"
+    "Cron status|${cron_status}"
+    "Worker unit|${worker_unit}"
+    "Worker status|${worker_status}"
+    "Target|${target}"
+    "Updated at|${updated_at}"
+  )
+  print_kv_table "${rows[@]}"
+}
+
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
+register_cmd "site" "info" "Show site details" "site_info_handler" "" "domain="

@@ -1344,6 +1344,11 @@ site_ssl_brief() {
   elif [[ -f "$custom_cert" && -f "$custom_key" ]]; then
     cert="$custom_cert"; key="$custom_key"; type="custom"
   fi
+  if [[ "$type" == "LE" ]]; then
+    if ssl_cert_is_staging "$cert"; then
+      type="LE-stg"
+    fi
+  fi
   if [[ -n "$cert" ]]; then
     until=$(openssl x509 -enddate -noout -in "$cert" 2>/dev/null | cut -d= -f2 || true)
     [[ -n "$until" ]] && until=$(date -d "$until" +%Y-%m-%d 2>/dev/null || echo "$until")
@@ -1354,6 +1359,110 @@ site_ssl_brief() {
     echo "${type}:${until}"
   else
     echo "${type}"
+  fi
+}
+
+ssl_cert_is_staging() {
+  local cert="$1"
+  if [[ -z "$cert" || ! -f "$cert" ]]; then
+    return 1
+  fi
+  command -v openssl >/dev/null 2>&1 || return 1
+  local issuer
+  issuer=$(openssl x509 -issuer -noout -in "$cert" 2>/dev/null || true)
+  echo "$issuer" | grep -qiE '(fake|staging)'
+}
+
+site_nginx_is_enabled() {
+  local domain="$1"
+  local link="/etc/nginx/sites-enabled/${domain}.conf"
+  if [[ -L "$link" || -f "$link" ]]; then
+    echo "yes"
+  else
+    echo "no"
+  fi
+}
+
+site_nginx_healthcheck_endpoint() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ ! -f "$cfg" ]]; then
+    echo "unknown"
+    return
+  fi
+  if grep -qE 'location[[:space:]]*=[[:space:]]*/healthcheck\.php' "$cfg"; then
+    echo "/healthcheck.php"
+    return
+  fi
+  if grep -qE 'location[[:space:]]*=[[:space:]]*/healthcheck' "$cfg"; then
+    echo "/healthcheck"
+    return
+  fi
+  echo "unknown"
+}
+
+site_nginx_ssl_redirect_enabled() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ ! -f "$cfg" ]]; then
+    echo "unknown"
+    return
+  fi
+  if grep -q "simai-ssl-redirect-start" "$cfg"; then
+    echo "yes"
+    return
+  fi
+  if grep -qE 'if[[:space:]]*\\(\\$scheme[[:space:]]*!=[[:space:]]*"https"\\)[[:space:]]*\\{[[:space:]]*return[[:space:]]*301' "$cfg"; then
+    echo "yes"
+    return
+  fi
+  echo "no"
+}
+
+site_nginx_hsts_enabled() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ ! -f "$cfg" ]]; then
+    echo "unknown"
+    return
+  fi
+  if grep -q "simai-ssl-hsts-start" "$cfg"; then
+    echo "yes"
+    return
+  fi
+  if grep -q "Strict-Transport-Security" "$cfg"; then
+    echo "yes"
+    return
+  fi
+  echo "no"
+}
+
+site_expected_nginx_logs() {
+  local project="$1"
+  echo "/var/log/nginx/${project}.access.log|/var/log/nginx/${project}.error.log"
+}
+
+site_cron_file_status() {
+  local slug="$1"
+  local file="/etc/cron.d/${slug}"
+  if [[ -f "$file" ]]; then
+    echo "present"
+  else
+    echo "missing"
+  fi
+}
+
+site_worker_status() {
+  local project="$1"
+  local unit="laravel-queue-${project}.service"
+  if ! os_svc_has_unit "$unit"; then
+    echo "missing"
+    return
+  fi
+  if os_svc_is_active "$unit"; then
+    echo "active"
+  else
+    echo "inactive"
   fi
 }
 

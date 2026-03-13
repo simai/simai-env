@@ -499,6 +499,13 @@ install_packages() {
     git unzip htop rsyslog logrotate certbot
   run_long "Installing base utilities" "${OS_CMD[@]}" || fail "Failed to install base utilities"
   os_svc_enable_now cron || true
+  if command -v systemctl >/dev/null 2>&1; then
+    local load_state
+    load_state=$(systemctl show -p LoadState --value certbot.timer 2>/dev/null || true)
+    if [[ "$load_state" == "loaded" ]]; then
+      systemctl enable --now certbot.timer >>"$LOG_FILE" 2>&1 || warn "Failed to enable certbot.timer"
+    fi
+  fi
 }
 
 install_php_stack() {

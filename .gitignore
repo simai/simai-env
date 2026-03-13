@@ -3,3 +3,5 @@
 *.bak
 .idea/
 .vscode/
+testing/test-config.env
+testing/secrets/

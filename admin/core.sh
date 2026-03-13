@@ -73,6 +73,30 @@ info() { log "INFO" "$@"; }
 warn() { log "WARN" "$@"; }
 error() { log "ERROR" "$@"; }
 
+print_kv_table() {
+  local -a rows=("$@")
+  if [[ ${#rows[@]} -eq 0 ]]; then
+    return 0
+  fi
+  local key_width=0 val_width=0
+  local row key val
+  for row in "${rows[@]}"; do
+    key="${row%%|*}"
+    val="${row#*|}"
+    [[ ${#key} -gt $key_width ]] && key_width=${#key}
+    [[ ${#val} -gt $val_width ]] && val_width=${#val}
+  done
+  local sep
+  sep="+$(printf '%*s' "$((key_width+2))" "" | tr ' ' '-')+$(printf '%*s' "$((val_width+2))" "" | tr ' ' '-')+"
+  printf "%s\n" "$sep"
+  for row in "${rows[@]}"; do
+    key="${row%%|*}"
+    val="${row#*|}"
+    printf "| %-*s | %-*s |\n" "$key_width" "$key" "$val_width" "$val"
+  done
+  printf "%s\n" "$sep"
+}
+
 run_long() {
   local desc="$1"; shift
   local has_tty=0

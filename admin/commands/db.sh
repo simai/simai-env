@@ -135,6 +135,123 @@ db_pass_handler() {
   echo "User     : ${user}"
 }
 
+db_status_handler() {
+  local service="mysql"
+  local active="unknown"
+  local enabled="unknown"
+  local version="n/a"
+  local ping="fail"
+  local socket="/var/run/mysqld/mysqld.sock"
+  local socket_status="missing"
+  local port="default 3306"
+  local datadir="unknown"
+  local disk_free="unknown"
+
+  if os_svc_has_unit "$service"; then
+    if os_svc_is_active "$service"; then
+      active="active"
+    else
+      active="inactive"
+    fi
+    if command -v systemctl >/dev/null 2>&1; then
+      if systemctl is-enabled --quiet "$service"; then
+        enabled="enabled"
+      else
+        enabled="disabled"
+      fi
+    fi
+  else
+    active="not installed"
+    enabled="not installed"
+  fi
+
+  if command -v mysql >/dev/null 2>&1; then
+    version=$(mysql --version 2>/dev/null || true)
+  elif command -v mysqld >/dev/null 2>&1; then
+    version=$(mysqld --version 2>/dev/null || true)
+  fi
+  [[ -z "$version" ]] && version="unknown"
+
+  if [[ -S "$socket" || -e "$socket" ]]; then
+    socket_status="exists"
+  else
+    local alt_socket="/run/mysqld/mysqld.sock"
+    if [[ -S "$alt_socket" || -e "$alt_socket" ]]; then
+      socket="$alt_socket"
+      socket_status="exists"
+    fi
+  fi
+
+  if command -v mysqld >/dev/null 2>&1; then
+    local port_hint
+    port_hint=$(mysqld --verbose --help 2>/dev/null | awk '$1=="port"{print $2; exit}')
+    [[ -n "$port_hint" ]] && port="$port_hint"
+    local datadir_hint
+    datadir_hint=$(mysqld --verbose --help 2>/dev/null | awk '$1=="datadir"{print $2; exit}')
+    [[ -n "$datadir_hint" ]] && datadir="$datadir_hint"
+  fi
+  if [[ "$datadir" == "unknown" ]]; then
+    local cfg="/etc/mysql/mysql.conf.d/mysqld.cnf"
+    if [[ -f "$cfg" ]]; then
+      local val
+      val=$(grep -E '^[[:space:]]*port[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]')
+      [[ -n "$val" ]] && port="$val"
+      val=$(grep -E '^[[:space:]]*datadir[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]')
+      [[ -n "$val" ]] && datadir="$val"
+    fi
+  fi
+
+  if [[ "$active" != "not installed" && "$ping" != "not installed" ]]; then
+    if mysql_root_detect_cli; then
+      ping="ok"
+    fi
+  else
+    ping="not installed"
+  fi
+
+  local df_target="$datadir"
+  if [[ "$df_target" == "unknown" || ! -d "$df_target" ]]; then
+    df_target="/var/lib/mysql"
+  fi
+  if [[ -d "$df_target" ]]; then
+    disk_free=$(df -h "$df_target" 2>/dev/null | awk 'NR==2{print $4}')
+    [[ -z "$disk_free" ]] && disk_free="unknown"
+  fi
+
+  print_kv_table \
+    "Service|${active}" \
+    "Enabled|${enabled}" \
+    "Version|${version}" \
+    "Ping|${ping}" \
+    "Socket|${socket} (${socket_status})" \
+    "Port|${port}" \
+    "Datadir|${datadir}" \
+    "Disk free|${disk_free}"
+
+  if [[ "$active" == "not installed" || "$ping" != "ok" ]]; then
+    return 1
+  fi
+}
+
+db_list_handler() {
+  if ! mysql_root_detect_cli; then
+    return 1
+  fi
+  local dbs
+  dbs=$(mysql_root_query_stdin "SHOW DATABASES;")
+  if [[ -z "$dbs" ]]; then
+    warn "No databases found"
+    return 0
+  fi
+  echo "Databases:"
+  while IFS= read -r db; do
+    [[ -z "$db" ]] && continue
+    echo " - ${db}"
+  done <<<"$dbs"
+}
+
 register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" "" "menu:hidden"
 register_cmd "db" "drop" "Legacy: Drop database (use 'site db-drop')" "db_drop_handler" "name" "drop-user=0 user= confirm=" "menu:hidden"
 register_cmd "db" "set-pass" "Legacy: Change DB user password (use 'site db-rotate')" "db_pass_handler" "user pass" "" "menu:hidden"
+register_cmd "db" "status" "Show MySQL/Percona service status" "db_status_handler" "" ""
+register_cmd "db" "list" "List databases" "db_list_handler" "" ""
