@@ -58,6 +58,7 @@ profile_validate_file() {
     local v
     while IFS= read -r v; do
       [[ -z "$v" ]] && continue
+      [[ "$v" == __simai_* ]] && continue
       if [[ ! "$v" =~ ^PROFILE_ ]]; then
         profile_add_result "FAIL" "$id" "Non-PROFILE variable declared: ${v}"
         failures=1
