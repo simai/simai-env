@@ -274,8 +274,13 @@ parse_kv_args() {
       --*)
         local key="${1#--}"
         local val="${2:-}"
-        PARSED_ARGS["$key"]="$val"
-        shift 2
+        if [[ $# -eq 1 || "$val" == --* ]]; then
+          PARSED_ARGS["$key"]="yes"
+          shift
+        else
+          PARSED_ARGS["$key"]="$val"
+          shift 2
+        fi
         ;;
       *)
         shift
