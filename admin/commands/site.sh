@@ -336,7 +336,7 @@ site_add_handler() {
   if [[ "$create_db" == "yes" ]]; then
     echo "DB name     : ${DB_CREDS_NAME}"
     echo "DB user     : ${DB_CREDS_USER}"
-    echo "DB password : ${DB_CREDS_PASS} (not logged)"
+    echo "DB password : hidden"
   else
     echo "Database    : ${db_summary}"
   fi
