@@ -23,7 +23,7 @@ site_add_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
-  local create_db="${PARSED_ARGS[create-db]:-}"
+  local create_db="${PARSED_ARGS[create-db]:-${PARSED_ARGS[db]:-}}"
   local db_export_opt="${PARSED_ARGS[db-export]:-}"
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
@@ -1111,7 +1111,7 @@ site_info_handler() {
   print_kv_table "${rows[@]}"
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

@@ -188,7 +188,7 @@ select_php_version_for_profile() {
 }
 
 decide_create_db_for_profile() {
-  local create_db="${PARSED_ARGS[create-db]:-}"
+  local create_db="${PARSED_ARGS[create-db]:-${PARSED_ARGS[db]:-}}"
   local skip_db_required="${PARSED_ARGS[skip-db-required]:-no}"
   [[ "${skip_db_required,,}" != "yes" ]] && skip_db_required="no"
   case "${PROFILE_REQUIRES_DB:-no}" in
@@ -207,7 +207,7 @@ decide_create_db_for_profile() {
           echo "no"
           return 0
         else
-          error "Database is required for profile ${PROFILE_ID:-unknown}; use --create-db yes"
+          error "Database is required for profile ${PROFILE_ID:-unknown}; use --create-db yes (or --db yes)"
           return 1
         fi
       fi
