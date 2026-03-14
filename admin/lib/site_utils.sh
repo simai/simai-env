@@ -849,18 +849,19 @@ create_nginx_site() {
     *nginx-generic.conf) template_id="generic" ;;
     *nginx-static.conf) template_id="static" ;;
     *nginx-alias.conf) template_id="alias" ;;
+    *nginx-wordpress.conf) template_id="wordpress" ;;
+    *nginx-bitrix.conf) template_id="bitrix" ;;
     *) template_id="${profile:-unknown}" ;;
   esac
   if [[ -n "$template_override" ]]; then
     template_id="$template_override"
   fi
-  case "$template_id" in
-    static|generic|laravel|alias) ;;
-    *)
-      error "Unknown nginx template id: ${template_id}"
-      return 1
-      ;;
-  esac
+  if [[ -z "$template_id" || "$template_id" == "unknown" ]]; then
+    template_id="$(basename "$template_path" | sed -E 's/^nginx-//; s/\.conf$//')"
+  fi
+  if [[ ! "$template_id" =~ ^[a-z0-9-]+$ ]]; then
+    template_id="unknown"
+  fi
   local doc_root
   doc_root=$(site_compute_doc_root "$project_path" "$public_dir") || return 1
   local acme_root
