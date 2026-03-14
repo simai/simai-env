@@ -1,6 +1,26 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.5] - 2026-03-15
+### Changed
+- Improved interactive menu UX:
+  - command execution now opens a dedicated result screen (output + status) before returning to menu.
+  - added keyboard usage hints for menu navigation (`Enter/Tab/Esc` for whiptail).
+  - added runtime backend toggle in `System` section (`text` <-> `whiptail`).
+- Added calmer default `whiptail` color theme to reduce overly bright background behavior.
+
+## [1.11.4] - 2026-03-14
+### Added
+- Added dedicated WordPress production runbook with end-to-end flow:
+  - provisioning
+  - cron baseline
+  - TLS go-live
+  - daily checks
+  - incident fast path
+  (`docs/operations/wordpress-production-runbook.md`)
+### Changed
+- Linked WordPress production runbook from top-level docs entrypoints and profile matrix.
+
 ## [1.11.3] - 2026-03-14
 ### Added
 - Added dedicated Bitrix production runbook with end-to-end flow:

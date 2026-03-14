@@ -116,6 +116,57 @@ run_menu() {
   fi
   local reload_requested=1
   local requested_backend="${SIMAI_MENU_BACKEND:-auto}"
+  menu_init_whiptail_theme() {
+    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" && -z "${NEWT_COLORS:-}" ]]; then
+      export NEWT_COLORS='
+root=,blue
+window=white,black
+border=white,black
+title=yellow,black
+textbox=white,black
+button=black,white
+actbutton=black,cyan
+entry=white,black
+listbox=white,black
+actlistbox=black,cyan
+compactbutton=black,white
+actsellistbox=black,cyan
+'
+    fi
+  }
+  menu_pause_after_command() {
+    local section="$1" cmd="$2" rc="$3" output_file="$4"
+    local status="SUCCESS"
+    [[ "$rc" -ne 0 ]] && status="FAILED (${rc})"
+    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
+      local title="Result: ${section} ${cmd}"
+      local display_file
+      display_file="$(mktemp)"
+      {
+        echo "Command: ${section} ${cmd}"
+        echo "Status : ${status}"
+        echo ""
+        if [[ -s "$output_file" ]]; then
+          cat "$output_file"
+        else
+          echo "(no output)"
+        fi
+      } >"$display_file"
+      whiptail --title "$title" --textbox "$display_file" 24 110
+      rm -f "$display_file"
+      return 0
+    fi
+    echo
+    echo "Result: ${section} ${cmd}"
+    echo "Status: ${status}"
+    if [[ -s "$output_file" ]]; then
+      cat "$output_file"
+    else
+      echo "(no output)"
+    fi
+    echo
+    read -r -p "Press Enter to continue..." _menu_continue || true
+  }
   case "${requested_backend,,}" in
     whiptail)
       if command -v whiptail >/dev/null 2>&1; then
@@ -142,6 +193,7 @@ run_menu() {
     *) show_advanced=0 ;;
   esac
   export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+  menu_init_whiptail_theme
 
   menu_choose_key() {
     local title="$1" prompt_text="$2" default_key="${3:-}"
@@ -271,11 +323,15 @@ run_menu() {
         args+=("--$key" "$val")
       done
     fi
-    if run_command "$section" "$cmd" "${args[@]}"; then
+    local out_file
+    out_file="$(mktemp)"
+    if run_command "$section" "$cmd" "${args[@]}" >"$out_file" 2>&1; then
       rc=0
     else
       rc=$?
     fi
+    menu_pause_after_command "$section" "$cmd" "$rc" "$out_file"
+    rm -f "$out_file"
     if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
       info "Restarting menu after update..."
       if menu_spawn_restart; then
@@ -591,12 +647,14 @@ run_menu() {
   system_menu() {
     while true; do
       local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
+      local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local -a items=(
         "1|System status"
         "2|Repair environment"
         "3|Update simai-env"
         "4|Version"
         "5|${adv_label}"
+        "6|${backend_label}"
         "0|Back"
       )
       local ch=""
@@ -614,6 +672,18 @@ run_menu() {
           fi
           export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
           ;;
+        6)
+          if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+            export SIMAI_MENU_BACKEND="text"
+          else
+            if command -v whiptail >/dev/null 2>&1; then
+              export SIMAI_MENU_BACKEND="whiptail"
+              menu_init_whiptail_theme
+            else
+              warn "whiptail is not installed; backend stays text."
+            fi
+          fi
+          ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -629,6 +699,11 @@ run_menu() {
       print_version_banner
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       printf "Menu backend: %s\n" "${SIMAI_MENU_BACKEND:-text}"
+      if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+        printf "Keys: arrows move, Enter select, Tab switches buttons, Esc cancels.\n"
+      else
+        printf "Keys: type menu number and press Enter.\n"
+      fi
       preflight_bootstrap
     fi
     local -a root_items=(

@@ -3,6 +3,7 @@
 `simai-admin.sh` provides maintenance commands with two modes:
 - Direct CLI: `sudo /root/simai-env/simai-admin.sh <section> <command> [options]`
 - Interactive menu: `sudo /root/simai-env/simai-admin.sh menu` (numeric choices, stays in section; self-update reloads menu)
+  - After each command, menu shows a dedicated result screen (status + output) before returning.
 
 Supported OS: Ubuntu 22.04/24.04. Run as root.
 
@@ -69,6 +70,7 @@ fi
 ### Menu backend switches
 - `SIMAI_MENU_BACKEND=text` forces text menu backend.
 - `SIMAI_MENU_BACKEND=whiptail` requests `whiptail` backend (falls back safely when unavailable).
+- Backend can also be switched during menu session: `System -> Menu backend`.
 
 Commands detail: see `docs/commands/*`.
 Daily profile mapping: `docs/operations/profile-ops-matrix.md`.
