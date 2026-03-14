@@ -14,12 +14,27 @@ PROFILE_HEALTHCHECK_MODE="php"
 
 # PHP runtime
 PROFILE_REQUIRES_PHP="yes"
-PROFILE_ALLOWED_PHP_VERSIONS=("8.1" "8.2" "8.3")
+PROFILE_ALLOWED_PHP_VERSIONS=("8.2" "8.3" "8.4")
 PROFILE_PHP_EXTENSIONS_REQUIRED=("curl" "dom" "fileinfo" "gd" "intl" "json" "mbstring" "mysqli" "opcache" "xml" "zip")
 PROFILE_PHP_EXTENSIONS_RECOMMENDED=()
 PROFILE_PHP_EXTENSIONS_OPTIONAL=()
 PROFILE_PHP_INI_REQUIRED=()
-PROFILE_PHP_INI_RECOMMENDED=()
+PROFILE_PHP_INI_RECOMMENDED=(
+  "memory_limit=512M"
+  "max_execution_time=300"
+  "max_input_time=300"
+  "post_max_size=64M"
+  "upload_max_filesize=64M"
+  "max_input_vars=10000"
+  "realpath_cache_size=4096K"
+  "realpath_cache_ttl=600"
+  "opcache.enable=1"
+  "opcache.memory_consumption=256"
+  "opcache.interned_strings_buffer=16"
+  "opcache.max_accelerated_files=20000"
+  "opcache.revalidate_freq=2"
+  "opcache.validate_timestamps=1"
+)
 PROFILE_PHP_INI_FORBIDDEN=()
 
 # Database

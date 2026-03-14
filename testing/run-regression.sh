@@ -10,8 +10,12 @@ if [[ ! -f "$CONFIG_FILE" ]]; then
   exit 1
 fi
 
+USER_TEST_SYNC_UPDATE="${TEST_SYNC_UPDATE:-}"
 # shellcheck source=/dev/null
 source "$CONFIG_FILE"
+if [[ -n "$USER_TEST_SYNC_UPDATE" ]]; then
+  TEST_SYNC_UPDATE="$USER_TEST_SYNC_UPDATE"
+fi
 
 require_var() {
   local name="$1"
@@ -138,6 +142,8 @@ run_core() {
   run_cmd "bitrix status" "./simai-admin.sh bitrix status --domain '${_bitrix_test_domain}' >/dev/null"
   run_cmd "bitrix cron-status" "./simai-admin.sh bitrix cron-status --domain '${_bitrix_test_domain}' >/dev/null"
   run_cmd "bitrix cron-sync" "./simai-admin.sh bitrix cron-sync --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix agents-status" "./simai-admin.sh bitrix agents-status --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix agents-sync plan" "./simai-admin.sh bitrix agents-sync --domain '${_bitrix_test_domain}' >/dev/null"
 }
 
 run_menu() {
@@ -198,6 +204,7 @@ run_negative() {
   if [[ -n "${_test_domain:-}" ]]; then
     run_cmd_expect_fail "wp status on non-wordpress profile" "./simai-admin.sh wp status --domain '${_test_domain}'"
     run_cmd_expect_fail "bitrix status on non-bitrix profile" "./simai-admin.sh bitrix status --domain '${_test_domain}'"
+    run_cmd_expect_fail "bitrix agents-status on non-bitrix profile" "./simai-admin.sh bitrix agents-status --domain '${_test_domain}'"
   fi
   run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
   run_cmd_expect_fail "backup import apply unknown profile" "./simai-admin.sh backup import --file '${backup_unknown}' --apply yes --enable no --reload no"

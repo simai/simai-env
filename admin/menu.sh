@@ -517,8 +517,13 @@ run_menu() {
         "12|Bitrix cron status"
         "13|Bitrix cron sync"
         "14|Bitrix cache clear"
+        "15|Bitrix agents status"
+        "16|Bitrix agents sync (plan)"
         "0|Back"
       )
+      if [[ $show_advanced -eq 1 ]]; then
+        items=("1|Clear cache" "2|Scheduler add (schedule:run)" "3|Scheduler remove (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress cron status" "9|WordPress cron sync" "10|WordPress cache clear" "11|Bitrix status" "12|Bitrix cron status" "13|Bitrix cron sync" "14|Bitrix cache clear" "15|Bitrix agents status" "16|Bitrix agents sync (plan)" "17|Bitrix agents sync (apply)" "0|Back")
+      fi
       local ch=""
       ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
       case "$ch" in
@@ -536,6 +541,15 @@ run_menu() {
         12) run_menu_command bitrix cron-status ;;
         13) run_menu_command bitrix cron-sync ;;
         14) run_menu_command bitrix cache-clear ;;
+        15) run_menu_command bitrix agents-status ;;
+        16) run_menu_command bitrix agents-sync ;;
+        17)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command bitrix agents-sync --apply yes
+          else
+            menu_invalid_choice
+          fi
+          ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

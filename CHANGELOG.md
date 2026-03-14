@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2026-03-14
+### Added
+- Added Bitrix agents baseline commands:
+  - `bitrix agents-status`
+  - `bitrix agents-sync` (plan/apply)
+- Wired Bitrix agents commands into interactive menu (`Laravel` section), including advanced apply action.
+### Changed
+- Updated Bitrix profile runtime policy:
+  - allowed PHP versions are now `8.2/8.3/8.4` (removed `8.1`).
+  - added recommended PHP INI baseline for Bitrix production workloads.
+- Extended regression coverage with Bitrix agents checks (`core` + profile-mismatch negative).
+- Expanded Bitrix command docs with agents-over-cron workflow and safeguards.
+
 ## [1.10.7] - 2026-03-14
 ### Added
 - Added profile operations matrix for daily use (`docs/operations/profile-ops-matrix.md`) covering `generic`, `laravel`, `wordpress`, `bitrix`, `static`, and `alias`.
