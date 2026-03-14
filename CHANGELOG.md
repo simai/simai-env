@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.7] - 2026-03-14
+### Fixed
+- Polished SSL menu cancel flow (`ssl status/remove/install/letsencrypt`): cancelled domain selection now exits cleanly without fallback manual prompts.
+- `site info` now treats an empty site list in menu mode as a non-error result (`No sites found`) to avoid false command-failed noise.
+
 ## [1.8.6] - 2026-03-14
 ### Changed
 - Improved interactive required-argument UX in menu flows: `domain` is now selected from existing sites and backup `file` is selected from discovered archives.
