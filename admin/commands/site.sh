@@ -374,6 +374,10 @@ site_remove_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[dry-run]:-}" ]]; then
     local mode_choice
     mode_choice=$(select_from_list "Select remove mode" "plan" "plan" "apply")
+    if [[ -z "$mode_choice" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     case "$mode_choice" in
       plan) is_dry_run=1 ;;
       apply) show_plan_first=1; is_dry_run=0 ;;
@@ -383,7 +387,15 @@ site_remove_handler() {
   if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local sites=()
     mapfile -t sites < <(list_sites)
+    if [[ ${#sites[@]} -eq 0 ]]; then
+      warn "No sites found"
+      return 0
+    fi
     domain=$(select_from_list "Select domain to remove" "" "${sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   if [[ -z "$domain" ]]; then
     require_args "domain" || return 1
