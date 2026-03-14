@@ -58,13 +58,18 @@ site_doctor_handler() {
     local sites=()
     mapfile -t sites < <(list_sites)
     if [[ ${#sites[@]} -eq 0 ]]; then
-      error "No sites found to diagnose"
-      return 1
+      warn "No sites found"
+      return 0
     fi
     domain=$(select_from_list "Select domain to diagnose" "" "${sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
+    PARSED_ARGS[domain]="$domain"
   fi
   if [[ -z "$domain" ]]; then
-    require_args "domain"
+    require_args "domain" || return 1
   fi
   if ! validate_domain "$domain" "allow"; then
     return 1

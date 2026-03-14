@@ -14,15 +14,19 @@ site_php_ini_set_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   if [[ -n "$domain" ]]; then
     PARSED_ARGS[domain]="$domain"
   fi
   domain="${PARSED_ARGS[domain]:-}"
-  require_args "domain name value"
+  require_args "domain name value" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   validate_ini_key "$name" || return 1
@@ -87,15 +91,19 @@ site_php_ini_unset_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   if [[ -n "$domain" ]]; then
     PARSED_ARGS[domain]="$domain"
   fi
   domain="${PARSED_ARGS[domain]:-}"
-  require_args "domain name"
+  require_args "domain name" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   validate_ini_key "$name" || return 1
@@ -155,15 +163,19 @@ site_php_ini_list_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   if [[ -n "$domain" ]]; then
     PARSED_ARGS[domain]="$domain"
   fi
   domain="${PARSED_ARGS[domain]:-}"
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   local entries=()
@@ -194,15 +206,19 @@ site_php_ini_apply_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   if [[ -n "$domain" ]]; then
     PARSED_ARGS[domain]="$domain"
   fi
   domain="${PARSED_ARGS[domain]:-}"
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
 

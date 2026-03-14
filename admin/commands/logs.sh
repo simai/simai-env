@@ -49,10 +49,18 @@ logs_nginx_handler() {
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$domain" ]]; then
     mapfile -t _sites < <(list_sites)
+    if [[ ${#_sites[@]} -eq 0 ]]; then
+      warn "No sites found"
+      return 0
+    fi
     domain=$(select_from_list "Select domain" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   case "$kind" in
     access|error) ;;
     *) kind="access" ;;
