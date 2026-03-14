@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.2] - 2026-03-14
+### Fixed
+- Hardened site lifecycle flows: alias targets can no longer be removed while dependent alias sites still exist.
+- Polished status output and accuracy across `site info`, `ssl status`, `self platform-status`, `site doctor`, and `site drift`.
+- Improved SSL cleanup behavior for custom certificates and restored proper CLI handling for `ssl status --domain`.
+- Refined profile validation to avoid false PHP warnings for non-PHP profiles with empty declarative arrays.
+
 ## [1.8.1] - 2026-01-20
 ### Fixed
 - SSL status output formatting and nginx-cert detection.
