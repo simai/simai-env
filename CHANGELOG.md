@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.4] - 2026-03-14
+### Added
+- Added `wordpress` and `bitrix` profile MVPs with dedicated nginx templates for daily-use site lifecycle operations.
+- Added executable regression runner (`testing/run-regression.sh`) and Q1 delivery roadmap (`docs/development/roadmap-2026-q1.md`).
+### Changed
+- Generalized nginx template id handling so new profile templates work without hardcoded template whitelists.
+- Improved profile lifecycle setup by creating declared writable paths during `site add`.
+- Made cron checks and cron rendering profile-aware for Laravel, WordPress, and Bitrix.
+### Fixed
+- Normalized PHP module detection in doctor checks to avoid false `opcache` missing reports.
+
 ## [1.8.3] - 2026-03-14
 ### Fixed
 - Stopped exposing generated DB passwords in `site db-create` output.
