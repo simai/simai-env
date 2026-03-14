@@ -50,6 +50,20 @@ cp testing/test-config.example.env testing/test-config.env
 
 Do not commit `testing/test-config.env`.
 
+## Regression Runner
+
+Use the executable regression runner for repeatable checks:
+
+```bash
+bash testing/run-regression.sh smoke
+bash testing/run-regression.sh core
+```
+
+Modes:
+
+- `smoke` runs read-only daily checks.
+- `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
+
 ## Secret Material
 
 Do not store private keys or certificate bundles in git.
