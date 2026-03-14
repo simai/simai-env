@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.3] - 2026-03-14
+### Fixed
+- Stopped exposing generated DB passwords in `site db-create` output.
+- Silenced MySQL root detection probe noise in admin logs.
+
 ## [1.8.2] - 2026-03-14
 ### Fixed
 - Hardened site lifecycle flows: alias targets can no longer be removed while dependent alias sites still exist.
