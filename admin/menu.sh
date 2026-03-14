@@ -289,6 +289,10 @@ run_menu() {
     warn "Not implemented yet."
   }
 
+  menu_invalid_choice() {
+    warn "Invalid choice."
+  }
+
   sites_menu() {
     while true; do
       local -a items=(
@@ -315,14 +319,14 @@ run_menu() {
           if [[ $show_advanced -eq 1 ]]; then
             not_implemented
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         6) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -349,8 +353,8 @@ run_menu() {
         6) run_menu_command ssl remove ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -381,20 +385,20 @@ run_menu() {
           if [[ $show_advanced -eq 1 ]]; then
             not_implemented
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         7)
           if [[ $show_advanced -eq 1 ]]; then
             not_implemented
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -427,20 +431,20 @@ run_menu() {
           if [[ $show_advanced -eq 1 ]]; then
             not_implemented
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         8)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site db-drop
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -465,14 +469,14 @@ run_menu() {
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site drift --fix yes
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         4) run_menu_command self platform-status ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -501,8 +505,8 @@ run_menu() {
         7) not_implemented ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -528,13 +532,13 @@ run_menu() {
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command backup import --apply yes
           else
-            echo "Invalid choice"
+            menu_invalid_choice
           fi
           ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -561,8 +565,8 @@ run_menu() {
         6) run_menu_command queue logs ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -591,8 +595,8 @@ run_menu() {
         7) run_menu_command profile init ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -625,8 +629,8 @@ run_menu() {
           ;;
         0) break ;;
         "") continue ;;
-        "__invalid__") echo "Invalid choice" ;;
-        *) echo "Invalid choice" ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
       esac
     done
   }
@@ -637,6 +641,7 @@ run_menu() {
       SIMAI_PREFLIGHT_DONE=0
       print_version_banner
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
+      printf "Menu backend: %s\n" "${SIMAI_MENU_BACKEND:-text}"
       preflight_bootstrap
     fi
     local -a root_items=(
@@ -667,8 +672,8 @@ run_menu() {
       10) system_menu ;;
       0) exit 0 ;;
       "") continue ;;
-      "__invalid__") echo "Invalid choice" ;;
-      *) echo "Invalid choice" ;;
+      "__invalid__") menu_invalid_choice ;;
+      *) menu_invalid_choice ;;
     esac
   done
 }

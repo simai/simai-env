@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.13] - 2026-03-14
+### Changed
+- Polished interactive menu UX: invalid selections now use unified warning output and the menu header now shows active backend (`text`/`whiptail`).
+### Added
+- Extended automated menu regression checks with `backup inspect` cancel-flow coverage in `testing/run-regression.sh menu/full`.
+
 ## [1.8.12] - 2026-03-14
 ### Added
 - Added dedicated `menu` and `full` modes to `testing/run-regression.sh` for automated interactive menu cancel-flow checks.
