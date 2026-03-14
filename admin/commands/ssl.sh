@@ -404,8 +404,9 @@ ssl_remove_handler() {
   info "Removing SSL config for ${domain}"
   create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "" "${SITE_SSL_PUBLIC_DIR}"
   site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "${SITE_META[project]}" "${SITE_META[profile]}" "${SITE_META[root]}" "${SITE_META[project]}" "${SITE_META[php]}" "none" "" "${SITE_META[target]:-}" "${SITE_META[php_socket_project]:-${SITE_META[project]}}" "${SITE_META[nginx_template]:-${SITE_META[profile]}}" "${SITE_SSL_PUBLIC_DIR}" >/dev/null 2>&1 || true
+  local ssl_kind="${SITE_META[ssl]:-none}"
   if [[ "$delete_cert" == "yes" ]]; then
-    if command -v certbot >/dev/null 2>&1; then
+    if [[ "$ssl_kind" == "letsencrypt" ]] && command -v certbot >/dev/null 2>&1; then
       run_long "Deleting certbot certificate for ${domain}" certbot delete --cert-name "$domain" --non-interactive || true
     fi
     rm -rf "/etc/nginx/ssl/${domain}" >>"$LOG_FILE" 2>&1 || true
