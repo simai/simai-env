@@ -115,7 +115,7 @@ run_menu() {
     fi
   fi
   local reload_requested=1
-  local requested_backend="${SIMAI_MENU_BACKEND:-auto}"
+  local requested_backend="${SIMAI_MENU_BACKEND:-text}"
   menu_init_whiptail_theme() {
     if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" && -z "${NEWT_COLORS:-}" ]]; then
       export NEWT_COLORS='
@@ -138,24 +138,6 @@ actsellistbox=black,cyan
     local section="$1" cmd="$2" rc="$3" output_file="$4"
     local status="SUCCESS"
     [[ "$rc" -ne 0 ]] && status="FAILED (${rc})"
-    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
-      local title="Result: ${section} ${cmd}"
-      local display_file
-      display_file="$(mktemp)"
-      {
-        echo "Command: ${section} ${cmd}"
-        echo "Status : ${status}"
-        echo ""
-        if [[ -s "$output_file" ]]; then
-          cat "$output_file"
-        else
-          echo "(no output)"
-        fi
-      } >"$display_file"
-      whiptail --title "$title" --textbox "$display_file" 24 110
-      rm -f "$display_file"
-      return 0
-    fi
     echo
     echo "Result: ${section} ${cmd}"
     echo "Status: ${status}"
@@ -173,13 +155,6 @@ actsellistbox=black,cyan
         export SIMAI_MENU_BACKEND="whiptail"
       else
         warn "whiptail requested but not installed; falling back to text menu."
-        export SIMAI_MENU_BACKEND="text"
-      fi
-      ;;
-    auto)
-      if command -v whiptail >/dev/null 2>&1; then
-        export SIMAI_MENU_BACKEND="whiptail"
-      else
         export SIMAI_MENU_BACKEND="text"
       fi
       ;;
@@ -699,11 +674,7 @@ actsellistbox=black,cyan
       print_version_banner
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       printf "Menu backend: %s\n" "${SIMAI_MENU_BACKEND:-text}"
-      if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
-        printf "Keys: arrows move, Enter select, Tab switches buttons, Esc cancels.\n"
-      else
-        printf "Keys: type menu number and press Enter.\n"
-      fi
+      printf "Keys: type menu number and press Enter.\n"
       preflight_bootstrap
     fi
     local -a root_items=(

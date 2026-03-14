@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.7] - 2026-03-15
+### Changed
+- Switched interactive menu to stable text backend by default (no auto whiptail).
+- Simplified command result flow in menu: plain console result/status + explicit Enter pause.
+- Kept `whiptail` as optional backend via explicit selection/env for users who prefer TUI.
+
 ## [1.11.6] - 2026-03-15
 ### Added
 - Added dedicated WordPress production runbook with end-to-end flow:
