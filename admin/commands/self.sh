@@ -1,6 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+self_update_ref() {
+  local branch="${SIMAI_UPDATE_BRANCH:-main}"
+  local ref="${SIMAI_UPDATE_REF:-refs/heads/${branch}}"
+  if [[ "$ref" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]; then
+    echo "$ref"
+    return 0
+  fi
+  echo "refs/heads/main"
+}
+
+self_remote_version_url() {
+  local ref
+  ref="$(self_update_ref)"
+  case "$ref" in
+    refs/heads/*)
+      echo "https://raw.githubusercontent.com/simai/simai-env/${ref#refs/heads/}/VERSION"
+      ;;
+    refs/tags/*)
+      echo "https://raw.githubusercontent.com/simai/simai-env/${ref#refs/tags/}/VERSION"
+      ;;
+    *)
+      echo "https://raw.githubusercontent.com/simai/simai-env/main/VERSION"
+      ;;
+  esac
+}
+
 self_update_handler() {
   local updater="${SCRIPT_DIR}/update.sh"
   if [[ ! -x "$updater" ]]; then
@@ -44,8 +70,10 @@ self_version_handler() {
   local version_file="${SCRIPT_DIR}/VERSION"
   [[ -f "$version_file" ]] && local_version="$(cat "$version_file")"
 
-  local remote_version
-  remote_version=$(curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/VERSION 2>/dev/null || true)
+  local update_ref remote_version_url remote_version
+  update_ref="$(self_update_ref)"
+  remote_version_url="$(self_remote_version_url)"
+  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
   [[ -z "$remote_version" ]] && remote_version="(unavailable)"
 
   local status="n/a"
@@ -69,6 +97,7 @@ self_version_handler() {
 
   local sep="+----------------------+----------------------+"
   printf "%s\n" "$sep"
+  printf "| %-20s | %-20s |\n" "Update ref" "$update_ref"
   printf "| %-20s | %-20s |\n" "Local version" "$local_version"
   printf "| %-20s | %-20s |\n" "Remote version" "$remote_version"
   printf "| %-20s | %-20s |\n" "Status" "$status_colored"

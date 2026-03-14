@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.2] - 2026-03-14
+### Added
+- Added mandatory release gate runner `testing/release-gate.sh` (shell syntax checks + `testing/run-regression.sh full`).
+### Changed
+- Hardened update channel handling:
+  - `self version` and menu banner now resolve remote version by configured update ref (`SIMAI_UPDATE_REF`/`SIMAI_UPDATE_BRANCH`).
+  - `update.sh` now supports update ref/branch from `/etc/simai-env.conf` and validates ref format.
+- `testing/run-regression.sh` now syncs test host with `self update` before checks (`TEST_SYNC_UPDATE=yes` by default).
+- Extended negative regression with backup import apply guards for profile incompatibility.
+### Fixed
+- Added best-effort pre-update backup creation in `update.sh` with explicit rollback hint.
+
 ## [1.10.1] - 2026-03-14
 ### Changed
 - Polished `backup import` plan with profile-compatibility summary (known/enabled/requires PHP/supports cron/supports queue).

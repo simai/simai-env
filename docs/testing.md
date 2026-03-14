@@ -55,6 +55,7 @@ Do not commit `testing/test-config.env`.
 Use the executable regression runner for repeatable checks:
 
 ```bash
+bash testing/release-gate.sh
 bash testing/run-regression.sh smoke
 bash testing/run-regression.sh core
 bash testing/run-regression.sh menu
@@ -65,12 +66,13 @@ bash testing/run-regression.sh full
 
 Modes:
 
+- `release-gate` wrapper runs shell syntax checks + `full` regression (mandatory for releases).
 - `smoke` runs read-only daily checks.
 - `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
 - `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
 - `backend` probes `SIMAI_MENU_BACKEND=whiptail` activation (skips if `whiptail` is not installed on target host).
 - `negative` runs expected-failure checks (missing domain/file) to validate error handling.
-- `negative` runs expected-failure checks (missing domain/file and broken manual cert paths) to validate error handling.
+- `negative` runs expected-failure checks (missing domain/file, broken manual cert paths, backup import profile-compatibility guards).
 - `full` runs smoke + core + menu + backend + negative.
 
 ## Secret Material

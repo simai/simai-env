@@ -23,10 +23,16 @@ prompt() {
 }
 
 print_version_banner() {
+  local update_ref="${SIMAI_UPDATE_REF:-refs/heads/${SIMAI_UPDATE_BRANCH:-main}}"
+  local remote_version_url="https://raw.githubusercontent.com/simai/simai-env/main/VERSION"
+  case "$update_ref" in
+    refs/heads/*) remote_version_url="https://raw.githubusercontent.com/simai/simai-env/${update_ref#refs/heads/}/VERSION" ;;
+    refs/tags/*) remote_version_url="https://raw.githubusercontent.com/simai/simai-env/${update_ref#refs/tags/}/VERSION" ;;
+  esac
   local local_version="(unknown)"
   local remote_version="(unavailable)"
   [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"
-  remote_version=$(curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/VERSION 2>/dev/null || true)
+  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
   [[ -z "$remote_version" ]] && remote_version="(unavailable)"
   local status="n/a"
   if [[ "$remote_version" != "(unavailable)" ]]; then
@@ -47,6 +53,7 @@ print_version_banner() {
   fi
   local sep="+----------------------+----------------------+"
   printf "%s\n" "$sep"
+  printf "| %-20s | %-20s |\n" "Update ref" "$update_ref"
   printf "| %-20s | %-20s |\n" "Local version" "$local_version"
   printf "| %-20s | %-20s |\n" "Remote version" "$remote_version"
   printf "| %-20s | %-20s |\n" "Status" "$status_colored"

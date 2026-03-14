@@ -94,6 +94,9 @@ cleanup() {
 trap cleanup EXIT
 
 run_smoke() {
+  if [[ "${TEST_SYNC_UPDATE:-yes}" == "yes" ]]; then
+    run_cmd "self update (sync test host)" "./simai-admin.sh self update >/dev/null"
+  fi
   run_cmd "self status" "./simai-admin.sh self status >/dev/null"
   run_cmd "self platform-status" "./simai-admin.sh self platform-status >/dev/null"
   run_cmd "db status" "./simai-admin.sh db status >/dev/null"
@@ -173,9 +176,28 @@ run_backend() {
 }
 
 run_negative() {
+  if [[ -z "${_test_domain:-}" ]]; then
+    local suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
+    local stamp
+    stamp="$(date +%y%m%d-%H%M%S)"
+    _test_domain="t-neg-${stamp}${suffix}"
+    run_cmd "site add (negative fixture)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php-version 8.2 --db no --force >/dev/null"
+  fi
+
+  local backup_base="/root/simai-backups/${_test_domain}-negative-base.tar.gz"
+  local backup_unknown="/root/simai-backups/${_test_domain}-negative-unknown-profile.tar.gz"
+  local backup_phpnone="/root/simai-backups/${_test_domain}-negative-phpnone.tar.gz"
+  local tmp_unknown="/tmp/simai-neg-unknown-${_test_domain}"
+  local tmp_phpnone="/tmp/simai-neg-phpnone-${_test_domain}"
+  run_cmd "backup export (negative fixture)" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_base}' >/dev/null"
+  run_cmd "prepare backup (unknown profile)" "rm -rf '${tmp_unknown}' && mkdir -p '${tmp_unknown}' && tar -xzf '${backup_base}' -C '${tmp_unknown}' && python3 -c \"import json; p='${tmp_unknown}/manifest.json'; d=json.load(open(p)); d['profile']='missing-profile'; open(p,'w').write(json.dumps(d,ensure_ascii=False,indent=2)+'\\\\n')\" && tar -czf '${backup_unknown}' -C '${tmp_unknown}' ."
+  run_cmd "prepare backup (php none mismatch)" "rm -rf '${tmp_phpnone}' && mkdir -p '${tmp_phpnone}' && tar -xzf '${backup_base}' -C '${tmp_phpnone}' && python3 -c \"import json; p='${tmp_phpnone}/manifest.json'; d=json.load(open(p)); d['profile']='generic'; d['php']='none'; open(p,'w').write(json.dumps(d,ensure_ascii=False,indent=2)+'\\\\n')\" && tar -czf '${backup_phpnone}' -C '${tmp_phpnone}' ."
+
   run_cmd_expect_fail "site info missing domain" "./simai-admin.sh site info --domain does-not-exist-zzz.env.sf8.ru"
   run_cmd_expect_fail "ssl status missing domain" "./simai-admin.sh ssl status --domain does-not-exist-zzz.env.sf8.ru"
   run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
+  run_cmd_expect_fail "backup import apply unknown profile" "./simai-admin.sh backup import --file '${backup_unknown}' --apply yes --enable no --reload no"
+  run_cmd_expect_fail "backup import apply php none mismatch" "./simai-admin.sh backup import --file '${backup_phpnone}' --apply yes --enable no --reload no"
   if [[ -n "${_test_domain:-}" ]]; then
     run_cmd_expect_fail "ssl install broken cert path" "./simai-admin.sh ssl install --domain '${_test_domain}' --cert /root/test-certs/does-not-exist.crt --key /root/test-certs/does-not-exist.key"
   fi

@@ -35,7 +35,9 @@ See `docs/architecture/profiles.md`.
 
 ## Self commands
 - `self update`: update scripts in place (reloads menu when invoked from menu).
-- `self version`: show local/remote versions to know if an update is available.
+  - Honors update source from `/etc/simai-env.conf`: `SIMAI_UPDATE_REF` (`refs/heads/...` or `refs/tags/...`) or `SIMAI_UPDATE_BRANCH`.
+  - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
+- `self version`: show local/remote versions to know if an update is available (including configured update ref).
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).
