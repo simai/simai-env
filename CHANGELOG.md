@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.17] - 2026-03-14
+### Added
+- Added operator runbook for daily operations and incident handling: `docs/operations/runbook.md`.
+### Changed
+- Documented non-interactive usage contract in `docs/admin.md` (exit codes, output channels, color control, menu backend switches).
+- Updated documentation entrypoints to include the operations runbook.
+
 ## [1.8.16] - 2026-03-14
 ### Changed
 - Unified lifecycle output blocks for `ssl letsencrypt/install/remove` and `backup export/inspect/import` using structured `Header -> Result/Plan -> Next steps` sections.

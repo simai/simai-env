@@ -35,4 +35,34 @@ See `docs/architecture/profiles.md`.
 - `self update`: update scripts in place (reloads menu when invoked from menu).
 - `self version`: show local/remote versions to know if an update is available.
 
+## Non-Interactive Contract
+Use this section when running commands from automation (CI, cron, deploy scripts).
+
+- Prefer direct CLI mode (`simai-admin.sh <section> <command> ...`), not `menu`.
+- Treat exit code `0` as success and non-zero as failure.
+- In menu mode, cancel actions are intentionally non-fatal (`exit 0`) to keep the session alive.
+
+### Output channels
+- Command output is primarily printed to stdout.
+- Operational logs are also written to `/var/log/simai-admin.log`.
+- Audit trail is written to `/var/log/simai-audit.log` with redacted arguments.
+
+### Color control
+- Disable ANSI colors in automation with `NO_COLOR=1` or `SIMAI_UI_COLOR=never`.
+- Force colors for interactive troubleshooting with `SIMAI_UI_COLOR=always`.
+
+### Recommended automation pattern
+```bash
+NO_COLOR=1 /root/simai-env/simai-admin.sh self status >/tmp/simai-status.txt
+rc=$?
+if [[ $rc -ne 0 ]]; then
+  echo "simai status failed" >&2
+  exit $rc
+fi
+```
+
+### Menu backend switches
+- `SIMAI_MENU_BACKEND=text` forces text menu backend.
+- `SIMAI_MENU_BACKEND=whiptail` requests `whiptail` backend (falls back safely when unavailable).
+
 Commands detail: see `docs/commands/*`.
