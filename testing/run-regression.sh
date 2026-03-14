@@ -195,6 +195,10 @@ run_negative() {
 
   run_cmd_expect_fail "site info missing domain" "./simai-admin.sh site info --domain does-not-exist-zzz.env.sf8.ru"
   run_cmd_expect_fail "ssl status missing domain" "./simai-admin.sh ssl status --domain does-not-exist-zzz.env.sf8.ru"
+  if [[ -n "${_test_domain:-}" ]]; then
+    run_cmd_expect_fail "wp status on non-wordpress profile" "./simai-admin.sh wp status --domain '${_test_domain}'"
+    run_cmd_expect_fail "bitrix status on non-bitrix profile" "./simai-admin.sh bitrix status --domain '${_test_domain}'"
+  fi
   run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
   run_cmd_expect_fail "backup import apply unknown profile" "./simai-admin.sh backup import --file '${backup_unknown}' --apply yes --enable no --reload no"
   run_cmd_expect_fail "backup import apply php none mismatch" "./simai-admin.sh backup import --file '${backup_phpnone}' --apply yes --enable no --reload no"

@@ -13,8 +13,10 @@ simai-admin.sh wp status --domain <domain>
 Shows:
 - WP-CLI availability
 - core/config marker presence
+- readiness for WP-CLI actions
+- Home URL (best effort via `wp option get home`)
 - `DISABLE_WP_CRON` mode
-- cron file/entry state
+- cron file/entry state with managed/domain/slug marker checks
 - core version (best effort, when WP-CLI + core are available)
 
 ## Cron Status
@@ -23,7 +25,8 @@ Shows:
 simai-admin.sh wp cron-status --domain <domain>
 ```
 
-Read-only cron diagnostics for WordPress (`/etc/cron.d/<slug>` + `wp-cron.php` entry).
+Read-only cron diagnostics for WordPress (`/etc/cron.d/<slug>` + `wp-cron.php` entry),
+including simai-managed/domain/slug marker checks.
 
 ## Cron Sync
 

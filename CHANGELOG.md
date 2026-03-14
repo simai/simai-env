@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.5] - 2026-03-14
+### Changed
+- Improved WordPress and Bitrix status UX with richer daily diagnostics:
+  - cron managed/domain/slug marker checks in `status` and `cron-status`.
+  - WordPress status now reports CLI readiness and best-effort Home URL.
+  - Bitrix status now reports `dbconn.php` presence and best-effort `BX_CRONTAB` mode.
+### Fixed
+- Added regression negatives for profile-mismatch guards (`wp status` on non-wordpress profile, `bitrix status` on non-bitrix profile).
+
 ## [1.10.4] - 2026-03-14
 ### Fixed
 - Updated menu regression selector for `Sites -> Remove site` after menu key cleanup.

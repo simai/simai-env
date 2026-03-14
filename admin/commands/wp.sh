@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+wp_cron_markers() {
+  local cron_file="$1" domain="$2" slug="$3"
+  WP_CRON_MANAGED="no"
+  WP_CRON_DOMAIN_MATCH="no"
+  WP_CRON_SLUG_MATCH="no"
+  WP_CRON_ENTRY_MATCH="no"
+  if [[ ! -f "$cron_file" ]]; then
+    return 0
+  fi
+  grep -Eq "^# simai-managed: yes" "$cron_file" && WP_CRON_MANAGED="yes"
+  grep -Eq "^# simai-domain: ${domain}$" "$cron_file" && WP_CRON_DOMAIN_MATCH="yes"
+  grep -Eq "^# simai-slug: ${slug}$" "$cron_file" && WP_CRON_SLUG_MATCH="yes"
+  grep -Eq "wp-cron\\.php" "$cron_file" && WP_CRON_ENTRY_MATCH="yes"
+}
+
 wp_prepare_site() {
   local domain="$1"
   if ! validate_domain "$domain" "allow"; then
@@ -63,6 +78,11 @@ wp_status_handler() {
   local disable_wp_cron="unknown"
   local cron_file_state="missing"
   local cron_line_state="missing"
+  local cron_managed="no"
+  local cron_domain_match="no"
+  local cron_slug_match="no"
+  local ready_cli="no"
+  local home_url="n/a"
 
   if command -v wp >/dev/null 2>&1; then
     wp_cli="present"
@@ -78,13 +98,22 @@ wp_status_handler() {
   [[ -f "$WP_CRON_ENTRYPOINT" ]] && cron_entrypoint="present"
   if [[ -f "$WP_CRON_FILE" ]]; then
     cron_file_state="present"
-    if grep -Eq "wp-cron\\.php" "$WP_CRON_FILE"; then
+    wp_cron_markers "$WP_CRON_FILE" "$WP_DOMAIN" "$WP_SLUG"
+    cron_managed="${WP_CRON_MANAGED:-no}"
+    cron_domain_match="${WP_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${WP_CRON_SLUG_MATCH:-no}"
+    if [[ "${WP_CRON_ENTRY_MATCH:-no}" == "yes" ]]; then
       cron_line_state="present"
     fi
   fi
-  if [[ "$wp_cli" == "present" && "$WP_HAS_CORE" == "yes" ]]; then
+  if [[ "$wp_cli" == "present" && "$WP_HAS_CORE" == "yes" && "$config_present" == "yes" ]]; then
+    ready_cli="yes"
+  fi
+  if [[ "$ready_cli" == "yes" ]]; then
     core_version=$(sudo -u "${SIMAI_USER:-simai}" -H wp core version --path="$WP_DOC_ROOT" 2>/dev/null || true)
     [[ -z "$core_version" ]] && core_version="unknown"
+    home_url=$(timeout 15 sudo -u "${SIMAI_USER:-simai}" -H wp option get home --path="$WP_DOC_ROOT" 2>/dev/null || true)
+    [[ -z "$home_url" ]] && home_url="unknown"
   fi
 
   ui_section "Result"
@@ -95,10 +124,15 @@ wp_status_handler() {
     "Core files|${WP_HAS_CORE}" \
     "Core version|${core_version}" \
     "wp-config.php|${config_present}" \
+    "Ready for WP-CLI actions|${ready_cli}" \
+    "Home URL|${home_url}" \
     "wp-cron.php|${cron_entrypoint}" \
     "DISABLE_WP_CRON|${disable_wp_cron}" \
     "Cron file|${WP_CRON_FILE} (${cron_file_state})" \
-    "Cron entry|${cron_line_state}"
+    "Cron entry|${cron_line_state}" \
+    "Cron managed markers|${cron_managed}" \
+    "Cron domain marker|${cron_domain_match}" \
+    "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${WP_DOMAIN}"
   ui_kv "Cron sync" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
@@ -120,9 +154,16 @@ wp_cron_status_handler() {
   local cron_file_state="missing"
   local cron_line_state="missing"
   local disable_wp_cron="unknown"
+  local cron_managed="no"
+  local cron_domain_match="no"
+  local cron_slug_match="no"
   if [[ -f "$WP_CRON_FILE" ]]; then
     cron_file_state="present"
-    if grep -Eq "wp-cron\\.php" "$WP_CRON_FILE"; then
+    wp_cron_markers "$WP_CRON_FILE" "$WP_DOMAIN" "$WP_SLUG"
+    cron_managed="${WP_CRON_MANAGED:-no}"
+    cron_domain_match="${WP_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${WP_CRON_SLUG_MATCH:-no}"
+    if [[ "${WP_CRON_ENTRY_MATCH:-no}" == "yes" ]]; then
       cron_line_state="present"
     fi
   fi
@@ -138,6 +179,9 @@ wp_cron_status_handler() {
     "Domain|${WP_DOMAIN}" \
     "Cron file|${WP_CRON_FILE} (${cron_file_state})" \
     "Cron line (wp-cron.php)|${cron_line_state}" \
+    "Cron managed markers|${cron_managed}" \
+    "Cron domain marker|${cron_domain_match}" \
+    "Cron slug marker|${cron_slug_match}" \
     "DISABLE_WP_CRON|${disable_wp_cron}"
   ui_section "Next steps"
   ui_kv "Sync cron" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"

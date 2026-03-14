@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+bitrix_cron_markers() {
+  local cron_file="$1" domain="$2" slug="$3"
+  BX_CRON_MANAGED="no"
+  BX_CRON_DOMAIN_MATCH="no"
+  BX_CRON_SLUG_MATCH="no"
+  BX_CRON_ENTRY_MATCH="no"
+  if [[ ! -f "$cron_file" ]]; then
+    return 0
+  fi
+  grep -Eq "^# simai-managed: yes" "$cron_file" && BX_CRON_MANAGED="yes"
+  grep -Eq "^# simai-domain: ${domain}$" "$cron_file" && BX_CRON_DOMAIN_MATCH="yes"
+  grep -Eq "^# simai-slug: ${slug}$" "$cron_file" && BX_CRON_SLUG_MATCH="yes"
+  grep -Eq "cron_events\\.php" "$cron_file" && BX_CRON_ENTRY_MATCH="yes"
+}
+
 bitrix_prepare_site() {
   local domain="$1"
   if ! validate_domain "$domain" "allow"; then
@@ -57,15 +72,33 @@ bitrix_status_handler() {
 
   ui_header "SIMAI ENV · Bitrix status"
   local settings_present="no"
+  local dbconn_present="no"
+  local bx_crontab="unknown"
   local cron_entrypoint="missing"
   local cron_file_state="missing"
   local cron_line_state="missing"
+  local cron_managed="no"
+  local cron_domain_match="no"
+  local cron_slug_match="no"
 
   [[ -f "$BX_SETTINGS_FILE" ]] && settings_present="yes"
+  local dbconn_file="${BX_DOC_ROOT}/bitrix/php_interface/dbconn.php"
+  if [[ -f "$dbconn_file" ]]; then
+    dbconn_present="yes"
+    if grep -Eqi "define[[:space:]]*\\([[:space:]]*['\"]BX_CRONTAB['\"][[:space:]]*,[[:space:]]*true" "$dbconn_file"; then
+      bx_crontab="true"
+    else
+      bx_crontab="false"
+    fi
+  fi
   [[ -f "$BX_CRON_ENTRYPOINT" ]] && cron_entrypoint="present"
   if [[ -f "$BX_CRON_FILE" ]]; then
     cron_file_state="present"
-    if grep -Eq "cron_events\\.php" "$BX_CRON_FILE"; then
+    bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
+    cron_managed="${BX_CRON_MANAGED:-no}"
+    cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
+    if [[ "${BX_CRON_ENTRY_MATCH:-no}" == "yes" ]]; then
       cron_line_state="present"
     fi
   fi
@@ -76,9 +109,14 @@ bitrix_status_handler() {
     "Docroot|${BX_DOC_ROOT}" \
     "Core files|${BX_HAS_CORE}" \
     ".settings.php|${settings_present}" \
+    "dbconn.php|${dbconn_present}" \
+    "BX_CRONTAB|${bx_crontab}" \
     "cron_events.php|${cron_entrypoint}" \
     "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
-    "Cron entry|${cron_line_state}"
+    "Cron entry|${cron_line_state}" \
+    "Cron managed markers|${cron_managed}" \
+    "Cron domain marker|${cron_domain_match}" \
+    "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
   ui_kv "Cron sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
@@ -99,9 +137,16 @@ bitrix_cron_status_handler() {
   ui_header "SIMAI ENV · Bitrix cron status"
   local cron_file_state="missing"
   local cron_line_state="missing"
+  local cron_managed="no"
+  local cron_domain_match="no"
+  local cron_slug_match="no"
   if [[ -f "$BX_CRON_FILE" ]]; then
     cron_file_state="present"
-    if grep -Eq "cron_events\\.php" "$BX_CRON_FILE"; then
+    bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
+    cron_managed="${BX_CRON_MANAGED:-no}"
+    cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
+    if [[ "${BX_CRON_ENTRY_MATCH:-no}" == "yes" ]]; then
       cron_line_state="present"
     fi
   fi
@@ -109,7 +154,10 @@ bitrix_cron_status_handler() {
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
     "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
-    "Cron line (cron_events.php)|${cron_line_state}"
+    "Cron line (cron_events.php)|${cron_line_state}" \
+    "Cron managed markers|${cron_managed}" \
+    "Cron domain marker|${cron_domain_match}" \
+    "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Sync cron" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
 }

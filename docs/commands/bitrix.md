@@ -13,8 +13,10 @@ simai-admin.sh bitrix status --domain <domain>
 Shows:
 - core marker presence
 - `.settings.php` presence
+- `dbconn.php` presence
+- `BX_CRONTAB` mode (best effort from `dbconn.php`)
 - `cron_events.php` entrypoint presence
-- cron file/entry state
+- cron file/entry state with managed/domain/slug marker checks
 
 ## Cron Status
 
@@ -22,7 +24,8 @@ Shows:
 simai-admin.sh bitrix cron-status --domain <domain>
 ```
 
-Read-only cron diagnostics for Bitrix (`/etc/cron.d/<slug>` + `cron_events.php` entry).
+Read-only cron diagnostics for Bitrix (`/etc/cron.d/<slug>` + `cron_events.php` entry),
+including simai-managed/domain/slug marker checks.
 
 ## Cron Sync
 
