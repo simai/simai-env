@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.1] - 2026-03-14
+### Fixed
+- Fixed Bitrix profile syntax for `PROFILE_PHP_INI_RECOMMENDED` to keep `profile validate` compatible (single-line declarative assignment).
+
 ## [1.11.0] - 2026-03-14
 ### Added
 - Added Bitrix agents baseline commands:
