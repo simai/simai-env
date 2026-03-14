@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.4] - 2026-03-14
+### Fixed
+- Updated menu regression selector for `Sites -> Remove site` after menu key cleanup.
+
 ## [1.10.3] - 2026-03-14
 ### Changed
 - Polished interactive menu UX by hiding unfinished actions and keeping only implemented daily-use paths in Sites/PHP/Database/Logs.

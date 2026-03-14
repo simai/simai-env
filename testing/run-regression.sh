@@ -143,7 +143,7 @@ run_core() {
 run_menu() {
   run_menu_case "menu site info cancel" $'1\n3\n\n0\n0\n' "---- done (site info), exit=0 ----"
   run_menu_case "menu ssl status cancel" $'2\n2\n\n0\n0\n' "---- done (ssl status), exit=0 ----"
-  run_menu_case "menu site remove cancel" $'1\n6\n\n0\n0\n' "---- done (site remove), exit=0 ----"
+  run_menu_case "menu site remove cancel" $'1\n5\n\n0\n0\n' "---- done (site remove), exit=0 ----"
   run_menu_case "menu backup inspect cancel" $'7\n2\n\n0\n0\n' "---- done (backup inspect), exit=0 ----"
 }
 
