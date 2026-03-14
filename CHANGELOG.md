@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.5] - 2026-03-14
+### Changed
+- Improved `site drift` cron checks to validate profile-specific cron entries (Laravel, WordPress, Bitrix).
+- Updated release process to include executable regression gates (`testing/run-regression.sh smoke|core`).
+### Fixed
+- Reduced `site doctor` noise for WordPress and Bitrix profiles by tightening extension expectation defaults.
+
 ## [1.8.4] - 2026-03-14
 ### Added
 - Added `wordpress` and `bitrix` profile MVPs with dedicated nginx templates for daily-use site lifecycle operations.
