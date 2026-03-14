@@ -177,8 +177,10 @@ declare -p PROFILE_BOOTSTRAP_FILES 2>/dev/null || true
 
   local requires_php="${fields[PROFILE_REQUIRES_PHP]:-no}"
   local declared_arrays
-  declared_arrays="$(printf "%s\n" "$meta" | grep '^declare -[aA] PROFILE_PHP_' || true)"
-  if [[ "$requires_php" != "yes" && -n "$declared_arrays" ]]; then
+  declared_arrays="$(printf "%s\n" "$meta" | grep '^declare -[aA] PROFILE_PHP_' | grep -v '=()$' || true)"
+  local allowed_php_versions_decl
+  allowed_php_versions_decl="$(printf "%s\n" "$meta" | grep '^declare -[aA] PROFILE_ALLOWED_PHP_VERSIONS=' | grep -v '=()$' || true)"
+  if [[ "$requires_php" != "yes" && ( -n "$declared_arrays" || -n "$allowed_php_versions_decl" ) ]]; then
     profile_add_result "WARN" "$id" "PHP-specific fields set while PROFILE_REQUIRES_PHP=${requires_php}"
     warnings=1
   fi
