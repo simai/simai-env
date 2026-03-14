@@ -49,7 +49,8 @@ queue_collect_status() {
   if [[ "$status_out" == *"could not be found"* || "$status_out" == *"Loaded: not-found"* || "$load_state" == "not-found" ]]; then
     return 3
   fi
-  QUEUE_ENABLED=$(systemctl is-enabled "$unit" 2>/dev/null || echo "unknown")
+  QUEUE_ENABLED=$(systemctl is-enabled "$unit" 2>/dev/null || true)
+  [[ -z "$QUEUE_ENABLED" ]] && QUEUE_ENABLED="unknown"
   [[ -z "$main_pid" ]] && main_pid="-"
   [[ -z "$exit_status" ]] && exit_status="-"
   QUEUE_ACTIVE_STATE="$active"
@@ -77,17 +78,15 @@ queue_status_handler() {
     fi
     return $rc
   fi
-  local border="+----------------+------------------+"
-  printf "%s\n" "$border"
-  printf "| %-14s | %-16s |\n" "Field" "Value"
-  printf "%s\n" "$border"
-  printf "| %-14s | %-16s |\n" "Unit" "$QUEUE_UNIT_NAME"
-  printf "| %-14s | %-16s |\n" "Enabled" "$QUEUE_ENABLED"
-  printf "| %-14s | %-16s |\n" "ActiveState" "$QUEUE_ACTIVE_STATE"
-  printf "| %-14s | %-16s |\n" "SubState" "$QUEUE_SUB_STATE"
-  printf "| %-14s | %-16s |\n" "MainPID" "$QUEUE_MAIN_PID"
-  printf "| %-14s | %-16s |\n" "ExitStatus" "$QUEUE_EXIT_STATUS"
-  printf "%s\n" "$border"
+  local -a rows=(
+    "Unit|$QUEUE_UNIT_NAME"
+    "Enabled|$QUEUE_ENABLED"
+    "ActiveState|$QUEUE_ACTIVE_STATE"
+    "SubState|$QUEUE_SUB_STATE"
+    "MainPID|$QUEUE_MAIN_PID"
+    "ExitStatus|$QUEUE_EXIT_STATUS"
+  )
+  print_kv_table "${rows[@]}"
   return 0
 }
 

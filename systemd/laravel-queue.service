@@ -10,8 +10,6 @@ WorkingDirectory={{PROJECT_ROOT}}
 ExecStart={{PHP_BIN}} {{PROJECT_ROOT}}/artisan queue:work --tries=3 --sleep=3
 Restart=always
 RestartSec=5
-StandardOutput=syslog
-StandardError=syslog
 SyslogIdentifier=laravel-queue-{{PROJECT_NAME}}
 
 [Install]
