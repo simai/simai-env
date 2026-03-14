@@ -11,12 +11,16 @@ site_db_export_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
 

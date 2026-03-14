@@ -7,12 +7,16 @@ site_db_status_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   local db_name="" db_user="" db_charset="" db_collation=""
@@ -73,12 +77,16 @@ site_db_create_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   read_site_metadata "$domain"
@@ -152,12 +160,16 @@ site_db_drop_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   read_site_metadata "$domain"
@@ -227,12 +239,16 @@ site_db_rotate_handler() {
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
       warn "No sites found"
-      return 1
+      return 0
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
     PARSED_ARGS[domain]="$domain"
   fi
-  require_args "domain"
+  require_args "domain" || return 1
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   read_site_metadata "$domain"
