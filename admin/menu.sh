@@ -136,6 +136,66 @@ run_menu() {
   esac
   export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
 
+  menu_choose_key() {
+    local title="$1" prompt_text="$2" default_key="${3:-}"
+    shift 3
+    local -a items=("$@")
+    if [[ ${#items[@]} -eq 0 ]]; then
+      echo ""
+      return 1
+    fi
+    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+      local -a opts=()
+      local item key label selected=""
+      for item in "${items[@]}"; do
+        key="${item%%|*}"
+        label="${item#*|}"
+        opts+=("$key" "$label")
+        if [[ -n "$default_key" && "$key" == "$default_key" ]]; then
+          selected="$key"
+        fi
+      done
+      local out rc=0
+      if [[ -n "$selected" ]]; then
+        out=$(whiptail --title "$title" --default-item "$selected" --menu "$prompt_text" 22 100 14 "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
+      else
+        out=$(whiptail --title "$title" --menu "$prompt_text" 22 100 14 "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
+      fi
+      if [[ $rc -ne 0 ]]; then
+        echo ""
+        return 1
+      fi
+      echo "$out"
+      return 0
+    fi
+
+    echo
+    [[ -n "$title" ]] && echo "$title"
+    local item key label
+    for item in "${items[@]}"; do
+      key="${item%%|*}"
+      label="${item#*|}"
+      printf "  [%s] %s\n" "$key" "$label"
+    done
+    local choice=""
+    if [[ -n "$default_key" ]]; then
+      read -r -p "${prompt_text} [${default_key}]: " choice || true
+      [[ -z "$choice" ]] && choice="$default_key"
+    else
+      read -r -p "${prompt_text}: " choice || true
+    fi
+    [[ -z "$choice" ]] && { echo ""; return 1; }
+    for item in "${items[@]}"; do
+      key="${item%%|*}"
+      if [[ "$choice" == "$key" ]]; then
+        echo "$choice"
+        return 0
+      fi
+    done
+    echo "__invalid__"
+    return 0
+  }
+
   menu_args_has_key() {
     local key="$1"; shift
     local a
@@ -231,22 +291,21 @@ run_menu() {
 
   sites_menu() {
     while true; do
-      echo
-      echo "Sites"
-      cat <<'EOF'
-  [1] List sites
-  [2] Create site
-  [3] Site info
-  [4] Change site PHP
-EOF
+      local -a items=(
+        "1|List sites"
+        "2|Create site"
+        "3|Site info"
+        "4|Change site PHP"
+      )
       if [[ $show_advanced -eq 1 ]]; then
-        echo "  [5] Change site profile"
+        items+=("5|Change site profile")
       fi
-      cat <<'EOF'
-  [6] Remove site
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      items+=(
+        "6|Remove site"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Sites" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
@@ -262,6 +321,7 @@ EOF
         6) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -269,18 +329,17 @@ EOF
 
   ssl_menu() {
     while true; do
-      echo
-      echo "SSL"
-      cat <<'EOF'
-  [1] List SSL
-  [2] SSL status
-  [3] Issue Let's Encrypt
-  [4] Install custom certificate
-  [5] Renew certificate
-  [6] Remove SSL
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      local -a items=(
+        "1|List SSL"
+        "2|SSL status"
+        "3|Issue Let's Encrypt"
+        "4|Install custom certificate"
+        "5|Renew certificate"
+        "6|Remove SSL"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "SSL" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command ssl list ;;
         2) run_menu_command ssl status ;;
@@ -290,6 +349,7 @@ EOF
         6) run_menu_command ssl remove ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -576,20 +636,21 @@ EOF
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       preflight_bootstrap
     fi
-    echo
-    echo "Select section:"
-    printf "  [1] Sites\n"
-    printf "  [2] SSL\n"
-    printf "  [3] PHP\n"
-    printf "  [4] Database\n"
-    printf "  [5] Diagnostics\n"
-    printf "  [6] Logs\n"
-    printf "  [7] Backup / Migrate\n"
-    printf "  [8] Laravel\n"
-    printf "  [9] Profiles\n"
-    printf "  [10] System\n"
-    echo "  [0] Exit"
-    read -r -p "Enter choice: " choice || true
+    local -a root_items=(
+      "1|Sites"
+      "2|SSL"
+      "3|PHP"
+      "4|Database"
+      "5|Diagnostics"
+      "6|Logs"
+      "7|Backup / Migrate"
+      "8|Laravel"
+      "9|Profiles"
+      "10|System"
+      "0|Exit"
+    )
+    local choice=""
+    choice=$(menu_choose_key "SIMAI ENV" "Select section" "" "${root_items[@]}")
     case "$choice" in
       1) sites_menu ;;
       2) ssl_menu ;;
@@ -603,6 +664,7 @@ EOF
       10) system_menu ;;
       0) exit 0 ;;
       "") continue ;;
+      "__invalid__") echo "Invalid choice" ;;
       *) echo "Invalid choice" ;;
     esac
   done

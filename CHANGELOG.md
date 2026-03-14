@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.9] - 2026-03-14
+### Changed
+- Added unified menu choice adapter in `admin/menu.sh` with automatic `whiptail` or text rendering.
+- Migrated main menu, `Sites`, and `SSL` submenu selection flow to the new adapter while keeping command behavior unchanged.
+
 ## [1.8.8] - 2026-03-14
 ### Added
 - Added reusable UI helper layer in `lib/ui.sh` (`ui_header`, `ui_section`, `ui_step`, `ui_kv`, `ui_info/success/warn/error`) for consistent CLI rendering.
