@@ -417,6 +417,23 @@ list_simai_sites() {
   shopt -u nullglob
 }
 
+site_alias_dependents() {
+  local target_domain="$1"
+  shopt -s nullglob
+  local cfg name
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    name=$(basename "$cfg" .conf)
+    [[ "$name" == "000-catchall" || "$name" == "$target_domain" ]] && continue
+    declare -A meta=()
+    if site_nginx_metadata_parse "$cfg" meta; then
+      if [[ "${meta[profile]:-}" == "alias" && "${meta[target]:-}" == "$target_domain" ]]; then
+        echo "$name"
+      fi
+    fi
+  done | sort -u
+  shopt -u nullglob
+}
+
 has_simai_sites() {
   [[ -n "$(list_simai_sites | head -n 1)" ]]
 }

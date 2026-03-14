@@ -394,6 +394,15 @@ site_remove_handler() {
     return 1
   fi
 
+  local -a alias_dependents=()
+  mapfile -t alias_dependents < <(site_alias_dependents "$domain")
+  if [[ ${#alias_dependents[@]} -gt 0 ]]; then
+    error "Cannot remove ${domain}: alias sites depend on it"
+    printf 'Dependent aliases: %s\n' "${alias_dependents[*]}"
+    echo "Remove or retarget those alias sites first."
+    return 1
+  fi
+
   read_site_metadata "$domain"
   local profile="${SITE_META[profile]:-generic}"
   project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
