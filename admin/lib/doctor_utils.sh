@@ -82,7 +82,8 @@ doctor_php_modules() {
   if [[ -z "$php_bin" ]]; then
     return 1
   fi
-  "$php_bin" -m 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed '/^\[/d;/^$/d' | sort -u
+  "$php_bin" -m 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed '/^\[/d;/^$/d' | \
+    sed 's/^zend opcache$/opcache/' | sort -u
 }
 
 doctor_php_ini_get() {
