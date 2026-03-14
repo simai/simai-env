@@ -241,8 +241,12 @@ bitrix_agents_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if bitrix_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
 
   ui_header "SIMAI ENV · Bitrix agents status"
@@ -297,8 +301,12 @@ bitrix_agents_sync_handler() {
   [[ "${apply,,}" == "yes" ]] || apply="no"
   [[ "${confirm,,}" == "yes" ]] || confirm="no"
 
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if bitrix_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
   if [[ -z "$BX_PHP_VERSION" || "$BX_PHP_VERSION" == "none" ]]; then
     error "Bitrix site PHP version is missing for ${domain}."
