@@ -40,15 +40,38 @@ site_drift_handler() {
     meta_version="-"
   fi
   local cron_file cron_status="MISSING" cron_notes=()
+  local cron_expect_pattern=""
+  local cron_expect_label=""
   if [[ "$meta_status" == "OK" && -n "${meta[slug]:-}" ]]; then
     local profile_id="${meta[profile]:-}"
     if [[ -n "$profile_id" ]] && load_profile "$profile_id" >/dev/null 2>&1; then
       if [[ "${PROFILE_SUPPORTS_CRON:-no}" != "yes" || "${PROFILE_REQUIRES_PHP:-yes}" == "no" ]]; then
         cron_status="N/A"
       else
+        case "$profile_id" in
+          laravel)
+            cron_expect_pattern="schedule:run"
+            cron_expect_label="schedule:run entry"
+            ;;
+          wordpress)
+            cron_expect_pattern="wp-cron\\.php"
+            cron_expect_label="wp-cron.php entry"
+            ;;
+          bitrix)
+            cron_expect_pattern="cron_events\\.php"
+            cron_expect_label="cron_events.php entry"
+            ;;
+        esac
         cron_file=$(cron_site_file_path "${meta[slug]}")
         if [[ -f "$cron_file" ]]; then
-          cron_status="OK"
+          if [[ -n "$cron_expect_pattern" ]] && grep -Eq "$cron_expect_pattern" "$cron_file"; then
+            cron_status="OK"
+          elif [[ -n "$cron_expect_pattern" ]]; then
+            cron_status="DRIFT"
+            cron_notes+=("missing ${cron_expect_label}")
+          else
+            cron_status="OK"
+          fi
         fi
       fi
     else
