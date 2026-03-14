@@ -4,7 +4,7 @@ set -euo pipefail
 prompt() {
   local label="$1" default="${2:-}"
   local value
-  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
     if [[ -n "$default" ]]; then
       value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 90 "$default" 3>&1 1>&2 2>&3) || return 1
     else
@@ -144,7 +144,7 @@ run_menu() {
       echo ""
       return 1
     fi
-    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
       local -a opts=()
       local item key label selected=""
       for item in "${items[@]}"; do

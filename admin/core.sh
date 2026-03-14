@@ -27,7 +27,7 @@ menu_can_use_whiptail() {
   [[ "${SIMAI_MENU_BACKEND:-auto}" == "whiptail" ]] || return 1
   [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]] || return 1
   command -v whiptail >/dev/null 2>&1 || return 1
-  [[ -t 0 && -t 1 ]] || return 1
+  [[ -r /dev/tty && -w /dev/tty ]] || return 1
   return 0
 }
 
