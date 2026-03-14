@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.11] - 2026-03-14
+### Changed
+- Migrated all remaining submenus (PHP/Database/Diagnostics/Logs/Backup/Laravel/Profiles/System) to the unified menu adapter.
+- Standardized selection flow across text and optional `whiptail` backends while preserving existing command behavior and safety semantics.
+
 ## [1.8.10] - 2026-03-14
 ### Fixed
 - Fixed text-menu regression in the new menu adapter: menu rendering now writes to stderr so captured menu choices remain valid.

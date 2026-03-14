@@ -357,19 +357,20 @@ run_menu() {
 
   php_menu() {
     while true; do
-      echo
-      echo "PHP"
-      printf "  [1] List PHP versions\n"
-      printf "  [2] Install PHP version\n"
-      printf "  [3] Manage PHP extensions\n"
-      printf "  [4] Manage PHP parameters (FPM/CLI)\n"
-      printf "  [5] Reload / restart PHP-FPM\n"
+      local -a items=(
+        "1|List PHP versions"
+        "2|Install PHP version"
+        "3|Manage PHP extensions"
+        "4|Manage PHP parameters (FPM/CLI)"
+        "5|Reload / restart PHP-FPM"
+      )
       if [[ $show_advanced -eq 1 ]]; then
-        printf "  [6] Reset PHP parameters\n"
-        printf "  [7] Remove PHP version\n"
+        items+=("6|Reset PHP parameters")
+        items+=("7|Remove PHP version")
       fi
-      printf "  [0] Back\n"
-      read -r -p "Enter choice: " ch || true
+      items+=("0|Back")
+      local ch=""
+      ch=$(menu_choose_key "PHP" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command php list ;;
         2) run_menu_command php install ;;
@@ -392,6 +393,7 @@ run_menu() {
           ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -399,24 +401,21 @@ run_menu() {
 
   db_menu() {
     while true; do
-      echo
-      echo "Database"
-      cat <<'EOF'
-  [1] List databases
-  [2] MySQL status
-  [3] Create DB + user (for site)
-  [4] Write DB credentials to project
-  [5] Rotate DB user password
-  [6] Export DB dump
-EOF
+      local -a items=(
+        "1|List databases"
+        "2|MySQL status"
+        "3|Create DB + user (for site)"
+        "4|Write DB credentials to project"
+        "5|Rotate DB user password"
+        "6|Export DB dump"
+      )
       if [[ $show_advanced -eq 1 ]]; then
-        echo "  [7] Import DB dump"
-        echo "  [8] Drop DB + user"
+        items+=("7|Import DB dump")
+        items+=("8|Drop DB + user")
       fi
-      cat <<'EOF'
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      items+=("0|Back")
+      local ch=""
+      ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command db list ;;
         2) run_menu_command db status ;;
@@ -440,6 +439,7 @@ EOF
           ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -447,16 +447,17 @@ EOF
 
   diagnostics_menu() {
     while true; do
-      echo
-      echo "Diagnostics"
-      printf "  [1] Site doctor\n"
-      printf "  [2] Drift plan\n"
+      local -a items=(
+        "1|Site doctor"
+        "2|Drift plan"
+      )
       if [[ $show_advanced -eq 1 ]]; then
-        printf "  [3] Drift apply\n"
+        items+=("3|Drift apply")
       fi
-      printf "  [4] Platform status\n"
-      printf "  [0] Back\n"
-      read -r -p "Enter choice: " ch || true
+      items+=("4|Platform status")
+      items+=("0|Back")
+      local ch=""
+      ch=$(menu_choose_key "Diagnostics" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command site doctor ;;
         2) run_menu_command site drift ;;
@@ -470,6 +471,7 @@ EOF
         4) run_menu_command self platform-status ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -477,19 +479,18 @@ EOF
 
   logs_menu() {
     while true; do
-      echo
-      echo "Logs"
-      cat <<'EOF'
-  [1] Admin log
-  [2] Environment log
-  [3] Audit log
-  [4] Nginx access log (by domain)
-  [5] Nginx error log (by domain)
-  [6] Let's Encrypt log
-  [7] Laravel worker log (by domain)
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      local -a items=(
+        "1|Admin log"
+        "2|Environment log"
+        "3|Audit log"
+        "4|Nginx access log (by domain)"
+        "5|Nginx error log (by domain)"
+        "6|Let's Encrypt log"
+        "7|Laravel worker log (by domain)"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Logs" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command logs admin ;;
         2) run_menu_command logs env ;;
@@ -500,6 +501,7 @@ EOF
         7) not_implemented ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -507,20 +509,17 @@ EOF
 
   backup_menu() {
     while true; do
-      echo
-      echo "Backup / Migrate"
-      cat <<'EOF'
-  [1] Export site config
-  [2] Inspect archive
-  [3] Import plan (dry-run)
-EOF
+      local -a items=(
+        "1|Export site config"
+        "2|Inspect archive"
+        "3|Import plan (dry-run)"
+      )
       if [[ $show_advanced -eq 1 ]]; then
-        echo "  [4] Import apply"
+        items+=("4|Import apply")
       fi
-      cat <<'EOF'
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      items+=("0|Back")
+      local ch=""
+      ch=$(menu_choose_key "Backup / Migrate" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command backup export ;;
         2) run_menu_command backup inspect ;;
@@ -534,6 +533,7 @@ EOF
           ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -541,18 +541,17 @@ EOF
 
   laravel_menu() {
     while true; do
-      echo
-      echo "Laravel"
-      cat <<'EOF'
-  [1] Clear cache
-  [2] Scheduler add (schedule:run)
-  [3] Scheduler remove (schedule:run)
-  [4] Worker status
-  [5] Worker restart
-  [6] Worker logs
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      local -a items=(
+        "1|Clear cache"
+        "2|Scheduler add (schedule:run)"
+        "3|Scheduler remove (schedule:run)"
+        "4|Worker status"
+        "5|Worker restart"
+        "6|Worker logs"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command cache clear ;;
         2) run_menu_command cron add ;;
@@ -562,6 +561,7 @@ EOF
         6) run_menu_command queue logs ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -569,19 +569,18 @@ EOF
 
   profiles_menu() {
     while true; do
-      echo
-      echo "Profiles"
-      cat <<'EOF'
-  [1] List profiles
-  [2] Used by (summary)
-  [3] Used by (one profile)
-  [4] Validate profiles
-  [5] Enable profile
-  [6] Disable profile
-  [7] Init allowlist
-  [0] Back
-EOF
-      read -r -p "Enter choice: " ch || true
+      local -a items=(
+        "1|List profiles"
+        "2|Used by (summary)"
+        "3|Used by (one profile)"
+        "4|Validate profiles"
+        "5|Enable profile"
+        "6|Disable profile"
+        "7|Init allowlist"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Profiles" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command profile list ;;
         2) run_menu_command profile used-by ;;
@@ -592,6 +591,7 @@ EOF
         7) run_menu_command profile init ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
@@ -599,15 +599,17 @@ EOF
 
   system_menu() {
     while true; do
-      echo
-      echo "System"
-      printf "  [1] System status\n"
-      printf "  [2] Repair environment\n"
-      printf "  [3] Update simai-env\n"
-      printf "  [4] Version\n"
-      printf "  [5] Advanced mode (currently: %s)\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
-      printf "  [0] Back\n"
-      read -r -p "Enter choice: " ch || true
+      local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
+      local -a items=(
+        "1|System status"
+        "2|Repair environment"
+        "3|Update simai-env"
+        "4|Version"
+        "5|${adv_label}"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command self status ;;
         2) run_menu_command self bootstrap ;;
@@ -623,6 +625,7 @@ EOF
           ;;
         0) break ;;
         "") continue ;;
+        "__invalid__") echo "Invalid choice" ;;
         *) echo "Invalid choice" ;;
       esac
     done
