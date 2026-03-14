@@ -245,10 +245,13 @@ self_platform_status_handler() {
   local disk_root="unknown"
   disk_root=$(df -h / 2>/dev/null | awk 'NR==2{print $4}')
   [[ -z "$disk_root" ]] && disk_root="unknown"
+  local disk_data_label="disk free /var"
   local disk_var="unknown"
   if [[ -d /var/lib/mysql ]]; then
+    disk_data_label="disk free /var/lib/mysql"
     disk_var=$(df -h /var/lib/mysql 2>/dev/null | awk 'NR==2{print $4}')
   elif [[ -d /var ]]; then
+    disk_data_label="disk free /var"
     disk_var=$(df -h /var 2>/dev/null | awk 'NR==2{print $4}')
   fi
   [[ -z "$disk_var" ]] && disk_var="unknown"
@@ -288,7 +291,7 @@ self_platform_status_handler() {
     "redis|${redis_state}" \
     "php-fpm units|${php_units}" \
     "disk free /|${disk_root}" \
-    "disk free /var|${disk_var}" \
+    "${disk_data_label}|${disk_var}" \
     "inodes free /|${inodes_root}" \
     "memory (total/used/free)|${mem_summary}" \
     "certbot timer|${certbot_timer}"
