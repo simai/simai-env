@@ -70,10 +70,13 @@ queue_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! queue_prepare_site "$domain"; then
-    return $?
-  fi
   local rc=0
+  if queue_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
+  fi
   if queue_collect_status "$QUEUE_UNIT_NAME"; then
     rc=0
   else
@@ -100,15 +103,18 @@ queue_restart_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! queue_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if queue_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
   if [[ "${QUEUE_REAL_APP:-no}" != "yes" ]]; then
     error "Queue restart is unavailable for bootstrap placeholder sites: ${domain}"
     echo "Deploy a real Laravel app first, then restart the queue worker."
     return 1
   fi
-  local rc=0
   if queue_collect_status "$QUEUE_UNIT_NAME"; then
     rc=0
   else
@@ -142,10 +148,13 @@ queue_logs_handler() {
     error "Invalid --lines value: ${lines} (must be numeric)"
     return 1
   fi
-  if ! queue_prepare_site "$domain"; then
-    return $?
-  fi
   local rc=0
+  if queue_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
+  fi
   if queue_collect_status "$QUEUE_UNIT_NAME"; then
     rc=0
   else
