@@ -40,6 +40,16 @@ run_cmd() {
   remote "cd '${SIMAI_ROOT}' && $*"
 }
 
+run_cmd_expect_fail() {
+  local title="$1"
+  shift
+  echo "[run] ${title} (expect fail)"
+  if remote "cd '${SIMAI_ROOT}' && $* >/dev/null 2>&1"; then
+    echo "[fail] ${title}: command unexpectedly succeeded" >&2
+    exit 1
+  fi
+}
+
 run_menu_case() {
   local title="$1"
   local payload="$2"
@@ -129,6 +139,12 @@ run_backend() {
   fi
 }
 
+run_negative() {
+  run_cmd_expect_fail "site info missing domain" "./simai-admin.sh site info --domain does-not-exist-zzz.env.sf8.ru"
+  run_cmd_expect_fail "ssl status missing domain" "./simai-admin.sh ssl status --domain does-not-exist-zzz.env.sf8.ru"
+  run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
+}
+
 case "$MODE" in
   smoke)
     run_smoke
@@ -143,14 +159,18 @@ case "$MODE" in
   backend)
     run_backend
     ;;
+  negative)
+    run_negative
+    ;;
   full)
     run_smoke
     run_core
     run_menu
     run_backend
+    run_negative
     ;;
   *)
-    echo "Usage: testing/run-regression.sh [smoke|core|menu|backend|full]" >&2
+    echo "Usage: testing/run-regression.sh [smoke|core|menu|backend|negative|full]" >&2
     exit 1
     ;;
 esac

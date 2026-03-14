@@ -6,6 +6,7 @@ source "${SCRIPT_DIR}/admin/lib/backup_utils.sh"
 
 backup_export_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Backup export"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
   local out="${PARSED_ARGS[out]:-}"
@@ -119,19 +120,22 @@ backup_export_handler() {
   rm -rf "$tmpdir"
 
   progress_step "Summary"
-  info "Backup created: ${out}"
-  info "Files:"
-  for idx in "${!files_dst[@]}"; do
-    echo " - ${files_dst[$idx]}"
-  done
-  echo " - nginx/sites-enabled/${domain}.conf.symlink"
-  echo " - manifest.json"
-  echo " - NOTES.txt"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Archive|${out}" \
+    "Profile|${profile}" \
+    "PHP|${php}" \
+    "Enabled|${enabled_flag}"
+  ui_section "Next steps"
+  ui_kv "Inspect archive" "simai-admin.sh backup inspect --file ${out}"
+  ui_kv "Import plan" "simai-admin.sh backup import --file ${out} --apply no"
   info "Secrets are NOT included (no SSL keys, no .env)"
 }
 
 backup_inspect_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Backup inspect"
   require_args "file" || return 1
   local file="${PARSED_ARGS[file]:-}"
   if [[ ! -f "$file" ]]; then
@@ -151,8 +155,9 @@ backup_inspect_handler() {
     rm -rf "$tmpdir"
     return 1
   fi
-  info "Manifest:"
+  ui_section "Manifest"
   backup_print_manifest "$manifest"
+  ui_section "Verification"
   info "Verifying checksums..."
   if ! backup_verify_checksums "$tmpdir" "$manifest"; then
     warn "Checksum verification failed"
@@ -160,11 +165,14 @@ backup_inspect_handler() {
     return 1
   fi
   info "Checksums OK"
+  ui_section "Next steps"
+  ui_kv "Import plan" "simai-admin.sh backup import --file ${file} --apply no"
   rm -rf "$tmpdir"
 }
 
 backup_import_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Backup import"
   require_args "file" || return 1
   local file="${PARSED_ARGS[file]:-}"
   local apply="${PARSED_ARGS[apply]:-no}"
@@ -229,10 +237,12 @@ backup_import_handler() {
     return 1
   fi
 
-  info "Plan:"
+  ui_section "Plan"
   backup_print_plan "$tmpdir" "$domain" "$slug" "$php"
   if [[ "$apply" != "yes" ]]; then
     info "Dry-run only. To apply changes, run with --apply yes"
+    ui_section "Next steps"
+    ui_kv "Apply import" "simai-admin.sh backup import --file ${file} --apply yes"
     rm -rf "$tmpdir"
     return 0
   fi
@@ -256,6 +266,14 @@ backup_import_handler() {
     fi
   fi
 
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Applied|yes" \
+    "Enable symlink|${enable}" \
+    "Reload services|${reload}"
+  ui_section "Next steps"
+  ui_kv "Inspect archive" "simai-admin.sh backup inspect --file ${file}"
   info "Import applied successfully"
   rm -rf "$tmpdir"
 }

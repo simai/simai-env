@@ -108,6 +108,7 @@ ssl_apply_nginx() {
 
 ssl_issue_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Issue Let's Encrypt certificate"
   local is_advanced=0
   local advanced_flag="${SIMAI_MENU_SHOW_ADVANCED:-0}"
   advanced_flag="${advanced_flag,,}"
@@ -218,24 +219,29 @@ ssl_issue_handler() {
   fi
   ensure_certbot_cron
   progress_step "Reloading nginx"
-  echo "===== SSL issue summary ====="
-  echo "Domain   : ${domain}"
-  echo "Type     : Let's Encrypt"
-  echo "Cert     : ${cert}"
-  echo "Key      : ${key}"
-  echo "Chain    : ${chain}"
-  echo "Staging  : ${staging}"
-  echo "Redirect : ${redirect}"
+  ui_section "Result"
+  local hsts_display="${hsts}"
   if [[ "$staging" == "yes" ]]; then
-    echo "HSTS     : ${hsts} (forced)"
-  else
-    echo "HSTS     : ${hsts}"
+    hsts_display="${hsts} (forced)"
   fi
+  print_kv_table \
+    "Domain|${domain}" \
+    "Type|Let's Encrypt" \
+    "Cert|${cert}" \
+    "Key|${key}" \
+    "Chain|${chain}" \
+    "Staging|${staging}" \
+    "Redirect|${redirect}" \
+    "HSTS|${hsts_display}"
+  ui_section "Next steps"
+  ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
+  ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   progress_done "Done"
 }
 
 ssl_install_custom_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Install custom certificate"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
     if ! ssl_select_domain; then
@@ -332,14 +338,22 @@ ssl_install_custom_handler() {
     return 1
   fi
   progress_step "Reloading nginx"
-  echo "===== SSL install summary ====="
-  echo "Domain   : ${domain}"
-  echo "Type     : custom"
-  echo "Cert     : ${cert_dst}"
-  echo "Key      : ${key_dst}"
-  [[ -n "$chain_arg" ]] && echo "Chain    : ${chain_arg}"
-  echo "Redirect : ${redirect}"
-  echo "HSTS     : ${hsts}"
+  ui_section "Result"
+  local -a rows=(
+    "Domain|${domain}"
+    "Type|custom"
+    "Cert|${cert_dst}"
+    "Key|${key_dst}"
+    "Redirect|${redirect}"
+    "HSTS|${hsts}"
+  )
+  if [[ -n "$chain_arg" ]]; then
+    rows+=("Chain|${chain_arg}")
+  fi
+  print_kv_table "${rows[@]}"
+  ui_section "Next steps"
+  ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
+  ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   progress_done "Done"
 }
 
@@ -386,6 +400,7 @@ ssl_renew_handler() {
 
 ssl_remove_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Remove SSL"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
     if ! ssl_select_domain "allow"; then
@@ -434,10 +449,14 @@ ssl_remove_handler() {
     fi
     rm -rf "/etc/nginx/ssl/${domain}" >>"$LOG_FILE" 2>&1 || true
   fi
-  echo "===== SSL remove summary ====="
-  echo "Domain : ${domain}"
-  echo "SSL    : disabled"
-  echo "Cert   : $([[ "$delete_cert" == "yes" ]] && echo deleted || echo kept)"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "SSL|disabled" \
+    "Cert|$([[ "$delete_cert" == "yes" ]] && echo deleted || echo kept)"
+  ui_section "Next steps"
+  ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
+  ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email>"
 }
 
 ssl_status_handler() {

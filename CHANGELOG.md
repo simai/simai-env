@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.16] - 2026-03-14
+### Changed
+- Unified lifecycle output blocks for `ssl letsencrypt/install/remove` and `backup export/inspect/import` using structured `Header -> Result/Plan -> Next steps` sections.
+### Added
+- Added `negative` regression mode for expected-failure scenarios (missing domain/file), and included it in `full` regression runs.
+
 ## [1.8.15] - 2026-03-14
 ### Changed
 - Unified overview command UX for daily operations: `site info`, `ssl list`, `db status`, and `db list` now use structured `Header -> Result -> Next steps` output blocks.

@@ -59,6 +59,7 @@ bash testing/run-regression.sh smoke
 bash testing/run-regression.sh core
 bash testing/run-regression.sh menu
 bash testing/run-regression.sh backend
+bash testing/run-regression.sh negative
 bash testing/run-regression.sh full
 ```
 
@@ -68,7 +69,8 @@ Modes:
 - `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
 - `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
 - `backend` probes `SIMAI_MENU_BACKEND=whiptail` activation (skips if `whiptail` is not installed on target host).
-- `full` runs smoke + core + menu + backend.
+- `negative` runs expected-failure checks (missing domain/file) to validate error handling.
+- `full` runs smoke + core + menu + backend + negative.
 
 ## Secret Material
 
