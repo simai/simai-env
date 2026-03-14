@@ -76,6 +76,7 @@ self_version_handler() {
 }
 
 self_status_handler() {
+  ui_header "SIMAI ENV · System status"
   platform_detect_os
   local os_name="${PLATFORM_OS_PRETTY:-unknown}"
   local supported="no"
@@ -177,6 +178,7 @@ self_status_handler() {
     fi
   fi
 
+  ui_section "Result"
   print_kv_table \
     "Install dir|${install_dir}" \
     "OS|${os_name}" \
@@ -191,9 +193,13 @@ self_status_handler() {
     "php cli|${php_cli_version}" \
     "certbot version|${certbot_version}" \
     "certbot timer|${certbot_timer}"
+  ui_section "Next steps"
+  ui_kv "Diagnostics" "simai-admin.sh self platform-status"
+  ui_kv "Update" "simai-admin.sh self update"
 }
 
 self_platform_status_handler() {
+  ui_header "SIMAI ENV · Platform diagnostics"
   local svc_state
   svc_state() {
     local svc="$1"
@@ -284,6 +290,7 @@ self_platform_status_handler() {
     fi
   fi
 
+  ui_section "Result"
   print_kv_table \
     "nginx|${nginx_state}" \
     "nginx test|${nginx_test}" \
@@ -295,6 +302,9 @@ self_platform_status_handler() {
     "inodes free /|${inodes_root}" \
     "memory (total/used/free)|${mem_summary}" \
     "certbot timer|${certbot_timer}"
+  ui_section "Next steps"
+  ui_kv "Validate nginx" "nginx -t"
+  ui_kv "Repair stack" "simai-admin.sh self bootstrap"
 }
 
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""

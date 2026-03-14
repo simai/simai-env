@@ -9,6 +9,7 @@ SIMAI_RC_MENU_RELOAD=88
 SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
+source "${SIMAI_ENV_ROOT}/lib/ui.sh"
 if [[ -f /etc/simai-env.conf ]]; then
   # shellcheck disable=SC1091
   source /etc/simai-env.conf
@@ -20,12 +21,53 @@ declare -Ag CMD_REQUIRED=()
 declare -Ag CMD_OPTIONAL=()
 declare -Ag CMD_FLAGS=()
 
+ui_init
+
+menu_can_use_whiptail() {
+  [[ "${SIMAI_MENU_BACKEND:-auto}" == "whiptail" ]] || return 1
+  [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]] || return 1
+  command -v whiptail >/dev/null 2>&1 || return 1
+  [[ -t 0 && -t 1 ]] || return 1
+  return 0
+}
+
 select_from_list() {
   local prompt="$1"
   local default="${2:-}"
   shift 2
   local options=("$@")
   if [[ ${#options[@]} -eq 0 ]]; then
+    echo ""
+    return 1
+  fi
+  if menu_can_use_whiptail; then
+    local -a items=()
+    local i tag selected_tag=""
+    for i in "${!options[@]}"; do
+      tag=$((i + 1))
+      items+=("$tag" "${options[$i]}")
+      if [[ -n "$default" && "${options[$i]}" == "$default" ]]; then
+        selected_tag="$tag"
+      fi
+    done
+    local choice rc
+    if [[ -n "$selected_tag" ]]; then
+      choice=$(whiptail --title "SIMAI ENV" --default-item "$selected_tag" --menu "$prompt" 20 100 10 "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
+    else
+      choice=$(whiptail --title "SIMAI ENV" --menu "$prompt" 20 100 10 "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
+    fi
+    rc=${rc:-0}
+    if [[ $rc -ne 0 || -z "$choice" ]]; then
+      echo ""
+      return 1
+    fi
+    if [[ "$choice" =~ ^[0-9]+$ ]]; then
+      local idx=$((choice - 1))
+      if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
+        echo "${options[$idx]}"
+        return 0
+      fi
+    fi
     echo ""
     return 1
   fi

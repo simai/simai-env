@@ -4,6 +4,15 @@ set -euo pipefail
 prompt() {
   local label="$1" default="${2:-}"
   local value
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    if [[ -n "$default" ]]; then
+      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 90 "$default" 3>&1 1>&2 2>&3) || return 1
+    else
+      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 90 3>&1 1>&2 2>&3) || return 1
+    fi
+    echo "$value"
+    return 0
+  fi
   if [[ -n "$default" ]]; then
     read -r -p "$label [$default]: " value || true
     [[ -z "$value" ]] && value="$default"
@@ -99,6 +108,27 @@ run_menu() {
     fi
   fi
   local reload_requested=1
+  local requested_backend="${SIMAI_MENU_BACKEND:-auto}"
+  case "${requested_backend,,}" in
+    whiptail)
+      if command -v whiptail >/dev/null 2>&1; then
+        export SIMAI_MENU_BACKEND="whiptail"
+      else
+        warn "whiptail requested but not installed; falling back to text menu."
+        export SIMAI_MENU_BACKEND="text"
+      fi
+      ;;
+    auto)
+      if command -v whiptail >/dev/null 2>&1; then
+        export SIMAI_MENU_BACKEND="whiptail"
+      else
+        export SIMAI_MENU_BACKEND="text"
+      fi
+      ;;
+    *)
+      export SIMAI_MENU_BACKEND="text"
+      ;;
+  esac
   local show_advanced="${SIMAI_MENU_SHOW_ADVANCED:-0}"
   case "${show_advanced,,}" in
     1|yes|true) show_advanced=1 ;;

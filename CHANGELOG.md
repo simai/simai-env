@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.8] - 2026-03-14
+### Added
+- Added reusable UI helper layer in `lib/ui.sh` (`ui_header`, `ui_section`, `ui_step`, `ui_kv`, `ui_info/success/warn/error`) for consistent CLI rendering.
+### Changed
+- Added optional `whiptail` backend support for interactive selections and prompts in menu mode, with automatic fallback to text backend.
+- Updated `self status`, `self platform-status`, and `ssl status` to render structured header/result/next-steps blocks using the new UI helpers.
+
 ## [1.8.7] - 2026-03-14
 ### Fixed
 - Polished SSL menu cancel flow (`ssl status/remove/install/letsencrypt`): cancelled domain selection now exits cleanly without fallback manual prompts.
