@@ -418,12 +418,13 @@ ssl_remove_handler() {
 
 ssl_status_handler() {
   parse_kv_args "$@"
-  local domain
-  if ! domain=$(ssl_select_domain "allow"); then
-    warn "Cancelled."
-    return 0
+  local domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    if ! domain=$(ssl_select_domain "allow"); then
+      warn "Cancelled."
+      return 0
+    fi
   fi
-  domain="${PARSED_ARGS[domain]:-$domain}"
   if [[ -z "$domain" ]]; then
     warn "Cancelled."
     return 0
