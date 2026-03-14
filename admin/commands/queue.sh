@@ -61,13 +61,16 @@ queue_collect_status() {
 
 queue_status_handler() {
   parse_kv_args "$@"
-  require_args "domain"
-  local domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
   if ! queue_prepare_site "$domain"; then
     return $?
   fi
-  if ! queue_collect_status "$QUEUE_UNIT_NAME"; then
-    local rc=$?
+  local rc=0
+  if queue_collect_status "$QUEUE_UNIT_NAME"; then
+    rc=0
+  else
+    rc=$?
     if [[ $rc -eq 3 ]]; then
       error "Queue unit not found for ${domain}: ${QUEUE_UNIT_NAME}"
       echo "Queue unit not found. Recreate site wiring: simai-admin.sh site set-php --domain ${domain} --php ${QUEUE_PHP_VERSION:-<php>} (or site fix)."
@@ -90,13 +93,16 @@ queue_status_handler() {
 
 queue_restart_handler() {
   parse_kv_args "$@"
-  require_args "domain"
-  local domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
   if ! queue_prepare_site "$domain"; then
     return $?
   fi
-  if ! queue_collect_status "$QUEUE_UNIT_NAME"; then
-    local rc=$?
+  local rc=0
+  if queue_collect_status "$QUEUE_UNIT_NAME"; then
+    rc=0
+  else
+    rc=$?
     if [[ $rc -eq 3 ]]; then
       error "Queue unit not found for ${domain}: ${QUEUE_UNIT_NAME}"
       echo "Queue unit not found. Recreate site wiring: simai-admin.sh site set-php --domain ${domain} --php ${QUEUE_PHP_VERSION:-<php>} (or site fix)."
@@ -108,7 +114,9 @@ queue_restart_handler() {
     journalctl -u "$QUEUE_UNIT_NAME" -n 30 --no-pager 2>&1 | sed 's/^/log: /'
     return 1
   fi
-  if ! queue_collect_status "$QUEUE_UNIT_NAME"; then
+  if queue_collect_status "$QUEUE_UNIT_NAME"; then
+    :
+  else
     return $?
   fi
   info "Queue unit restarted: ActiveState=${QUEUE_ACTIVE_STATE}, SubState=${QUEUE_SUB_STATE}"
@@ -117,8 +125,8 @@ queue_restart_handler() {
 
 queue_logs_handler() {
   parse_kv_args "$@"
-  require_args "domain"
-  local domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
   local lines="${PARSED_ARGS[lines]:-100}"
   if [[ -n "$lines" && ! "$lines" =~ ^[0-9]+$ ]]; then
     error "Invalid --lines value: ${lines} (must be numeric)"
@@ -127,8 +135,11 @@ queue_logs_handler() {
   if ! queue_prepare_site "$domain"; then
     return $?
   fi
-  if ! queue_collect_status "$QUEUE_UNIT_NAME"; then
-    local rc=$?
+  local rc=0
+  if queue_collect_status "$QUEUE_UNIT_NAME"; then
+    rc=0
+  else
+    rc=$?
     if [[ $rc -eq 3 ]]; then
       error "Queue unit not found for ${domain}: ${QUEUE_UNIT_NAME}"
       echo "Queue unit not found. Recreate site wiring: simai-admin.sh site set-php --domain ${domain} --php ${QUEUE_PHP_VERSION:-<php>} (or site fix)."
