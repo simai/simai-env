@@ -101,6 +101,34 @@ run_menu() {
   run_menu_case "menu backup inspect cancel" $'7\n2\n\n0\n0\n' "---- done (backup inspect), exit=0 ----"
 }
 
+run_backend() {
+  if ! remote "command -v whiptail >/dev/null 2>&1"; then
+    echo "[skip] backend whiptail probe (whiptail not installed)"
+    return 0
+  fi
+  echo "[run] backend whiptail probe"
+  local output=""
+  output=$(
+    ssh -tt -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+      "cd '${SIMAI_ROOT}' && SIMAI_MENU_BACKEND=whiptail timeout 8 ./simai-admin.sh menu" \
+      <<<"" 2>&1 || true
+  )
+  if ! grep -Fq -- "Menu backend: whiptail" <<<"$output"; then
+    echo "[fail] backend probe: whiptail backend marker not found" >&2
+    echo "---- menu output ----" >&2
+    echo "$output" >&2
+    echo "---------------------" >&2
+    exit 1
+  fi
+  if grep -Fq -- "Select section:" <<<"$output"; then
+    echo "[fail] backend probe: text fallback detected while whiptail backend requested" >&2
+    echo "---- menu output ----" >&2
+    echo "$output" >&2
+    echo "---------------------" >&2
+    exit 1
+  fi
+}
+
 case "$MODE" in
   smoke)
     run_smoke
@@ -112,13 +140,17 @@ case "$MODE" in
   menu)
     run_menu
     ;;
+  backend)
+    run_backend
+    ;;
   full)
     run_smoke
     run_core
     run_menu
+    run_backend
     ;;
   *)
-    echo "Usage: testing/run-regression.sh [smoke|core|menu|full]" >&2
+    echo "Usage: testing/run-regression.sh [smoke|core|menu|backend|full]" >&2
     exit 1
     ;;
 esac

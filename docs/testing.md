@@ -58,6 +58,7 @@ Use the executable regression runner for repeatable checks:
 bash testing/run-regression.sh smoke
 bash testing/run-regression.sh core
 bash testing/run-regression.sh menu
+bash testing/run-regression.sh backend
 bash testing/run-regression.sh full
 ```
 
@@ -66,7 +67,8 @@ Modes:
 - `smoke` runs read-only daily checks.
 - `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
 - `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
-- `full` runs smoke + core + menu.
+- `backend` probes `SIMAI_MENU_BACKEND=whiptail` activation (skips if `whiptail` is not installed on target host).
+- `full` runs smoke + core + menu + backend.
 
 ## Secret Material
 

@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.14] - 2026-03-14
+### Fixed
+- Fixed `whiptail` backend activation in menu selections/prompts when values are captured via command substitution (switched TTY checks to `/dev/tty` availability).
+### Added
+- Added `backend` regression mode to probe `SIMAI_MENU_BACKEND=whiptail` activation and detect unintended text fallback.
+### Changed
+- Included backend probe in `testing/run-regression.sh full` and documented the new mode in testing guide.
+
 ## [1.8.13] - 2026-03-14
 ### Changed
 - Polished interactive menu UX: invalid selections now use unified warning output and the menu header now shows active backend (`text`/`whiptail`).
