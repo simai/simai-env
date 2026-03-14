@@ -47,8 +47,12 @@ wp_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! wp_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if wp_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
 
   ui_header "SIMAI ENV · WordPress status"
@@ -104,8 +108,12 @@ wp_cron_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! wp_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if wp_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
 
   ui_header "SIMAI ENV · WordPress cron status"
@@ -139,8 +147,12 @@ wp_cron_sync_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! wp_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if wp_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
   if [[ -z "$WP_PHP_VERSION" || "$WP_PHP_VERSION" == "none" ]]; then
     error "WordPress site PHP version is missing for ${domain}."
@@ -162,8 +174,12 @@ wp_cache_clear_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! wp_prepare_site "$domain"; then
-    return $?
+  local rc=0
+  if wp_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
   fi
   ui_header "SIMAI ENV · WordPress cache clear"
   if ! command -v wp >/dev/null 2>&1; then
