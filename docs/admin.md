@@ -14,6 +14,7 @@ Supported OS: Ubuntu 22.04/24.04. Run as root.
 - `static`: serves `<project-root>/public/index.html`; no PHP/DB; no cron/queue; nginx-mode healthcheck at `/healthcheck` (local-only).
 - `alias`: points a new domain to an existing site (reuses target PHP-FPM pool and root); no DB/pool creation.
 - `wordpress`: nginx root `<project-root>/public`, requires DB, enables WordPress-oriented nginx routing and recommended cron.
+- `bitrix`: nginx root `<project-root>/public`, requires DB, enables Bitrix-oriented routing with basic hardening and recommended cron.
 - Public web root is always `<project-root>/public`; default filesystem path is `/home/simai/www/<domain>`, while slug is used for IDs (pool/cron/socket/logs).
 See `docs/architecture/profiles.md`.
 
