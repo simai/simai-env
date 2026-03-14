@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-03-14
+### Added
+- Added WordPress daily-ops command group `wp`:
+  - `wp status`
+  - `wp cron-status`
+  - `wp cron-sync`
+  - `wp cache-clear`
+- Added WordPress command reference: `docs/commands/wp.md`.
+### Changed
+- Wired WordPress daily-ops commands into interactive menu (Laravel section) for operational access.
+- Extended core regression flow with disposable WordPress profile lifecycle checks (`wp status/cron-status/cron-sync`).
+
 ## [1.8.19] - 2026-03-14
 ### Fixed
 - Fixed `site doctor` progress counter after adding profile-specific application checks (`11/11` instead of `11/10`).
