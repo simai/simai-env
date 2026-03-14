@@ -11,6 +11,7 @@ Behavior:
 - Validates the domain and profile (laravel-only).
 - Reads site metadata to locate the queue unit and reports Enabled/Active/SubState/PID/ExitStatus in a small table.
 - If the unit is missing, suggests recreating wiring via `site set-php` or `site fix`.
+- New Laravel sites render the unit during `site add`; placeholder bootstrap sites keep it disabled until the app is real.
 
 ## restart
 Restart queue worker unit for a Laravel site.

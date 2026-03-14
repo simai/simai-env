@@ -276,6 +276,12 @@ site_add_handler() {
     cron_summary="/etc/cron.d/${project} (created/updated)"
   fi
 
+  local queue_summary="none"
+  if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
+    create_queue_unit "$project" "$path" "$php_version" "$SIMAI_USER" || return 1
+    queue_summary="${QUEUE_UNIT_RESULT:-unknown}"
+  fi
+
   local db_summary="not requested"
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
     create_db=$(decide_create_db_for_profile) || return 1
@@ -333,6 +339,9 @@ site_add_handler() {
     echo "PHP-FPM pool: /etc/php/${php_version}/fpm/pool.d/${project}.conf"
   fi
   echo "Cron file   : ${cron_summary}"
+  if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
+    echo "Queue unit  : ${queue_summary}"
+  fi
   if [[ "$create_db" == "yes" ]]; then
     echo "DB name     : ${DB_CREDS_NAME}"
     echo "DB user     : ${DB_CREDS_USER}"

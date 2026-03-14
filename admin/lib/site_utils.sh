@@ -489,6 +489,65 @@ queue_unit_path() {
   echo "/etc/systemd/system/${name}"
 }
 
+queue_template_path() {
+  echo "${SIMAI_ENV_ROOT}/systemd/laravel-queue.service"
+}
+
+laravel_queue_has_real_app() {
+  local project_root="$1"
+  local artisan="${project_root}/artisan"
+  local bootstrap_app="${project_root}/bootstrap/app.php"
+  [[ -f "$artisan" && -f "$bootstrap_app" ]] || return 1
+  if grep -q "SIMAI placeholder" "$artisan" 2>/dev/null; then
+    return 1
+  fi
+  if grep -q "SIMAI placeholder" "$bootstrap_app" 2>/dev/null; then
+    return 1
+  fi
+  return 0
+}
+
+create_queue_unit() {
+  local project="$1" project_root="$2" php_version="$3" run_user="${4:-$SIMAI_USER}"
+  declare -g QUEUE_UNIT_RESULT="unknown"
+  if ! validate_project_slug "$project"; then
+    return 1
+  fi
+  if ! validate_path "$project_root"; then
+    return 1
+  fi
+  local template unit unit_name php_bin tmp
+  template=$(queue_template_path)
+  if [[ ! -f "$template" ]]; then
+    error "Queue template not found: ${template}"
+    return 1
+  fi
+  unit_name=$(queue_unit_name "$project") || return 1
+  unit=$(queue_unit_path "$project") || return 1
+  php_bin=$(resolve_php_bin "$php_version")
+  tmp=$(mktemp)
+  PROJECT_NAME="$project" PROJECT_ROOT="$project_root" PHP_BIN="$php_bin" USER_NAME="$run_user" \
+    perl -0pe 's/\{\{PROJECT_NAME\}\}/$ENV{PROJECT_NAME}/g; s/\{\{PROJECT_ROOT\}\}/$ENV{PROJECT_ROOT}/g; s/\{\{PHP_BIN\}\}/$ENV{PHP_BIN}/g; s/\{\{USER\}\}/$ENV{USER_NAME}/g' \
+    "$template" >"$tmp"
+  chmod 644 "$tmp"
+  chown root:root "$tmp" 2>/dev/null || true
+  mv "$tmp" "$unit"
+  os_svc_daemon_reload || true
+
+  if laravel_queue_has_real_app "$project_root"; then
+    if os_svc_enable_now "$unit_name"; then
+      info "Created and started queue unit ${unit_name}"
+      QUEUE_UNIT_RESULT="created/started"
+    else
+      warn "Created queue unit ${unit_name}, but failed to enable/start it"
+      QUEUE_UNIT_RESULT="created/inactive"
+    fi
+  else
+    warn "Created queue unit ${unit_name}, but bootstrap placeholders were detected; leaving it disabled"
+    QUEUE_UNIT_RESULT="created/disabled"
+  fi
+}
+
 installed_php_versions() {
   local versions=()
   shopt -s nullglob

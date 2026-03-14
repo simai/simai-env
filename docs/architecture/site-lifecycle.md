@@ -9,7 +9,8 @@
 - Configure PHP-FPM pool (except static/alias) using project slug for pool/socket/cron/unit names.
 - Generate nginx vhost from template, embed `# simai-*` metadata, lock down catch-all.
 - Install healthcheck (if profile enables it) to `public/healthcheck.php`.
-- For laravel: create cron in `/etc/cron.d/<project-slug>`; optional queue unit.
+- For laravel: create cron in `/etc/cron.d/<project-slug>` and render queue unit `laravel-queue-<project-slug>.service`.
+- Queue autostart is enabled only when the project looks like a real Laravel app (not SIMAI bootstrap placeholders); otherwise the unit is rendered but left disabled.
 - Optional DB/user creation when requested.
 
 ## Removal (site remove)
