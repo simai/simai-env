@@ -887,8 +887,13 @@ site_set_php_handler() {
       php_bin=$(resolve_php_bin "$php_version")
       perl -pi -e "s#^(ExecStart=)\\S+(\\s+.*)#\\1${php_bin}\\2#" "$unit"
       os_svc_daemon_reload || true
-      os_svc_restart "$unit_name" || warn "Failed to restart queue service ${unit_name}"
-      queue_updated="yes"
+      if laravel_queue_has_real_app "$root"; then
+        os_svc_restart "$unit_name" || warn "Failed to restart queue service ${unit_name}"
+        queue_updated="updated/restarted"
+      else
+        os_svc_disable_now "$unit_name" || true
+        queue_updated="updated/disabled"
+      fi
     else
       info "Queue unit not found for ${queue_project}; skipping queue update"
     fi
@@ -905,8 +910,8 @@ site_set_php_handler() {
     echo "Cron        : refreshed"
   fi
   if [[ "$supports_queue" == "yes" ]]; then
-    if [[ "$queue_updated" == "yes" ]]; then
-      echo "Queue unit  : updated/restarted"
+    if [[ "$queue_updated" != "no" ]]; then
+      echo "Queue unit  : ${queue_updated}"
     else
       echo "Queue unit  : none"
     fi
