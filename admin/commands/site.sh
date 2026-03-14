@@ -1078,12 +1078,20 @@ site_info_handler() {
   logs=$(site_expected_nginx_logs "$project")
   local access_log="${logs%%|*}"
   local error_log="${logs#*|}"
-  local cron_file="/etc/cron.d/${slug}"
-  local cron_status
-  cron_status=$(site_cron_file_status "$slug")
-  local worker_unit="laravel-queue-${project}.service"
-  local worker_status
-  worker_status=$(site_worker_status "$project")
+  local cron_file="n/a"
+  local cron_status="n/a"
+  local worker_unit="n/a"
+  local worker_status="n/a"
+  if load_profile "$profile"; then
+    if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" && "${PROFILE_REQUIRES_PHP:-yes}" != "no" ]]; then
+      cron_file="/etc/cron.d/${slug}"
+      cron_status=$(site_cron_file_status "$slug")
+    fi
+    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" && "${PROFILE_REQUIRES_PHP:-yes}" != "no" ]]; then
+      worker_unit="laravel-queue-${project}.service"
+      worker_status=$(site_worker_status "$project")
+    fi
+  fi
   local php="${SITE_META[php]:-}"
   [[ -z "$php" ]] && php="none"
   local socket_project="${SITE_META[php_socket_project]:-$project}"
