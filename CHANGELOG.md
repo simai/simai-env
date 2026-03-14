@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2026-03-14
+### Added
+- Added Bitrix daily-ops command group `bitrix`:
+  - `bitrix status`
+  - `bitrix cron-status`
+  - `bitrix cron-sync`
+  - `bitrix cache-clear`
+- Added Bitrix command reference: `docs/commands/bitrix.md`.
+### Changed
+- Wired Bitrix daily-ops commands into interactive menu for operational access.
+- Extended core regression flow with disposable Bitrix profile lifecycle checks (`bitrix status/cron-status/cron-sync`).
+
 ## [1.9.0] - 2026-03-14
 ### Added
 - Added WordPress daily-ops command group `wp`:
