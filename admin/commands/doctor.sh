@@ -216,6 +216,50 @@ site_doctor_handler() {
     fi
   fi
 
+  progress_step "Application checks"
+  if [[ "$profile" == "wordpress" ]]; then
+    local wp_public="${root}/${PROFILE_PUBLIC_DIR}"
+    local wp_config="${wp_public}/wp-config.php"
+    if [[ -f "$wp_config" ]]; then
+      if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$wp_config"; then
+        doctor_add_result "PASS" "app" "WordPress cron mode" "DISABLE_WP_CRON=true" ""
+      else
+        doctor_add_result "WARN" "app" "WordPress cron mode" "DISABLE_WP_CRON is not true in wp-config.php" "Set DISABLE_WP_CRON=true when using system cron"
+      fi
+    else
+      doctor_add_result "WARN" "app" "WordPress config" "Missing ${wp_config}" "Complete WordPress installation and verify wp-config.php"
+    fi
+    if [[ -d "${wp_public}/wp-includes" ]]; then
+      if [[ -f "${wp_public}/wp-cron.php" ]]; then
+        doctor_add_result "PASS" "app" "WordPress cron entrypoint" "wp-cron.php present" ""
+      else
+        doctor_add_result "FAIL" "app" "WordPress cron entrypoint" "Missing ${wp_public}/wp-cron.php" "Restore WordPress core files"
+      fi
+    else
+      doctor_add_result "SKIP" "app" "WordPress core files" "wp-includes not present (scaffold or incomplete install)" ""
+    fi
+  elif [[ "$profile" == "bitrix" ]]; then
+    local bx_public="${root}/${PROFILE_PUBLIC_DIR}"
+    local bx_settings="${bx_public}/bitrix/.settings.php"
+    if [[ -f "$bx_settings" ]]; then
+      doctor_add_result "PASS" "app" "Bitrix settings" "${bx_settings}" ""
+    else
+      doctor_add_result "WARN" "app" "Bitrix settings" "Missing ${bx_settings}" "Complete Bitrix installation and verify .settings.php"
+    fi
+    if [[ -d "${bx_public}/bitrix/modules" ]]; then
+      local bx_cron="${bx_public}/bitrix/modules/main/tools/cron_events.php"
+      if [[ -f "$bx_cron" ]]; then
+        doctor_add_result "PASS" "app" "Bitrix cron entrypoint" "cron_events.php present" ""
+      else
+        doctor_add_result "FAIL" "app" "Bitrix cron entrypoint" "Missing ${bx_cron}" "Restore Bitrix core files"
+      fi
+    else
+      doctor_add_result "SKIP" "app" "Bitrix core files" "bitrix/modules not present (scaffold or incomplete install)" ""
+    fi
+  else
+    doctor_add_result "SKIP" "app" "Application profile checks" "No profile-specific app checks for ${profile}" ""
+  fi
+
   progress_step "Nginx checks"
   local avail="/etc/nginx/sites-available/${domain}.conf"
   local enabled="/etc/nginx/sites-enabled/${domain}.conf"

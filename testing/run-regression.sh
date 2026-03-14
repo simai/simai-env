@@ -143,6 +143,9 @@ run_negative() {
   run_cmd_expect_fail "site info missing domain" "./simai-admin.sh site info --domain does-not-exist-zzz.env.sf8.ru"
   run_cmd_expect_fail "ssl status missing domain" "./simai-admin.sh ssl status --domain does-not-exist-zzz.env.sf8.ru"
   run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
+  if [[ -n "${_test_domain:-}" ]]; then
+    run_cmd_expect_fail "ssl install broken cert path" "./simai-admin.sh ssl install --domain '${_test_domain}' --cert /root/test-certs/does-not-exist.crt --key /root/test-certs/does-not-exist.key"
+  fi
 }
 
 case "$MODE" in

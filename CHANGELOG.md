@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.18] - 2026-03-14
+### Changed
+- Extended `site doctor` with profile-aware application checks for WordPress/Bitrix (cron mode/config presence, core entrypoint checks with scaffold-safe SKIP behavior).
+### Added
+- Added broken manual certificate path check to `negative/full` regression scenarios.
+
 ## [1.8.17] - 2026-03-14
 ### Added
 - Added operator runbook for daily operations and incident handling: `docs/operations/runbook.md`.

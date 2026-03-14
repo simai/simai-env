@@ -70,6 +70,7 @@ Modes:
 - `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
 - `backend` probes `SIMAI_MENU_BACKEND=whiptail` activation (skips if `whiptail` is not installed on target host).
 - `negative` runs expected-failure checks (missing domain/file) to validate error handling.
+- `negative` runs expected-failure checks (missing domain/file and broken manual cert paths) to validate error handling.
 - `full` runs smoke + core + menu + backend + negative.
 
 ## Secret Material
