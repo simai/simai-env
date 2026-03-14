@@ -1168,14 +1168,18 @@ nginx_patch_php_socket() {
   backup_file "$cfg"
   local new_socket="/run/php/php${new_php}-fpm-${socket_project}.sock"
   local pattern="/run/php/php[0-9.]+-fpm-${socket_project}\\.sock"
-  perl -pi -e "s#${pattern}#${new_socket}#g" "$cfg"
+  SOCKET_PATTERN="$pattern" NEW_SOCKET="$new_socket" \
+    perl -0pi -e 's#$ENV{SOCKET_PATTERN}#$ENV{NEW_SOCKET}#g' "$cfg"
   if grep -q "^# simai-php:" "$cfg"; then
-    perl -pi -e "s|^(# simai-php: ).*|\\1${new_php}|" "$cfg"
+    NEW_PHP="$new_php" \
+      perl -0pi -e 's/^# simai-php: .*/# simai-php: $ENV{NEW_PHP}/m' "$cfg"
   else
     if grep -q "^# simai-root:" "$cfg"; then
-      perl -0pi -e "s/(# simai-root:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
+      NEW_PHP="$new_php" \
+        perl -0pi -e 's/(# simai-root:.*\n)/${1}# simai-php: $ENV{NEW_PHP}\n/' "$cfg"
     else
-      perl -0pi -e "s/(# simai-project:.*\n)/\\1# simai-php: ${new_php}\n/" "$cfg"
+      NEW_PHP="$new_php" \
+        perl -0pi -e 's/(# simai-project:.*\n)/${1}# simai-php: $ENV{NEW_PHP}\n/' "$cfg"
     fi
   fi
   if ! grep -q "${new_socket}" "$cfg"; then
