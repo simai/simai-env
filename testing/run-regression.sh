@@ -40,6 +40,26 @@ run_cmd() {
   remote "cd '${SIMAI_ROOT}' && $*"
 }
 
+run_menu_case() {
+  local title="$1"
+  local payload="$2"
+  local expected="$3"
+  echo "[run] ${title}"
+  local output=""
+  output=$(
+    ssh -tt -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+      "cd '${SIMAI_ROOT}' && SIMAI_MENU_BACKEND=text timeout 45 ./simai-admin.sh menu" \
+      <<<"$payload" 2>&1 || true
+  )
+  if ! grep -Fq -- "$expected" <<<"$output"; then
+    echo "[fail] ${title}: expected '${expected}'" >&2
+    echo "---- menu output ----" >&2
+    echo "$output" >&2
+    echo "---------------------" >&2
+    exit 1
+  fi
+}
+
 cleanup() {
   if [[ -z "${_test_domain}" ]]; then
     return 0
@@ -74,6 +94,12 @@ run_core() {
   run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' >/dev/null"
 }
 
+run_menu() {
+  run_menu_case "menu site info cancel" $'1\n3\n\n0\n0\n' "---- done (site info), exit=0 ----"
+  run_menu_case "menu ssl status cancel" $'2\n2\n\n0\n0\n' "---- done (ssl status), exit=0 ----"
+  run_menu_case "menu site remove cancel" $'1\n6\n\n0\n0\n' "---- done (site remove), exit=0 ----"
+}
+
 case "$MODE" in
   smoke)
     run_smoke
@@ -82,8 +108,16 @@ case "$MODE" in
     run_smoke
     run_core
     ;;
+  menu)
+    run_menu
+    ;;
+  full)
+    run_smoke
+    run_core
+    run_menu
+    ;;
   *)
-    echo "Usage: testing/run-regression.sh [smoke|core]" >&2
+    echo "Usage: testing/run-regression.sh [smoke|core|menu|full]" >&2
     exit 1
     ;;
 esac

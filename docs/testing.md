@@ -57,12 +57,16 @@ Use the executable regression runner for repeatable checks:
 ```bash
 bash testing/run-regression.sh smoke
 bash testing/run-regression.sh core
+bash testing/run-regression.sh menu
+bash testing/run-regression.sh full
 ```
 
 Modes:
 
 - `smoke` runs read-only daily checks.
 - `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
+- `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
+- `full` runs smoke + core + menu.
 
 ## Secret Material
 

@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.12] - 2026-03-14
+### Added
+- Added dedicated `menu` and `full` modes to `testing/run-regression.sh` for automated interactive menu cancel-flow checks.
+### Changed
+- Updated test documentation with new regression modes and usage examples.
+### Fixed
+- Hardened menu regression matcher (`grep -Fq --`) to correctly validate expected lines that start with dashes.
+
 ## [1.8.11] - 2026-03-14
 ### Changed
 - Migrated all remaining submenus (PHP/Database/Diagnostics/Logs/Backup/Laravel/Profiles/System) to the unified menu adapter.
