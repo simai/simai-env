@@ -141,8 +141,8 @@ site_db_create_handler() {
   echo "Database created for ${domain}"
   echo "DB_NAME=${DB_CREDS_NAME}"
   echo "DB_USER=${DB_CREDS_USER}"
-  echo "DB_PASS=${DB_CREDS_PASS}"
   echo "DB_HOST=localhost"
+  echo "DB_PASS=created (hidden)"
   return 0
 }
 
