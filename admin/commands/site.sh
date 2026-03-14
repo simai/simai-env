@@ -1060,7 +1060,7 @@ site_info_handler() {
       mapfile -t sites < <(list_sites)
       if [[ ${#sites[@]} -eq 0 ]]; then
         warn "No sites found"
-        return 1
+        return 0
       fi
       domain=$(select_from_list "Select site" "" "${sites[@]}")
     else
