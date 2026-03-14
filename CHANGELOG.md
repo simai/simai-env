@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.3] - 2026-03-14
+### Changed
+- Polished interactive menu UX by hiding unfinished actions and keeping only implemented daily-use paths in Sites/PHP/Database/Logs.
+- Added compact operator quickstart for daily routines and release gating (`docs/operations/daily-ops-quickstart.md`).
+- Linked quickstart from top-level documentation entrypoints.
+
 ## [1.10.2] - 2026-03-14
 ### Added
 - Added mandatory release gate runner `testing/release-gate.sh` (shell syntax checks + `testing/run-regression.sh full`).

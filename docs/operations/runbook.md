@@ -2,6 +2,8 @@
 
 This runbook targets day-to-day server operations for simai-env on Ubuntu 22.04/24.04.
 
+For a compact command checklist, see `docs/operations/daily-ops-quickstart.md`.
+
 ## 1) Daily health check (read-only)
 
 ```bash

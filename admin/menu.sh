@@ -292,10 +292,6 @@ run_menu() {
     fi
     return 0
   }
-  not_implemented() {
-    warn "Not implemented yet."
-  }
-
   menu_invalid_choice() {
     warn "Invalid choice."
   }
@@ -307,12 +303,7 @@ run_menu() {
         "2|Create site"
         "3|Site info"
         "4|Change site PHP"
-      )
-      if [[ $show_advanced -eq 1 ]]; then
-        items+=("5|Change site profile")
-      fi
-      items+=(
-        "6|Remove site"
+        "5|Remove site"
         "0|Back"
       )
       local ch=""
@@ -322,14 +313,7 @@ run_menu() {
         2) run_menu_command site add ;;
         3) run_menu_command site info ;;
         4) run_menu_command site set-php ;;
-        5)
-          if [[ $show_advanced -eq 1 ]]; then
-            not_implemented
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        6) run_menu_command site remove ;;
+        5) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -371,37 +355,15 @@ run_menu() {
       local -a items=(
         "1|List PHP versions"
         "2|Install PHP version"
-        "3|Manage PHP extensions"
-        "4|Manage PHP parameters (FPM/CLI)"
-        "5|Reload / restart PHP-FPM"
+        "3|Reload / restart PHP-FPM"
+        "0|Back"
       )
-      if [[ $show_advanced -eq 1 ]]; then
-        items+=("6|Reset PHP parameters")
-        items+=("7|Remove PHP version")
-      fi
-      items+=("0|Back")
       local ch=""
       ch=$(menu_choose_key "PHP" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command php list ;;
         2) run_menu_command php install ;;
-        3) not_implemented ;;
-        4) not_implemented ;;
-        5) run_menu_command php reload ;;
-        6)
-          if [[ $show_advanced -eq 1 ]]; then
-            not_implemented
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            not_implemented
-          else
-            menu_invalid_choice
-          fi
-          ;;
+        3) run_menu_command php reload ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -418,13 +380,11 @@ run_menu() {
         "3|Create DB + user (for site)"
         "4|Write DB credentials to project"
         "5|Rotate DB user password"
-        "6|Export DB dump"
+        "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items+=("7|Import DB dump")
-        items+=("8|Drop DB + user")
+        items=("1|List databases" "2|MySQL status" "3|Create DB + user (for site)" "4|Write DB credentials to project" "5|Rotate DB user password" "6|Drop DB + user" "0|Back")
       fi
-      items+=("0|Back")
       local ch=""
       ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
       case "$ch" in
@@ -433,15 +393,7 @@ run_menu() {
         3) run_menu_command site db-create ;;
         4) run_menu_command site db-export ;;
         5) run_menu_command site db-rotate ;;
-        6) not_implemented ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            not_implemented
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        8)
+        6)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site db-drop
           else
@@ -497,7 +449,6 @@ run_menu() {
         "4|Nginx access log (by domain)"
         "5|Nginx error log (by domain)"
         "6|Let's Encrypt log"
-        "7|Laravel worker log (by domain)"
         "0|Back"
       )
       local ch=""
@@ -509,7 +460,6 @@ run_menu() {
         4) run_menu_command logs nginx --kind access ;;
         5) run_menu_command logs nginx --kind error ;;
         6) run_menu_command logs letsencrypt ;;
-        7) not_implemented ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

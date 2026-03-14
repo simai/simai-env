@@ -36,6 +36,7 @@ You can point `SHELLCHECK_BIN` to a custom binary if not in PATH.
 
 ## More docs
 - Docs entrypoint: `docs/README.md`
+- Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`
 - Operator runbook: `docs/operations/runbook.md`
 - Architecture overview: `docs/architecture/overview.md`
 - Admin commands: `docs/commands/`

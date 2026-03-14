@@ -12,7 +12,7 @@ fi
 
 REPO_BRANCH=${SIMAI_UPDATE_BRANCH:-${REPO_BRANCH:-main}}
 REF=${SIMAI_UPDATE_REF:-${REF:-refs/heads/${REPO_BRANCH}}}
-BACKUP_ROOT=${SIMAI_UPDATE_BACKUP_DIR:-/root/simai-backups}
+UPDATE_BACKUP_ROOT=${SIMAI_UPDATE_BACKUP_DIR:-/root/simai-backups}
 
 if [[ ! "$REF" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]; then
   echo "Invalid update ref: ${REF} (expected refs/heads/<branch> or refs/tags/<tag>)" >&2
@@ -51,9 +51,9 @@ if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
 fi
 BACKUP_ARCHIVE=""
 if [[ -d "$INSTALL_DIR" ]]; then
-  if mkdir -p "$BACKUP_ROOT" 2>/dev/null; then
+  if mkdir -p "${UPDATE_BACKUP_ROOT:-/root/simai-backups}" 2>/dev/null; then
     ts=$(date +%Y%m%d-%H%M%S)
-    BACKUP_ARCHIVE="${BACKUP_ROOT}/simai-env-preupdate-${ts}.tar.gz"
+    BACKUP_ARCHIVE="${UPDATE_BACKUP_ROOT:-/root/simai-backups}/simai-env-preupdate-${ts}.tar.gz"
     if tar -czf "$BACKUP_ARCHIVE" -C "$INSTALL_DIR" .; then
       echo "Pre-update backup created: ${BACKUP_ARCHIVE}"
     else
@@ -61,7 +61,7 @@ if [[ -d "$INSTALL_DIR" ]]; then
       BACKUP_ARCHIVE=""
     fi
   else
-    echo "Warning: cannot create backup directory ${BACKUP_ROOT}; continuing without backup" >&2
+    echo "Warning: cannot create backup directory ${UPDATE_BACKUP_ROOT:-/root/simai-backups}; continuing without backup" >&2
   fi
 fi
 
