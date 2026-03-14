@@ -37,6 +37,7 @@ See `docs/architecture/profiles.md`.
 - `self update`: update scripts in place (reloads menu when invoked from menu).
   - Honors update source from `/etc/simai-env.conf`: `SIMAI_UPDATE_REF` (`refs/heads/...` or `refs/tags/...`) or `SIMAI_UPDATE_BRANCH`.
   - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
+  - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 
 ## Non-Interactive Contract

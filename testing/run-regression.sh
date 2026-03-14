@@ -95,7 +95,7 @@ trap cleanup EXIT
 
 run_smoke() {
   if [[ "${TEST_SYNC_UPDATE:-yes}" == "yes" ]]; then
-    run_cmd "self update (sync test host)" "./simai-admin.sh self update >/dev/null"
+    run_cmd "self update (sync test host)" "SIMAI_UPDATE_SMOKE_STRICT=yes ./simai-admin.sh self update >/dev/null"
   fi
   run_cmd "self status" "./simai-admin.sh self status >/dev/null"
   run_cmd "self platform-status" "./simai-admin.sh self platform-status >/dev/null"

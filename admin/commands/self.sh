@@ -27,6 +27,46 @@ self_remote_version_url() {
   esac
 }
 
+self_post_update_smoke() {
+  local root_dir="$1"
+  local strict="${2:-no}"
+  local has_fail=0
+  local failed=()
+
+  [[ "${strict,,}" == "yes" ]] || strict="no"
+
+  if [[ ! -x "${root_dir}/simai-admin.sh" ]]; then
+    has_fail=1
+    failed+=("simai-admin.sh is missing or not executable")
+  fi
+  if [[ ! -x "${root_dir}/simai-env.sh" ]]; then
+    has_fail=1
+    failed+=("simai-env.sh is missing or not executable")
+  fi
+  if ! bash -n "${root_dir}/simai-admin.sh" >/dev/null 2>&1; then
+    has_fail=1
+    failed+=("bash -n simai-admin.sh failed")
+  fi
+  if ! bash -n "${root_dir}/update.sh" >/dev/null 2>&1; then
+    has_fail=1
+    failed+=("bash -n update.sh failed")
+  fi
+
+  if [[ "$has_fail" -eq 0 ]]; then
+    info "Post-update smoke: OK"
+    return 0
+  fi
+
+  local msg
+  msg=$(IFS='; '; echo "${failed[*]}")
+  warn "Post-update smoke: FAILED (${msg})"
+  warn "Run: bash ${root_dir}/testing/release-gate.sh"
+  if [[ "$strict" == "yes" ]]; then
+    return 1
+  fi
+  return 0
+}
+
 self_update_handler() {
   local updater="${SCRIPT_DIR}/update.sh"
   if [[ ! -x "$updater" ]]; then
@@ -37,6 +77,11 @@ self_update_handler() {
   progress_init 2
   progress_step "Downloading and applying update"
   "$updater"
+  local smoke_strict="${SIMAI_UPDATE_SMOKE_STRICT:-no}"
+  if ! self_post_update_smoke "${SCRIPT_DIR}" "$smoke_strict"; then
+    progress_done "Update completed with smoke failures"
+    return 1
+  fi
   progress_done "Update completed"
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     progress_step "Reloading admin menu"

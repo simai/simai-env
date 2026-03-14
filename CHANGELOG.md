@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.6] - 2026-03-14
+### Changed
+- Added fast post-update smoke checks to `self update` (script executability + shell syntax sanity).
+- Added strict mode for post-update smoke via `SIMAI_UPDATE_SMOKE_STRICT=yes`.
+- Regression sync-update step now uses strict smoke mode to fail fast on broken updates.
+
 ## [1.10.5] - 2026-03-14
 ### Changed
 - Improved WordPress and Bitrix status UX with richer daily diagnostics:
