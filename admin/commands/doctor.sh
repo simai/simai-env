@@ -78,7 +78,7 @@ site_doctor_handler() {
     return 1
   fi
 
-  progress_init 10
+  progress_init 11
   doctor_results_init
 
   progress_step "Reading site metadata"

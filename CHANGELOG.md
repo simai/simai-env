@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.19] - 2026-03-14
+### Fixed
+- Fixed `site doctor` progress counter after adding profile-specific application checks (`11/11` instead of `11/10`).
+
 ## [1.8.18] - 2026-03-14
 ### Changed
 - Extended `site doctor` with profile-aware application checks for WordPress/Bitrix (cron mode/config presence, core entrypoint checks with scaffold-safe SKIP behavior).
