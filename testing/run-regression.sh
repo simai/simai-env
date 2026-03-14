@@ -29,6 +29,7 @@ SIMAI_ROOT="${TEST_SIMAI_ROOT:-/root/simai-env}"
 
 _test_domain=""
 _wp_test_domain=""
+_bitrix_test_domain=""
 
 remote() {
   ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" "$@"
@@ -83,6 +84,11 @@ cleanup() {
     remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_wp_test_domain}' --confirm yes >/dev/null 2>&1 || true"
     remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_wp_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
   fi
+  if [[ -n "${_bitrix_test_domain}" ]]; then
+    echo "[cleanup] ${_bitrix_test_domain}"
+    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_bitrix_test_domain}' --confirm yes >/dev/null 2>&1 || true"
+    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_bitrix_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
+  fi
 }
 
 trap cleanup EXIT
@@ -117,6 +123,15 @@ run_core() {
   run_cmd "wp status" "./simai-admin.sh wp status --domain '${_wp_test_domain}' >/dev/null"
   run_cmd "wp cron-status" "./simai-admin.sh wp cron-status --domain '${_wp_test_domain}' >/dev/null"
   run_cmd "wp cron-sync" "./simai-admin.sh wp cron-sync --domain '${_wp_test_domain}' >/dev/null"
+
+  local bx_suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
+  local bx_stamp
+  bx_stamp="$(date +%y%m%d-%H%M%S)"
+  _bitrix_test_domain="t-bitrix-${bx_stamp}${bx_suffix}"
+  run_cmd "site add (bitrix + db)" "./simai-admin.sh site add --domain '${_bitrix_test_domain}' --profile bitrix --php-version 8.2 --db yes --force >/dev/null"
+  run_cmd "bitrix status" "./simai-admin.sh bitrix status --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix cron-status" "./simai-admin.sh bitrix cron-status --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix cron-sync" "./simai-admin.sh bitrix cron-sync --domain '${_bitrix_test_domain}' >/dev/null"
 }
 
 run_menu() {

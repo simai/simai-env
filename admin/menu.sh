@@ -556,6 +556,10 @@ run_menu() {
         "8|WordPress cron status"
         "9|WordPress cron sync"
         "10|WordPress cache clear"
+        "11|Bitrix status"
+        "12|Bitrix cron status"
+        "13|Bitrix cron sync"
+        "14|Bitrix cache clear"
         "0|Back"
       )
       local ch=""
@@ -571,6 +575,10 @@ run_menu() {
         8) run_menu_command wp cron-status ;;
         9) run_menu_command wp cron-sync ;;
         10) run_menu_command wp cache-clear ;;
+        11) run_menu_command bitrix status ;;
+        12) run_menu_command bitrix cron-status ;;
+        13) run_menu_command bitrix cron-sync ;;
+        14) run_menu_command bitrix cache-clear ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
