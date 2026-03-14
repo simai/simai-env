@@ -20,6 +20,7 @@ Usage: `simai-admin.sh queue restart --domain <domain>`
 
 Behavior:
 - Same validation as `status`; fails fast for non-Laravel profiles.
+- Refuses to restart queue workers for placeholder bootstrap sites; deploy a real Laravel app first.
 - Restarts the unit with systemd, then prints the resulting Active/SubState.
 - On failure, shows the last few journal lines for the unit.
 

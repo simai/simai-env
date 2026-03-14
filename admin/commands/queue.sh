@@ -15,6 +15,7 @@ queue_prepare_site() {
   fi
   local project="${SITE_META[project]}"
   local php_version="${SITE_META[php]}"
+  local root="${SITE_META[root]:-}"
   local safe_project="$project"
   if ! validate_project_slug "$safe_project"; then
     safe_project=$(project_slug_from_domain "$domain")
@@ -24,6 +25,11 @@ queue_prepare_site() {
   queue_unit_path "$safe_project" >/dev/null || return 1
   QUEUE_UNIT_NAME="$unit_name"
   QUEUE_PHP_VERSION="$php_version"
+  if [[ -n "$root" ]] && laravel_queue_has_real_app "$root"; then
+    QUEUE_REAL_APP="yes"
+  else
+    QUEUE_REAL_APP="no"
+  fi
 }
 
 queue_collect_status() {
@@ -96,6 +102,11 @@ queue_restart_handler() {
   local domain="${PARSED_ARGS[domain]:-}"
   if ! queue_prepare_site "$domain"; then
     return $?
+  fi
+  if [[ "${QUEUE_REAL_APP:-no}" != "yes" ]]; then
+    error "Queue restart is unavailable for bootstrap placeholder sites: ${domain}"
+    echo "Deploy a real Laravel app first, then restart the queue worker."
+    return 1
   fi
   local rc=0
   if queue_collect_status "$QUEUE_UNIT_NAME"; then
