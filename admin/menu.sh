@@ -552,6 +552,10 @@ run_menu() {
         "4|Worker status"
         "5|Worker restart"
         "6|Worker logs"
+        "7|WordPress status"
+        "8|WordPress cron status"
+        "9|WordPress cron sync"
+        "10|WordPress cache clear"
         "0|Back"
       )
       local ch=""
@@ -563,6 +567,10 @@ run_menu() {
         4) run_menu_command queue status ;;
         5) run_menu_command queue restart ;;
         6) run_menu_command queue logs ;;
+        7) run_menu_command wp status ;;
+        8) run_menu_command wp cron-status ;;
+        9) run_menu_command wp cron-sync ;;
+        10) run_menu_command wp cache-clear ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

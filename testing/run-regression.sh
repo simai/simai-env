@@ -28,6 +28,7 @@ SSH_TARGET="${TEST_SERVER_USER}@${TEST_SERVER_HOST}"
 SIMAI_ROOT="${TEST_SIMAI_ROOT:-/root/simai-env}"
 
 _test_domain=""
+_wp_test_domain=""
 
 remote() {
   ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" "$@"
@@ -77,6 +78,11 @@ cleanup() {
   echo "[cleanup] ${_test_domain}"
   remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_test_domain}' --confirm yes >/dev/null 2>&1 || true"
   remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
+  if [[ -n "${_wp_test_domain}" ]]; then
+    echo "[cleanup] ${_wp_test_domain}"
+    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_wp_test_domain}' --confirm yes >/dev/null 2>&1 || true"
+    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_wp_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
+  fi
 }
 
 trap cleanup EXIT
@@ -102,6 +108,15 @@ run_core() {
   run_cmd "site db-export" "./simai-admin.sh site db-export --domain '${_test_domain}' --confirm yes >/dev/null"
   run_cmd "site db-rotate" "./simai-admin.sh site db-rotate --domain '${_test_domain}' --confirm yes >/dev/null"
   run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' >/dev/null"
+
+  local wp_suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
+  local wp_stamp
+  wp_stamp="$(date +%y%m%d-%H%M%S)"
+  _wp_test_domain="t-wp-${wp_stamp}${wp_suffix}"
+  run_cmd "site add (wordpress + db)" "./simai-admin.sh site add --domain '${_wp_test_domain}' --profile wordpress --php-version 8.2 --db yes --force >/dev/null"
+  run_cmd "wp status" "./simai-admin.sh wp status --domain '${_wp_test_domain}' >/dev/null"
+  run_cmd "wp cron-status" "./simai-admin.sh wp cron-status --domain '${_wp_test_domain}' >/dev/null"
+  run_cmd "wp cron-sync" "./simai-admin.sh wp cron-sync --domain '${_wp_test_domain}' >/dev/null"
 }
 
 run_menu() {

@@ -24,6 +24,7 @@ See `docs/architecture/profiles.md`.
 - Healthcheck copied to `public/healthcheck.php` for php-mode profiles; static uses nginx-served `/healthcheck` (local-only); alias inherits target.
 - Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
 - Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP, cron, SSL, DB) with PASS/WARN/FAIL summary; does not apply changes.
+- WordPress daily ops (`wp status`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and cron/cache maintenance for wordpress profile sites.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
 - Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
 - Logging:
