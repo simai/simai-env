@@ -421,11 +421,27 @@ site_doctor_handler() {
   progress_step "Cron checks"
   if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" ]]; then
     local cron_file="/etc/cron.d/${safe_project}"
+    local cron_expect_label="profile cron entry"
+    local cron_expect_pattern=""
+    case "$profile" in
+      laravel)
+        cron_expect_label="schedule:run entry"
+        cron_expect_pattern="schedule:run"
+        ;;
+      wordpress)
+        cron_expect_label="wp-cron.php entry"
+        cron_expect_pattern="wp-cron\\.php"
+        ;;
+      bitrix)
+        cron_expect_label="cron_events.php entry"
+        cron_expect_pattern="cron_events\\.php"
+        ;;
+    esac
     if [[ -f "$cron_file" ]]; then
-      if grep -q "schedule:run" "$cron_file"; then
+      if [[ -n "$cron_expect_pattern" ]] && grep -Eq "$cron_expect_pattern" "$cron_file"; then
         doctor_add_result "PASS" "cron" "Cron file" "$cron_file" ""
       else
-        doctor_add_result "WARN" "cron" "Cron file" "Missing schedule:run entry" "Recreate cron via site add"
+        doctor_add_result "WARN" "cron" "Cron file" "Missing ${cron_expect_label}" "Recreate cron via site add"
       fi
     else
       doctor_add_result "FAIL" "cron" "Cron file" "Missing ${cron_file}" "Ensure cron is created for profile ${profile}"

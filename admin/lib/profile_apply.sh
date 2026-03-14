@@ -49,6 +49,15 @@ ensure_profile_bootstrap_files() {
   done
 }
 
+ensure_profile_writable_paths() {
+  local project_root="$1"
+  local path
+  for path in "${PROFILE_WRITABLE_PATHS[@]}"; do
+    [[ -z "$path" ]] && continue
+    mkdir -p "${project_root}/${path}"
+  done
+}
+
 ensure_profile_required_markers() {
   local project_root="$1"
   local missing=()

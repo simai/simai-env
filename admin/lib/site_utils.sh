@@ -75,11 +75,19 @@ cron_site_render() {
 # simai-profile: ${profile}
 
 EOF
-  if [[ "$profile" == "laravel" ]]; then
-    local php_bin
-    php_bin=$(resolve_php_bin "$php_version")
-    echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} artisan schedule:run >> /dev/null 2>&1"
-  fi
+  local php_bin
+  php_bin=$(resolve_php_bin "$php_version")
+  case "$profile" in
+    laravel)
+      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} artisan schedule:run >> /dev/null 2>&1"
+      ;;
+    wordpress)
+      echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
+      ;;
+    bitrix)
+      echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
+      ;;
+  esac
 }
 
 cron_site_write() {

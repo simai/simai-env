@@ -227,6 +227,7 @@ site_add_handler() {
   local public_dir="${PROFILE_PUBLIC_DIR}"
   ensure_profile_public_dir "$path"
   ensure_profile_bootstrap_files "$path"
+  ensure_profile_writable_paths "$path"
   if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" && $need_post_bootstrap_marker_check -eq 1 ]]; then
     if [[ ${#PROFILE_REQUIRED_MARKERS[@]} -gt 0 ]] && ! ensure_profile_required_markers "$path"; then
       error "Required markers are still missing for profile ${profile} after bootstrap"
