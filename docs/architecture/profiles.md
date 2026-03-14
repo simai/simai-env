@@ -6,6 +6,7 @@ Profiles describe site types in a single registry (`profiles/*.profile.sh`) and 
 - **laravel**: PHP app with `artisan` and `bootstrap/app.php`; requires DB; cron/queue supported; healthcheck enabled.
 - **static**: No PHP/DB; serves `<project-root>/public/index.html`; no cron/queue; healthcheck served directly by nginx at `/healthcheck` (local-only).
 - **alias**: Points to an existing site; no PHP/DB resources of its own; allows aliasing to another root/target.
+- **wordpress**: PHP WordPress site; DB required; cron supported (`wp-cron.php`); healthcheck enabled.
 
 All profiles use `<project-root>/public` as web root. Each profile declares the nginx template (`PROFILE_NGINX_TEMPLATE`), healthcheck mode (`PROFILE_HEALTHCHECK_MODE`), and any required markers (`PROFILE_REQUIRED_MARKERS`) that must exist before applying the profile. Definition files are declarative (`PROFILE_` variables only) and live in `profiles/<id>.profile.sh`. The admin menu reads available profiles from this registry.
 
