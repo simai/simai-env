@@ -1575,14 +1575,14 @@ mysql_root_detect_cli() {
   fi
   local cli
   cli=(mysql -uroot)
-  if printf "SELECT 1;\n" | "${cli[@]}" >>"$LOG_FILE" 2>&1; then
+  if printf "SELECT 1;\n" | "${cli[@]}" >/dev/null 2>>"$LOG_FILE"; then
     MYSQL_ROOT_CLI=("${cli[@]}")
     MYSQL_ROOT_PWD=""
     return 0
   fi
   if [[ -n "${SIMAI_MYSQL_ROOT_PASSWORD:-}" ]]; then
     MYSQL_ROOT_PWD="${SIMAI_MYSQL_ROOT_PASSWORD}"
-    if printf "SELECT 1;\n" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${cli[@]}" >>"$LOG_FILE" 2>&1; then
+    if printf "SELECT 1;\n" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${cli[@]}" >/dev/null 2>>"$LOG_FILE"; then
       MYSQL_ROOT_CLI=("${cli[@]}")
       return 0
     fi
@@ -1590,7 +1590,7 @@ mysql_root_detect_cli() {
   fi
   if [[ -f /root/.my.cnf ]]; then
     cli=(mysql --defaults-extra-file=/root/.my.cnf)
-    if printf "SELECT 1;\n" | "${cli[@]}" >>"$LOG_FILE" 2>&1; then
+    if printf "SELECT 1;\n" | "${cli[@]}" >/dev/null 2>>"$LOG_FILE"; then
       MYSQL_ROOT_CLI=("${cli[@]}")
       MYSQL_ROOT_PWD=""
       return 0
