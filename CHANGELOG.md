@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.15] - 2026-03-14
+### Changed
+- Unified overview command UX for daily operations: `site info`, `ssl list`, `db status`, and `db list` now use structured `Header -> Result -> Next steps` output blocks.
+
 ## [1.8.14] - 2026-03-14
 ### Fixed
 - Fixed `whiptail` backend activation in menu selections/prompts when values are captured via command substitution (switched TTY checks to `/dev/tty` availability).

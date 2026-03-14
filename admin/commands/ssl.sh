@@ -555,6 +555,7 @@ ssl_status_handler() {
 }
 
 ssl_list_handler() {
+  ui_header "SIMAI ENV · SSL list"
   local sites=()
   mapfile -t sites < <(list_sites)
   if [[ ${#sites[@]} -eq 0 ]]; then
@@ -611,6 +612,7 @@ ssl_list_handler() {
     [[ ${#hsts} -gt $hsts_w ]] && hsts_w=${#hsts}
   done
   local sep
+  ui_section "Result"
   sep="+$(printf '%*s' "$((domain_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((type_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((exp_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((days_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((staging_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((redirect_w+2))" "" | tr ' ' '-')+$(printf '%*s' "$((hsts_w+2))" "" | tr ' ' '-')+"
   printf "%s\n" "$sep"
   printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
@@ -622,6 +624,9 @@ ssl_list_handler() {
       "$domain_w" "$domain" "$type_w" "$type" "$exp_w" "$expires" "$days_w" "$days" "$staging_w" "$staging" "$redirect_w" "$redirect" "$hsts_w" "$hsts"
   done
   printf "%s\n" "$sep"
+  ui_section "Next steps"
+  ui_kv "Check domain" "simai-admin.sh ssl status --domain <domain>"
+  ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain <domain> --email <email>"
 }
 
 register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging="

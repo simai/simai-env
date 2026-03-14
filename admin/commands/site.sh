@@ -1053,6 +1053,7 @@ site_list_handler() {
 
 site_info_handler() {
   parse_kv_args "$@"
+  ui_header "SIMAI ENV · Site info"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -1152,7 +1153,11 @@ site_info_handler() {
     "Target|${target}"
     "Updated at|${updated_at}"
   )
+  ui_section "Result"
   print_kv_table "${rows[@]}"
+  ui_section "Next steps"
+  ui_kv "SSL status" "simai-admin.sh ssl status --domain ${domain}"
+  ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required="

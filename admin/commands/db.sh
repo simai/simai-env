@@ -136,6 +136,7 @@ db_pass_handler() {
 }
 
 db_status_handler() {
+  ui_header "SIMAI ENV · Database status"
   local service="mysql"
   local active="unknown"
   local enabled="unknown"
@@ -218,6 +219,7 @@ db_status_handler() {
     [[ -z "$disk_free" ]] && disk_free="unknown"
   fi
 
+  ui_section "Result"
   print_kv_table \
     "Service|${active}" \
     "Enabled|${enabled}" \
@@ -227,6 +229,9 @@ db_status_handler() {
     "Port|${port}" \
     "Datadir|${datadir}" \
     "Disk free|${disk_free}"
+  ui_section "Next steps"
+  ui_kv "List databases" "simai-admin.sh db list"
+  ui_kv "Platform diagnostics" "simai-admin.sh self platform-status"
 
   if [[ "$active" == "not installed" || "$ping" != "ok" ]]; then
     return 1
@@ -234,6 +239,7 @@ db_status_handler() {
 }
 
 db_list_handler() {
+  ui_header "SIMAI ENV · Database list"
   if ! mysql_root_detect_cli; then
     return 1
   fi
@@ -243,11 +249,14 @@ db_list_handler() {
     warn "No databases found"
     return 0
   fi
+  ui_section "Result"
   echo "Databases:"
   while IFS= read -r db; do
     [[ -z "$db" ]] && continue
     echo " - ${db}"
   done <<<"$dbs"
+  ui_section "Next steps"
+  ui_kv "Service status" "simai-admin.sh db status"
 }
 
 register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" "" "menu:hidden"
