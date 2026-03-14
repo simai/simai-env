@@ -25,6 +25,7 @@ Use this matrix to choose the right daily commands for each site profile.
 - Main checks: `bitrix status`, `bitrix cron-status`, `bitrix agents-status`, `site doctor`, `ssl status`.
 - Typical actions: `bitrix cron-sync`, `bitrix agents-sync` (plan first), `bitrix cache-clear`, SSL lifecycle commands, DB rotate/export.
 - Notes: `bitrix status` reports `dbconn.php`, `BX_CRONTAB` (best effort), and cron marker consistency.
+- Production rollout playbook: `docs/operations/bitrix-production-runbook.md`.
 
 ## static
 

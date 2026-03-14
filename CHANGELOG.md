@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.3] - 2026-03-14
+### Added
+- Added dedicated Bitrix production runbook with end-to-end flow:
+  - provisioning
+  - agents-over-cron baseline
+  - TLS go-live
+  - daily checks
+  - incident fast path
+  (`docs/operations/bitrix-production-runbook.md`)
+### Changed
+- Linked Bitrix production runbook from top-level docs entrypoints and profile matrix.
+
 ## [1.11.2] - 2026-03-14
 ### Fixed
 - Fixed error-code propagation in `bitrix agents-status` and `bitrix agents-sync` (profile-mismatch now returns non-zero as expected).
