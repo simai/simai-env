@@ -19,6 +19,7 @@ Use this matrix to choose the right daily commands for each site profile.
 - Main checks: `wp status`, `wp cron-status`, `site doctor`, `ssl status`.
 - Typical actions: `wp cron-sync`, `wp cache-clear`, SSL lifecycle commands, DB rotate/export.
 - Notes: `wp status` reports WP-CLI readiness and cron marker consistency.
+- Production rollout playbook: `docs/operations/wordpress-production-runbook.md`.
 
 ## bitrix
 

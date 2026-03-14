@@ -39,6 +39,7 @@ You can point `SHELLCHECK_BIN` to a custom binary if not in PATH.
 - Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`
 - Profile ops matrix: `docs/operations/profile-ops-matrix.md`
 - Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`
+- WordPress production runbook: `docs/operations/wordpress-production-runbook.md`
 - Operator runbook: `docs/operations/runbook.md`
 - Architecture overview: `docs/architecture/overview.md`
 - Admin commands: `docs/commands/`

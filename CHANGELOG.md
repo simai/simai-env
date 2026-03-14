@@ -1,6 +1,18 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.6] - 2026-03-15
+### Added
+- Added dedicated WordPress production runbook with end-to-end flow:
+  - provisioning
+  - cron baseline
+  - TLS go-live
+  - daily checks
+  - incident fast path
+  (`docs/operations/wordpress-production-runbook.md`)
+### Changed
+- Linked WordPress production runbook from top-level docs entrypoints and profile matrix.
+
 ## [1.11.5] - 2026-03-15
 ### Changed
 - Improved interactive menu UX:
