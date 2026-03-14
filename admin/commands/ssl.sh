@@ -116,12 +116,15 @@ ssl_issue_handler() {
     *) is_advanced=0 ;;
   esac
   local staging_warned=0
-  local domain
-  if ! domain=$(ssl_select_domain); then
-    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      return 0
+  local domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    if ! ssl_select_domain; then
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        return 0
+      fi
+      return 1
     fi
-    return 1
+    domain="${PARSED_ARGS[domain]:-}"
   fi
   progress_init 6
   domain="${PARSED_ARGS[domain]:-$domain}"
@@ -233,12 +236,15 @@ ssl_issue_handler() {
 
 ssl_install_custom_handler() {
   parse_kv_args "$@"
-  local domain
-  if ! domain=$(ssl_select_domain); then
-    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      return 0
+  local domain="${PARSED_ARGS[domain]:-}"
+  if [[ -z "$domain" ]]; then
+    if ! ssl_select_domain; then
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        return 0
+      fi
+      return 1
     fi
-    return 1
+    domain="${PARSED_ARGS[domain]:-}"
   fi
   progress_init 6
   local redirect="${PARSED_ARGS[redirect]:-no}"
@@ -382,12 +388,13 @@ ssl_remove_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! domain=$(ssl_select_domain "allow"); then
+    if ! ssl_select_domain "allow"; then
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
         return 0
       fi
       return 1
     fi
+    domain="${PARSED_ARGS[domain]:-}"
   fi
   if [[ -z "$domain" ]]; then
     warn "Cancelled."
@@ -437,12 +444,13 @@ ssl_status_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! domain=$(ssl_select_domain "allow"); then
+    if ! ssl_select_domain "allow"; then
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
         return 0
       fi
       return 1
     fi
+    domain="${PARSED_ARGS[domain]:-}"
   fi
   if [[ -z "$domain" ]]; then
     warn "Cancelled."
