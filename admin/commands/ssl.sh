@@ -7,8 +7,16 @@ ssl_select_domain() {
   if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local sites=() filtered=()
     mapfile -t sites < <(list_sites)
+    if [[ ${#sites[@]} -eq 0 ]]; then
+      warn "No sites found"
+      return 1
+    fi
     filtered=("${sites[@]}")
     domain=$(select_from_list "Select domain" "" "${filtered[@]}")
+    if [[ -z "$domain" ]]; then
+      warn "Cancelled."
+      return 1
+    fi
   fi
   if [[ -z "$domain" ]]; then
     domain=$(prompt "domain")
@@ -110,6 +118,9 @@ ssl_issue_handler() {
   local staging_warned=0
   local domain
   if ! domain=$(ssl_select_domain); then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      return 0
+    fi
     return 1
   fi
   progress_init 6
@@ -224,6 +235,9 @@ ssl_install_custom_handler() {
   parse_kv_args "$@"
   local domain
   if ! domain=$(ssl_select_domain); then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      return 0
+    fi
     return 1
   fi
   progress_init 6
@@ -369,8 +383,10 @@ ssl_remove_handler() {
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
     if ! domain=$(ssl_select_domain "allow"); then
-      warn "Cancelled."
-      return 0
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        return 0
+      fi
+      return 1
     fi
   fi
   if [[ -z "$domain" ]]; then
@@ -422,8 +438,10 @@ ssl_status_handler() {
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
     if ! domain=$(ssl_select_domain "allow"); then
-      warn "Cancelled."
-      return 0
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        return 0
+      fi
+      return 1
     fi
   fi
   if [[ -z "$domain" ]]; then
