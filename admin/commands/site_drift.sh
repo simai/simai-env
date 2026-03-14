@@ -41,9 +41,21 @@ site_drift_handler() {
   fi
   local cron_file cron_status="MISSING" cron_notes=()
   if [[ "$meta_status" == "OK" && -n "${meta[slug]:-}" ]]; then
-    cron_file=$(cron_site_file_path "${meta[slug]}")
-    if [[ -f "$cron_file" ]]; then
-      cron_status="OK"
+    local profile_id="${meta[profile]:-}"
+    if [[ -n "$profile_id" ]] && load_profile "$profile_id" >/dev/null 2>&1; then
+      if [[ "${PROFILE_SUPPORTS_CRON:-no}" != "yes" || "${PROFILE_REQUIRES_PHP:-yes}" == "no" ]]; then
+        cron_status="N/A"
+      else
+        cron_file=$(cron_site_file_path "${meta[slug]}")
+        if [[ -f "$cron_file" ]]; then
+          cron_status="OK"
+        fi
+      fi
+    else
+      cron_file=$(cron_site_file_path "${meta[slug]}")
+      if [[ -f "$cron_file" ]]; then
+        cron_status="OK"
+      fi
     fi
   else
     cron_file=$(cron_site_file_path "$(project_slug_from_domain "$domain")")

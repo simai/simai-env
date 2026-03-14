@@ -275,7 +275,9 @@ site_doctor_handler() {
   progress_step "PHP checks"
   local php_bin="" pool_file=""
   if [[ "${PROFILE_REQUIRES_PHP}" == "no" ]]; then
-    if [[ "$php_version" == "none" ]]; then
+    if [[ "$profile" == "alias" ]]; then
+      doctor_add_result "SKIP" "php" "PHP runtime" "Inherited from target site" ""
+    elif [[ "$php_version" == "none" ]]; then
       doctor_add_result "PASS" "php" "PHP runtime" "Not required" ""
     else
       doctor_add_result "WARN" "php" "PHP runtime" "Profile says none, metadata has ${php_version}" "Update metadata/profile if PHP is actually needed"
