@@ -117,6 +117,41 @@ run_menu() {
     return 1
   }
 
+  menu_prompt_required_arg() {
+    local section="$1" cmd="$2" key="$3"
+    local val=""
+    case "$key" in
+      domain)
+        local sites=()
+        mapfile -t sites < <(list_sites)
+        if [[ ${#sites[@]} -gt 0 ]]; then
+          val=$(select_from_list "Select domain" "" "${sites[@]}")
+        else
+          val=$(prompt "$key")
+        fi
+        ;;
+      file)
+        if [[ "$section" == "backup" && ( "$cmd" == "inspect" || "$cmd" == "import" ) ]]; then
+          local archives=()
+          shopt -s nullglob
+          mapfile -t archives < <(ls -1t /root/simai-backups/*.tar.gz 2>/dev/null || true)
+          shopt -u nullglob
+          if [[ ${#archives[@]} -gt 0 ]]; then
+            val=$(select_from_list "Select archive" "${archives[0]}" "${archives[@]}")
+          else
+            val=$(prompt "$key")
+          fi
+        else
+          val=$(prompt "$key")
+        fi
+        ;;
+      *)
+        val=$(prompt "$key")
+        ;;
+    esac
+    echo "$val"
+  }
+
   run_menu_command() {
     local section="$1" cmd="$2"; shift 2
     echo "---- running ${section} ${cmd} ----"
@@ -130,7 +165,7 @@ run_menu() {
         if menu_args_has_key "$key" "${args[@]}"; then
           continue
         fi
-        val=$(prompt "$key")
+        val=$(menu_prompt_required_arg "$section" "$cmd" "$key")
         if [[ -z "$val" ]]; then
           warn "Cancelled."
           echo "---- done (${section} ${cmd}), exit=0 ----"
