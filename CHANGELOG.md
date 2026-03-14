@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.1] - 2026-03-14
+### Changed
+- Polished `backup import` plan with profile-compatibility summary (known/enabled/requires PHP/supports cron/supports queue).
+- Made backup apply profile-aware: cron and queue unit restore now respects local profile contract.
+- Extended core regression flow with `backup inspect` and `backup import --apply no`.
+### Fixed
+- Prevented backup apply on incompatible profile state (unknown/disabled profile, or PHP-required profile with `php=none` in manifest).
+
 ## [1.10.0] - 2026-03-14
 ### Added
 - Added Bitrix daily-ops command group `bitrix`:

@@ -181,8 +181,8 @@ backup_print_plan() {
 }
 
 backup_apply_files() {
-  local root="$1" domain="$2" slug="$3" php="$4" enable_flag="$5" ts="$6"
-  local -n rollback_ref="$7"
+  local root="$1" domain="$2" slug="$3" php="$4" enable_flag="$5" ts="$6" cron_allowed="$7" queue_allowed="$8"
+  local -n rollback_ref="$9"
   local ok=0
 
   local nginx_src="${root}/nginx/sites-available/${domain}.conf"
@@ -215,7 +215,9 @@ backup_apply_files() {
   local cron_src="${root}/cron.d/${slug}"
   local cron_dst="/etc/cron.d/${slug}"
   if [[ -f "$cron_src" ]]; then
-    if backup_is_simai_cron "$cron_src" "$slug" "$domain"; then
+    if [[ "${cron_allowed}" != "yes" ]]; then
+      warn "Skipping cron import: profile does not support cron"
+    elif backup_is_simai_cron "$cron_src" "$slug" "$domain"; then
       mkdir -p "/etc/cron.d"
       backup_backup_if_exists "$cron_dst" "$ts" rollback_ref
       cp "$cron_src" "$cron_dst"
@@ -226,12 +228,16 @@ backup_apply_files() {
 
   local systemd_dir="${root}/systemd"
   if [[ -d "$systemd_dir" ]]; then
-    for unit in "$systemd_dir"/*.service; do
-      [[ -f "$unit" ]] || continue
-      local dst="/etc/systemd/system/$(basename "$unit")"
-      backup_backup_if_exists "$dst" "$ts" rollback_ref
-      cp "$unit" "$dst"
-    done
+    if [[ "${queue_allowed}" != "yes" ]]; then
+      warn "Skipping queue unit import: profile does not support queue services"
+    else
+      for unit in "$systemd_dir"/*.service; do
+        [[ -f "$unit" ]] || continue
+        local dst="/etc/systemd/system/$(basename "$unit")"
+        backup_backup_if_exists "$dst" "$ts" rollback_ref
+        cp "$unit" "$dst"
+      done
+    fi
   fi
 
   ok=1
@@ -302,4 +308,51 @@ backup_safe_extract_archive() {
     [[ "$p" == *\\* ]] && { error "Backslash in path not allowed: ${p}"; return 1; }
   done <<<"$paths"
   tar --no-same-owner --no-same-permissions -xzf "$file" -C "$dst"
+}
+
+backup_profile_contract() {
+  local profile="$1"
+  BACKUP_PROFILE_KNOWN="no"
+  BACKUP_PROFILE_ENABLED="unknown"
+  BACKUP_PROFILE_REQUIRES_PHP="unknown"
+  BACKUP_PROFILE_SUPPORTS_CRON="unknown"
+  BACKUP_PROFILE_SUPPORTS_QUEUE="unknown"
+  BACKUP_PROFILE_NOTE=""
+
+  if [[ -z "$profile" ]]; then
+    BACKUP_PROFILE_NOTE="manifest profile is empty"
+    return 1
+  fi
+  if ! command -v is_profile_known >/dev/null 2>&1; then
+    BACKUP_PROFILE_NOTE="profile registry helpers unavailable"
+    return 1
+  fi
+  if ! is_profile_known "$profile"; then
+    BACKUP_PROFILE_NOTE="profile '${profile}' is not present in local registry"
+    return 1
+  fi
+  BACKUP_PROFILE_KNOWN="yes"
+
+  if command -v is_profile_enabled >/dev/null 2>&1; then
+    if is_profile_enabled "$profile"; then
+      BACKUP_PROFILE_ENABLED="yes"
+    else
+      BACKUP_PROFILE_ENABLED="no"
+    fi
+  fi
+
+  if command -v source_profile_file_raw >/dev/null 2>&1; then
+    if source_profile_file_raw "$profile"; then
+      BACKUP_PROFILE_REQUIRES_PHP="${PROFILE_REQUIRES_PHP:-yes}"
+      BACKUP_PROFILE_SUPPORTS_CRON="${PROFILE_SUPPORTS_CRON:-no}"
+      BACKUP_PROFILE_SUPPORTS_QUEUE="${PROFILE_SUPPORTS_QUEUE:-no}"
+      BACKUP_PROFILE_NOTE="ok"
+      return 0
+    fi
+    BACKUP_PROFILE_NOTE="failed to load profile contract for '${profile}'"
+    return 1
+  fi
+
+  BACKUP_PROFILE_NOTE="profile loader helper unavailable"
+  return 1
 }

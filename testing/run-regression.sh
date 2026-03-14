@@ -113,7 +113,10 @@ run_core() {
   run_cmd "site db-status" "./simai-admin.sh site db-status --domain '${_test_domain}' >/dev/null"
   run_cmd "site db-export" "./simai-admin.sh site db-export --domain '${_test_domain}' --confirm yes >/dev/null"
   run_cmd "site db-rotate" "./simai-admin.sh site db-rotate --domain '${_test_domain}' --confirm yes >/dev/null"
-  run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' >/dev/null"
+  local backup_file="/root/simai-backups/${_test_domain}-regression.tar.gz"
+  run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_file}' >/dev/null"
+  run_cmd "backup inspect" "./simai-admin.sh backup inspect --file '${backup_file}' >/dev/null"
+  run_cmd "backup import plan" "./simai-admin.sh backup import --file '${backup_file}' --apply no >/dev/null"
 
   local wp_suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
   local wp_stamp

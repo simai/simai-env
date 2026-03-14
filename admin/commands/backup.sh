@@ -237,9 +237,34 @@ backup_import_handler() {
     return 1
   fi
 
+  backup_profile_contract "$profile" || true
+  local profile_known="${BACKUP_PROFILE_KNOWN:-no}"
+  local profile_enabled="${BACKUP_PROFILE_ENABLED:-unknown}"
+  local profile_requires_php="${BACKUP_PROFILE_REQUIRES_PHP:-unknown}"
+  local profile_supports_cron="${BACKUP_PROFILE_SUPPORTS_CRON:-unknown}"
+  local profile_supports_queue="${BACKUP_PROFILE_SUPPORTS_QUEUE:-unknown}"
+  local profile_note="${BACKUP_PROFILE_NOTE:-unknown}"
+
   ui_section "Plan"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Profile|${profile}" \
+    "Profile known|${profile_known}" \
+    "Profile enabled|${profile_enabled}" \
+    "Profile requires PHP|${profile_requires_php}" \
+    "Profile supports cron|${profile_supports_cron}" \
+    "Profile supports queue|${profile_supports_queue}" \
+    "Manifest PHP|${php}" \
+    "Note|${profile_note}"
   backup_print_plan "$tmpdir" "$domain" "$slug" "$php"
   if [[ "$apply" != "yes" ]]; then
+    if [[ "$profile_known" != "yes" ]]; then
+      warn "Archive profile '${profile}' is not present locally; apply would be blocked."
+    elif [[ "$profile_enabled" == "no" ]]; then
+      warn "Archive profile '${profile}' is disabled locally; apply would be blocked."
+    elif [[ "$profile_requires_php" == "yes" && "$php" == "none" ]]; then
+      warn "Profile requires PHP, but manifest declares php=none; apply would be blocked."
+    fi
     info "Dry-run only. To apply changes, run with --apply yes"
     ui_section "Next steps"
     ui_kv "Apply import" "simai-admin.sh backup import --file ${file} --apply yes"
@@ -247,10 +272,29 @@ backup_import_handler() {
     return 0
   fi
 
+  if [[ "$profile_known" != "yes" ]]; then
+    error "Archive profile '${profile}' is not present in local profile registry"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if [[ "$profile_enabled" == "no" ]]; then
+    error "Archive profile '${profile}' is disabled. Enable it first: simai-admin.sh profile enable --id ${profile}"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if [[ "$profile_requires_php" == "yes" && "$php" == "none" ]]; then
+    error "Profile '${profile}' requires PHP, but manifest has php=none"
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  if [[ "$profile_requires_php" == "no" && "$php" != "none" ]]; then
+    warn "Manifest includes PHP pool for non-PHP profile '${profile}'; pool import will be attempted only if file exists."
+  fi
+
   local timestamp
   timestamp=$(date +%Y%m%d%H%M%S)
   local rollback_paths=()
-  if ! backup_apply_files "$tmpdir" "$domain" "$slug" "$php" "$enable" "$timestamp" rollback_paths; then
+  if ! backup_apply_files "$tmpdir" "$domain" "$slug" "$php" "$enable" "$timestamp" "$profile_supports_cron" "$profile_supports_queue" rollback_paths; then
     backup_rollback rollback_paths
     error "Import failed; rollback applied"
     rm -rf "$tmpdir"
@@ -269,6 +313,7 @@ backup_import_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
+    "Profile|${profile}" \
     "Applied|yes" \
     "Enable symlink|${enable}" \
     "Reload services|${reload}"

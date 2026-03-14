@@ -19,8 +19,10 @@ simai-admin.sh backup inspect --file example.tar.gz
 simai-admin.sh backup import --file example.tar.gz [--apply yes] [--enable yes|no] [--reload yes|no]
 ```
 - По умолчанию dry-run (apply=no): только план.
+- План показывает профильную совместимость архива с текущим сервером (known/enabled/requires-php/supports cron/queue).
 - apply=yes применяет файлы с бэкапом существующих (`.bak.<timestamp>`).
+- apply=yes блокируется, если профиль из архива отсутствует или отключён локально.
 - enable=yes создаст symlink в sites-enabled.
 - reload=yes выполнит nginx -t, затем reload nginx и php-fpm (если есть пул); при ошибке reload/restart выполняется откат бэкапов (включая symlink).
 
-Cron импортируется только если файл содержит заголовки `simai-managed: yes` и slug совпадает. SSL ключи и .env не входят в архив и не импортируются.
+Cron импортируется только если файл содержит заголовки `simai-managed: yes`, slug совпадает и профиль поддерживает cron. Queue systemd unit импортируется только для профилей с queue-support. SSL ключи и .env не входят в архив и не импортируются.

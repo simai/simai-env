@@ -20,5 +20,8 @@
 - Инспекция: `simai-admin.sh backup inspect --file <archive>`
 - Импорт: `simai-admin.sh backup import --file <archive> [--apply yes] [--enable yes|no] [--reload yes|no]`
   - По умолчанию dry-run (apply=no).
+  - Dry-run показывает профильную совместимость (`profile known/enabled`, `requires PHP`, `supports cron/queue`).
+  - apply=yes блокируется, если профиль архива не известен или отключён в локальном allowlist.
   - При apply=yes существующие файлы бэкапятся в `.bak.<timestamp>` перед заменой.
   - nginx reload выполняется только после `nginx -t`; при ошибке reload/ restart выполняется откат бэкапов (включая symlink, если enable=yes).
+  - cron/unit импортируются условно: только если это разрешено контрактом профиля.
