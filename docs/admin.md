@@ -71,3 +71,4 @@ fi
 - `SIMAI_MENU_BACKEND=whiptail` requests `whiptail` backend (falls back safely when unavailable).
 
 Commands detail: see `docs/commands/*`.
+Daily profile mapping: `docs/operations/profile-ops-matrix.md`.

@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.10.7] - 2026-03-14
+### Added
+- Added profile operations matrix for daily use (`docs/operations/profile-ops-matrix.md`) covering `generic`, `laravel`, `wordpress`, `bitrix`, `static`, and `alias`.
+### Changed
+- Linked the new profile matrix from `README.md`, `docs/README.md`, `docs/admin.md`, and daily quickstart.
+
 ## [1.10.6] - 2026-03-14
 ### Changed
 - Added fast post-update smoke checks to `self update` (script executability + shell syntax sanity).
