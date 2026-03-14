@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.6] - 2026-03-14
+### Changed
+- Improved interactive required-argument UX in menu flows: `domain` is now selected from existing sites and backup `file` is selected from discovered archives.
+### Fixed
+- `site remove` now handles menu cancel paths safely (including empty site list and cancelled domain selection) without surfacing missing required-argument errors.
+
 ## [1.8.5] - 2026-03-14
 ### Changed
 - Improved `site drift` cron checks to validate profile-specific cron entries (Laravel, WordPress, Bitrix).
