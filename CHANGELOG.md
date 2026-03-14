@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.8.10] - 2026-03-14
+### Fixed
+- Fixed text-menu regression in the new menu adapter: menu rendering now writes to stderr so captured menu choices remain valid.
+
 ## [1.8.9] - 2026-03-14
 ### Changed
 - Added unified menu choice adapter in `admin/menu.sh` with automatic `whiptail` or text rendering.

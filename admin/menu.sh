@@ -169,13 +169,13 @@ run_menu() {
       return 0
     fi
 
-    echo
-    [[ -n "$title" ]] && echo "$title"
+    echo >&2
+    [[ -n "$title" ]] && echo "$title" >&2
     local item key label
     for item in "${items[@]}"; do
       key="${item%%|*}"
       label="${item#*|}"
-      printf "  [%s] %s\n" "$key" "$label"
+      printf "  [%s] %s\n" "$key" "$label" >&2
     done
     local choice=""
     if [[ -n "$default_key" ]]; then
