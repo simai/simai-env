@@ -327,8 +327,10 @@ site_add_handler() {
   fi
 
   if [[ "$profile" == "bitrix" ]]; then
+    local bitrix_short_install="${PROFILE_BITRIX_SHORT_INSTALL_DEFAULT:-yes}"
+    [[ "${bitrix_short_install,,}" == "yes" ]] && bitrix_short_install="yes" || bitrix_short_install="no"
     if read_site_db_env "$domain" >/dev/null 2>&1; then
-      if bitrix_write_db_preseed_files "$domain" "$doc_root" "no"; then
+      if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_short_install"; then
         bitrix_preseed_summary="ready"
       else
         bitrix_preseed_summary="failed"

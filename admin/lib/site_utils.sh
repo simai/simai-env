@@ -1576,7 +1576,7 @@ bitrix_php_quote() {
 }
 
 bitrix_write_db_preseed_files() {
-  local domain="$1" doc_root="$2" overwrite="${3:-no}"
+  local domain="$1" doc_root="$2" overwrite="${3:-no}" short_install="${4:-yes}"
   local db_name="" db_user="" db_pass="" db_host="localhost"
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
@@ -1609,6 +1609,10 @@ bitrix_write_db_preseed_files() {
   if [[ "$do_write" != "yes" ]]; then
     return 0
   fi
+
+  [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
+  local short_install_php="false"
+  [[ "$short_install" == "yes" ]] && short_install_php="true"
 
   mkdir -p "${bx_dir}/php_interface"
 
@@ -1647,6 +1651,9 @@ EOF
 define("BX_UTF", true);
 define("BX_CRONTAB", true);
 define("BX_CRONTAB_SUPPORT", true);
+if (!defined("SHORT_INSTALL")) {
+    define("SHORT_INSTALL", ${short_install_php});
+}
 EOF
 
   if ! php -l "$tmp_settings" >/dev/null 2>&1 || ! php -l "$tmp_dbconn" >/dev/null 2>&1; then

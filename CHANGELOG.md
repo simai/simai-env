@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.15] - 2026-03-15
+### Changed
+- Bitrix profile now enables `SHORT_INSTALL` by default in generated DB preseed (`dbconn.php`) to simplify installer flow.
+- `bitrix db-preseed` now supports `--short-install yes|no` and reports selected mode in output.
+### Added
+- `bitrix status` now shows `SHORT_INSTALL` state from `dbconn.php` (best effort).
+
 ## [1.11.14] - 2026-03-15
 ### Fixed
 - Improved `bitrix php-baseline-sync` to enforce critical FPM runtime keys after `site fix`:

@@ -73,7 +73,7 @@ Clears Bitrix cache directories:
 ## DB Preseed
 
 ```bash
-simai-admin.sh bitrix db-preseed --domain <domain> [--overwrite yes]
+simai-admin.sh bitrix db-preseed --domain <domain> [--overwrite yes] [--short-install yes|no]
 ```
 
 Generates Bitrix DB configuration files from site `db.env`:
@@ -84,6 +84,8 @@ Notes:
 - Safe for installer flow; no secrets are printed to console.
 - By default it does not overwrite existing non-empty files.
 - Use `--overwrite yes` to force regeneration.
+- By default preseed writes `SHORT_INSTALL=true` into `dbconn.php` to simplify Bitrix install flow.
+- Use `--short-install no` if full/manual installer flow is required.
 
 ## PHP Baseline Sync
 

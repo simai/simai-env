@@ -124,6 +124,7 @@ bitrix_status_handler() {
   local dbconn_present="no"
   local bx_crontab="unknown"
   local bx_crontab_support="unknown"
+  local short_install="unknown"
   local cron_entrypoint="missing"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -136,6 +137,7 @@ bitrix_status_handler() {
     dbconn_present="yes"
     bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
     bx_crontab_support=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB_SUPPORT")
+    short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
   fi
   [[ -f "$BX_CRON_ENTRYPOINT" ]] && cron_entrypoint="present"
   if [[ -f "$BX_CRON_FILE" ]]; then
@@ -158,6 +160,7 @@ bitrix_status_handler() {
     "dbconn.php|${dbconn_present}" \
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
+    "SHORT_INSTALL|${short_install}" \
     "cron_events.php|${cron_entrypoint}" \
     "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
     "Cron entry|${cron_line_state}" \
@@ -441,7 +444,9 @@ bitrix_db_preseed_handler() {
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
   local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  local short_install="${PARSED_ARGS[short-install]:-yes}"
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
 
   local rc=0
   if bitrix_prepare_site "$domain"; then
@@ -458,7 +463,7 @@ bitrix_db_preseed_handler() {
 
   ui_header "SIMAI ENV · Bitrix DB preseed"
   local status="failed"
-  if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite"; then
+  if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite" "$short_install"; then
     status="ready"
   else
     error "Failed to generate Bitrix DB preseed files"
@@ -470,6 +475,7 @@ bitrix_db_preseed_handler() {
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
     "Overwrite|${overwrite}" \
+    "SHORT_INSTALL|${short_install}" \
     ".settings.php|${BX_SETTINGS_FILE}" \
     "dbconn.php|${BX_DBCONN_FILE}" \
     "Status|${status}"
@@ -576,5 +582,5 @@ register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix cron file" "bitrix_cron_
 register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bitrix_agents_status_handler" "domain" ""
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
-register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite="
+register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
