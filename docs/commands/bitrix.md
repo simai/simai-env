@@ -87,6 +87,21 @@ Notes:
 - By default preseed writes `SHORT_INSTALL=true` into `dbconn.php` to simplify Bitrix install flow.
 - Use `--short-install no` if full/manual installer flow is required.
 
+## Installer Ready
+
+```bash
+simai-admin.sh bitrix installer-ready --domain <domain> [--overwrite yes] [--short-install yes|no] [--setup-overwrite yes|no]
+```
+
+Prepares Bitrix installer flow in one step:
+- generates/updates DB preseed files from `db.env`
+- downloads `public/bitrixsetup.php` from official Bitrix URL (best effort)
+
+Notes:
+- default mode keeps existing files (`--overwrite no`, `--setup-overwrite no`).
+- command is safe for repeat runs (idempotent).
+- if network is unavailable, setup script step can fail while DB preseed still stays valid.
+
 ## PHP Baseline Sync
 
 ```bash

@@ -125,6 +125,8 @@ bitrix_status_handler() {
   local bx_crontab="unknown"
   local bx_crontab_support="unknown"
   local short_install="unknown"
+  local setup_script=""
+  local setup_state="missing"
   local cron_entrypoint="missing"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -133,6 +135,8 @@ bitrix_status_handler() {
   local cron_slug_match="no"
 
   [[ -f "$BX_SETTINGS_FILE" ]] && settings_present="yes"
+  setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
+  [[ -s "$setup_script" ]] && setup_state="present"
   if [[ -f "$BX_DBCONN_FILE" ]]; then
     dbconn_present="yes"
     bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
@@ -158,6 +162,7 @@ bitrix_status_handler() {
     "Core files|${BX_HAS_CORE}" \
     ".settings.php|${settings_present}" \
     "dbconn.php|${dbconn_present}" \
+    "bitrixsetup.php|${setup_script} (${setup_state})" \
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
     "SHORT_INSTALL|${short_install}" \
@@ -169,6 +174,7 @@ bitrix_status_handler() {
     "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
+  ui_kv "Installer ready" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
   ui_kv "Cron sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
   ui_kv "Agents status" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
@@ -484,6 +490,57 @@ bitrix_db_preseed_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+bitrix_installer_ready_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  local short_install="${PARSED_ARGS[short-install]:-yes}"
+  local setup_overwrite="${PARSED_ARGS[setup-overwrite]:-no}"
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
+  [[ "${setup_overwrite,,}" == "yes" ]] || setup_overwrite="no"
+
+  if ! bitrix_prepare_site "$domain"; then
+    return $?
+  fi
+  if ! read_site_db_env "$BX_DOMAIN" >/dev/null 2>&1; then
+    error "db.env not found or incomplete for ${BX_DOMAIN}"
+    return 1
+  fi
+
+  ui_header "SIMAI ENV · Bitrix installer ready"
+  local preseed_state="failed"
+  if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite" "$short_install"; then
+    preseed_state="ready"
+  fi
+  local setup_state="failed"
+  local setup_script
+  setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
+  if bitrix_download_setup_script "$BX_DOC_ROOT" "$setup_overwrite"; then
+    setup_state="ready"
+  fi
+  local status="ready"
+  [[ "$preseed_state" == "ready" && "$setup_state" == "ready" ]] || status="partial"
+
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${BX_DOMAIN}" \
+    "Docroot|${BX_DOC_ROOT}" \
+    "DB preseed|${preseed_state}" \
+    "SHORT_INSTALL|${short_install}" \
+    "Setup script|${setup_state}" \
+    "bitrixsetup.php|${setup_script}" \
+    "Status|${status}"
+  if [[ "$status" != "ready" ]]; then
+    warn "Installer ready is partial. Check network access and db.env values."
+    return 1
+  fi
+  ui_section "Next steps"
+  ui_kv "Open installer" "https://${BX_DOMAIN}/bitrixsetup.php"
+  ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
+}
+
 bitrix_php_baseline_sync_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -583,4 +640,5 @@ register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bit
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
+register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="

@@ -283,6 +283,7 @@ site_add_handler() {
     queue_summary="${QUEUE_UNIT_RESULT:-unknown}"
   fi
   local bitrix_preseed_summary="n/a"
+  local bitrix_setup_summary="n/a"
 
   local db_summary="not requested"
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
@@ -339,6 +340,12 @@ site_add_handler() {
     else
       bitrix_preseed_summary="skipped (no db.env)"
     fi
+    if bitrix_download_setup_script "$doc_root" "no"; then
+      bitrix_setup_summary="ready"
+    else
+      bitrix_setup_summary="failed"
+      warn "Failed to download bitrixsetup.php"
+    fi
   fi
 
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
@@ -368,6 +375,7 @@ site_add_handler() {
   fi
   if [[ "$profile" == "bitrix" ]]; then
     echo "Bitrix DB preseed: ${bitrix_preseed_summary}"
+    echo "Bitrix setup.php : ${bitrix_setup_summary}"
   fi
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"

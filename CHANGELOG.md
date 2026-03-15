@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.16] - 2026-03-15
+### Added
+- Added `bitrix installer-ready` command to prepare installer flow in one step:
+  - DB preseed generation (`.settings.php`, `dbconn.php`)
+  - best-effort download of `bitrixsetup.php`
+- Added `Bitrix installer ready` item in interactive menu (`Laravel` section).
+### Changed
+- `site add` for `bitrix` profile now also downloads `bitrixsetup.php` (best effort) after DB preseed generation.
+- `bitrix status` now reports `bitrixsetup.php` presence/path.
+
 ## [1.11.15] - 2026-03-15
 ### Changed
 - Bitrix profile now enables `SHORT_INSTALL` by default in generated DB preseed (`dbconn.php`) to simplify installer flow.

@@ -1575,6 +1575,54 @@ bitrix_php_quote() {
   printf "'%s'" "$raw"
 }
 
+bitrix_setup_script_url() {
+  echo "${SIMAI_BITRIX_SETUP_URL:-https://www.1c-bitrix.ru/download/scripts/bitrixsetup.php}"
+}
+
+bitrix_setup_script_path() {
+  local doc_root="$1"
+  echo "${doc_root}/bitrixsetup.php"
+}
+
+bitrix_download_setup_script() {
+  local doc_root="$1" overwrite="${2:-no}"
+  local target
+  target=$(bitrix_setup_script_path "$doc_root")
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -s "$target" ]]; then
+    return 0
+  fi
+
+  local url
+  url=$(bitrix_setup_script_url)
+  local tmp
+  tmp=$(mktemp)
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL "$url" -o "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget -qO "$tmp" "$url"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+
+  if [[ ! -s "$tmp" ]] || ! grep -q "<\\?php" "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+
+  mv "$tmp" "$target"
+  chmod 0644 "$target"
+  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  return 0
+}
+
 bitrix_write_db_preseed_files() {
   local domain="$1" doc_root="$2" overwrite="${3:-no}" short_install="${4:-yes}"
   local db_name="" db_user="" db_pass="" db_host="localhost"
