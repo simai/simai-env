@@ -69,3 +69,18 @@ Clears Bitrix cache directories:
 - `bitrix/cache`
 - `bitrix/managed_cache`
 - `bitrix/stack_cache`
+
+## DB Preseed
+
+```bash
+simai-admin.sh bitrix db-preseed --domain <domain> [--overwrite yes]
+```
+
+Generates Bitrix DB configuration files from site `db.env`:
+- `public/bitrix/.settings.php`
+- `public/bitrix/php_interface/dbconn.php`
+
+Notes:
+- Safe for installer flow; no secrets are printed to console.
+- By default it does not overwrite existing non-empty files.
+- Use `--overwrite yes` to force regeneration.

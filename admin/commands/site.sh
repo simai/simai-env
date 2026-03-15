@@ -282,6 +282,7 @@ site_add_handler() {
     create_queue_unit "$project" "$path" "$php_version" "$SIMAI_USER" || return 1
     queue_summary="${QUEUE_UNIT_RESULT:-unknown}"
   fi
+  local bitrix_preseed_summary="n/a"
 
   local db_summary="not requested"
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
@@ -325,6 +326,19 @@ site_add_handler() {
     fi
   fi
 
+  if [[ "$profile" == "bitrix" ]]; then
+    if read_site_db_env "$domain" >/dev/null 2>&1; then
+      if bitrix_write_db_preseed_files "$domain" "$doc_root" "no"; then
+        bitrix_preseed_summary="ready"
+      else
+        bitrix_preseed_summary="failed"
+        warn "Failed to generate Bitrix DB preseed files from db.env"
+      fi
+    else
+      bitrix_preseed_summary="skipped (no db.env)"
+    fi
+  fi
+
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
 
   echo "===== Site summary ====="
@@ -349,6 +363,9 @@ site_add_handler() {
     echo "DB password : hidden"
   else
     echo "Database    : ${db_summary}"
+  fi
+  if [[ "$profile" == "bitrix" ]]; then
+    echo "Bitrix DB preseed: ${bitrix_preseed_summary}"
   fi
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"

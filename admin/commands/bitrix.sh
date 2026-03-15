@@ -423,9 +423,52 @@ bitrix_cache_clear_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+bitrix_db_preseed_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+
+  local rc=0
+  if bitrix_prepare_site "$domain"; then
+    rc=0
+  else
+    rc=$?
+    return $rc
+  fi
+
+  if ! read_site_db_env "$BX_DOMAIN" >/dev/null 2>&1; then
+    error "db.env not found or incomplete for ${BX_DOMAIN}"
+    return 1
+  fi
+
+  ui_header "SIMAI ENV · Bitrix DB preseed"
+  local status="failed"
+  if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite"; then
+    status="ready"
+  else
+    error "Failed to generate Bitrix DB preseed files"
+    return 1
+  fi
+
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${BX_DOMAIN}" \
+    "Docroot|${BX_DOC_ROOT}" \
+    "Overwrite|${overwrite}" \
+    ".settings.php|${BX_SETTINGS_FILE}" \
+    "dbconn.php|${BX_DBCONN_FILE}" \
+    "Status|${status}"
+  ui_section "Next steps"
+  ui_kv "Open installer" "https://${BX_DOMAIN}/bitrixsetup.php"
+  ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
+}
+
 register_cmd "bitrix" "status" "Show Bitrix operational status" "bitrix_status_handler" "domain" ""
 register_cmd "bitrix" "cron-status" "Show Bitrix cron status" "bitrix_cron_status_handler" "domain" ""
 register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix cron file" "bitrix_cron_sync_handler" "domain" ""
 register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bitrix_agents_status_handler" "domain" ""
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
+register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite="

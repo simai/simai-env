@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.10] - 2026-03-15
+### Added
+- Added `bitrix db-preseed --domain <domain> [--overwrite yes]` to generate valid Bitrix DB config files (`bitrix/.settings.php`, `bitrix/php_interface/dbconn.php`) from site `db.env`.
+### Changed
+- `site add` now auto-generates Bitrix DB preseed files for `bitrix` profile sites when `db.env` is available.
+### Fixed
+- Hardened Bitrix DB preseed generation with safe PHP string escaping and syntax validation before write.
+
 ## [1.11.9] - 2026-03-15
 ### Fixed
 - Improved `site doctor` SSL checks to use actual nginx TLS directives/cert files in addition to metadata.

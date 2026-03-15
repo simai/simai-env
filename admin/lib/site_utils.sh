@@ -1564,6 +1564,99 @@ site_worker_status() {
   fi
 }
 
+bitrix_php_quote() {
+  local raw="${1:-}"
+  raw="${raw//\\/\\\\}"
+  raw="${raw//\'/\\\'}"
+  printf "'%s'" "$raw"
+}
+
+bitrix_write_db_preseed_files() {
+  local domain="$1" doc_root="$2" overwrite="${3:-no}"
+  local db_name="" db_user="" db_pass="" db_host="localhost"
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) db_name="$v" ;;
+      DB_USER) db_user="$v" ;;
+      DB_PASS) db_pass="$v" ;;
+      DB_HOST) db_host="$v" ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+
+  if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    return 1
+  fi
+
+  local bx_dir="${doc_root}/bitrix"
+  local settings_file="${bx_dir}/.settings.php"
+  local dbconn_file="${bx_dir}/php_interface/dbconn.php"
+  local q_host q_name q_user q_pass
+  q_host=$(bitrix_php_quote "${db_host:-localhost}")
+  q_name=$(bitrix_php_quote "$db_name")
+  q_user=$(bitrix_php_quote "$db_user")
+  q_pass=$(bitrix_php_quote "$db_pass")
+
+  local do_write="yes"
+  if [[ "${overwrite,,}" != "yes" && -s "$settings_file" && -s "$dbconn_file" ]]; then
+    do_write="no"
+  fi
+  if [[ "$do_write" != "yes" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${bx_dir}/php_interface"
+
+  local tmp_settings tmp_dbconn
+  tmp_settings=$(mktemp)
+  tmp_dbconn=$(mktemp)
+
+  cat >"$tmp_settings" <<EOF
+<?php
+return [
+  'connections' => [
+    'value' => [
+      'default' => [
+        'className' => '\\Bitrix\\Main\\DB\\MysqliConnection',
+        'host' => ${q_host},
+        'database' => ${q_name},
+        'login' => ${q_user},
+        'password' => ${q_pass},
+        'options' => 2,
+      ],
+    ],
+    'readonly' => true,
+  ],
+];
+EOF
+
+  cat >"$tmp_dbconn" <<EOF
+<?php
+\$DBType = "mysql";
+\$DBHost = ${q_host};
+\$DBLogin = ${q_user};
+\$DBPassword = ${q_pass};
+\$DBName = ${q_name};
+\$DBDebug = false;
+\$DBDebugToFile = false;
+define("BX_UTF", true);
+define("BX_CRONTAB", true);
+define("BX_CRONTAB_SUPPORT", true);
+EOF
+
+  if ! php -l "$tmp_settings" >/dev/null 2>&1 || ! php -l "$tmp_dbconn" >/dev/null 2>&1; then
+    rm -f "$tmp_settings" "$tmp_dbconn"
+    return 1
+  fi
+
+  mv "$tmp_settings" "$settings_file"
+  mv "$tmp_dbconn" "$dbconn_file"
+  chmod 0640 "$settings_file" "$dbconn_file"
+  chown "${SIMAI_USER}:www-data" "$settings_file" "$dbconn_file" 2>/dev/null || true
+  return 0
+}
+
 site_ssl_info() {
   local domain="$1"
   local cfg="/etc/nginx/sites-available/${domain}.conf"
