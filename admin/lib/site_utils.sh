@@ -815,6 +815,9 @@ EOF
     cat >>"$pool_file" <<'EOF'
 ; simai-profile-ini-begin
 php_admin_flag[short_open_tag] = on
+php_admin_value[memory_limit] = 512M
+php_admin_value[opcache.validate_timestamps] = 1
+php_admin_value[opcache.revalidate_freq] = 0
 ; simai-profile-ini-end
 EOF
   fi

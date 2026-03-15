@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.11] - 2026-03-15
+### Added
+- Added `Bitrix DB preseed` action to interactive menu (`Laravel` section) for quick generation of Bitrix DB config files from `db.env`.
+### Changed
+- Updated Bitrix profile recommendation: `opcache.revalidate_freq=0`.
+- New Bitrix PHP-FPM pools now include baseline overrides for installer/runtime compatibility:
+  - `short_open_tag=on`
+  - `memory_limit=512M`
+  - `opcache.validate_timestamps=1`
+  - `opcache.revalidate_freq=0`
+
 ## [1.11.10] - 2026-03-15
 ### Added
 - Added `bitrix db-preseed --domain <domain> [--overwrite yes]` to generate valid Bitrix DB config files (`bitrix/.settings.php`, `bitrix/php_interface/dbconn.php`) from site `db.env`.
