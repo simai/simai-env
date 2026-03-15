@@ -55,7 +55,7 @@ simai-admin.sh bitrix agents-sync --domain <domain> [--apply yes] [--confirm yes
 ```
 
 - Default is plan-only (`--apply no`).
-- Apply mode updates `dbconn.php` constants (`BX_CRONTAB=true`, `BX_CRONTAB_SUPPORT=true`) and rewrites managed cron entry.
+- Apply mode rewrites managed cron entry and normalizes `dbconn.php` constants for web-safe cron mode (`BX_CRONTAB` removed, `BX_CRONTAB_SUPPORT=true`).
 - In CLI mode use `--confirm yes` with `--apply yes`.
 - Creates `dbconn.php.bak.<timestamp>` before modification.
 

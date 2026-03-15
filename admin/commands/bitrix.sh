@@ -98,9 +98,20 @@ bitrix_dbconn_set_const_true() {
   return 0
 }
 
+bitrix_dbconn_drop_const() {
+  local file="$1" const_name="$2"
+  if [[ ! -f "$file" ]]; then
+    return 1
+  fi
+  local esc
+  esc=$(printf '%s\n' "$const_name" | sed 's/[][^$.*/\\|+?(){}]/\\&/g')
+  perl -0777 -i -pe "s/^\\s*define\\s*\\(\\s*(['\"])${esc}\\1\\s*,[^;]*\\)\\s*;\\s*\\n?//img" "$file"
+  return 0
+}
+
 bitrix_agents_ready_state() {
   local cron_managed="$1" cron_domain_match="$2" cron_slug_match="$3" cron_entry="$4" crontab="$5" crontab_support="$6"
-  if [[ "$cron_managed" == "yes" && "$cron_domain_match" == "yes" && "$cron_slug_match" == "yes" && "$cron_entry" == "yes" && "$crontab" == "true" && "$crontab_support" == "true" ]]; then
+  if [[ "$cron_managed" == "yes" && "$cron_domain_match" == "yes" && "$cron_slug_match" == "yes" && "$cron_entry" == "yes" && "$crontab_support" == "true" ]]; then
     echo "yes"
     return 0
   fi
@@ -361,8 +372,8 @@ bitrix_agents_sync_handler() {
   ts=$(date +%Y%m%d-%H%M%S)
   backup="${BX_DBCONN_FILE}.bak.${ts}"
   cp -a "$BX_DBCONN_FILE" "$backup"
-  if ! bitrix_dbconn_set_const_true "$BX_DBCONN_FILE" "BX_CRONTAB"; then
-    error "Failed to update BX_CRONTAB in ${BX_DBCONN_FILE}"
+  if ! bitrix_dbconn_drop_const "$BX_DBCONN_FILE" "BX_CRONTAB"; then
+    error "Failed to sanitize BX_CRONTAB in ${BX_DBCONN_FILE}"
     cp -a "$backup" "$BX_DBCONN_FILE" || true
     return 1
   fi

@@ -1703,7 +1703,6 @@ if (!defined("BX_DIR_PERMISSIONS")) {
     define("BX_DIR_PERMISSIONS", 0755);
 }
 define("BX_UTF", true);
-define("BX_CRONTAB", true);
 define("BX_CRONTAB_SUPPORT", true);
 if (!defined("SHORT_INSTALL")) {
     define("SHORT_INSTALL", ${short_install_php});

@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.18] - 2026-03-15
+### Fixed
+- Bitrix preseed no longer writes `BX_CRONTAB` into `dbconn.php` (web checker-compatible behavior).
+- `bitrix agents-sync` now normalizes cron constants to web-safe mode:
+  - removes `BX_CRONTAB` from `dbconn.php`
+  - keeps `BX_CRONTAB_SUPPORT=true`
+- Updated agents readiness logic to rely on cron markers + `BX_CRONTAB_SUPPORT`.
+
 ## [1.11.17] - 2026-03-15
 ### Fixed
 - Bitrix DB preseed now also writes default file/dir permission constants in `dbconn.php`:
