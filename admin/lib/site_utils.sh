@@ -85,7 +85,7 @@ EOF
       echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
       ;;
     bitrix)
-      echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
+      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
       ;;
   esac
 }
@@ -817,6 +817,7 @@ EOF
 ; simai-profile-ini-begin
 php_admin_flag[short_open_tag] = on
 php_admin_value[memory_limit] = 512M
+php_admin_value[max_input_vars] = 10000
 php_admin_value[opcache.validate_timestamps] = 1
 php_admin_value[opcache.revalidate_freq] = 0
 ; simai-profile-ini-end
@@ -1679,6 +1680,7 @@ return [
         'database' => ${q_name},
         'login' => ${q_user},
         'password' => ${q_pass},
+        'init_commands' => "SET sql_mode=''; SET collation_connection='utf8mb4_unicode_ci';",
         'options' => 2,
       ],
     ],
@@ -1703,7 +1705,9 @@ if (!defined("BX_DIR_PERMISSIONS")) {
     define("BX_DIR_PERMISSIONS", 0755);
 }
 define("BX_UTF", true);
-define("BX_CRONTAB_SUPPORT", true);
+if (!defined("BX_CRONTAB_SUPPORT")) {
+    define("BX_CRONTAB_SUPPORT", true);
+}
 if (!defined("SHORT_INSTALL")) {
     define("SHORT_INSTALL", ${short_install_php});
 }

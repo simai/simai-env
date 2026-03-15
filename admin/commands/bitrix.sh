@@ -84,9 +84,9 @@ bitrix_dbconn_set_const_true() {
   local esc
   esc=$(printf '%s\n' "$const_name" | sed 's/[][^$.*/\\|+?(){}]/\\&/g')
   if grep -Eqi "define[[:space:]]*\\([[:space:]]*['\"]${esc}['\"][[:space:]]*," "$file"; then
-    perl -0777 -i -pe "s/define\\s*\\(\\s*(['\"])${esc}\\1\\s*,\\s*(true|false)\\s*\\)\\s*;/define(\"${const_name}\", true);/ig" "$file"
+    perl -0777 -i -pe "s/^\\s*define\\s*\\(\\s*(['\"])${esc}\\1\\s*,\\s*(true|false)\\s*\\)\\s*;\\s*\$/if (!defined('${const_name}')) {\\n    define('${const_name}', true);\\n}/img" "$file"
   fi
-  if ! grep -Eqi "define[[:space:]]*\\([[:space:]]*['\"]${esc}['\"][[:space:]]*," "$file"; then
+  if ! grep -Eqi "defined[[:space:]]*\\([[:space:]]*['\"]${esc}['\"]" "$file"; then
     {
       echo ""
       echo "// simai-managed: bitrix agents baseline"
@@ -605,7 +605,9 @@ bitrix_php_baseline_sync_handler() {
         local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$(project_slug_from_domain "$d")}}"
         if [[ -n "${BX_PHP_VERSION:-}" && "${BX_PHP_VERSION:-none}" != "none" ]]; then
           write_site_php_ini_overrides "$d" \
+            "short_open_tag|1" \
             "memory_limit|512M" \
+            "max_input_vars|10000" \
             "opcache.validate_timestamps|1" \
             "opcache.revalidate_freq|0"
           if apply_site_php_ini_overrides_to_pool "$d" "$BX_PHP_VERSION" "$socket_project" "yes"; then

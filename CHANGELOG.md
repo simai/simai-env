@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.20] - 2026-03-15
+### Changed
+- Bitrix cron baseline now uses `* * * * *` for `public/bitrix/modules/main/tools/cron_events.php`.
+- Bitrix DB preseed now writes `BX_CRONTAB_SUPPORT` in guarded form (`if (!defined(...))`), matching cron-enable workflow safety.
+### Fixed
+- Bitrix DB preseed now sets MySQL session compatibility defaults in `.settings.php`:
+  - `SET sql_mode=''`
+  - `SET collation_connection='utf8mb4_unicode_ci'`
+- Bootstrap now installs/enables local postfix (`Local only`) so PHP mail transport works out-of-the-box for checker mail tests.
+
 ## [1.11.19] - 2026-03-15
 ### Fixed
 - Bitrix nginx template now sets `client_max_body_size 64m` to avoid `413 Request Entity Too Large` during site checker large upload test (`check_upload_big`).

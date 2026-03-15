@@ -594,6 +594,22 @@ install_redis() {
   os_svc_enable_now redis-server || true
 }
 
+install_mail_transport() {
+  apt_update_once
+  export DEBIAN_FRONTEND=noninteractive
+  if command -v debconf-set-selections >/dev/null 2>&1; then
+    printf '%s\n' \
+      "postfix postfix/mailname string localhost" \
+      "postfix postfix/main_mailer_type select Local only" \
+      "postfix postfix/destinations string localhost.localdomain, localhost" \
+      "postfix postfix/protocols select all" \
+      "postfix postfix/chattr boolean false" | debconf-set-selections || true
+  fi
+  os_cmd_pkg_install postfix
+  run_long "Installing local mail transport (postfix)" "${OS_CMD[@]}" || warn "Failed to install postfix"
+  os_svc_enable_now postfix || true
+}
+
 install_node() {
   if command -v node >/dev/null 2>&1; then
     local current
@@ -864,6 +880,7 @@ install_stack() {
   install_nginx
   install_mysql
   install_redis
+  install_mail_transport
   install_node
   install_composer
 }
@@ -967,7 +984,7 @@ clean_flow() {
 
 bootstrap_flow() {
   info "Starting bootstrap (no sites will be created)"
-  progress_init 9
+  progress_init 10
   progress_step "Checking OS compatibility"
   platform_detect_os
   platform_print_os_support_status || fail "Unsupported OS. Supported only on $(platform_supported_matrix_string)"
@@ -986,6 +1003,8 @@ bootstrap_flow() {
   install_mysql
   progress_step "Installing redis"
   install_redis
+  progress_step "Installing local mail transport"
+  install_mail_transport
   progress_step "Installing Node.js ${NODE_VERSION}"
   install_node
   progress_step "Installing Composer"
