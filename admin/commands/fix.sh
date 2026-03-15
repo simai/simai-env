@@ -302,15 +302,19 @@ site_fix_handler() {
       printf "\n; simai-profile-ini-begin\n" >>"$tmp_out"
       for ini_entry in "${ini_to_apply[@]}"; do
         key="${ini_entry%%|*}"; expected="${ini_entry#*|}"
-        local norm
-        norm=$(doctor_normalize_bool "$expected")
-        if [[ "$norm" == "1" || "$norm" == "0" ]]; then
-          local flag="off"
-          [[ "$norm" == "1" ]] && flag="on"
-          printf "php_admin_flag[%s] = %s\n" "$key" "$flag" >>"$tmp_out"
-        else
-          printf "php_admin_value[%s] = %s\n" "$key" "$expected" >>"$tmp_out"
-        fi
+        local expected_lc="${expected,,}"
+        case "$expected_lc" in
+          true|on|yes)
+            printf "php_admin_flag[%s] = on\n" "$key" >>"$tmp_out"
+            ;;
+          false|off|no)
+            printf "php_admin_flag[%s] = off\n" "$key" >>"$tmp_out"
+            ;;
+          *)
+            # Numeric values (including 0/1) must stay php_admin_value for INI keys like opcache.revalidate_freq.
+            printf "php_admin_value[%s] = %s\n" "$key" "$expected" >>"$tmp_out"
+            ;;
+        esac
       done
       printf "; simai-profile-ini-end\n" >>"$tmp_out"
       rm -f "$tmp_clean"

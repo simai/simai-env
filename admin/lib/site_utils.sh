@@ -321,13 +321,14 @@ apply_site_php_ini_overrides_to_pool() {
       local val="${kv[$key]}"
       local lower="${val,,}"
       case "$lower" in
-        1|true|on|yes)
+        true|on|yes)
           site_block+=$'php_admin_flag['"$key"$'] = on\n'
           ;;
-        0|false|off|no)
+        false|off|no)
           site_block+=$'php_admin_flag['"$key"$'] = off\n'
           ;;
         *)
+          # Keep numeric 0/1 as value, because many INI directives are numeric (not boolean flags).
           site_block+=$'php_admin_value['"$key"$'] = '"$val"$'\n'
           ;;
       esac

@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.12] - 2026-03-15
+### Fixed
+- Fixed PHP INI writer behavior for numeric values (`0`/`1`) in pool overrides:
+  - `site fix` now writes numeric settings as `php_admin_value` (not `php_admin_flag`).
+  - site-level INI overrides now keep numeric values as `php_admin_value`.
+- This prevents incorrect flag rendering for keys like `opcache.revalidate_freq`.
+
 ## [1.11.11] - 2026-03-15
 ### Added
 - Added `Bitrix DB preseed` action to interactive menu (`Laravel` section) for quick generation of Bitrix DB config files from `db.env`.
