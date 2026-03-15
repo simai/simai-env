@@ -423,6 +423,19 @@ bitrix_cache_clear_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+bitrix_list_sites() {
+  local domain profile
+  while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    if read_site_metadata "$domain"; then
+      profile="${SITE_META[profile]:-}"
+      if [[ "$profile" == "bitrix" ]]; then
+        echo "$domain"
+      fi
+    fi
+  done < <(list_sites)
+}
+
 bitrix_db_preseed_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -465,6 +478,77 @@ bitrix_db_preseed_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+bitrix_php_baseline_sync_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}"
+  local all="${PARSED_ARGS[all]:-no}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  local include_recommended="${PARSED_ARGS[include-recommended]:-yes}"
+  [[ "${all,,}" == "yes" ]] && all="yes" || all="no"
+  [[ "${confirm,,}" == "yes" ]] && confirm="yes" || confirm="no"
+  [[ "${include_recommended,,}" == "yes" ]] && include_recommended="yes" || include_recommended="no"
+
+  local -a targets=()
+  if [[ "$all" == "yes" ]]; then
+    mapfile -t targets < <(bitrix_list_sites)
+    if [[ ${#targets[@]} -eq 0 ]]; then
+      warn "No bitrix sites found"
+      return 0
+    fi
+    if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+      error "Bulk sync requires --confirm yes"
+      return 1
+    fi
+  else
+    if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      local candidates=()
+      mapfile -t candidates < <(bitrix_list_sites)
+      if [[ ${#candidates[@]} -eq 0 ]]; then
+        warn "No bitrix sites found"
+        return 0
+      fi
+      domain=$(select_from_list "Select Bitrix site" "" "${candidates[@]}")
+      if [[ -z "$domain" ]]; then
+        warn "Cancelled."
+        return 0
+      fi
+    fi
+    require_args "domain" || return 1
+    if ! bitrix_prepare_site "$domain"; then
+      return $?
+    fi
+    targets=("$domain")
+  fi
+
+  ui_header "SIMAI ENV · Bitrix PHP baseline sync"
+  local ok=0 fail=0 d
+  local -a failed=()
+  for d in "${targets[@]}"; do
+    info "Applying PHP INI baseline for ${d}"
+    if run_command site fix --domain "$d" --apply php-ini --include-recommended "$include_recommended" --confirm yes; then
+      ok=$((ok + 1))
+    else
+      fail=$((fail + 1))
+      failed+=("$d")
+    fi
+  done
+
+  ui_section "Result"
+  print_kv_table \
+    "Scope|$([[ "$all" == "yes" ]] && echo all bitrix sites || echo single site)" \
+    "Targets|${#targets[@]}" \
+    "Applied|${ok}" \
+    "Failed|${fail}" \
+    "Include recommended|${include_recommended}"
+  if [[ ${#failed[@]} -gt 0 ]]; then
+    warn "Failed sites: ${failed[*]}"
+    return 1
+  fi
+  ui_section "Next steps"
+  ui_kv "Verify one site" "simai-admin.sh site doctor --domain <bitrix-domain>"
+  return 0
+}
+
 register_cmd "bitrix" "status" "Show Bitrix operational status" "bitrix_status_handler" "domain" ""
 register_cmd "bitrix" "cron-status" "Show Bitrix cron status" "bitrix_cron_status_handler" "domain" ""
 register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix cron file" "bitrix_cron_sync_handler" "domain" ""
@@ -472,3 +556,4 @@ register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bit
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite="
+register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="

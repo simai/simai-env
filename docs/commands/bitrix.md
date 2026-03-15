@@ -84,3 +84,18 @@ Notes:
 - Safe for installer flow; no secrets are printed to console.
 - By default it does not overwrite existing non-empty files.
 - Use `--overwrite yes` to force regeneration.
+
+## PHP Baseline Sync
+
+```bash
+simai-admin.sh bitrix php-baseline-sync --domain <domain>
+simai-admin.sh bitrix php-baseline-sync --all yes --confirm yes
+```
+
+Applies Bitrix PHP INI baseline via `site fix` (`--apply php-ini`), with
+`--include-recommended yes` by default.
+
+Notes:
+- Single-domain mode works with `--domain`.
+- Bulk mode (`--all yes`) requires `--confirm yes` in CLI mode.
+- Read-only checks are not changed; only PHP pool INI overrides are updated.

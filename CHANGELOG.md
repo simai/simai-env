@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.13] - 2026-03-15
+### Added
+- Added `bitrix php-baseline-sync` command:
+  - single site: `--domain <domain>`
+  - bulk mode: `--all yes --confirm yes`
+- Added menu action `Bitrix PHP baseline sync (all)` in advanced mode.
+
 ## [1.11.12] - 2026-03-15
 ### Fixed
 - Fixed PHP INI writer behavior for numeric values (`0`/`1`) in pool overrides:
