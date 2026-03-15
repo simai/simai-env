@@ -94,6 +94,10 @@ simai-admin.sh bitrix php-baseline-sync --all yes --confirm yes
 
 Applies Bitrix PHP INI baseline via `site fix` (`--apply php-ini`), with
 `--include-recommended yes` by default.
+Then enforces critical FPM keys per site:
+- `memory_limit=512M`
+- `opcache.validate_timestamps=1`
+- `opcache.revalidate_freq=0`
 
 Notes:
 - Single-domain mode works with `--domain`.

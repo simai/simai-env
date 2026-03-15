@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.14] - 2026-03-15
+### Fixed
+- Improved `bitrix php-baseline-sync` to enforce critical FPM runtime keys after `site fix`:
+  - `memory_limit=512M`
+  - `opcache.validate_timestamps=1`
+  - `opcache.revalidate_freq=0`
+- This ensures Bitrix installer/runtime checks are consistent even when CLI defaults differ from FPM pool values.
+
 ## [1.11.13] - 2026-03-15
 ### Added
 - Added `bitrix php-baseline-sync` command:

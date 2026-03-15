@@ -526,7 +526,28 @@ bitrix_php_baseline_sync_handler() {
   for d in "${targets[@]}"; do
     info "Applying PHP INI baseline for ${d}"
     if run_command site fix --domain "$d" --apply php-ini --include-recommended "$include_recommended" --confirm yes; then
-      ok=$((ok + 1))
+      # Enforce critical Bitrix runtime keys in FPM pool regardless of CLI ini defaults.
+      if bitrix_prepare_site "$d"; then
+        local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$(project_slug_from_domain "$d")}}"
+        if [[ -n "${BX_PHP_VERSION:-}" && "${BX_PHP_VERSION:-none}" != "none" ]]; then
+          write_site_php_ini_overrides "$d" \
+            "memory_limit|512M" \
+            "opcache.validate_timestamps|1" \
+            "opcache.revalidate_freq|0"
+          if apply_site_php_ini_overrides_to_pool "$d" "$BX_PHP_VERSION" "$socket_project" "yes"; then
+            ok=$((ok + 1))
+          else
+            fail=$((fail + 1))
+            failed+=("$d")
+          fi
+        else
+          fail=$((fail + 1))
+          failed+=("$d")
+        fi
+      else
+        fail=$((fail + 1))
+        failed+=("$d")
+      fi
     else
       fail=$((fail + 1))
       failed+=("$d")
