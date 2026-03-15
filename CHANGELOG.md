@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.17] - 2026-03-15
+### Fixed
+- Bitrix DB preseed now also writes default file/dir permission constants in `dbconn.php`:
+  - `BX_FILE_PERMISSIONS=0644`
+  - `BX_DIR_PERMISSIONS=0755`
+- This prevents `site_checker` runtime errors on cache/FS checks when these constants are missing.
+
 ## [1.11.16] - 2026-03-15
 ### Added
 - Added `bitrix installer-ready` command to prepare installer flow in one step:

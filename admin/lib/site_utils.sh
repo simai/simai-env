@@ -1696,6 +1696,12 @@ EOF
 \$DBName = ${q_name};
 \$DBDebug = false;
 \$DBDebugToFile = false;
+if (!defined("BX_FILE_PERMISSIONS")) {
+    define("BX_FILE_PERMISSIONS", 0644);
+}
+if (!defined("BX_DIR_PERMISSIONS")) {
+    define("BX_DIR_PERMISSIONS", 0755);
+}
 define("BX_UTF", true);
 define("BX_CRONTAB", true);
 define("BX_CRONTAB_SUPPORT", true);
