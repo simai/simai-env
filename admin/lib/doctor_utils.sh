@@ -9,7 +9,11 @@ doctor_results_init() {
 }
 
 doctor_to_bytes() {
-  local val="$1" num unit
+  local val="${1,,}" num unit
+  if [[ "$val" == "-1" ]]; then
+    echo "-1"
+    return
+  fi
   num=${val%[kmg]}
   unit=${val#$num}
   unit=${unit,,}

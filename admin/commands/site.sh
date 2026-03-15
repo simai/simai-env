@@ -250,7 +250,7 @@ site_add_handler() {
   ensure_project_permissions "$path"
 
   if [[ "$php_version" != "none" ]]; then
-    create_php_pool "$project" "$php_version" "$path"
+    create_php_pool "$project" "$php_version" "$path" "$profile"
   fi
 
   local ssl_redirect="no" ssl_hsts="no"
@@ -830,7 +830,7 @@ site_set_php_handler() {
 
   progress_init 4
   progress_step "Preparing PHP-FPM pool"
-  if ! create_php_pool "$socket_project" "$php_version" "$root"; then
+  if ! create_php_pool "$socket_project" "$php_version" "$root" "$profile"; then
     error "Failed to create PHP-FPM pool for ${socket_project}"
     return 1
   fi

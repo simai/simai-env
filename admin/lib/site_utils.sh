@@ -789,7 +789,7 @@ create_mysql_db_user() {
 }
 
 create_php_pool() {
-  local project="$1" php_version="$2" project_path="$3"
+  local project="$1" php_version="$2" project_path="$3" profile_id="${4:-${PROFILE_ID:-}}"
   if ! validate_project_slug "$project"; then
     return 1
   fi
@@ -811,6 +811,13 @@ chdir = ${project_path}
 php_admin_value[error_log] = /var/log/php${php_version}-fpm-${project}.log
 php_admin_flag[log_errors] = on
 EOF
+  if [[ "$profile_id" == "bitrix" ]]; then
+    cat >>"$pool_file" <<'EOF'
+; simai-profile-ini-begin
+php_admin_flag[short_open_tag] = on
+; simai-profile-ini-end
+EOF
+  fi
   os_svc_reload_or_restart "php${php_version}-fpm" || true
 }
 
@@ -1134,7 +1141,9 @@ restore_nginx_backup() {
 
 reload_cron_daemon() {
   ensure_cron_service
-  os_svc_reload_or_restart cron || true
+  if os_svc_has_unit cron; then
+    os_svc_restart cron || true
+  fi
 }
 
 ensure_cron_service() {
@@ -1680,7 +1689,7 @@ switch_site_php() {
     return 1
   fi
 
-  create_php_pool "$socket_project" "$new_php" "$root"
+  create_php_pool "$socket_project" "$new_php" "$root" "$profile"
   if ! nginx_patch_php_socket "$domain" "$new_php" "$socket_project"; then
     return 1
   fi

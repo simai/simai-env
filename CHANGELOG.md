@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.8] - 2026-03-15
+### Fixed
+- Fixed `site doctor` INI comparison for values with uppercase size suffixes (`8M`, `4096K`) to avoid arithmetic parser warnings.
+- Reduced cron refresh noise by using restart flow instead of reload for `cron` service updates.
+- Bitrix profile PHP-FPM pool now enables `short_open_tag` by default, so `bitrixsetup.php` works out-of-the-box.
+
 ## [1.11.7] - 2026-03-15
 ### Changed
 - Switched interactive menu to stable text backend by default (no auto whiptail).
