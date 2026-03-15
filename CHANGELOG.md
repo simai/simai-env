@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.19] - 2026-03-15
+### Fixed
+- Bitrix nginx template now sets `client_max_body_size 64m` to avoid `413 Request Entity Too Large` during site checker large upload test (`check_upload_big`).
+
 ## [1.11.18] - 2026-03-15
 ### Fixed
 - Bitrix preseed no longer writes `BX_CRONTAB` into `dbconn.php` (web checker-compatible behavior).
