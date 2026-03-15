@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.9] - 2026-03-15
+### Fixed
+- Improved `site doctor` SSL checks to use actual nginx TLS directives/cert files in addition to metadata.
+- Added SSL metadata drift warnings when nginx and metadata disagree (`ssl=on/off` mismatch).
+
 ## [1.11.8] - 2026-03-15
 ### Fixed
 - Fixed `site doctor` INI comparison for values with uppercase size suffixes (`8M`, `4096K`) to avoid arithmetic parser warnings.

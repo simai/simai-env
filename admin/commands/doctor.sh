@@ -495,15 +495,37 @@ site_doctor_handler() {
   fi
 
   progress_step "SSL checks"
-  if [[ "${ssl_flag}" == "on" ]]; then
-    local le_dir="/etc/letsencrypt/live/${domain}"
-    if [[ -f "${le_dir}/fullchain.pem" && -f "${le_dir}/privkey.pem" ]]; then
-      doctor_add_result "PASS" "ssl" "Certificates" "LetsEncrypt files present" ""
+  local ssl_cfg="/etc/nginx/sites-available/${domain}.conf"
+  local nginx_cert="" nginx_key="" nginx_ssl_declared="no"
+  if [[ -f "$ssl_cfg" ]]; then
+    nginx_cert=$(awk '/^\s*ssl_certificate\s+/ {print $2; exit}' "$ssl_cfg" | sed 's/;$//')
+    nginx_key=$(awk '/^\s*ssl_certificate_key\s+/ {print $2; exit}' "$ssl_cfg" | sed 's/;$//')
+    if [[ -n "$nginx_cert" || -n "$nginx_key" ]]; then
+      nginx_ssl_declared="yes"
+    fi
+  fi
+  if [[ "${ssl_flag}" == "on" || "${nginx_ssl_declared}" == "yes" ]]; then
+    if [[ -n "$nginx_cert" && -n "$nginx_key" ]]; then
+      if [[ -f "$nginx_cert" && -f "$nginx_key" ]]; then
+        doctor_add_result "PASS" "ssl" "Certificates" "Nginx cert/key files present" ""
+      else
+        doctor_add_result "WARN" "ssl" "Certificates" "Nginx cert/key missing (${nginx_cert:-none}, ${nginx_key:-none})" "Re-run ssl letsencrypt or install custom certs"
+      fi
     else
-      doctor_add_result "WARN" "ssl" "Certificates" "Expected cert files missing under ${le_dir}" "Re-run ssl letsencrypt or install custom certs"
+      local le_dir="/etc/letsencrypt/live/${domain}"
+      if [[ -f "${le_dir}/fullchain.pem" && -f "${le_dir}/privkey.pem" ]]; then
+        doctor_add_result "PASS" "ssl" "Certificates" "LetsEncrypt files present" ""
+      else
+        doctor_add_result "WARN" "ssl" "Certificates" "SSL enabled but nginx cert/key directives are missing" "Re-run ssl letsencrypt or install custom certs"
+      fi
+    fi
+    if [[ "${ssl_flag}" != "on" && "${nginx_ssl_declared}" == "yes" ]]; then
+      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=off, but nginx uses SSL directives" "Run ssl status and refresh site metadata via SSL commands"
+    elif [[ "${ssl_flag}" == "on" && "${nginx_ssl_declared}" != "yes" ]]; then
+      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=on, but nginx has no SSL directives" "Run ssl status and re-apply SSL configuration"
     fi
   else
-    doctor_add_result "SKIP" "ssl" "SSL" "Disabled in metadata" ""
+    doctor_add_result "SKIP" "ssl" "SSL" "Disabled (metadata and nginx)" ""
   fi
 
 progress_step "DB checks"
