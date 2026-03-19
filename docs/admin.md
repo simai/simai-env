@@ -43,6 +43,7 @@ See `docs/architecture/profiles.md`.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 - `self perf-status`: show current managed performance baseline, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server and a reduction plan when total configured children exceed the safe budget.
+- `self perf-rebalance --limit <n> --confirm yes`: apply `site perf-tune --mode safe` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
 - `site perf-tune --domain <domain> --mode safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.

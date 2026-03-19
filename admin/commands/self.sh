@@ -564,6 +564,81 @@ self_perf_plan_handler() {
   fi
 }
 
+self_perf_rebalance_handler() {
+  parse_kv_args "$@"
+  local limit="${PARSED_ARGS[limit]:-8}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=8
+  (( limit < 1 )) && limit=1
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to apply FPM rebalancing changes"
+    return 1
+  fi
+
+  local before_total budget before_excess
+  before_total=$(perf_fpm_total_max_children)
+  budget=$(perf_fpm_recommended_total_children)
+  before_excess=$(perf_fpm_excess_children "$before_total" "$budget")
+
+  if [[ "$before_excess" == "0" ]]; then
+    ui_header "SIMAI ENV · FPM rebalance"
+    ui_section "Result"
+    ui_info "No FPM rebalance is needed."
+    return 0
+  fi
+
+  local changed=()
+  local skipped=()
+  local applied=0
+  local entry current domain profile mode safe_target reduction php_version pool_file
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    IFS='|' read -r current domain profile mode safe_target reduction php_version pool_file <<<"$entry"
+    [[ "$domain" == *.* ]] || continue
+    [[ "$reduction" =~ ^[0-9]+$ && "$reduction" -gt 0 ]] || continue
+    if [[ "$mode" == "safe" ]]; then
+      skipped+=("${domain}|already safe")
+      continue
+    fi
+    if site_perf_tune_handler --domain "$domain" --mode safe --confirm yes >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
+      changed+=("${domain}|${current} -> ${safe_target} (${profile}, php ${php_version})")
+      applied=$((applied + 1))
+    else
+      skipped+=("${domain}|apply failed")
+    fi
+    (( applied >= limit )) && break
+  done < <(perf_fpm_top_pools "$limit")
+
+  local after_total after_excess after_risk
+  after_total=$(perf_fpm_total_max_children)
+  after_excess=$(perf_fpm_excess_children "$after_total" "$budget")
+  after_risk=$(perf_fpm_oversubscription_risk "$after_total" "$budget")
+
+  ui_header "SIMAI ENV · FPM rebalance"
+  ui_section "Summary"
+  print_kv_table \
+    "Applied changes|${applied}" \
+    "Children before|${before_total}" \
+    "Children after|${after_total}" \
+    "Recommended budget|${budget}" \
+    "Excess before|${before_excess}" \
+    "Excess after|${after_excess}" \
+    "Oversubscription after|${after_risk}"
+
+  if (( ${#changed[@]} > 0 )); then
+    ui_section "Changed sites"
+    print_kv_table "${changed[@]}"
+  fi
+  if (( ${#skipped[@]} > 0 )); then
+    ui_section "Skipped"
+    print_kv_table "${skipped[@]}"
+  fi
+  ui_section "Next steps"
+  ui_kv "Review status" "simai-admin.sh self perf-status"
+  ui_kv "Review plan" "simai-admin.sh self perf-plan"
+}
+
 self_perf_apply_handler() {
   parse_kv_args "$@"
   local preset="${PARSED_ARGS[preset]:-}"
@@ -616,4 +691,5 @@ register_cmd "self" "status" "Show platform/service status" "self_status_handler
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
 register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
 register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
+register_cmd "self" "perf-rebalance" "Apply safe FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= confirm="
 register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="
