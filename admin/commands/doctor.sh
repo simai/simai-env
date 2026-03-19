@@ -416,7 +416,7 @@ site_doctor_handler() {
           continue
         fi
         key="${parsed%%|*}"; expected="${parsed#*|}"
-        actual=$(doctor_php_ini_get "$php_bin" "$key" || true)
+        actual=$(doctor_php_ini_effective_get "$php_bin" "$pool_file" "$key" || true)
         cmp=$(doctor_compare_ini "$key" "$expected" "$actual")
         if [[ "$cmp" == "ok" ]]; then
           doctor_add_result "PASS" "php" "INI required" "${key}=${actual}" ""
@@ -431,7 +431,7 @@ site_doctor_handler() {
         parsed=$(doctor_parse_ini_expectation "$ini_entry" || true)
         [[ -z "$parsed" ]] && continue
         key="${parsed%%|*}"; expected="${parsed#*|}"
-        actual=$(doctor_php_ini_get "$php_bin" "$key" || true)
+        actual=$(doctor_php_ini_effective_get "$php_bin" "$pool_file" "$key" || true)
         cmp=$(doctor_compare_ini "$key" "$expected" "$actual")
         if [[ "$cmp" == "ok" ]]; then
           doctor_add_result "PASS" "php" "INI recommended" "${key}=${actual}" ""
@@ -449,7 +449,7 @@ site_doctor_handler() {
           continue
         fi
         key="${parsed%%|*}"; expected="${parsed#*|}"
-        actual=$(doctor_php_ini_get "$php_bin" "$key" || true)
+        actual=$(doctor_php_ini_effective_get "$php_bin" "$pool_file" "$key" || true)
         cmp=$(doctor_ini_equals "$expected" "$actual")
         if [[ "$cmp" == "yes" ]]; then
           doctor_add_result "FAIL" "php" "INI forbidden" "${key}=${actual:-<empty>} is forbidden" "Set to a safe value in pool/php.ini and reload"

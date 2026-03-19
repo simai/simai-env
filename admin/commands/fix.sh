@@ -107,6 +107,8 @@ site_fix_handler() {
   resolved=$(fix_resolve_effective_project_and_socket "$domain" "$project" "$socket_meta")
   local socket_project
   IFS="|" read -r _ socket_project <<<"$resolved"
+  local pool_file
+  pool_file=$(fix_resolve_pool_file "$php_version" "$socket_project") || return 1
 
   progress_step "Planning PHP extensions"
   local missing_req=() missing_rec=()
@@ -160,7 +162,7 @@ site_fix_handler() {
       continue
     fi
     key="${parsed%%|*}"; expected="${parsed#*|}"
-    actual=$(doctor_php_ini_get "$php_bin" "$key" || true)
+    actual=$(doctor_php_ini_effective_get "$php_bin" "$pool_file" "$key" || true)
     cmp=$(doctor_compare_ini "$key" "$expected" "$actual")
     case "$cmp" in
       ok) ini_ok+=("${key}=${actual}") ;;
@@ -288,8 +290,6 @@ site_fix_handler() {
     if [[ ${#ini_to_apply[@]} -eq 0 ]]; then
       info "No INI overrides to apply"
     else
-      local pool_file
-      pool_file=$(fix_resolve_pool_file "$php_version" "$socket_project") || return 1
       local backup
       backup="${pool_file}.bak.$(date +%Y%m%d%H%M%S)"
       cp -p "$pool_file" "$backup" >>"$LOG_FILE" 2>&1 || backup=""

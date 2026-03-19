@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.26] - 2026-03-19
+### Fixed
+- `site doctor` and `site fix` now evaluate PHP INI against the effective PHP-FPM pool config when available, avoiding false Bitrix runtime warnings caused by CLI `php.ini`.
+
 ## [1.11.25] - 2026-03-19
 ### Fixed
 - Bitrix DB preseed now initializes MySQL connection collation more explicitly with `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci`, preventing MySQL 8 `utf8mb4_0900_ai_ci` connection mismatch on fresh installs.

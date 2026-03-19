@@ -95,6 +95,39 @@ doctor_php_ini_get() {
   "$php_bin" -d detect_unicode=0 -r "echo ini_get('$key');" 2>/dev/null
 }
 
+doctor_php_pool_ini_get() {
+  local pool_file="$1" key="$2"
+  [[ -f "$pool_file" ]] || return 1
+  awk -v target="$key" '
+    {
+      if (match($0, /^[[:space:]]*php_admin_value\[([^]]+)\][[:space:]]*=[[:space:]]*(.+)[[:space:]]*$/, m) && m[1] == target) {
+        value = m[2]
+      } else if (match($0, /^[[:space:]]*php_admin_flag\[([^]]+)\][[:space:]]*=[[:space:]]*(.+)[[:space:]]*$/, m) && m[1] == target) {
+        value = m[2]
+      }
+    }
+    END {
+      if (value != "") {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        print value
+      }
+    }
+  ' "$pool_file"
+}
+
+doctor_php_ini_effective_get() {
+  local php_bin="$1" pool_file="${2:-}" key="$3"
+  local pool_value=""
+  if [[ -n "$pool_file" ]]; then
+    pool_value=$(doctor_php_pool_ini_get "$pool_file" "$key" || true)
+  fi
+  if [[ -n "$pool_value" ]]; then
+    printf '%s' "$pool_value"
+    return 0
+  fi
+  doctor_php_ini_get "$php_bin" "$key"
+}
+
 doctor_normalize_bool() {
   local v="${1,,}"
   case "$v" in
