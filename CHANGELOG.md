@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.31] - 2026-03-19
+### Changed
+- Bitrix installer/status output now uses `http://` before SSL is enabled, avoiding misleading fresh-site `https://.../bitrixsetup.php` checks.
+### Fixed
+- Bitrix setup script detection now distinguishes a Site Management installer from a generic Bitrix24 loader, so fresh-site readiness no longer reports false-positive `ready` status.
+
 ## [1.11.30] - 2026-03-19
 ### Fixed
 - `site add` runtime now defines `SIMAI_HOME` consistently inside site utility helpers, avoiding `unbound variable` failures during user/home preparation on fresh site creation.

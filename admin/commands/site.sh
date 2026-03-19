@@ -329,6 +329,7 @@ site_add_handler() {
 
   if [[ "$profile" == "bitrix" ]]; then
     local bitrix_short_install="${PROFILE_BITRIX_SHORT_INSTALL_DEFAULT:-yes}"
+    local bitrix_setup_kind="missing"
     [[ "${bitrix_short_install,,}" == "yes" ]] && bitrix_short_install="yes" || bitrix_short_install="no"
     if read_site_db_env "$domain" >/dev/null 2>&1; then
       if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_short_install"; then
@@ -341,7 +342,12 @@ site_add_handler() {
       bitrix_preseed_summary="skipped (no db.env)"
     fi
     if bitrix_download_setup_script "$doc_root" "no"; then
-      bitrix_setup_summary="ready"
+      bitrix_setup_kind=$(bitrix_setup_script_kind "$(bitrix_setup_script_path "$doc_root")")
+      case "$bitrix_setup_kind" in
+        site-management) bitrix_setup_summary="ready" ;;
+        bitrix24-loader) bitrix_setup_summary="generic-loader" ;;
+        *) bitrix_setup_summary="downloaded" ;;
+      esac
     else
       bitrix_setup_summary="failed"
       warn "Failed to download bitrixsetup.php"
@@ -376,6 +382,9 @@ site_add_handler() {
   if [[ "$profile" == "bitrix" ]]; then
     echo "Bitrix DB preseed: ${bitrix_preseed_summary}"
     echo "Bitrix setup.php : ${bitrix_setup_summary}"
+    if [[ -n "${bitrix_setup_kind:-}" && "$bitrix_setup_kind" != "missing" ]]; then
+      echo "Bitrix setup kind: ${bitrix_setup_kind}"
+    fi
   fi
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"

@@ -138,6 +138,7 @@ bitrix_status_handler() {
   local short_install="unknown"
   local setup_script=""
   local setup_state="missing"
+  local setup_kind="missing"
   local cron_entrypoint="missing"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -147,7 +148,14 @@ bitrix_status_handler() {
 
   [[ -f "$BX_SETTINGS_FILE" ]] && settings_present="yes"
   setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
-  [[ -s "$setup_script" ]] && setup_state="present"
+  if [[ -s "$setup_script" ]]; then
+    setup_kind=$(bitrix_setup_script_kind "$setup_script")
+    case "$setup_kind" in
+      site-management) setup_state="ready" ;;
+      bitrix24-loader) setup_state="generic-loader" ;;
+      *) setup_state="present" ;;
+    esac
+  fi
   if [[ -f "$BX_DBCONN_FILE" ]]; then
     dbconn_present="yes"
     bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
@@ -174,6 +182,7 @@ bitrix_status_handler() {
     ".settings.php|${settings_present}" \
     "dbconn.php|${dbconn_present}" \
     "bitrixsetup.php|${setup_script} (${setup_state})" \
+    "Setup kind|${setup_kind}" \
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
     "SHORT_INSTALL|${short_install}" \
@@ -184,6 +193,7 @@ bitrix_status_handler() {
     "Cron domain marker|${cron_domain_match}" \
     "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
+  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
   ui_kv "Installer ready" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
   ui_kv "Cron sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
@@ -527,9 +537,15 @@ bitrix_installer_ready_handler() {
   fi
   local setup_state="failed"
   local setup_script
+  local setup_kind="missing"
   setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
   if bitrix_download_setup_script "$BX_DOC_ROOT" "$setup_overwrite"; then
-    setup_state="ready"
+    setup_kind=$(bitrix_setup_script_kind "$setup_script")
+    case "$setup_kind" in
+      site-management) setup_state="ready" ;;
+      bitrix24-loader) setup_state="generic-loader" ;;
+      *) setup_state="downloaded" ;;
+    esac
   fi
   local status="ready"
   [[ "$preseed_state" == "ready" && "$setup_state" == "ready" ]] || status="partial"
@@ -541,14 +557,15 @@ bitrix_installer_ready_handler() {
     "DB preseed|${preseed_state}" \
     "SHORT_INSTALL|${short_install}" \
     "Setup script|${setup_state}" \
+    "Setup kind|${setup_kind}" \
     "bitrixsetup.php|${setup_script}" \
     "Status|${status}"
   if [[ "$status" != "ready" ]]; then
-    warn "Installer ready is partial. Check network access and db.env values."
+    warn "Installer ready is partial. Check network access, db.env values, and whether bitrixsetup.php is a Site Management installer."
     return 1
   fi
   ui_section "Next steps"
-  ui_kv "Open installer" "https://${BX_DOMAIN}/bitrixsetup.php"
+  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php"
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 

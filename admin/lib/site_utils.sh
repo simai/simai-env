@@ -1598,6 +1598,38 @@ bitrix_setup_script_path() {
   echo "${doc_root}/bitrixsetup.php"
 }
 
+bitrix_setup_script_kind() {
+  local script_path="$1"
+  if [[ ! -s "$script_path" ]]; then
+    echo "missing"
+    return
+  fi
+  if grep -qE 'Bitrix24|portal/en_bitrix24|Choose a package' "$script_path" 2>/dev/null; then
+    echo "bitrix24-loader"
+    return
+  fi
+  if grep -qE 'Управление сайтом|Site Management|sitemanager|site manager' "$script_path" 2>/dev/null; then
+    echo "site-management"
+    return
+  fi
+  echo "unknown"
+}
+
+site_primary_scheme() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ -f "$cfg" ]] && grep -qE 'listen[[:space:]]+443|ssl_certificate[[:space:]]' "$cfg"; then
+    echo "https"
+    return
+  fi
+  echo "http"
+}
+
+site_primary_url() {
+  local domain="$1"
+  echo "$(site_primary_scheme "$domain")://${domain}"
+}
+
 bitrix_download_setup_script() {
   local doc_root="$1" overwrite="${2:-no}"
   local target
