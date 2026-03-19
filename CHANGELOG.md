@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.30] - 2026-03-19
+### Fixed
+- `site add` runtime now defines `SIMAI_HOME` consistently inside site utility helpers, avoiding `unbound variable` failures during user/home preparation on fresh site creation.
+
 ## [1.11.29] - 2026-03-19
 ### Fixed
 - `site add` and bootstrap no longer reset ownership recursively on the entire SIMAI home directory, avoiding long hangs on servers with existing site data.
