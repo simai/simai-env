@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.42] - 2026-03-19
+### Changed
+- `self perf-status` now reports live observability signals for nginx/MySQL/Redis/FPM pressure instead of baseline values only.
+- `site perf-status` now reports per-pool socket/service state, pool share, and error-log path for faster site-level diagnosis.
+
 ## [1.11.41] - 2026-03-19
 ### Fixed
 - Bitrix performance staging now derives `installer` vs `post-install` from effective runtime readiness (`agents-ready`) instead of trusting `SHORT_INSTALL` alone, avoiding false installer classification on already configured sites.

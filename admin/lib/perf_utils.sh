@@ -333,6 +333,117 @@ perf_redis_config_get() {
   redis-cli CONFIG GET "$key" 2>/dev/null | awk 'NR==2{print}'
 }
 
+perf_parse_size_to_bytes() {
+  local raw="${1:-0}"
+  raw=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')
+  case "$raw" in
+    ""|unknown|n/a) echo "0" ;;
+    *gb|*g) echo $(( ${raw%g*} * 1073741824 )) ;;
+    *mb|*m) echo $(( ${raw%m*} * 1048576 )) ;;
+    *kb|*k) echo $(( ${raw%k*} * 1024 )) ;;
+    *b) echo "${raw%b}" ;;
+    *[0-9]) echo "$raw" ;;
+    *) echo "0" ;;
+  esac
+}
+
+perf_ratio_band() {
+  local current="$1" total="$2"
+  if [[ -z "$current" || -z "$total" || ! "$current" =~ ^[0-9]+$ || ! "$total" =~ ^[0-9]+$ || "$total" -eq 0 ]]; then
+    echo "unknown"
+    return 0
+  fi
+  local pct=$(( current * 100 / total ))
+  if (( pct >= 85 )); then
+    echo "high (${current}/${total})"
+  elif (( pct >= 60 )); then
+    echo "medium (${current}/${total})"
+  else
+    echo "low (${current}/${total})"
+  fi
+}
+
+perf_mysql_show_status() {
+  local name="$1"
+  mysql -NBe "SHOW STATUS LIKE '${name}';" 2>/dev/null | awk '{print $2}' | head -n1
+}
+
+perf_mysql_slow_log_size() {
+  local path
+  path=$(perf_mysql_show_var "slow_query_log_file")
+  [[ -z "$path" ]] && path="/var/log/mysql/mysql-slow.log"
+  if [[ -f "$path" ]]; then
+    local size
+    size=$(wc -c <"$path" 2>/dev/null | tr -d ' ' || true)
+    [[ -n "$size" ]] && printf "%s (%s)" "$(perf_bytes_human "$size")" "$path" && return 0
+  fi
+  echo "missing (${path})"
+}
+
+perf_redis_info_get() {
+  local key="$1"
+  redis-cli INFO 2>/dev/null | awk -F: -v target="$key" '$1==target{print $2}' | tr -d '\r' | head -n1
+}
+
+perf_redis_memory_pressure() {
+  local used="$1" max="$2"
+  if [[ -z "$used" || -z "$max" || ! "$used" =~ ^[0-9]+$ || ! "$max" =~ ^[0-9]+$ || "$max" -eq 0 ]]; then
+    echo "unknown"
+    return 0
+  fi
+  perf_ratio_band "$used" "$max"
+}
+
+perf_fpm_service_summary() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+  local total=0 active=0 unit
+  while IFS= read -r unit; do
+    [[ -z "$unit" ]] && continue
+    total=$((total + 1))
+    if systemctl is-active --quiet "$unit"; then
+      active=$((active + 1))
+    fi
+  done < <(systemctl list-unit-files --type=service 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}')
+  if (( total == 0 )); then
+    echo "missing"
+    return 0
+  fi
+  echo "${active}/${total} active"
+}
+
+perf_fpm_pool_count() {
+  local count=0 file
+  shopt -s nullglob
+  for file in /etc/php/*/fpm/pool.d/*.conf; do
+    [[ -f "$file" ]] || continue
+    count=$((count + 1))
+  done
+  shopt -u nullglob
+  echo "$count"
+}
+
+perf_fpm_total_max_children() {
+  local total=0 file val
+  shopt -s nullglob
+  for file in /etc/php/*/fpm/pool.d/*.conf; do
+    [[ -f "$file" ]] || continue
+    val=$(perf_pool_directive_get "$file" "pm.max_children" || true)
+    if [[ -n "$val" && "$val" =~ ^[0-9]+$ ]]; then
+      total=$((total + val))
+    fi
+  done
+  shopt -u nullglob
+  echo "$total"
+}
+
+perf_pool_socket_path() {
+  local php_version="$1" socket_project="$2"
+  echo "/run/php/php${php_version}-fpm-${socket_project}.sock"
+}
+
 site_perf_file() {
   local domain="$1"
   echo "$(site_sites_config_dir)/${domain}/perf.env"

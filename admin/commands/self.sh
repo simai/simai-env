@@ -407,18 +407,26 @@ self_perf_status_handler() {
   fi
 
   local mysql_buffer mysql_connections mysql_slow mysql_long mysql_tmp mysql_heap
+  local mysql_threads_connected mysql_threads_running mysql_connection_pressure mysql_slow_file
   mysql_buffer=$(perf_mysql_show_var "innodb_buffer_pool_size")
   mysql_connections=$(perf_mysql_show_var "max_connections")
   mysql_slow=$(perf_mysql_show_var "slow_query_log")
   mysql_long=$(perf_mysql_show_var "long_query_time")
   mysql_tmp=$(perf_mysql_show_var "tmp_table_size")
   mysql_heap=$(perf_mysql_show_var "max_heap_table_size")
+  mysql_threads_connected=$(perf_mysql_show_status "Threads_connected")
+  mysql_threads_running=$(perf_mysql_show_status "Threads_running")
+  mysql_connection_pressure=$(perf_ratio_band "${mysql_threads_connected:-0}" "${mysql_connections:-0}")
+  mysql_slow_file=$(perf_mysql_slow_log_size)
   [[ -z "$mysql_buffer" ]] && mysql_buffer="unknown"
   [[ -z "$mysql_connections" ]] && mysql_connections="unknown"
   [[ -z "$mysql_slow" ]] && mysql_slow="unknown"
   [[ -z "$mysql_long" ]] && mysql_long="unknown"
   [[ -z "$mysql_tmp" ]] && mysql_tmp="unknown"
   [[ -z "$mysql_heap" ]] && mysql_heap="unknown"
+  [[ -z "$mysql_threads_connected" ]] && mysql_threads_connected="unknown"
+  [[ -z "$mysql_threads_running" ]] && mysql_threads_running="unknown"
+  [[ -z "$mysql_connection_pressure" ]] && mysql_connection_pressure="unknown"
 
   local redis_state="missing"
   if os_svc_has_unit "redis-server"; then
@@ -429,11 +437,33 @@ self_perf_status_handler() {
     fi
   fi
   local redis_maxmemory redis_policy redis_conf
+  local redis_used_memory redis_clients redis_ops redis_memory_pressure
   redis_maxmemory=$(perf_redis_config_get "maxmemory")
   redis_policy=$(perf_redis_config_get "maxmemory-policy")
   redis_conf=$(perf_redis_conf_path)
+  redis_used_memory=$(perf_redis_info_get "used_memory")
+  redis_clients=$(perf_redis_info_get "connected_clients")
+  redis_ops=$(perf_redis_info_get "instantaneous_ops_per_sec")
+  redis_memory_pressure=$(perf_redis_memory_pressure "${redis_used_memory:-0}" "${redis_maxmemory:-0}")
   [[ -z "$redis_maxmemory" ]] && redis_maxmemory="unknown"
   [[ -z "$redis_policy" ]] && redis_policy="unknown"
+  [[ -z "$redis_used_memory" ]] && redis_used_memory="unknown"
+  [[ -z "$redis_clients" ]] && redis_clients="unknown"
+  [[ -z "$redis_ops" ]] && redis_ops="unknown"
+  [[ -z "$redis_memory_pressure" ]] && redis_memory_pressure="unknown"
+
+  local fpm_services fpm_pools fpm_total_children
+  local nginx_test="unknown"
+  fpm_services=$(perf_fpm_service_summary)
+  fpm_pools=$(perf_fpm_pool_count)
+  fpm_total_children=$(perf_fpm_total_max_children)
+  if command -v nginx >/dev/null 2>&1; then
+    if nginx -t >/dev/null 2>&1; then
+      nginx_test="ok"
+    else
+      nginx_test="fail"
+    fi
+  fi
 
   ui_section "Result"
   print_kv_table \
@@ -441,17 +471,27 @@ self_perf_status_handler() {
     "Recommended preset|${recommended_preset}" \
     "Managed preset|${managed_preset}" \
     "FPM site defaults|${fpm_defaults}" \
+    "FPM services|${fpm_services}" \
+    "FPM pools|${fpm_pools}" \
+    "FPM configured children|${fpm_total_children}" \
     "OPcache defaults|${opcache_defaults}" \
     "nginx snippet|${nginx_managed} (${nginx_conf})" \
     "nginx gzip|${nginx_gzip}" \
     "nginx keepalive|${nginx_keepalive}" \
+    "nginx config test|${nginx_test}" \
     "mysql buffer pool|$(perf_bytes_human "$mysql_buffer")" \
     "mysql max connections|${mysql_connections}" \
+    "mysql threads|connected=${mysql_threads_connected}, running=${mysql_threads_running}" \
+    "mysql connection pressure|${mysql_connection_pressure}" \
     "mysql slow query log|${mysql_slow}" \
+    "mysql slow log file|${mysql_slow_file}" \
     "mysql long_query_time|${mysql_long}" \
     "mysql tmp/max heap|$(perf_bytes_human "$mysql_tmp") / $(perf_bytes_human "$mysql_heap")" \
     "redis|${redis_state}" \
     "redis maxmemory|${redis_maxmemory}" \
+    "redis used memory|$(perf_bytes_human "$redis_used_memory")" \
+    "redis memory pressure|${redis_memory_pressure}" \
+    "redis clients/ops|${redis_clients} / ${redis_ops}" \
     "redis policy|${redis_policy}" \
     "redis snippet|$( [[ -f "$redis_conf" ]] && printf 'present (%s)' "$redis_conf" || printf 'missing (%s)' "$redis_conf" )"
   ui_section "Next steps"

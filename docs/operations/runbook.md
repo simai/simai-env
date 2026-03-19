@@ -95,12 +95,13 @@ bash /root/simai-env/testing/run-regression.sh full
 
 1. Run `self platform-status` and `db status`.
 2. Run `self perf-status` to compare current baseline vs recommended preset.
-3. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
-4. Check admin/env/audit logs.
-5. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
-6. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
-7. Use `laravel perf-apply` / `wp perf-apply` only after the generic site baseline is healthy.
-8. For Bitrix, prefer `bitrix perf-apply` only after installer flow is complete; installer-stage sites intentionally skip agents/cache steps.
+3. Treat `mysql connection pressure`, `redis memory pressure`, and `FPM configured children` as first-pass saturation signals before changing presets.
+4. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
+5. Check admin/env/audit logs.
+6. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
+7. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
+8. Use `laravel perf-apply` / `wp perf-apply` only after the generic site baseline is healthy.
+9. For Bitrix, prefer `bitrix perf-apply` only after installer flow is complete; installer-stage sites intentionally skip agents/cache steps.
 
 ## 7) Safety notes
 

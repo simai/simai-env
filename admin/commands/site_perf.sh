@@ -50,6 +50,8 @@ site_perf_status_handler() {
   local opcache_ext="n/a" redis_ext="n/a" redis_service="n/a"
   local cron_summary="n/a" queue_summary="n/a"
   local php_bin=""
+  local pool_service="n/a" pool_socket="n/a" pool_socket_state="n/a" pool_error_log="n/a"
+  local total_children="0" pool_share="unknown"
 
   declare -A perf_settings=()
   local entry
@@ -71,15 +73,25 @@ site_perf_status_handler() {
   if [[ "$php_version" != "none" && -n "$socket_project" ]]; then
     pool_file="/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
     if [[ -f "$pool_file" ]]; then
+      pool_service="php${php_version}-fpm"
       pm=$(perf_pool_directive_get "$pool_file" "pm" || true)
       max_children=$(perf_pool_directive_get "$pool_file" "pm.max_children" || true)
       idle_timeout=$(perf_pool_directive_get "$pool_file" "pm.process_idle_timeout" || true)
       max_requests=$(perf_pool_directive_get "$pool_file" "pm.max_requests" || true)
       req_timeout=$(perf_pool_directive_get "$pool_file" "request_terminate_timeout" || true)
+      pool_error_log=$(perf_pool_directive_get "$pool_file" "php_admin_value[error_log]" || true)
       memory_limit=$(doctor_php_pool_ini_get "$pool_file" "memory_limit" || true)
       [[ -z "$memory_limit" ]] && memory_limit="n/a"
       memory_risk=$(site_perf_memory_risk "$memory_limit" "$max_children")
       php_bin=$(resolve_php_bin "$php_version")
+      pool_socket=$(perf_pool_socket_path "$php_version" "$socket_project")
+      if [[ -S "$pool_socket" ]]; then
+        pool_socket_state="present"
+      else
+        pool_socket_state="missing"
+      fi
+      total_children=$(perf_fpm_total_max_children)
+      pool_share=$(perf_ratio_band "${max_children:-0}" "${total_children:-0}")
       if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^Zend OPcache$'; then
         opcache_ext="yes"
       else
@@ -109,11 +121,15 @@ site_perf_status_handler() {
     "Managed mode|${mode}" \
     "PHP|${php_version}" \
     "Pool file|${pool_file}" \
+    "Pool service|${pool_service}" \
     "Pool pm|${pm:-n/a}" \
     "Pool max children|${max_children:-n/a}" \
+    "Pool children share|${pool_share}" \
     "Pool idle timeout|${idle_timeout:-n/a}" \
     "Pool max requests|${max_requests:-n/a}" \
     "Request timeout|${req_timeout:-n/a}" \
+    "Pool socket|${pool_socket} (${pool_socket_state})" \
+    "Pool error log|${pool_error_log:-n/a}" \
     "Memory limit|${memory_limit}" \
     "Estimated memory risk|${memory_risk}" \
     "OPcache extension|${opcache_ext}" \
