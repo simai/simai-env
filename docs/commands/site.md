@@ -27,6 +27,14 @@ Behavior:
   - `SIMAI_SSL_REDIRECT_DEFAULT=yes|no`
   - `SIMAI_SSL_HSTS_DEFAULT=yes|no`
   - `SIMAI_SSL_STAGING_DEFAULT=yes|no`
+  Example:
+  ```bash
+  SIMAI_SSL_AUTO_ISSUE_ON_CREATE=ask
+  SIMAI_SSL_LE_EMAIL_DEFAULT=ops@example.com
+  SIMAI_SSL_REDIRECT_DEFAULT=yes
+  SIMAI_SSL_HSTS_DEFAULT=no
+  SIMAI_SSL_STAGING_DEFAULT=no
+  ```
  - For static profile, `--php` and DB flags are ignored (with warnings); no PHP-FPM pool or cron is created.
  - Project ID (slug) is still used for pools/cron/queue/sockets/logs even if the path style uses the domain.
  - If an existing slug/domain directory is found, the tool reuses it to avoid duplicates and warns accordingly.
