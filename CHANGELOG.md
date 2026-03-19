@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.28] - 2026-03-19
+### Changed
+- Bitrix production docs now define a stricter post-install workflow: `site add` -> `installer-ready` -> web install -> `php-baseline-sync` -> `agents-sync` -> TLS -> final checker/perfmon acceptance.
+
 ## [1.11.27] - 2026-03-19
 ### Fixed
 - SSL metadata checks now understand normalized site metadata values like `letsencrypt` and `custom`, avoiding false `Metadata drift` warnings in `site doctor`.

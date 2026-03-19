@@ -102,6 +102,13 @@ Notes:
 - default mode keeps existing files (`--overwrite no`, `--setup-overwrite no`).
 - command is safe for repeat runs (idempotent).
 - if network is unavailable, setup script step can fail while DB preseed still stays valid.
+- recommended usage order for fresh sites:
+  1. `site add --profile bitrix --db yes`
+  2. `bitrix installer-ready --domain <domain>`
+  3. complete web installer
+  4. `bitrix php-baseline-sync --domain <domain>`
+  5. `bitrix agents-sync --domain <domain> --apply yes --confirm yes`
+  6. `ssl letsencrypt --domain <domain> --email <email>`
 
 ## PHP Baseline Sync
 
@@ -121,3 +128,4 @@ Notes:
 - Single-domain mode works with `--domain`.
 - Bulk mode (`--all yes`) requires `--confirm yes` in CLI mode.
 - Read-only checks are not changed; only PHP pool INI overrides are updated.
+- run this after Bitrix web installation, before final `site_checker` / `perfmon` acceptance checks.
