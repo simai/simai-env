@@ -786,6 +786,8 @@ create_mysql_db_user() {
   mysql_root_exec "ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${esc_pass}';"
   mysql_root_exec "GRANT ALL PRIVILEGES ON \\\`${db_name}\\\`.* TO '${db_user}'@'127.0.0.1';"
   mysql_root_exec "GRANT ALL PRIVILEGES ON \\\`${db_name}\\\`.* TO '${db_user}'@'localhost';"
+  mysql_root_exec "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${db_user}'@'127.0.0.1';" || true
+  mysql_root_exec "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${db_user}'@'localhost';" || true
   mysql_root_exec "FLUSH PRIVILEGES;"
 }
 
@@ -1645,6 +1647,7 @@ bitrix_write_db_preseed_files() {
   local bx_dir="${doc_root}/bitrix"
   local settings_file="${bx_dir}/.settings.php"
   local dbconn_file="${bx_dir}/php_interface/dbconn.php"
+  local after_connect_file="${bx_dir}/php_interface/after_connect_d7.php"
   local q_host q_name q_user q_pass
   q_host=$(bitrix_php_quote "${db_host:-localhost}")
   q_name=$(bitrix_php_quote "$db_name")
@@ -1652,7 +1655,7 @@ bitrix_write_db_preseed_files() {
   q_pass=$(bitrix_php_quote "$db_pass")
 
   local do_write="yes"
-  if [[ "${overwrite,,}" != "yes" && -s "$settings_file" && -s "$dbconn_file" ]]; then
+  if [[ "${overwrite,,}" != "yes" && -s "$settings_file" && -s "$dbconn_file" && -s "$after_connect_file" ]]; then
     do_write="no"
   fi
   if [[ "$do_write" != "yes" ]]; then
@@ -1666,8 +1669,10 @@ bitrix_write_db_preseed_files() {
   mkdir -p "${bx_dir}/php_interface"
 
   local tmp_settings tmp_dbconn
+  local tmp_after_connect
   tmp_settings=$(mktemp)
   tmp_dbconn=$(mktemp)
+  tmp_after_connect=$(mktemp)
 
   cat >"$tmp_settings" <<EOF
 <?php
@@ -1710,15 +1715,28 @@ if (!defined("SHORT_INSTALL")) {
 }
 EOF
 
-  if ! php -l "$tmp_settings" >/dev/null 2>&1 || ! php -l "$tmp_dbconn" >/dev/null 2>&1; then
-    rm -f "$tmp_settings" "$tmp_dbconn"
+  cat >"$tmp_after_connect" <<'EOF'
+<?php
+if (!class_exists('\Bitrix\Main\Application')) {
+    return;
+}
+
+$connection = \Bitrix\Main\Application::getConnection();
+$connection->queryExecute("SET SESSION sql_mode=''");
+$connection->queryExecute("SET SESSION innodb_strict_mode=0");
+$connection->queryExecute("SET SESSION collation_connection='utf8mb4_unicode_ci'");
+EOF
+
+  if ! php -l "$tmp_settings" >/dev/null 2>&1 || ! php -l "$tmp_dbconn" >/dev/null 2>&1 || ! php -l "$tmp_after_connect" >/dev/null 2>&1; then
+    rm -f "$tmp_settings" "$tmp_dbconn" "$tmp_after_connect"
     return 1
   fi
 
   mv "$tmp_settings" "$settings_file"
   mv "$tmp_dbconn" "$dbconn_file"
-  chmod 0640 "$settings_file" "$dbconn_file"
-  chown "${SIMAI_USER}:www-data" "$settings_file" "$dbconn_file" 2>/dev/null || true
+  mv "$tmp_after_connect" "$after_connect_file"
+  chmod 0640 "$settings_file" "$dbconn_file" "$after_connect_file"
+  chown "${SIMAI_USER}:www-data" "$settings_file" "$dbconn_file" "$after_connect_file" 2>/dev/null || true
   return 0
 }
 

@@ -211,6 +211,7 @@ site_db_apply_create() {
     [[ $created_db -eq 1 ]] && mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${db_name}\`" || true
     return 1
   fi
+  mysql_root_exec_stdin "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${db_user}'@'localhost'" || true
   if ! mysql_root_exec_stdin "FLUSH PRIVILEGES"; then
     error "Failed to flush privileges"
     [[ $created_user -eq 1 ]] && mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'localhost'" || true

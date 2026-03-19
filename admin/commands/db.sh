@@ -31,6 +31,8 @@ db_create_handler() {
   mysql_root_exec_stdin "ALTER USER '${user}'@'localhost' IDENTIFIED BY '${esc_pass}';" || return 1
   mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${name}\`.* TO '${user}'@'127.0.0.1';" || return 1
   mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${name}\`.* TO '${user}'@'localhost';" || return 1
+  mysql_root_exec_stdin "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${user}'@'127.0.0.1';" || true
+  mysql_root_exec_stdin "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${user}'@'localhost';" || true
   mysql_root_exec_stdin "FLUSH PRIVILEGES;" || return 1
   progress_done "DB created/updated"
   echo "===== DB create summary ====="

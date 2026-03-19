@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.24] - 2026-03-19
+### Fixed
+- Bitrix DB/user creation now grants `SESSION_VARIABLES_ADMIN` (best effort) so MySQL 8 session compatibility settings can be applied on fresh installs.
+- Bitrix DB preseed now also creates `bitrix/php_interface/after_connect_d7.php` with MySQL session compatibility commands:
+  - `SET SESSION sql_mode=''`
+  - `SET SESSION innodb_strict_mode=0`
+  - `SET SESSION collation_connection='utf8mb4_unicode_ci'`
+
 ## [1.11.23] - 2026-03-19
 ### Changed
 - Bitrix nginx template is now closer to default Bitrix `.htaccess` behavior on fresh installs:

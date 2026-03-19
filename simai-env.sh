@@ -666,7 +666,10 @@ create_database() {
   mysql_root_exec_stdin "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';" || warn "Failed to create user ${DB_USER}@127.0.0.1"
   mysql_root_exec_stdin "CREATE USER IF NOT EXISTS '${DB_USER}'@'localhost' IDENTIFIED BY '${DB_PASS}';" || warn "Failed to create user ${DB_USER}@localhost"
   mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'127.0.0.1';" || warn "Failed to grant privileges to ${DB_USER}@127.0.0.1"
-  mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost'; FLUSH PRIVILEGES;" || warn "Failed to grant privileges to ${DB_USER}@localhost"
+  mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${DB_NAME}\`.* TO '${DB_USER}'@'localhost';" || warn "Failed to grant privileges to ${DB_USER}@localhost"
+  mysql_root_exec_stdin "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${DB_USER}'@'127.0.0.1';" || warn "Failed to grant session variable privileges to ${DB_USER}@127.0.0.1"
+  mysql_root_exec_stdin "GRANT SESSION_VARIABLES_ADMIN ON *.* TO '${DB_USER}'@'localhost';" || warn "Failed to grant session variable privileges to ${DB_USER}@localhost"
+  mysql_root_exec_stdin "FLUSH PRIVILEGES;" || warn "Failed to flush privileges for ${DB_USER}"
 }
 
 copy_env_if_needed() {
