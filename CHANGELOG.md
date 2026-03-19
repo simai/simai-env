@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.46] - 2026-03-19
+### Added
+- Added reversible site runtime management: `site runtime-status`, `site runtime-suspend`, and `site runtime-resume`.
+### Changed
+- `site list`, `site info`, and `site perf-status` now expose runtime state so parked/suspended sites are visible in normal operations.
+
 ## [1.11.45] - 2026-03-19
 ### Added
 - Added `self perf-plan` to highlight the heaviest PHP-FPM pools and suggest site-level `perf-tune --mode safe` actions when server-wide FPM children are oversubscribed.

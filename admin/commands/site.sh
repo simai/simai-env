@@ -19,6 +19,229 @@ site_ssl_bool_normalize() {
   esac
 }
 
+site_pick_existing_domain() {
+  local domain="${1:-}"
+  if [[ -z "$domain" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      local sites=()
+      mapfile -t sites < <(list_sites)
+      if [[ ${#sites[@]} -eq 0 ]]; then
+        warn "No sites found"
+        return 0
+      fi
+      domain=$(select_from_list "Select site" "" "${sites[@]}")
+    else
+      read -r -p "domain: " domain || true
+    fi
+  fi
+  if [[ -z "$domain" ]]; then
+    warn "Cancelled."
+    return 0
+  fi
+  if ! validate_domain "$domain" "allow"; then
+    return 1
+  fi
+  if ! require_site_exists "$domain"; then
+    return 1
+  fi
+  printf '%s\n' "$domain"
+}
+
+site_runtime_status_handler() {
+  parse_kv_args "$@"
+  ui_header "SIMAI ENV · Site runtime"
+  local domain
+  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
+  [[ -z "$domain" ]] && return 0
+
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
+
+  local profile="${SITE_META[profile]:-unknown}"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local slug="${SITE_META[slug]:-$project}"
+  local php="${SITE_META[php]:-none}"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local state cron_state queue_state
+  state=$(site_runtime_state "$domain")
+  cron_state=$(site_runtime_read_var "$domain" "SITE_RUNTIME_CRON" 2>/dev/null || true)
+  queue_state=$(site_runtime_read_var "$domain" "SITE_RUNTIME_QUEUE" 2>/dev/null || true)
+  [[ -z "$cron_state" ]] && cron_state="unchanged"
+  [[ -z "$queue_state" ]] && queue_state="unchanged"
+  local pool_state="n/a"
+  if [[ "$php" != "none" ]]; then
+    if [[ -f "$(site_runtime_pool_disabled_path "$php" "$socket_project")" ]]; then
+      pool_state="disabled"
+    elif [[ -f "/etc/php/${php}/fpm/pool.d/${socket_project}.conf" ]]; then
+      pool_state="enabled"
+    else
+      pool_state="missing"
+    fi
+  fi
+  local queue_unit="n/a" queue_unit_state="n/a"
+  if load_profile "$profile"; then
+    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
+      queue_unit="laravel-queue-${project}.service"
+      if os_svc_has_unit "$queue_unit"; then
+        if os_svc_is_active "$queue_unit"; then
+          queue_unit_state="active"
+        else
+          queue_unit_state="inactive"
+        fi
+      else
+        queue_unit_state="missing"
+      fi
+    fi
+  fi
+  local cron_file="/etc/cron.d/${slug}" cron_file_state="n/a"
+  if [[ -f "$cron_file" ]]; then
+    cron_file_state="enabled"
+  elif [[ -f "$(site_runtime_cron_disabled_path "$slug")" ]]; then
+    cron_file_state="disabled"
+  else
+    cron_file_state="missing"
+  fi
+
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Profile|${profile}" \
+    "Runtime state|${state}" \
+    "PHP pool|${pool_state}" \
+    "Cron file|${cron_file_state}" \
+    "Queue unit|${queue_unit}" \
+    "Queue status|${queue_unit_state}" \
+    "Runtime cron policy|${cron_state}" \
+    "Runtime queue policy|${queue_state}"
+  ui_section "Next steps"
+  ui_kv "Suspend" "simai-admin.sh site runtime-suspend --domain ${domain} --confirm yes"
+  ui_kv "Resume" "simai-admin.sh site runtime-resume --domain ${domain} --confirm yes"
+}
+
+site_runtime_suspend_handler() {
+  parse_kv_args "$@"
+  local domain
+  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
+  [[ -z "$domain" ]] && return 0
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to suspend site runtime"
+    return 1
+  fi
+
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
+
+  local profile="${SITE_META[profile]:-unknown}"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local slug="${SITE_META[slug]:-$project}"
+  local php="${SITE_META[php]:-none}"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local state
+  state=$(site_runtime_state "$domain")
+  if [[ "$state" == "suspended" ]]; then
+    warn "Site runtime is already suspended."
+    return 0
+  fi
+
+  local cron_policy="unchanged" queue_policy="unchanged" pool_status="n/a"
+  if [[ "$php" != "none" ]]; then
+    pool_status=$(site_runtime_disable_pool "$php" "$socket_project")
+  fi
+  if load_profile "$profile"; then
+    if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" ]]; then
+      cron_policy=$(site_runtime_disable_cron "$slug")
+    fi
+    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
+      local queue_unit="laravel-queue-${project}.service"
+      if os_svc_has_unit "$queue_unit"; then
+        os_svc_disable_now "$queue_unit" || true
+        queue_policy="disabled"
+      else
+        queue_policy="missing"
+      fi
+    fi
+  fi
+  if ! site_runtime_nginx_suspend "$domain"; then
+    return 1
+  fi
+  write_site_runtime_state "$domain" \
+    "SITE_RUNTIME_STATE|suspended" \
+    "SITE_RUNTIME_CRON|${cron_policy}" \
+    "SITE_RUNTIME_QUEUE|${queue_policy}"
+
+  ui_header "SIMAI ENV · Site runtime suspend"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Runtime state|suspended" \
+    "PHP pool|${pool_status}" \
+    "Cron|${cron_policy}" \
+    "Queue|${queue_policy}"
+}
+
+site_runtime_resume_handler() {
+  parse_kv_args "$@"
+  local domain
+  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
+  [[ -z "$domain" ]] && return 0
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to resume site runtime"
+    return 1
+  fi
+
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
+
+  local profile="${SITE_META[profile]:-unknown}"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local slug="${SITE_META[slug]:-$project}"
+  local php="${SITE_META[php]:-none}"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local cron_policy queue_policy
+  cron_policy=$(site_runtime_read_var "$domain" "SITE_RUNTIME_CRON" 2>/dev/null || true)
+  queue_policy=$(site_runtime_read_var "$domain" "SITE_RUNTIME_QUEUE" 2>/dev/null || true)
+  local pool_status="n/a"
+  if [[ "$php" != "none" ]]; then
+    pool_status=$(site_runtime_enable_pool "$php" "$socket_project")
+  fi
+  if load_profile "$profile"; then
+    if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" && "$cron_policy" == "disabled" ]]; then
+      cron_policy=$(site_runtime_enable_cron "$slug")
+    fi
+    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" && "$queue_policy" == "disabled" ]]; then
+      local queue_unit="laravel-queue-${project}.service"
+      if os_svc_has_unit "$queue_unit"; then
+        os_svc_enable_now "$queue_unit" || os_svc_restart "$queue_unit" || true
+        queue_policy="enabled"
+      fi
+    fi
+  fi
+  if ! site_runtime_nginx_resume "$domain"; then
+    return 1
+  fi
+  write_site_runtime_state "$domain" \
+    "SITE_RUNTIME_STATE|active" \
+    "SITE_RUNTIME_CRON|${cron_policy:-unchanged}" \
+    "SITE_RUNTIME_QUEUE|${queue_policy:-unchanged}"
+
+  ui_header "SIMAI ENV · Site runtime resume"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Runtime state|active" \
+    "PHP pool|${pool_status}" \
+    "Cron|${cron_policy:-unchanged}" \
+    "Queue|${queue_policy:-unchanged}"
+}
+
 site_issue_default_ssl_after_create() {
   SITE_SSL_ISSUE_SUMMARY="not requested"
   local domain="$1"
@@ -1072,34 +1295,35 @@ site_list_handler() {
   local cols
   cols=$(tput cols 2>/dev/null || echo 120)
 
-  local domain_w=28 profile_w=10 php_w=6 ssl_w=12 root_w=40
-  local min_domain=15 min_profile=8 min_php=4 min_ssl=10 min_root=20
+  local domain_w=28 profile_w=10 php_w=6 ssl_w=12 runtime_w=10 root_w=30
+  local min_domain=15 min_profile=8 min_php=4 min_ssl=10 min_runtime=8 min_root=16
   if [[ $is_tty -eq 1 ]]; then
-    domain_w=$min_domain; profile_w=$min_profile; php_w=$min_php; ssl_w=$min_ssl; root_w=$min_root
-    local ncols=5
-    local total=$((domain_w+profile_w+php_w+ssl_w+root_w + 3*ncols + 1))
+    domain_w=$min_domain; profile_w=$min_profile; php_w=$min_php; ssl_w=$min_ssl; runtime_w=$min_runtime; root_w=$min_root
+    local ncols=6
+    local total=$((domain_w+profile_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
     if (( cols > total )); then
       local extra=$((cols - total))
       root_w=$((root_w + extra))
     else
       # compact mode
-      local compact_domain compact_profile compact_php compact_ssl
+      local compact_domain compact_profile compact_php compact_ssl compact_runtime
       compact_domain=$min_domain
       compact_profile=$min_profile
       compact_php=$min_php
       compact_ssl=$min_ssl
-      local available=$((cols - (3*4 + 1)))
-      if (( available < compact_profile+compact_php+compact_ssl+8 )); then
+      compact_runtime=$min_runtime
+      local available=$((cols - (3*5 + 1)))
+      if (( available < compact_profile+compact_php+compact_ssl+compact_runtime+8 )); then
         compact_domain=8
       else
-        compact_domain=$((available - (compact_profile+compact_php+compact_ssl)))
+        compact_domain=$((available - (compact_profile+compact_php+compact_ssl+compact_runtime)))
       fi
       ((compact_domain<8)) && compact_domain=8
       local sep
-      sep="+$(repeat '-' $((compact_domain+2)))+$(repeat '-' $((compact_profile+2)))+$(repeat '-' $((compact_php+2)))+$(repeat '-' $((compact_ssl+2)))+"
+      sep="+$(repeat '-' $((compact_domain+2)))+$(repeat '-' $((compact_profile+2)))+$(repeat '-' $((compact_php+2)))+$(repeat '-' $((compact_ssl+2)))+$(repeat '-' $((compact_runtime+2)))+"
       printf "%s\n" "$sep"
-      printf "| %-*s | %-*s | %-*s | %-*s |\n" \
-        "$compact_domain" "Domain" "$compact_profile" "Profile" "$compact_php" "PHP" "$compact_ssl" "SSL"
+      printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+        "$compact_domain" "Domain" "$compact_profile" "Profile" "$compact_php" "PHP" "$compact_ssl" "SSL" "$compact_runtime" "Runtime"
       printf "%s\n" "$sep"
       while IFS= read -r s; do
         [[ -z "$s" ]] && continue
@@ -1108,17 +1332,20 @@ site_list_handler() {
         local php="${SITE_META[php]:-}"
         local root="${SITE_META[root]:-}"
         local target="${SITE_META[target]:-}"
+        local runtime
+        runtime=$(site_runtime_state "$s")
         local ssl_info
         ssl_info=$(site_ssl_brief "$s")
         local summary="$root"
         if [[ "$profile" == "alias" && -n "$target" ]]; then
           summary="alias -> ${target}"
         fi
-        printf "| %-*s | %-*s | %-*s | %-*s |\n" \
+        printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
           "$compact_domain" "$(truncate_cell "$compact_domain" "$s")" \
           "$compact_profile" "$(truncate_cell "$compact_profile" "$profile")" \
           "$compact_php" "$(truncate_cell "$compact_php" "$php")" \
-          "$compact_ssl" "$(truncate_cell "$compact_ssl" "$ssl_info")"
+          "$compact_ssl" "$(truncate_cell "$compact_ssl" "$ssl_info")" \
+          "$compact_runtime" "$(truncate_cell "$compact_runtime" "$runtime")"
         local label="Root/Target"
         local max_summary=$((cols-4-${#label}))
         ((max_summary<0)) && max_summary=0
@@ -1129,13 +1356,13 @@ site_list_handler() {
     fi
   fi
 
-  local ncols=5
-  local total=$((domain_w+profile_w+php_w+ssl_w+root_w + 3*ncols + 1))
+  local ncols=6
+  local total=$((domain_w+profile_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
   local sep
-  sep="+$(repeat '-' $((domain_w+2)))+$(repeat '-' $((profile_w+2)))+$(repeat '-' $((php_w+2)))+$(repeat '-' $((ssl_w+2)))+$(repeat '-' $((root_w+2)))+"
+  sep="+$(repeat '-' $((domain_w+2)))+$(repeat '-' $((profile_w+2)))+$(repeat '-' $((php_w+2)))+$(repeat '-' $((ssl_w+2)))+$(repeat '-' $((runtime_w+2)))+$(repeat '-' $((root_w+2)))+"
   printf "%s\n" "$sep"
-  printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
-    "$domain_w" "Domain" "$profile_w" "Profile" "$php_w" "PHP" "$ssl_w" "SSL" "$root_w" "Root/Target"
+  printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    "$domain_w" "Domain" "$profile_w" "Profile" "$php_w" "PHP" "$ssl_w" "SSL" "$runtime_w" "Runtime" "$root_w" "Root/Target"
   printf "%s\n" "$sep"
   local s
   while IFS= read -r s; do
@@ -1145,17 +1372,20 @@ site_list_handler() {
     local php="${SITE_META[php]:-}"
     local root="${SITE_META[root]:-}"
     local target="${SITE_META[target]:-}"
+    local runtime
+    runtime=$(site_runtime_state "$s")
     local ssl_info
     ssl_info=$(site_ssl_brief "$s")
     local summary="$root"
     if [[ "$profile" == "alias" && -n "$target" ]]; then
       summary="alias -> ${target}"
     fi
-    printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
       "$domain_w" "$(truncate_cell "$domain_w" "$s")" \
       "$profile_w" "$(truncate_cell "$profile_w" "$profile")" \
       "$php_w" "$(truncate_cell "$php_w" "$php")" \
       "$ssl_w" "$(truncate_cell "$ssl_w" "$ssl_info")" \
+      "$runtime_w" "$(truncate_cell "$runtime_w" "$runtime")" \
       "$root_w" "$(truncate_cell "$root_w" "$summary")"
   done < <(list_sites)
   printf "%s\n" "$sep"
@@ -1164,30 +1394,9 @@ site_list_handler() {
 site_info_handler() {
   parse_kv_args "$@"
   ui_header "SIMAI ENV · Site info"
-  local domain="${PARSED_ARGS[domain]:-}"
-  if [[ -z "$domain" ]]; then
-    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      local sites=()
-      mapfile -t sites < <(list_sites)
-      if [[ ${#sites[@]} -eq 0 ]]; then
-        warn "No sites found"
-        return 0
-      fi
-      domain=$(select_from_list "Select site" "" "${sites[@]}")
-    else
-      read -r -p "domain: " domain || true
-    fi
-  fi
-  if [[ -z "$domain" ]]; then
-    warn "Cancelled."
-    return 0
-  fi
-  if ! validate_domain "$domain" "allow"; then
-    return 1
-  fi
-  if ! require_site_exists "$domain"; then
-    return 1
-  fi
+  local domain
+  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
+  [[ -z "$domain" ]] && return 0
   if ! read_site_metadata "$domain"; then
     error "Failed to read site metadata for ${domain}"
     return 1
@@ -1238,6 +1447,8 @@ site_info_handler() {
   [[ -z "$target" ]] && target="n/a"
   local updated_at="${SITE_META[updated_at]:-}"
   [[ -z "$updated_at" ]] && updated_at="n/a"
+  local runtime_state
+  runtime_state=$(site_runtime_state "$domain")
 
   local -a rows=(
     "Domain|${domain}"
@@ -1253,6 +1464,7 @@ site_info_handler() {
     "Error log|${error_log}"
     "PHP|${php}"
     "PHP socket|${php_socket}"
+    "Runtime state|${runtime_state}"
     "SSL|${ssl_brief}"
     "Redirect|${ssl_redirect}"
     "HSTS|${ssl_hsts}"
@@ -1275,3 +1487,6 @@ register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "d
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
 register_cmd "site" "info" "Show site details" "site_info_handler" "" "domain="
+register_cmd "site" "runtime-status" "Show site runtime state" "site_runtime_status_handler" "" "domain="
+register_cmd "site" "runtime-suspend" "Suspend site runtime" "site_runtime_suspend_handler" "" "domain= confirm="
+register_cmd "site" "runtime-resume" "Resume site runtime" "site_runtime_resume_handler" "" "domain= confirm="

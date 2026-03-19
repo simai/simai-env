@@ -37,6 +37,70 @@ site_sites_config_dir() {
   echo "/etc/simai-env/sites"
 }
 
+site_runtime_file() {
+  local domain="$1"
+  echo "$(site_sites_config_dir)/${domain}/runtime.env"
+}
+
+site_runtime_read_var() {
+  local domain="$1" key="$2"
+  local file
+  file=$(site_runtime_file "$domain")
+  [[ -f "$file" ]] || return 1
+  awk -F= -v target="$key" '
+    $1 == target {
+      val=substr($0, index($0, "=")+1)
+      sub(/^[[:space:]]+/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      print val
+      found=1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$file"
+}
+
+site_runtime_state() {
+  local domain="$1"
+  local state
+  state=$(site_runtime_read_var "$domain" "SITE_RUNTIME_STATE" 2>/dev/null || true)
+  [[ -z "$state" ]] && state="active"
+  echo "$state"
+}
+
+write_site_runtime_state() {
+  local domain="$1"
+  shift
+  local file dir tmp
+  file=$(site_runtime_file "$domain")
+  dir=$(dirname "$file")
+  mkdir -p "$dir"
+  tmp=$(mktemp)
+  local entry
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    printf "%s=%s\n" "${entry%%|*}" "${entry#*|}" >>"$tmp"
+  done
+  if [[ -s "$tmp" ]]; then
+    mv "$tmp" "$file"
+    chmod 0644 "$file"
+    chown root:root "$file" 2>/dev/null || true
+  else
+    rm -f "$tmp"
+    rm -f "$file"
+  fi
+}
+
+site_runtime_pool_disabled_path() {
+  local php_version="$1" socket_project="$2"
+  echo "/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf.disabled-by-simai"
+}
+
+site_runtime_cron_disabled_path() {
+  local slug="$1"
+  echo "/etc/cron.d/${slug}.disabled-by-simai"
+}
+
 validate_ini_key() {
   local name="$1"
   if [[ "$name" =~ ^[A-Za-z0-9_.-]{1,64}$ ]]; then
@@ -1010,6 +1074,149 @@ create_nginx_site() {
   fi
   echo "$nginx_test_output" >>"$LOG_FILE"
   os_svc_reload_or_restart nginx || true
+}
+
+site_runtime_nginx_block_render() {
+  cat <<'EOF'
+    # simai-runtime-suspend-begin
+    error_page 503 @simai_runtime_suspended;
+    if ($request_uri !~ "^/\.well-known/acme-challenge/") { return 503; }
+    location @simai_runtime_suspended {
+        internal;
+        default_type text/plain;
+        return 503 "Site is parked by simai-env\n";
+    }
+    # simai-runtime-suspend-end
+EOF
+}
+
+site_runtime_nginx_suspend() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  [[ -f "$cfg" ]] || { error "nginx config not found for ${domain}"; return 1; }
+  if grep -q "# simai-runtime-suspend-begin" "$cfg"; then
+    return 0
+  fi
+  local backup tmp
+  backup=$(mktemp)
+  cp -p "$cfg" "$backup"
+  tmp=$(mktemp)
+  SIMAI_RUNTIME_BLOCK="$(site_runtime_nginx_block_render)" \
+    perl -0pe 's#(\n[ \t]*location \^~ /\\.well-known/acme-challenge/ \{)#"\n" . $ENV{SIMAI_RUNTIME_BLOCK} . "$1"#e' "$cfg" >"$tmp"
+  if cmp -s "$cfg" "$tmp"; then
+    rm -f "$tmp"
+    tmp=$(mktemp)
+    cat "$cfg" >"$tmp"
+    printf "\n%s\n" "$(site_runtime_nginx_block_render)" >>"$tmp"
+  fi
+  mv "$tmp" "$cfg"
+  if ! nginx -t >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
+    cp -p "$backup" "$cfg" >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1 || true
+    rm -f "$backup"
+    error "nginx config test failed while suspending ${domain}"
+    return 1
+  fi
+  rm -f "$backup"
+  os_svc_reload_or_restart nginx || true
+}
+
+site_runtime_nginx_resume() {
+  local domain="$1"
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  [[ -f "$cfg" ]] || { error "nginx config not found for ${domain}"; return 1; }
+  if ! grep -q "# simai-runtime-suspend-begin" "$cfg"; then
+    return 0
+  fi
+  local backup tmp
+  backup=$(mktemp)
+  cp -p "$cfg" "$backup"
+  tmp=$(mktemp)
+  awk '
+    $0 ~ /# simai-runtime-suspend-begin/ { skip=1; next }
+    $0 ~ /# simai-runtime-suspend-end/ { skip=0; next }
+    !skip { print }
+  ' "$cfg" >"$tmp"
+  mv "$tmp" "$cfg"
+  if ! nginx -t >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
+    cp -p "$backup" "$cfg" >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1 || true
+    rm -f "$backup"
+    error "nginx config test failed while resuming ${domain}"
+    return 1
+  fi
+  rm -f "$backup"
+  os_svc_reload_or_restart nginx || true
+}
+
+site_runtime_disable_pool() {
+  local php_version="$1" socket_project="$2"
+  local pool="/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
+  local disabled
+  disabled=$(site_runtime_pool_disabled_path "$php_version" "$socket_project")
+  if [[ -f "$pool" ]]; then
+    mv "$pool" "$disabled"
+    os_svc_reload_or_restart "php${php_version}-fpm" || true
+    echo "disabled"
+    return 0
+  fi
+  if [[ -f "$disabled" ]]; then
+    echo "disabled"
+    return 0
+  fi
+  echo "missing"
+}
+
+site_runtime_enable_pool() {
+  local php_version="$1" socket_project="$2"
+  local pool="/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
+  local disabled
+  disabled=$(site_runtime_pool_disabled_path "$php_version" "$socket_project")
+  if [[ -f "$disabled" ]]; then
+    mv "$disabled" "$pool"
+    os_svc_reload_or_restart "php${php_version}-fpm" || true
+    echo "enabled"
+    return 0
+  fi
+  if [[ -f "$pool" ]]; then
+    echo "enabled"
+    return 0
+  fi
+  echo "missing"
+}
+
+site_runtime_disable_cron() {
+  local slug="$1"
+  local cron_file disabled
+  cron_file=$(cron_site_file_path "$slug")
+  disabled=$(site_runtime_cron_disabled_path "$slug")
+  if [[ -f "$cron_file" ]]; then
+    mv "$cron_file" "$disabled"
+    reload_cron_daemon
+    echo "disabled"
+    return 0
+  fi
+  if [[ -f "$disabled" ]]; then
+    echo "disabled"
+    return 0
+  fi
+  echo "missing"
+}
+
+site_runtime_enable_cron() {
+  local slug="$1"
+  local cron_file disabled
+  cron_file=$(cron_site_file_path "$slug")
+  disabled=$(site_runtime_cron_disabled_path "$slug")
+  if [[ -f "$disabled" ]]; then
+    mv "$disabled" "$cron_file"
+    reload_cron_daemon
+    echo "enabled"
+    return 0
+  fi
+  if [[ -f "$cron_file" ]]; then
+    echo "enabled"
+    return 0
+  fi
+  echo "missing"
 }
 
 ensure_project_permissions() {

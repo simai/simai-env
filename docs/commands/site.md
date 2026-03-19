@@ -123,6 +123,43 @@ Behavior:
 - Keeps existing `site php-ini` and profile-managed INI blocks intact.
 - Validates php-fpm config before reload and restores the previous pool on failure.
 
+## runtime-status
+Show whether a site runtime is active or suspended.
+
+Options:
+- `--domain` (required outside menu)
+
+Output includes:
+- runtime state (`active` / `suspended`)
+- PHP pool state
+- cron file state
+- queue unit state
+
+## runtime-suspend
+Suspend a site runtime without deleting the site.
+
+Options:
+- `--domain` (required outside menu)
+- `--confirm` (`yes|no`, default `no`; required outside menu)
+
+Behavior:
+- Disables the site PHP-FPM pool by moving it out of active `pool.d`.
+- Adds a managed nginx `503 Site is parked by simai-env` block while keeping ACME validation reachable.
+- Disables site cron/queue where the profile uses them.
+- Stores runtime state in `/etc/simai-env/sites/<domain>/runtime.env`.
+
+## runtime-resume
+Resume a previously suspended site runtime.
+
+Options:
+- `--domain` (required outside menu)
+- `--confirm` (`yes|no`, default `no`; required outside menu)
+
+Behavior:
+- Restores the disabled PHP-FPM pool.
+- Removes the managed nginx suspend block.
+- Re-enables cron/queue if they were disabled by `runtime-suspend`.
+
 ## fix
 Plan or apply profile-required PHP fixes (PHP extensions and PHP INI overrides). Defaults to plan-only (no changes).
 

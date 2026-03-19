@@ -52,6 +52,8 @@ site_perf_status_handler() {
   local php_bin=""
   local pool_service="n/a" pool_socket="n/a" pool_socket_state="n/a" pool_error_log="n/a"
   local total_children="0" pool_share="unknown" fpm_budget="0" fpm_oversub="unknown" mem_available="unknown"
+  local runtime_state
+  runtime_state=$(site_runtime_state "$domain")
 
   declare -A perf_settings=()
   local entry
@@ -121,6 +123,7 @@ site_perf_status_handler() {
   print_kv_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
+    "Runtime state|${runtime_state}" \
     "Managed mode|${mode}" \
     "PHP|${php_version}" \
     "Pool file|${pool_file}" \
