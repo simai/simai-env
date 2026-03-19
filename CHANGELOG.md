@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.48] - 2026-03-20
+### Changed
+- Interactive menu now exposes site runtime actions and system-level performance planning/rebalance commands.
+
 ## [1.11.47] - 2026-03-19
 ### Fixed
 - `site runtime-suspend` no longer emits awk regex warnings while inserting the managed nginx `503` runtime block.

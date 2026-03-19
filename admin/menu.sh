@@ -333,8 +333,11 @@ actsellistbox=black,cyan
         "1|List sites"
         "2|Create site"
         "3|Site info"
-        "4|Change site PHP"
-        "5|Remove site"
+        "4|Runtime status"
+        "5|Suspend site runtime"
+        "6|Resume site runtime"
+        "7|Change site PHP"
+        "8|Remove site"
         "0|Back"
       )
       local ch=""
@@ -343,8 +346,11 @@ actsellistbox=black,cyan
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
         3) run_menu_command site info ;;
-        4) run_menu_command site set-php ;;
-        5) run_menu_command site remove ;;
+        4) run_menu_command site runtime-status ;;
+        5) run_menu_command site runtime-suspend ;;
+        6) run_menu_command site runtime-resume ;;
+        7) run_menu_command site set-php ;;
+        8) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -636,29 +642,71 @@ actsellistbox=black,cyan
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local -a items=(
         "1|System status"
-        "2|Repair environment"
-        "3|Update simai-env"
-        "4|Version"
-        "5|${adv_label}"
-        "6|${backend_label}"
+        "2|Performance status"
+        "3|FPM reduction plan"
+        "4|Repair environment"
+        "5|Update simai-env"
+        "6|Version"
+        "7|${adv_label}"
+        "8|${backend_label}"
         "0|Back"
       )
+      if [[ $show_advanced -eq 1 ]]; then
+        items=("1|System status" "2|Performance status" "3|FPM reduction plan" "4|FPM rebalance (safe)" "5|Repair environment" "6|Update simai-env" "7|Version" "8|${adv_label}" "9|${backend_label}" "0|Back")
+      fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command self status ;;
-        2) run_menu_command self bootstrap ;;
-        3) run_menu_command self update ;;
-        4) run_menu_command self version ;;
+        2) run_menu_command self perf-status ;;
+        3) run_menu_command self perf-plan ;;
+        4)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self perf-rebalance --mode safe --confirm yes
+          else
+            run_menu_command self bootstrap
+          fi
+          ;;
         5)
           if [[ $show_advanced -eq 1 ]]; then
-            show_advanced=0
+            run_menu_command self bootstrap
           else
-            show_advanced=1
+            run_menu_command self update
           fi
-          export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
           ;;
         6)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self update
+          else
+            run_menu_command self version
+          fi
+          ;;
+        7)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self version
+          else
+            show_advanced=1
+            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+          fi
+          ;;
+        8)
+          if [[ $show_advanced -eq 1 ]]; then
+            show_advanced=0
+            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+          else
+            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+              export SIMAI_MENU_BACKEND="text"
+            else
+              if command -v whiptail >/dev/null 2>&1; then
+                export SIMAI_MENU_BACKEND="whiptail"
+                menu_init_whiptail_theme
+              else
+                warn "whiptail is not installed; backend stays text."
+              fi
+            fi
+          fi
+          ;;
+        9)
           if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
             export SIMAI_MENU_BACKEND="text"
           else

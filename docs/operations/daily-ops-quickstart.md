@@ -8,6 +8,8 @@ For profile-specific command selection, see `docs/operations/profile-ops-matrix.
 ```bash
 NO_COLOR=1 /root/simai-env/simai-admin.sh self status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self platform-status
+NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-status
+NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-plan
 NO_COLOR=1 /root/simai-env/simai-admin.sh site list
 NO_COLOR=1 /root/simai-env/simai-admin.sh ssl list
 NO_COLOR=1 /root/simai-env/simai-admin.sh db status
@@ -17,6 +19,7 @@ NO_COLOR=1 /root/simai-env/simai-admin.sh db status
 
 ```bash
 /root/simai-env/simai-admin.sh site info --domain <domain>
+/root/simai-env/simai-admin.sh site runtime-status --domain <domain>
 /root/simai-env/simai-admin.sh site doctor --domain <domain>
 /root/simai-env/simai-admin.sh ssl status --domain <domain>
 ```
