@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.21] - 2026-03-19
+### Fixed
+- Bitrix DB preseed no longer writes `BX_CRONTAB_SUPPORT` into `dbconn.php` during initial install.
+- Agents-over-cron mode is now enabled only via explicit `bitrix agents-sync --apply yes`, which keeps fresh installs compatible with Bitrix checker until cron mode is intentionally switched on.
+
 ## [1.11.20] - 2026-03-15
 ### Changed
 - Bitrix cron baseline now uses `* * * * *` for `public/bitrix/modules/main/tools/cron_events.php`.

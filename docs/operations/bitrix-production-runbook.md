@@ -23,6 +23,9 @@ Verify baseline:
 /root/simai-env/simai-admin.sh bitrix status --domain <domain>
 ```
 
+At this stage `dbconn.php` stays installer-safe: agents-via-cron is not enabled yet.
+Switch agents to cron only after the application/database side is ready.
+
 ## 3) Agents via Cron Baseline
 
 Check current state:

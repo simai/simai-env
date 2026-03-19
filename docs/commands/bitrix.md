@@ -85,6 +85,7 @@ Notes:
 - By default it does not overwrite existing non-empty files.
 - Use `--overwrite yes` to force regeneration.
 - By default preseed writes `SHORT_INSTALL=true` into `dbconn.php` to simplify Bitrix install flow.
+- Preseed does not enable agents-via-cron by itself; `BX_CRONTAB_SUPPORT` is added only by explicit `bitrix agents-sync --apply yes`.
 - Use `--short-install no` if full/manual installer flow is required.
 
 ## Installer Ready
