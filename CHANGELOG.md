@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.29] - 2026-03-19
+### Fixed
+- `site add` and bootstrap no longer reset ownership recursively on the entire SIMAI home directory, avoiding long hangs on servers with existing site data.
+
 ## [1.11.28] - 2026-03-19
 ### Changed
 - Bitrix production docs now define a stricter post-install workflow: `site add` -> `installer-ready` -> web install -> `php-baseline-sync` -> `agents-sync` -> TLS -> final checker/perfmon acceptance.

@@ -646,8 +646,10 @@ ensure_user() {
     useradd -m -s /bin/bash "$SIMAI_USER"
   fi
   usermod -a -G www-data "$SIMAI_USER" || true
-  mkdir -p "$WWW_ROOT"
-  chown -R "$SIMAI_USER":www-data "$SIMAI_HOME"
+  install -d -o "$SIMAI_USER" -g www-data "$(dirname "$SIMAI_HOME")" 2>/dev/null || true
+  install -d -o "$SIMAI_USER" -g www-data "$SIMAI_HOME" 2>/dev/null || true
+  install -d -o "$SIMAI_USER" -g www-data "$WWW_ROOT" 2>/dev/null || true
+  chown "$SIMAI_USER":www-data "$SIMAI_HOME" "$WWW_ROOT" 2>/dev/null || true
 }
 
 run_as_simai() {
