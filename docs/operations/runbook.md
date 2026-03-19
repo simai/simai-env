@@ -95,7 +95,7 @@ bash /root/simai-env/testing/run-regression.sh full
 
 1. Run `self platform-status` and `db status`.
 2. Run `self perf-status` to compare current baseline vs recommended preset.
-3. Treat `mysql connection pressure`, `redis memory pressure`, and `FPM configured children` as first-pass saturation signals before changing presets.
+3. Treat `mysql connection pressure`, `redis memory pressure`, and `FPM oversubscription` as first-pass saturation signals before changing presets.
 4. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
 5. Check admin/env/audit logs.
 6. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.

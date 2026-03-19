@@ -51,7 +51,7 @@ site_perf_status_handler() {
   local cron_summary="n/a" queue_summary="n/a"
   local php_bin=""
   local pool_service="n/a" pool_socket="n/a" pool_socket_state="n/a" pool_error_log="n/a"
-  local total_children="0" pool_share="unknown"
+  local total_children="0" pool_share="unknown" fpm_budget="0" fpm_oversub="unknown" mem_available="unknown"
 
   declare -A perf_settings=()
   local entry
@@ -91,6 +91,9 @@ site_perf_status_handler() {
         pool_socket_state="missing"
       fi
       total_children=$(perf_fpm_total_max_children)
+      fpm_budget=$(perf_fpm_recommended_total_children)
+      fpm_oversub=$(perf_fpm_oversubscription_risk "$total_children" "$fpm_budget")
+      mem_available=$(perf_memory_available_summary)
       pool_share=$(perf_ratio_band "${max_children:-0}" "${total_children:-0}")
       if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^Zend OPcache$'; then
         opcache_ext="yes"
@@ -125,12 +128,15 @@ site_perf_status_handler() {
     "Pool pm|${pm:-n/a}" \
     "Pool max children|${max_children:-n/a}" \
     "Pool children share|${pool_share}" \
+    "FPM child budget estimate|${fpm_budget}" \
+    "FPM oversubscription|${fpm_oversub}" \
     "Pool idle timeout|${idle_timeout:-n/a}" \
     "Pool max requests|${max_requests:-n/a}" \
     "Request timeout|${req_timeout:-n/a}" \
     "Pool socket|${pool_socket} (${pool_socket_state})" \
     "Pool error log|${pool_error_log:-n/a}" \
     "Memory limit|${memory_limit}" \
+    "Server memory available|${mem_available}" \
     "Estimated memory risk|${memory_risk}" \
     "OPcache extension|${opcache_ext}" \
     "Redis extension|${redis_ext}" \

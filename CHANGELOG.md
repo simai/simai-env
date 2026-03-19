@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.43] - 2026-03-19
+### Changed
+- `self perf-status` now estimates a safe global FPM child budget and flags oversubscription risk on small servers.
+- `site perf-status` now includes server memory availability and global FPM oversubscription context for each site.
+
 ## [1.11.42] - 2026-03-19
 ### Changed
 - `self perf-status` now reports live observability signals for nginx/MySQL/Redis/FPM pressure instead of baseline values only.

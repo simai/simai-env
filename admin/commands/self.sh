@@ -390,6 +390,8 @@ self_perf_status_handler() {
   local recommended_preset
   recommended_preset=$(perf_recommended_preset)
   local managed_preset="${SIMAI_PERF_PRESET:-none}"
+  local mem_available
+  mem_available=$(perf_memory_available_summary)
 
   local fpm_defaults="pm=${SIMAI_PERF_FPM_PM:-ondemand}, children=${SIMAI_PERF_FPM_MAX_CHILDREN:-10}, idle=${SIMAI_PERF_FPM_IDLE_TIMEOUT:-10s}, max_requests=${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
   local opcache_defaults="memory=${SIMAI_PERF_OPCACHE_MEMORY:-n/a}, strings=${SIMAI_PERF_OPCACHE_STRINGS:-n/a}, files=${SIMAI_PERF_OPCACHE_MAX_FILES:-n/a}, validate=${SIMAI_PERF_OPCACHE_VALIDATE:-n/a}, revalidate=${SIMAI_PERF_OPCACHE_REVALIDATE:-n/a}"
@@ -452,11 +454,13 @@ self_perf_status_handler() {
   [[ -z "$redis_ops" ]] && redis_ops="unknown"
   [[ -z "$redis_memory_pressure" ]] && redis_memory_pressure="unknown"
 
-  local fpm_services fpm_pools fpm_total_children
+  local fpm_services fpm_pools fpm_total_children fpm_budget fpm_oversub
   local nginx_test="unknown"
   fpm_services=$(perf_fpm_service_summary)
   fpm_pools=$(perf_fpm_pool_count)
   fpm_total_children=$(perf_fpm_total_max_children)
+  fpm_budget=$(perf_fpm_recommended_total_children)
+  fpm_oversub=$(perf_fpm_oversubscription_risk "$fpm_total_children" "$fpm_budget")
   if command -v nginx >/dev/null 2>&1; then
     if nginx -t >/dev/null 2>&1; then
       nginx_test="ok"
@@ -468,12 +472,15 @@ self_perf_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Server size|cpu=${PERF_CPU_COUNT}, mem=${PERF_MEM_MB}M, swap=${PERF_SWAP_MB}M" \
+    "Memory available|${mem_available}" \
     "Recommended preset|${recommended_preset}" \
     "Managed preset|${managed_preset}" \
     "FPM site defaults|${fpm_defaults}" \
     "FPM services|${fpm_services}" \
     "FPM pools|${fpm_pools}" \
     "FPM configured children|${fpm_total_children}" \
+    "FPM child budget estimate|${fpm_budget}" \
+    "FPM oversubscription|${fpm_oversub}" \
     "OPcache defaults|${opcache_defaults}" \
     "nginx snippet|${nginx_managed} (${nginx_conf})" \
     "nginx gzip|${nginx_gzip}" \

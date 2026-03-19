@@ -13,9 +13,11 @@ perf_normalize_preset() {
 perf_detect_resources() {
   PERF_CPU_COUNT=$(nproc 2>/dev/null || echo 1)
   PERF_MEM_MB=$(free -m 2>/dev/null | awk 'NR==2{print $2}')
+  PERF_MEM_AVAILABLE_MB=$(free -m 2>/dev/null | awk 'NR==2{print $7}')
   PERF_SWAP_MB=$(free -m 2>/dev/null | awk 'NR==3{print $2}')
   [[ -z "${PERF_CPU_COUNT:-}" ]] && PERF_CPU_COUNT=1
   [[ -z "${PERF_MEM_MB:-}" ]] && PERF_MEM_MB=0
+  [[ -z "${PERF_MEM_AVAILABLE_MB:-}" ]] && PERF_MEM_AVAILABLE_MB=0
   [[ -z "${PERF_SWAP_MB:-}" ]] && PERF_SWAP_MB=0
 }
 
@@ -437,6 +439,58 @@ perf_fpm_total_max_children() {
   done
   shopt -u nullglob
   echo "$total"
+}
+
+perf_fpm_recommended_total_children() {
+  perf_detect_resources
+  local mem_mb="${PERF_MEM_MB:-0}"
+  if [[ -z "$mem_mb" || ! "$mem_mb" =~ ^[0-9]+$ || "$mem_mb" -le 0 ]]; then
+    echo "0"
+    return 0
+  fi
+  local reserve_mb=512
+  if (( mem_mb > 4096 )); then
+    reserve_mb=1024
+  fi
+  local worker_mb=64
+  local usable=$(( mem_mb - reserve_mb ))
+  if (( usable <= worker_mb )); then
+    echo "1"
+    return 0
+  fi
+  local budget=$(( usable / worker_mb ))
+  (( budget < 1 )) && budget=1
+  echo "$budget"
+}
+
+perf_fpm_oversubscription_risk() {
+  local total="$1" budget="$2"
+  if [[ -z "$total" || -z "$budget" || ! "$total" =~ ^[0-9]+$ || ! "$budget" =~ ^[0-9]+$ || "$budget" -le 0 ]]; then
+    echo "unknown"
+    return 0
+  fi
+  local pct=$(( total * 100 / budget ))
+  if (( pct >= 200 )); then
+    echo "critical (${total}/${budget})"
+  elif (( pct >= 120 )); then
+    echo "high (${total}/${budget})"
+  elif (( pct >= 80 )); then
+    echo "medium (${total}/${budget})"
+  else
+    echo "low (${total}/${budget})"
+  fi
+}
+
+perf_memory_available_summary() {
+  perf_detect_resources
+  local avail="${PERF_MEM_AVAILABLE_MB:-0}"
+  local total="${PERF_MEM_MB:-0}"
+  if [[ ! "$avail" =~ ^[0-9]+$ || ! "$total" =~ ^[0-9]+$ || "$total" -le 0 ]]; then
+    echo "unknown"
+    return 0
+  fi
+  local pct=$(( avail * 100 / total ))
+  echo "${avail}M (${pct}% free)"
 }
 
 perf_pool_socket_path() {
