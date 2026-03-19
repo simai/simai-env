@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.25] - 2026-03-19
+### Fixed
+- Bitrix DB preseed now initializes MySQL connection collation more explicitly with `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci`, preventing MySQL 8 `utf8mb4_0900_ai_ci` connection mismatch on fresh installs.
+
 ## [1.11.24] - 2026-03-19
 ### Fixed
 - Bitrix DB/user creation now grants `SESSION_VARIABLES_ADMIN` (best effort) so MySQL 8 session compatibility settings can be applied on fresh installs.

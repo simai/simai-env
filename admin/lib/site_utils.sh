@@ -1685,7 +1685,7 @@ return [
         'database' => ${q_name},
         'login' => ${q_user},
         'password' => ${q_pass},
-        'init_commands' => "SET sql_mode=''; SET collation_connection='utf8mb4_unicode_ci';",
+        'init_commands' => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci; SET SESSION sql_mode=''; SET SESSION innodb_strict_mode=0; SET SESSION collation_connection='utf8mb4_unicode_ci';",
         'options' => 2,
       ],
     ],
