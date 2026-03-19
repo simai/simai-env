@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.41] - 2026-03-19
+### Fixed
+- Bitrix performance staging now derives `installer` vs `post-install` from effective runtime readiness (`agents-ready`) instead of trusting `SHORT_INSTALL` alone, avoiding false installer classification on already configured sites.
+
 ## [1.11.40] - 2026-03-19
 ### Added
 - Added `bitrix perf-status` and `bitrix perf-apply` for Bitrix-specific performance/runtime readiness (site governance, PHP baseline, installer-aware agents/cache orchestration).

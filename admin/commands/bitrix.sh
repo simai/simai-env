@@ -133,7 +133,11 @@ bitrix_perf_read_mode() {
 }
 
 bitrix_perf_install_stage() {
-  local short_install="$1"
+  local short_install="$1" agents_ready="${2:-no}"
+  if [[ "$agents_ready" == "yes" ]]; then
+    echo "post-install"
+    return 0
+  fi
   case "$short_install" in
     true) echo "installer" ;;
     false) echo "post-install" ;;
@@ -845,7 +849,6 @@ bitrix_perf_status_handler() {
     bx_crontab_support=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB_SUPPORT")
     short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
   fi
-  install_stage=$(bitrix_perf_install_stage "$short_install")
   after_connect_state=$(bitrix_perf_after_connect_state "${BX_DOC_ROOT}/bitrix/php_interface/after_connect_d7.php")
   if [[ -f "$BX_CRON_FILE" ]]; then
     cron_file_state="present"
@@ -856,6 +859,7 @@ bitrix_perf_status_handler() {
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
   agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  install_stage=$(bitrix_perf_install_stage "$short_install" "$agents_ready")
   cache_dirs=$(bitrix_perf_cache_dirs_state "$BX_DOC_ROOT")
 
   if [[ -f "$pool_file" ]]; then
@@ -956,10 +960,23 @@ bitrix_perf_apply_handler() {
   fi
 
   local short_install="unknown"
+  local cron_managed="no" cron_domain_match="no" cron_slug_match="no" cron_entry_match="no"
+  local bx_crontab="missing" bx_crontab_support="missing"
   if [[ -f "$BX_DBCONN_FILE" ]]; then
     short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
+    bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
+    bx_crontab_support=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB_SUPPORT")
   fi
-  if [[ "$short_install" != "true" && -f "$BX_DBCONN_FILE" ]]; then
+  if [[ -f "$BX_CRON_FILE" ]]; then
+    bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
+    cron_managed="${BX_CRON_MANAGED:-no}"
+    cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
+    cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
+  fi
+  local agents_ready="no"
+  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  if [[ ("$short_install" != "true" || "$agents_ready" == "yes") && -f "$BX_DBCONN_FILE" ]]; then
     if run_command bitrix agents-sync --domain "$domain" --apply yes --confirm yes; then
       agents_status="applied"
     else
@@ -971,7 +988,7 @@ bitrix_perf_apply_handler() {
     agents_status="skipped (installer)"
   fi
 
-  if [[ "$BX_HAS_CORE" == "yes" && "$short_install" != "true" ]]; then
+  if [[ "$BX_HAS_CORE" == "yes" && ("$short_install" != "true" || "$agents_ready" == "yes") ]]; then
     if run_command bitrix cache-clear --domain "$domain"; then
       cache_status="cleared"
     else
