@@ -1716,6 +1716,21 @@ bitrix_detect_distribution_archives() {
   echo "${names[*]}"
 }
 
+bitrix_unpack_distribution_archive() {
+  local doc_root="$1" edition="${2:-standard}"
+  local archive
+  archive=$(bitrix_distribution_archive_path "$doc_root" "$edition") || return 1
+  [[ -s "$archive" ]] || return 1
+
+  if [[ -f "${doc_root}/install.config" && -f "${doc_root}/index.php" && -d "${doc_root}/bitrix/modules" ]]; then
+    return 0
+  fi
+
+  tar -xzf "$archive" -C "$doc_root" || return 1
+  chown -R "${SIMAI_USER}:www-data" "$doc_root" 2>/dev/null || true
+  return 0
+}
+
 bitrix_download_setup_script() {
   local doc_root="$1" overwrite="${2:-no}"
   local target

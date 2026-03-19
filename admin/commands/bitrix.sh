@@ -524,11 +524,13 @@ bitrix_installer_ready_handler() {
   local archive="${PARSED_ARGS[archive]:-yes}"
   local edition="${PARSED_ARGS[edition]:-standard}"
   local archive_overwrite="${PARSED_ARGS[archive-overwrite]:-no}"
+  local unpack="${PARSED_ARGS[unpack]:-yes}"
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
   [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
   [[ "${setup_overwrite,,}" == "yes" ]] || setup_overwrite="no"
   [[ "${archive,,}" == "yes" ]] && archive="yes" || archive="no"
   [[ "${archive_overwrite,,}" == "yes" ]] || archive_overwrite="no"
+  [[ "${unpack,,}" == "yes" ]] && unpack="yes" || unpack="no"
   edition=$(bitrix_distribution_edition_normalize "$edition") || {
     error "Unsupported Bitrix edition '${edition}'. Use: start, standard, small-business, business"
     return 1
@@ -552,6 +554,7 @@ bitrix_installer_ready_handler() {
   local setup_kind="missing"
   local archive_state="skipped"
   local archive_path="n/a"
+  local unpack_state="skipped"
   setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
   if bitrix_download_setup_script "$BX_DOC_ROOT" "$setup_overwrite"; then
     setup_kind=$(bitrix_setup_script_kind "$setup_script")
@@ -569,9 +572,23 @@ bitrix_installer_ready_handler() {
       archive_state="failed"
     fi
   fi
+  if [[ "$archive_state" == "ready" && "$unpack" == "yes" ]]; then
+    if bitrix_unpack_distribution_archive "$BX_DOC_ROOT" "$edition"; then
+      unpack_state="ready"
+      if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "yes" "$short_install"; then
+        preseed_state="ready"
+      else
+        preseed_state="failed"
+      fi
+    else
+      unpack_state="failed"
+    fi
+  fi
   local status="ready"
   if [[ "$preseed_state" != "ready" ]]; then
     status="partial"
+  elif [[ "$unpack_state" == "ready" ]]; then
+    status="ready"
   elif [[ "$setup_state" == "ready" ]]; then
     status="ready"
   elif [[ "$setup_kind" == "bitrix24-loader" && "$archive_state" == "ready" ]]; then
@@ -591,6 +608,7 @@ bitrix_installer_ready_handler() {
     "Edition|${edition}" \
     "Archive|${archive_state}" \
     "Archive path|${archive_path}" \
+    "Unpack|${unpack_state}" \
     "bitrixsetup.php|${setup_script}" \
     "Status|${status}"
   if [[ "$status" != "ready" ]]; then
@@ -598,7 +616,11 @@ bitrix_installer_ready_handler() {
     return 1
   fi
   ui_section "Next steps"
-  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
+  if [[ "$unpack_state" == "ready" ]]; then
+    ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/"
+  else
+    ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
+  fi
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
@@ -703,5 +725,5 @@ register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bit
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
-register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite="
+register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="

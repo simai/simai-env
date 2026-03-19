@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.33] - 2026-03-19
+### Changed
+- `bitrix installer-ready` now unpacks the selected Site Management distro into docroot by default, exposing the regular web installer at `/` instead of relying on `bitrixsetup.php` alone.
+
 ## [1.11.32] - 2026-03-19
 ### Added
 - `bitrix installer-ready` now supports archive-based Site Management setup with edition-aware `.tar.gz` downloads (`start`, `standard`, `small-business`, `business`).
