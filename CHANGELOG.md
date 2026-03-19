@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.35] - 2026-03-19
+### Added
+- Added `self perf-status` and `self perf-apply --preset small|medium|large` for a managed server-side performance baseline.
+### Changed
+- Future PHP-FPM pools created by `site add` and bootstrap now inherit managed FPM defaults from `/etc/simai-env.conf` when a performance preset has been applied.
+- Managed performance baseline now writes OPcache snippets for installed PHP-FPM versions, nginx/http tuning, MySQL baseline tuning, and Redis maxmemory policy (when Redis is installed).
+
 ## [1.11.34] - 2026-03-19
 ### Changed
 - Bitrix profile now treats upload/time limits as baseline runtime requirements (`post_max_size`, `upload_max_filesize`, `max_execution_time`, `max_input_time`) so fresh installs are checker-safe by default.

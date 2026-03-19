@@ -269,6 +269,7 @@ self_status_handler() {
     "certbot timer|${certbot_timer}"
   ui_section "Next steps"
   ui_kv "Diagnostics" "simai-admin.sh self platform-status"
+  ui_kv "Performance" "simai-admin.sh self perf-status"
   ui_kv "Update" "simai-admin.sh self update"
 }
 
@@ -379,6 +380,128 @@ self_platform_status_handler() {
   ui_section "Next steps"
   ui_kv "Validate nginx" "nginx -t"
   ui_kv "Repair stack" "simai-admin.sh self bootstrap"
+  ui_kv "Performance" "simai-admin.sh self perf-status"
+}
+
+self_perf_status_handler() {
+  ui_header "SIMAI ENV · Performance baseline"
+
+  perf_detect_resources
+  local recommended_preset
+  recommended_preset=$(perf_recommended_preset)
+  local managed_preset="${SIMAI_PERF_PRESET:-none}"
+
+  local fpm_defaults="pm=${SIMAI_PERF_FPM_PM:-ondemand}, children=${SIMAI_PERF_FPM_MAX_CHILDREN:-10}, idle=${SIMAI_PERF_FPM_IDLE_TIMEOUT:-10s}, max_requests=${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
+  local opcache_defaults="memory=${SIMAI_PERF_OPCACHE_MEMORY:-n/a}, strings=${SIMAI_PERF_OPCACHE_STRINGS:-n/a}, files=${SIMAI_PERF_OPCACHE_MAX_FILES:-n/a}, validate=${SIMAI_PERF_OPCACHE_VALIDATE:-n/a}, revalidate=${SIMAI_PERF_OPCACHE_REVALIDATE:-n/a}"
+
+  local nginx_conf
+  nginx_conf=$(perf_nginx_conf_path)
+  local nginx_managed="missing"
+  [[ -f "$nginx_conf" ]] && nginx_managed="present"
+  local nginx_keepalive="unknown"
+  [[ -n "${SIMAI_PERF_NGINX_KEEPALIVE_TIMEOUT:-}" ]] && nginx_keepalive="${SIMAI_PERF_NGINX_KEEPALIVE_TIMEOUT}"
+  local nginx_gzip="unknown"
+  if command -v nginx >/dev/null 2>&1; then
+    nginx_gzip=$(nginx -T 2>/dev/null | awk '$1=="gzip"{print $2}' | tr -d ';' | tail -n1)
+    [[ -z "$nginx_gzip" ]] && nginx_gzip="unknown"
+  fi
+
+  local mysql_buffer mysql_connections mysql_slow mysql_long mysql_tmp mysql_heap
+  mysql_buffer=$(perf_mysql_show_var "innodb_buffer_pool_size")
+  mysql_connections=$(perf_mysql_show_var "max_connections")
+  mysql_slow=$(perf_mysql_show_var "slow_query_log")
+  mysql_long=$(perf_mysql_show_var "long_query_time")
+  mysql_tmp=$(perf_mysql_show_var "tmp_table_size")
+  mysql_heap=$(perf_mysql_show_var "max_heap_table_size")
+  [[ -z "$mysql_buffer" ]] && mysql_buffer="unknown"
+  [[ -z "$mysql_connections" ]] && mysql_connections="unknown"
+  [[ -z "$mysql_slow" ]] && mysql_slow="unknown"
+  [[ -z "$mysql_long" ]] && mysql_long="unknown"
+  [[ -z "$mysql_tmp" ]] && mysql_tmp="unknown"
+  [[ -z "$mysql_heap" ]] && mysql_heap="unknown"
+
+  local redis_state="missing"
+  if os_svc_has_unit "redis-server"; then
+    if os_svc_is_active "redis-server"; then
+      redis_state="active"
+    else
+      redis_state="inactive"
+    fi
+  fi
+  local redis_maxmemory redis_policy redis_conf
+  redis_maxmemory=$(perf_redis_config_get "maxmemory")
+  redis_policy=$(perf_redis_config_get "maxmemory-policy")
+  redis_conf=$(perf_redis_conf_path)
+  [[ -z "$redis_maxmemory" ]] && redis_maxmemory="unknown"
+  [[ -z "$redis_policy" ]] && redis_policy="unknown"
+
+  ui_section "Result"
+  print_kv_table \
+    "Server size|cpu=${PERF_CPU_COUNT}, mem=${PERF_MEM_MB}M, swap=${PERF_SWAP_MB}M" \
+    "Recommended preset|${recommended_preset}" \
+    "Managed preset|${managed_preset}" \
+    "FPM site defaults|${fpm_defaults}" \
+    "OPcache defaults|${opcache_defaults}" \
+    "nginx snippet|${nginx_managed} (${nginx_conf})" \
+    "nginx gzip|${nginx_gzip}" \
+    "nginx keepalive|${nginx_keepalive}" \
+    "mysql buffer pool|$(perf_bytes_human "$mysql_buffer")" \
+    "mysql max connections|${mysql_connections}" \
+    "mysql slow query log|${mysql_slow}" \
+    "mysql long_query_time|${mysql_long}" \
+    "mysql tmp/max heap|$(perf_bytes_human "$mysql_tmp") / $(perf_bytes_human "$mysql_heap")" \
+    "redis|${redis_state}" \
+    "redis maxmemory|${redis_maxmemory}" \
+    "redis policy|${redis_policy}" \
+    "redis snippet|$( [[ -f "$redis_conf" ]] && printf 'present (%s)' "$redis_conf" || printf 'missing (%s)' "$redis_conf" )"
+  ui_section "Next steps"
+  ui_kv "Apply recommended preset" "simai-admin.sh self perf-apply --preset ${recommended_preset} --confirm yes"
+  ui_kv "Apply medium preset" "simai-admin.sh self perf-apply --preset medium --confirm yes"
+}
+
+self_perf_apply_handler() {
+  parse_kv_args "$@"
+  local preset="${PARSED_ARGS[preset]:-}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ -z "$preset" ]]; then
+    preset=$(perf_recommended_preset)
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to apply performance baseline changes"
+    return 1
+  fi
+  perf_use_preset "$preset" || return 1
+
+  progress_init 5
+  progress_step "Writing managed simai performance defaults (${PERF_PRESET})"
+  perf_apply_env_defaults || return 1
+
+  progress_step "Applying nginx baseline"
+  perf_apply_nginx_baseline || return 1
+
+  progress_step "Applying MySQL baseline"
+  perf_apply_mysql_baseline || return 1
+
+  progress_step "Applying Redis baseline"
+  perf_apply_redis_baseline || true
+
+  progress_step "Applying PHP-FPM OPcache baseline"
+  perf_apply_php_fpm_baseline || return 1
+
+  progress_done "Performance baseline applied"
+
+  ui_section "Result"
+  print_kv_table \
+    "Preset|${PERF_PRESET}" \
+    "Future FPM defaults|pm=${PERF_FPM_PM}, children=${PERF_FPM_MAX_CHILDREN}, idle=${PERF_FPM_IDLE_TIMEOUT}, max_requests=${PERF_FPM_MAX_REQUESTS}" \
+    "OPcache|memory=${PERF_OPCACHE_MEMORY}, strings=${PERF_OPCACHE_STRINGS}, files=${PERF_OPCACHE_MAX_FILES}" \
+    "MySQL buffer pool|${PERF_MYSQL_BUFFER_POOL}" \
+    "MySQL max connections|${PERF_MYSQL_MAX_CONNECTIONS}" \
+    "Redis maxmemory|${PERF_REDIS_MAXMEMORY}" \
+    "Redis policy|${PERF_REDIS_POLICY}"
+  ui_section "Next steps"
+  ui_kv "Review status" "simai-admin.sh self perf-status"
+  ui_kv "Check platform" "simai-admin.sh self platform-status"
 }
 
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
@@ -386,3 +509,5 @@ register_cmd "self" "version" "Show local and remote simai-env version" "self_ve
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
+register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
+register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="

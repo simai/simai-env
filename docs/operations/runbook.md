@@ -9,6 +9,7 @@ For a compact command checklist, see `docs/operations/daily-ops-quickstart.md`.
 ```bash
 NO_COLOR=1 /root/simai-env/simai-admin.sh self status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self platform-status
+NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-status
 NO_COLOR=1 /root/simai-env/simai-admin.sh site list
 NO_COLOR=1 /root/simai-env/simai-admin.sh ssl list
 NO_COLOR=1 /root/simai-env/simai-admin.sh db status
@@ -89,9 +90,10 @@ bash /root/simai-env/testing/run-regression.sh full
 ## 6) Incident quick path
 
 1. Run `self platform-status` and `db status`.
-2. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
-3. Check admin/env/audit logs.
-4. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
+2. Run `self perf-status` to compare current baseline vs recommended preset.
+3. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
+4. Check admin/env/audit logs.
+5. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
 
 ## 7) Safety notes
 

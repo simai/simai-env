@@ -44,6 +44,10 @@ ALLOW_RESERVED_DOMAIN=0
 source "${SCRIPT_DIR}/lib/site_metadata.sh"
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
+if [[ -f /etc/simai-env.conf ]]; then
+  # shellcheck disable=SC1091
+  source /etc/simai-env.conf
+fi
 
 project_slug_from_domain() {
   local domain="$1"
@@ -774,6 +778,10 @@ configure_php_pool() {
   local pool_dir="/etc/php/${PHP_VERSION}/fpm/pool.d"
   mkdir -p "$pool_dir"
   local pool_file="${pool_dir}/${PROJECT_NAME}.conf"
+  local fpm_pm="${SIMAI_PERF_FPM_PM:-ondemand}"
+  local fpm_max_children="${SIMAI_PERF_FPM_MAX_CHILDREN:-10}"
+  local fpm_idle_timeout="${SIMAI_PERF_FPM_IDLE_TIMEOUT:-10s}"
+  local fpm_max_requests="${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
   cat >"$pool_file" <<EOF
 [${PROJECT_NAME}]
 user = ${SIMAI_USER}
@@ -781,9 +789,10 @@ group = www-data
 listen = /run/php/php${PHP_VERSION}-fpm-${PROJECT_NAME}.sock
 listen.owner = ${SIMAI_USER}
 listen.group = www-data
-pm = ondemand
-pm.max_children = 10
-pm.process_idle_timeout = 10s
+pm = ${fpm_pm}
+pm.max_children = ${fpm_max_children}
+pm.process_idle_timeout = ${fpm_idle_timeout}
+pm.max_requests = ${fpm_max_requests}
 request_terminate_timeout = 120s
 chdir = ${PROJECT_PATH}
 php_admin_value[error_log] = /var/log/php${PHP_VERSION}-fpm-${PROJECT_NAME}.log

@@ -799,6 +799,10 @@ create_php_pool() {
   if ! validate_project_slug "$project"; then
     return 1
   fi
+  local fpm_pm="${SIMAI_PERF_FPM_PM:-ondemand}"
+  local fpm_max_children="${SIMAI_PERF_FPM_MAX_CHILDREN:-10}"
+  local fpm_idle_timeout="${SIMAI_PERF_FPM_IDLE_TIMEOUT:-10s}"
+  local fpm_max_requests="${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
   local pool_dir="/etc/php/${php_version}/fpm/pool.d"
   local pool_file="${pool_dir}/${project}.conf"
   mkdir -p "$pool_dir"
@@ -809,9 +813,10 @@ group = www-data
 listen = /run/php/php${php_version}-fpm-${project}.sock
 listen.owner = ${SIMAI_USER}
 listen.group = www-data
-pm = ondemand
-pm.max_children = 10
-pm.process_idle_timeout = 10s
+pm = ${fpm_pm}
+pm.max_children = ${fpm_max_children}
+pm.process_idle_timeout = ${fpm_idle_timeout}
+pm.max_requests = ${fpm_max_requests}
 request_terminate_timeout = 120s
 chdir = ${project_path}
 php_admin_value[error_log] = /var/log/php${php_version}-fpm-${project}.log

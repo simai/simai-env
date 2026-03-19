@@ -41,6 +41,8 @@ See `docs/architecture/profiles.md`.
   - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
   - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
+- `self perf-status`: show current managed performance baseline, detected server size, recommended preset, and live nginx/mysql/redis values.
+- `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).
