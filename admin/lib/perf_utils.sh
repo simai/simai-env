@@ -493,6 +493,98 @@ perf_memory_available_summary() {
   echo "${avail}M (${pct}% free)"
 }
 
+perf_fpm_excess_children() {
+  local total="$1" budget="$2"
+  if [[ -z "$total" || -z "$budget" || ! "$total" =~ ^[0-9]+$ || ! "$budget" =~ ^[0-9]+$ ]]; then
+    echo "0"
+    return 0
+  fi
+  if (( total > budget )); then
+    echo $(( total - budget ))
+  else
+    echo "0"
+  fi
+}
+
+perf_site_mode_get() {
+  local domain="$1"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry%%|*}" == "mode" ]]; then
+      echo "${entry#*|}"
+      return 0
+    fi
+  done < <(read_site_perf_settings "$domain")
+  echo "none"
+}
+
+perf_site_mode_target_children() {
+  local profile="$1" mode="$2"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry%%|*}" == "pm.max_children" ]]; then
+      echo "${entry#*|}"
+      return 0
+    fi
+  done < <(site_perf_mode_defaults "$profile" "$mode" 2>/dev/null || true)
+  echo "0"
+}
+
+perf_fpm_top_pools() {
+  local limit="${1:-5}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=5
+  (( limit < 1 )) && limit=1
+
+  declare -A domain_map=()
+  declare -A profile_map=()
+  declare -A mode_map=()
+  local domain socket_project profile project
+  while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    if ! read_site_metadata "$domain" >/dev/null 2>&1; then
+      continue
+    fi
+    profile="${SITE_META[profile]:-unknown}"
+    project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+    socket_project="${SITE_META[php_socket_project]:-$project}"
+    [[ -z "$socket_project" ]] && continue
+    domain_map["$socket_project"]="$domain"
+    profile_map["$socket_project"]="$profile"
+    mode_map["$socket_project"]="$(perf_site_mode_get "$domain")"
+  done < <(list_sites 2>/dev/null || true)
+
+  local rows=()
+  local file pool_name current php_version mapped_domain mapped_profile managed_mode safe_target reduction
+  shopt -s nullglob
+  for file in /etc/php/*/fpm/pool.d/*.conf; do
+    [[ -f "$file" ]] || continue
+    current=$(perf_pool_directive_get "$file" "pm.max_children" || true)
+    [[ -n "$current" && "$current" =~ ^[0-9]+$ ]] || continue
+    pool_name=$(basename "$file" .conf)
+    php_version="${file#/etc/php/}"
+    php_version="${php_version%%/*}"
+    mapped_domain="${domain_map[$pool_name]:-$pool_name}"
+    mapped_profile="${profile_map[$pool_name]:-unknown}"
+    managed_mode="${mode_map[$pool_name]:-none}"
+    safe_target=$(perf_site_mode_target_children "$mapped_profile" "safe")
+    [[ -n "$safe_target" && "$safe_target" =~ ^[0-9]+$ ]] || safe_target=0
+    reduction=0
+    if (( current > safe_target && safe_target > 0 )); then
+      reduction=$(( current - safe_target ))
+    fi
+    rows+=("${current}|${mapped_domain}|${mapped_profile}|${managed_mode}|${safe_target}|${reduction}|${php_version}|${file}")
+  done
+  shopt -u nullglob
+
+  if (( ${#rows[@]} == 0 )); then
+    return 0
+  fi
+
+  printf "%s\n" "${rows[@]}" | sort -t'|' -k1,1nr | head -n "$limit"
+}
+
 perf_pool_socket_path() {
   local php_version="$1" socket_project="$2"
   echo "/run/php/php${php_version}-fpm-${socket_project}.sock"

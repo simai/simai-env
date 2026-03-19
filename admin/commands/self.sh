@@ -504,6 +504,64 @@ self_perf_status_handler() {
   ui_section "Next steps"
   ui_kv "Apply recommended preset" "simai-admin.sh self perf-apply --preset ${recommended_preset} --confirm yes"
   ui_kv "Apply medium preset" "simai-admin.sh self perf-apply --preset medium --confirm yes"
+  ui_kv "Review FPM plan" "simai-admin.sh self perf-plan"
+}
+
+self_perf_plan_handler() {
+  parse_kv_args "$@"
+  local limit="${PARSED_ARGS[limit]:-8}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=8
+  (( limit < 1 )) && limit=1
+
+  local total_children budget oversub excess mem_available
+  total_children=$(perf_fpm_total_max_children)
+  budget=$(perf_fpm_recommended_total_children)
+  oversub=$(perf_fpm_oversubscription_risk "$total_children" "$budget")
+  excess=$(perf_fpm_excess_children "$total_children" "$budget")
+  mem_available=$(perf_memory_available_summary)
+
+  ui_header "SIMAI ENV · FPM reduction plan"
+  ui_section "Summary"
+  print_kv_table \
+    "Configured children|${total_children}" \
+    "Recommended budget|${budget}" \
+    "Excess children|${excess}" \
+    "Oversubscription|${oversub}" \
+    "Memory available|${mem_available}"
+
+  if [[ "$excess" == "0" ]]; then
+    ui_section "Result"
+    ui_info "No FPM reduction plan is needed."
+    return 0
+  fi
+
+  local rows=()
+  local commands=()
+  local idx=0
+  local entry current domain profile mode safe_target reduction php_version pool_file
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    IFS='|' read -r current domain profile mode safe_target reduction php_version pool_file <<<"$entry"
+    idx=$((idx + 1))
+    rows+=("${idx}. ${domain}|children=${current}, safe=${safe_target}, reduce=${reduction}, mode=${mode}, profile=${profile}, php=${php_version}")
+    if [[ "$domain" == *.* && "$reduction" =~ ^[0-9]+$ && "$reduction" -gt 0 ]]; then
+      commands+=("Tune ${idx}|simai-admin.sh site perf-tune --domain ${domain} --mode safe --confirm yes")
+    fi
+  done < <(perf_fpm_top_pools "$limit")
+
+  if (( ${#rows[@]} == 0 )); then
+    ui_section "Result"
+    ui_warn "No FPM pools were found."
+    return 0
+  fi
+
+  ui_section "Top offenders"
+  print_kv_table "${rows[@]}"
+
+  if (( ${#commands[@]} > 0 )); then
+    ui_section "Suggested commands"
+    print_kv_table "${commands[@]}"
+  fi
 }
 
 self_perf_apply_handler() {
@@ -557,4 +615,5 @@ register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
 register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
+register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
 register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="

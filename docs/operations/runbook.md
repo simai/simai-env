@@ -10,6 +10,7 @@ For a compact command checklist, see `docs/operations/daily-ops-quickstart.md`.
 NO_COLOR=1 /root/simai-env/simai-admin.sh self status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self platform-status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-status
+NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-plan
 NO_COLOR=1 /root/simai-env/simai-admin.sh site list
 NO_COLOR=1 /root/simai-env/simai-admin.sh ssl list
 NO_COLOR=1 /root/simai-env/simai-admin.sh db status
@@ -96,12 +97,13 @@ bash /root/simai-env/testing/run-regression.sh full
 1. Run `self platform-status` and `db status`.
 2. Run `self perf-status` to compare current baseline vs recommended preset.
 3. Treat `mysql connection pressure`, `redis memory pressure`, and `FPM oversubscription` as first-pass saturation signals before changing presets.
-4. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
-5. Check admin/env/audit logs.
-6. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
-7. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
-8. Use `laravel perf-apply` / `wp perf-apply` only after the generic site baseline is healthy.
-9. For Bitrix, prefer `bitrix perf-apply` only after installer flow is complete; installer-stage sites intentionally skip agents/cache steps.
+4. If `FPM oversubscription` is `high` or `critical`, run `self perf-plan` before changing individual site pools.
+5. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
+6. Check admin/env/audit logs.
+7. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
+8. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
+9. Use `laravel perf-apply` / `wp perf-apply` only after the generic site baseline is healthy.
+10. For Bitrix, prefer `bitrix perf-apply` only after installer flow is complete; installer-stage sites intentionally skip agents/cache steps.
 
 ## 7) Safety notes
 
