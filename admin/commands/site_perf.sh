@@ -146,6 +146,7 @@ site_perf_status_handler() {
   ui_section "Next steps"
   ui_kv "Tune balanced" "simai-admin.sh site perf-tune --domain ${domain} --mode balanced --confirm yes"
   ui_kv "Tune safe" "simai-admin.sh site perf-tune --domain ${domain} --mode safe --confirm yes"
+  ui_kv "Tune parked" "simai-admin.sh site perf-tune --domain ${domain} --mode parked --confirm yes"
 }
 
 site_perf_tune_handler() {
@@ -157,7 +158,7 @@ site_perf_tune_handler() {
   local confirm="${PARSED_ARGS[confirm]:-no}"
   mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
   case "$mode" in
-    safe|balanced|aggressive) ;;
+    parked|safe|balanced|aggressive) ;;
     *)
       error "Unsupported site performance mode: ${mode}"
       return 1

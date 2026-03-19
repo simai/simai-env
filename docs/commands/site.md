@@ -114,7 +114,7 @@ Apply per-site PHP-FPM governance mode.
 
 Options:
 - `--domain` (required outside menu)
-- `--mode` (`safe|balanced|aggressive`, default `balanced`)
+- `--mode` (`parked|safe|balanced|aggressive`, default `balanced`)
 - `--confirm` (`yes|no`, default `no`; required outside menu)
 
 Behavior:

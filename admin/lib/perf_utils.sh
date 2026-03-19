@@ -585,6 +585,42 @@ perf_fpm_top_pools() {
   printf "%s\n" "${rows[@]}" | sort -t'|' -k1,1nr | head -n "$limit"
 }
 
+perf_fpm_mode_floor() {
+  local mode="${1:-safe}"
+  local total=0
+  declare -A profile_map=()
+  local domain socket_project profile project
+  while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    if ! read_site_metadata "$domain" >/dev/null 2>&1; then
+      continue
+    fi
+    profile="${SITE_META[profile]:-unknown}"
+    project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+    socket_project="${SITE_META[php_socket_project]:-$project}"
+    [[ -z "$socket_project" ]] && continue
+    profile_map["$socket_project"]="$profile"
+  done < <(list_sites 2>/dev/null || true)
+
+  local file pool_name current profile target
+  shopt -s nullglob
+  for file in /etc/php/*/fpm/pool.d/*.conf; do
+    [[ -f "$file" ]] || continue
+    current=$(perf_pool_directive_get "$file" "pm.max_children" || true)
+    [[ -n "$current" && "$current" =~ ^[0-9]+$ ]] || continue
+    pool_name=$(basename "$file" .conf)
+    profile="${profile_map[$pool_name]:-unknown}"
+    target=$(perf_site_mode_target_children "$profile" "$mode")
+    if [[ -n "$target" && "$target" =~ ^[0-9]+$ && "$target" -gt 0 ]]; then
+      total=$(( total + target ))
+    else
+      total=$(( total + current ))
+    fi
+  done
+  shopt -u nullglob
+  echo "$total"
+}
+
 perf_pool_socket_path() {
   local php_version="$1" socket_project="$2"
   echo "/run/php/php${php_version}-fpm-${socket_project}.sock"
@@ -704,6 +740,15 @@ site_perf_mode_defaults() {
   (( aggressive_requests <= base_requests )) && aggressive_requests=$(( base_requests + 250 ))
 
   case "$mode" in
+    parked)
+      printf "%s\n" \
+        "mode|parked" \
+        "pm|ondemand" \
+        "pm.max_children|2" \
+        "pm.process_idle_timeout|5s" \
+        "pm.max_requests|200" \
+        "request_terminate_timeout|60s"
+      ;;
     safe)
       printf "%s\n" \
         "mode|safe" \

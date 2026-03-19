@@ -513,12 +513,14 @@ self_perf_plan_handler() {
   [[ "$limit" =~ ^[0-9]+$ ]] || limit=8
   (( limit < 1 )) && limit=1
 
-  local total_children budget oversub excess mem_available
+  local total_children budget oversub excess mem_available safe_floor parked_floor
   total_children=$(perf_fpm_total_max_children)
   budget=$(perf_fpm_recommended_total_children)
   oversub=$(perf_fpm_oversubscription_risk "$total_children" "$budget")
   excess=$(perf_fpm_excess_children "$total_children" "$budget")
   mem_available=$(perf_memory_available_summary)
+  safe_floor=$(perf_fpm_mode_floor "safe")
+  parked_floor=$(perf_fpm_mode_floor "parked")
 
   ui_header "SIMAI ENV · FPM reduction plan"
   ui_section "Summary"
@@ -527,7 +529,9 @@ self_perf_plan_handler() {
     "Recommended budget|${budget}" \
     "Excess children|${excess}" \
     "Oversubscription|${oversub}" \
-    "Memory available|${mem_available}"
+    "Memory available|${mem_available}" \
+    "Safe-mode floor|${safe_floor}" \
+    "Parked-mode floor|${parked_floor}"
 
   if [[ "$excess" == "0" ]]; then
     ui_section "Result"
@@ -568,8 +572,17 @@ self_perf_rebalance_handler() {
   parse_kv_args "$@"
   local limit="${PARSED_ARGS[limit]:-8}"
   local confirm="${PARSED_ARGS[confirm]:-no}"
+  local mode="${PARSED_ARGS[mode]:-safe}"
   [[ "$limit" =~ ^[0-9]+$ ]] || limit=8
   (( limit < 1 )) && limit=1
+  mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$mode" in
+    safe|parked) ;;
+    *)
+      error "Unsupported rebalance mode: ${mode}"
+      return 1
+      ;;
+  esac
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
     error "Use --confirm yes to apply FPM rebalancing changes"
@@ -591,18 +604,20 @@ self_perf_rebalance_handler() {
   local changed=()
   local skipped=()
   local applied=0
-  local entry current domain profile mode safe_target reduction php_version pool_file
+  local entry current domain profile current_mode target_children reduction php_version pool_file
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
-    IFS='|' read -r current domain profile mode safe_target reduction php_version pool_file <<<"$entry"
+    IFS='|' read -r current domain profile current_mode _safe_target _reduction php_version pool_file <<<"$entry"
     [[ "$domain" == *.* ]] || continue
-    [[ "$reduction" =~ ^[0-9]+$ && "$reduction" -gt 0 ]] || continue
-    if [[ "$mode" == "safe" ]]; then
-      skipped+=("${domain}|already safe")
+    target_children=$(perf_site_mode_target_children "$profile" "$mode")
+    [[ -n "$target_children" && "$target_children" =~ ^[0-9]+$ ]] || continue
+    if (( current <= target_children )); then
+      skipped+=("${domain}|already within ${mode}")
       continue
     fi
-    if site_perf_tune_handler --domain "$domain" --mode safe --confirm yes >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
-      changed+=("${domain}|${current} -> ${safe_target} (${profile}, php ${php_version})")
+    if site_perf_tune_handler --domain "$domain" --mode "$mode" --confirm yes >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
+      reduction=$(( current - target_children ))
+      changed+=("${domain}|${current} -> ${target_children} (${profile}, php ${php_version}, reduce ${reduction})")
       applied=$((applied + 1))
     else
       skipped+=("${domain}|apply failed")
@@ -618,6 +633,7 @@ self_perf_rebalance_handler() {
   ui_header "SIMAI ENV · FPM rebalance"
   ui_section "Summary"
   print_kv_table \
+    "Mode|${mode}" \
     "Applied changes|${applied}" \
     "Children before|${before_total}" \
     "Children after|${after_total}" \
@@ -691,5 +707,5 @@ register_cmd "self" "status" "Show platform/service status" "self_status_handler
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
 register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
 register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
-register_cmd "self" "perf-rebalance" "Apply safe FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= confirm="
+register_cmd "self" "perf-rebalance" "Apply safe/parked FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= mode= confirm="
 register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="

@@ -12,7 +12,8 @@ NO_COLOR=1 /root/simai-env/simai-admin.sh self platform-status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-plan
 # Optional controlled reduction on oversubscribed small servers:
-# NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-rebalance --limit 5 --confirm yes
+# NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-rebalance --limit 5 --mode safe --confirm yes
+# NO_COLOR=1 /root/simai-env/simai-admin.sh self perf-rebalance --limit 5 --mode parked --confirm yes
 NO_COLOR=1 /root/simai-env/simai-admin.sh site list
 NO_COLOR=1 /root/simai-env/simai-admin.sh ssl list
 NO_COLOR=1 /root/simai-env/simai-admin.sh db status
@@ -100,7 +101,7 @@ bash /root/simai-env/testing/run-regression.sh full
 2. Run `self perf-status` to compare current baseline vs recommended preset.
 3. Treat `mysql connection pressure`, `redis memory pressure`, and `FPM oversubscription` as first-pass saturation signals before changing presets.
 4. If `FPM oversubscription` is `high` or `critical`, run `self perf-plan` before changing individual site pools.
-5. On test/staging servers, `self perf-rebalance --limit <n> --confirm yes` can batch-apply `safe` mode to the heaviest pools.
+5. On test/staging servers, `self perf-rebalance --limit <n> --mode safe|parked --confirm yes` can batch-apply stronger pool reductions to the heaviest sites.
 6. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
 7. Check admin/env/audit logs.
 8. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.

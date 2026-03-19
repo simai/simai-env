@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Added `self perf-plan` to highlight the heaviest PHP-FPM pools and suggest site-level `perf-tune --mode safe` actions when server-wide FPM children are oversubscribed.
 - Added `self perf-rebalance --limit <n> --confirm yes` for controlled batch reduction of the heaviest PHP-FPM pools on oversubscribed servers.
+### Changed
+- `self perf-plan` now reports both `safe` and `parked` server-wide FPM floors, and `site perf-tune` / `self perf-rebalance` now support a `parked` mode for rarely used sites.
 
 ## [1.11.43] - 2026-03-19
 ### Changed
