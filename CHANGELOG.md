@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.36] - 2026-03-19
+### Fixed
+- `self perf-apply` no longer emits a duplicate `gzip` directive in nginx performance snippets.
+- `self perf-apply` now writes managed `/etc/simai-env.conf` performance defaults only after baseline config changes succeed, avoiding partial apply drift.
+
 ## [1.11.35] - 2026-03-19
 ### Added
 - Added `self perf-status` and `self perf-apply --preset small|medium|large` for a managed server-side performance baseline.

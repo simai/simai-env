@@ -212,7 +212,6 @@ perf_nginx_conf_path() {
 perf_nginx_render() {
   cat <<EOF
 # managed by simai-env performance baseline
-gzip on;
 gzip_vary on;
 gzip_proxied any;
 gzip_comp_level ${PERF_NGINX_GZIP_COMP_LEVEL};

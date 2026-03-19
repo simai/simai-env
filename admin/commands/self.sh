@@ -473,9 +473,6 @@ self_perf_apply_handler() {
   perf_use_preset "$preset" || return 1
 
   progress_init 5
-  progress_step "Writing managed simai performance defaults (${PERF_PRESET})"
-  perf_apply_env_defaults || return 1
-
   progress_step "Applying nginx baseline"
   perf_apply_nginx_baseline || return 1
 
@@ -487,6 +484,9 @@ self_perf_apply_handler() {
 
   progress_step "Applying PHP-FPM OPcache baseline"
   perf_apply_php_fpm_baseline || return 1
+
+  progress_step "Writing managed simai performance defaults (${PERF_PRESET})"
+  perf_apply_env_defaults || return 1
 
   progress_done "Performance baseline applied"
 
