@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.38] - 2026-03-19
+### Added
+- Added `laravel perf-status` and `laravel perf-apply` for profile-aware Laravel performance tuning (site governance, cron, artisan cache warmup, queue restart).
+- Added `wp perf-status` and `wp perf-apply` for WordPress performance tuning (site governance, managed cron, `DISABLE_WP_CRON`, cache/runtime readiness).
+### Fixed
+- `cache clear` now uses safe `require_args ... || return 1` access for `domain` under `set -u`.
+
 ## [1.11.37] - 2026-03-19
 ### Added
 - Added `site perf-status --domain <domain>` for per-site PHP-FPM governance, memory risk, and cron/queue footprint inspection.

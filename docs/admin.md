@@ -45,6 +45,8 @@ See `docs/architecture/profiles.md`.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, memory risk, and cron/queue footprint.
 - `site perf-tune --domain <domain> --mode safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
+- `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel profile performance readiness and apply flow.
+- `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress performance readiness and apply flow.
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).

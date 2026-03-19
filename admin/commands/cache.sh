@@ -3,8 +3,8 @@ set -euo pipefail
 
 cache_clear_handler() {
   parse_kv_args "$@"
-  require_args "domain"
-  local domain="${PARSED_ARGS[domain]}"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
 
   if ! validate_domain "$domain"; then
     return 1
