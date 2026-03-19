@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.37] - 2026-03-19
+### Added
+- Added `site perf-status --domain <domain>` for per-site PHP-FPM governance, memory risk, and cron/queue footprint inspection.
+- Added `site perf-tune --domain <domain> --mode safe|balanced|aggressive --confirm yes` to apply a managed per-site PHP-FPM governance block.
+
 ## [1.11.36] - 2026-03-19
 ### Fixed
 - `self perf-apply` no longer emits a duplicate `gzip` directive in nginx performance snippets.

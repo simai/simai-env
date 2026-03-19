@@ -95,6 +95,34 @@ Behavior:
 - Recreates PHP-FPM pool for the target version, patches nginx upstream sockets in-place, validates with `nginx -t`, then reloads nginx/php-fpm. Socket/pool naming uses a safe fallback slug when metadata is invalid.
 - Laravel/queue profiles keep their cron/unit wiring; `--keep-old-pool=yes` preserves the previous pool, otherwise it is removed.
 
+## perf-status
+Show per-site runtime governance and PHP-FPM pool footprint.
+
+Options:
+- `--domain` (required outside menu)
+
+Output includes:
+- profile and PHP version
+- current pool mode / children / request limits
+- current request timeout
+- memory limit and a best-effort memory risk estimate
+- opcache / redis extension presence
+- cron / queue footprint summary
+
+## perf-tune
+Apply per-site PHP-FPM governance mode.
+
+Options:
+- `--domain` (required outside menu)
+- `--mode` (`safe|balanced|aggressive`, default `balanced`)
+- `--confirm` (`yes|no`, default `no`; required outside menu)
+
+Behavior:
+- Stores managed site-level performance settings in `/etc/simai-env/sites/<domain>/perf.env`.
+- Applies a managed `simai-site-perf-*` block to the current PHP-FPM pool.
+- Keeps existing `site php-ini` and profile-managed INI blocks intact.
+- Validates php-fpm config before reload and restores the previous pool on failure.
+
 ## fix
 Plan or apply profile-required PHP fixes (PHP extensions and PHP INI overrides). Defaults to plan-only (no changes).
 

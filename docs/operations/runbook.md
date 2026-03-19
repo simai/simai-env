@@ -27,6 +27,7 @@ If any command fails, check logs:
 
 ```bash
 /root/simai-env/simai-admin.sh site info --domain <domain>
+/root/simai-env/simai-admin.sh site perf-status --domain <domain>
 /root/simai-env/simai-admin.sh site doctor --domain <domain>
 /root/simai-env/simai-admin.sh site drift --domain <domain>
 /root/simai-env/simai-admin.sh ssl status --domain <domain>
@@ -94,6 +95,7 @@ bash /root/simai-env/testing/run-regression.sh full
 3. Run `site doctor --domain <domain>` and `ssl status --domain <domain>`.
 4. Check admin/env/audit logs.
 5. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
+6. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
 
 ## 7) Safety notes
 

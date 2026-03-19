@@ -332,3 +332,242 @@ perf_redis_config_get() {
   local key="$1"
   redis-cli CONFIG GET "$key" 2>/dev/null | awk 'NR==2{print}'
 }
+
+site_perf_file() {
+  local domain="$1"
+  echo "$(site_sites_config_dir)/${domain}/perf.env"
+}
+
+read_site_perf_settings() {
+  local domain="$1"
+  local file
+  file=$(site_perf_file "$domain")
+  [[ -f "$file" ]] || return 0
+  awk -F= '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    NF >= 2 {
+      key=$1
+      sub(/^[[:space:]]+/, "", key)
+      sub(/[[:space:]]+$/, "", key)
+      val=substr($0, index($0, "=")+1)
+      sub(/^[[:space:]]+/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      print key "|" val
+    }
+  ' "$file"
+}
+
+write_site_perf_settings() {
+  local domain="$1"
+  shift
+  local file tmp dir
+  file=$(site_perf_file "$domain")
+  dir=$(dirname "$file")
+  mkdir -p "$dir"
+  tmp=$(mktemp)
+  local entry
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    printf "%s=%s\n" "${entry%%|*}" "${entry#*|}" >>"$tmp"
+  done
+  if [[ -s "$tmp" ]]; then
+    mv "$tmp" "$file"
+    chmod 0644 "$file"
+    chown root:root "$file" 2>/dev/null || true
+  else
+    rm -f "$tmp"
+    rm -f "$file"
+  fi
+}
+
+perf_pool_directive_get() {
+  local pool_file="$1" key="$2"
+  [[ -f "$pool_file" ]] || return 1
+  awk -F= -v target="$key" '
+    {
+      line=$0
+      sub(/^[[:space:]]+/, "", line)
+      if (line ~ "^" target "[[:space:]]*=") {
+        sub("^[^=]+=[[:space:]]*", "", line)
+        sub(/[[:space:]]+$/, "", line)
+        print line
+      }
+    }
+  ' "$pool_file" | tail -n1
+}
+
+perf_ini_to_mb() {
+  local raw="${1:-}"
+  raw=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')
+  case "$raw" in
+    "" ) echo "0" ;;
+    -1|unlimited) echo "-1" ;;
+    *g) echo $(( ${raw%g} * 1024 )) ;;
+    *m) echo $(( ${raw%m} )) ;;
+    *k) echo $(( ${raw%k} / 1024 )) ;;
+    *[0-9]) echo $(( raw / 1048576 )) ;;
+    *) echo "0" ;;
+  esac
+}
+
+site_perf_memory_risk() {
+  local memory_limit="$1" max_children="$2"
+  perf_detect_resources
+  local mem_mb child_count
+  mem_mb=$(perf_ini_to_mb "$memory_limit")
+  child_count="${max_children:-0}"
+  if [[ "$mem_mb" == "-1" || "$mem_mb" == "0" || -z "$child_count" || ! "$child_count" =~ ^[0-9]+$ || "$child_count" -eq 0 || "${PERF_MEM_MB:-0}" -le 0 ]]; then
+    echo "unknown"
+    return 0
+  fi
+  local estimated=$(( mem_mb * child_count ))
+  local ratio=$(( estimated * 100 / PERF_MEM_MB ))
+  if (( ratio >= 100 )); then
+    echo "high (~${estimated}M / ${PERF_MEM_MB}M)"
+  elif (( ratio >= 60 )); then
+    echo "medium (~${estimated}M / ${PERF_MEM_MB}M)"
+  else
+    echo "low (~${estimated}M / ${PERF_MEM_MB}M)"
+  fi
+}
+
+site_perf_mode_defaults() {
+  local profile="$1" mode="$2"
+  local base_children="${SIMAI_PERF_FPM_MAX_CHILDREN:-10}"
+  local base_requests="${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
+  local base_pm="${SIMAI_PERF_FPM_PM:-ondemand}"
+  local safe_children=$(( base_children / 2 ))
+  (( safe_children < 2 )) && safe_children=2
+  local aggressive_children=$(( base_children + (base_children / 2) ))
+  (( aggressive_children <= base_children )) && aggressive_children=$(( base_children + 2 ))
+  local safe_requests=$(( base_requests / 2 ))
+  (( safe_requests < 250 )) && safe_requests=250
+  local aggressive_requests=$(( base_requests + (base_requests / 2) ))
+  (( aggressive_requests <= base_requests )) && aggressive_requests=$(( base_requests + 250 ))
+
+  case "$mode" in
+    safe)
+      printf "%s\n" \
+        "mode|safe" \
+        "pm|${base_pm}" \
+        "pm.max_children|${safe_children}" \
+        "pm.process_idle_timeout|10s" \
+        "pm.max_requests|${safe_requests}" \
+        "request_terminate_timeout|120s"
+      ;;
+    balanced)
+      local req_timeout="180s"
+      [[ "$profile" == "bitrix" ]] && req_timeout="300s"
+      printf "%s\n" \
+        "mode|balanced" \
+        "pm|${base_pm}" \
+        "pm.max_children|${base_children}" \
+        "pm.process_idle_timeout|10s" \
+        "pm.max_requests|${base_requests}" \
+        "request_terminate_timeout|${req_timeout}"
+      ;;
+    aggressive)
+      local req_timeout="300s"
+      printf "%s\n" \
+        "mode|aggressive" \
+        "pm|${base_pm}" \
+        "pm.max_children|${aggressive_children}" \
+        "pm.process_idle_timeout|20s" \
+        "pm.max_requests|${aggressive_requests}" \
+        "request_terminate_timeout|${req_timeout}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+apply_site_perf_settings_to_pool() {
+  local domain="$1" php_version="$2" socket_project="$3" reload_flag="${4:-yes}"
+  local pool_file="/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
+  if [[ ! -f "$pool_file" ]]; then
+    error "Pool file not found for ${socket_project} (php ${php_version})"
+    return 1
+  fi
+
+  declare -A kv=()
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    kv["${entry%%|*}"]="${entry#*|}"
+  done < <(read_site_perf_settings "$domain")
+
+  local perf_block=""
+  if [[ ${#kv[@]} -gt 0 ]]; then
+    perf_block=$'; simai-site-perf-begin\n'
+    local key
+    for key in pm pm.max_children pm.process_idle_timeout pm.max_requests request_terminate_timeout; do
+      [[ -n "${kv[$key]:-}" ]] || continue
+      perf_block+="${key} = ${kv[$key]}"$'\n'
+    done
+    perf_block+=$'; simai-site-perf-end\n'
+  fi
+
+  local site_ini_block=""
+  site_ini_block=$(awk '/; simai-site-ini-begin/{flag=1}flag{print}/; simai-site-ini-end/{flag=0}' "$pool_file")
+  local profile_block=""
+  profile_block=$(awk '/; simai-profile-ini-begin/{flag=1}flag{print}/; simai-profile-ini-end/{flag=0}' "$pool_file")
+  local base_content
+  base_content=$(sed '/; simai-profile-ini-begin/,/; simai-profile-ini-end/d;/; simai-site-ini-begin/,/; simai-site-ini-end/d;/; simai-site-perf-begin/,/; simai-site-perf-end/d' "$pool_file")
+
+  local new_content=""
+  new_content+="$base_content"
+  [[ -n "$base_content" && "${base_content: -1}" != $'\n' ]] && new_content+=$'\n'
+  if [[ -n "$perf_block" ]]; then
+    new_content+="$perf_block"
+    [[ "${new_content: -1}" != $'\n' ]] && new_content+=$'\n'
+  fi
+  if [[ -n "$site_ini_block" ]]; then
+    new_content+="$site_ini_block"
+    [[ "${new_content: -1}" != $'\n' ]] && new_content+=$'\n'
+  fi
+  if [[ -n "$profile_block" ]]; then
+    new_content+="$profile_block"
+    [[ "${new_content: -1}" != $'\n' ]] && new_content+=$'\n'
+  fi
+
+  local current_content
+  current_content=$(cat "$pool_file")
+  if [[ "$current_content" == "$new_content" ]]; then
+    info "No site performance changes to apply for ${domain}."
+    return 0
+  fi
+
+  local backup tmp_out
+  backup=$(mktemp)
+  cp -p "$pool_file" "$backup" >>"$LOG_FILE" 2>&1 || backup=""
+  tmp_out=$(mktemp)
+  printf "%s" "$new_content" >"$tmp_out"
+  chmod --reference="$pool_file" "$tmp_out" 2>/dev/null || true
+  chown --reference="$pool_file" "$tmp_out" 2>/dev/null || true
+  mv "$tmp_out" "$pool_file"
+
+  local fpm_bin
+  fpm_bin=$(command -v "php-fpm${php_version}" 2>/dev/null || true)
+  if [[ -z "$fpm_bin" && -x "/usr/sbin/php-fpm${php_version}" ]]; then
+    fpm_bin="/usr/sbin/php-fpm${php_version}"
+  fi
+  if [[ -z "$fpm_bin" ]]; then
+    error "php-fpm${php_version} binary not found for config test"
+    [[ -n "$backup" && -f "$backup" ]] && cp -p "$backup" "$pool_file" >>"$LOG_FILE" 2>&1 || true
+    return 1
+  fi
+  if ! "$fpm_bin" -t >>"$LOG_FILE" 2>&1; then
+    error "php-fpm${php_version} config test failed; restoring previous pool"
+    [[ -n "$backup" && -f "$backup" ]] && cp -p "$backup" "$pool_file" >>"$LOG_FILE" 2>&1 || true
+    return 1
+  fi
+  [[ -n "$backup" && -f "$backup" ]] && rm -f "$backup"
+
+  if [[ "${reload_flag,,}" != "no" ]]; then
+    if ! os_svc_reload "php${php_version}-fpm"; then
+      warn "Failed to reload php${php_version}-fpm after applying site perf settings; please reload manually"
+    fi
+  fi
+}
