@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.40] - 2026-03-19
+### Added
+- Added `bitrix perf-status` and `bitrix perf-apply` for Bitrix-specific performance/runtime readiness (site governance, PHP baseline, installer-aware agents/cache orchestration).
+
 ## [1.11.39] - 2026-03-19
 ### Fixed
 - `laravel perf-apply` no longer restarts placeholder queue units, avoiding misleading auto-restart loops on bootstrap sites.

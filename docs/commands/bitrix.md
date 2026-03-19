@@ -136,3 +136,40 @@ Notes:
 - Bulk mode (`--all yes`) requires `--confirm yes` in CLI mode.
 - Read-only checks are not changed; only PHP pool INI overrides are updated.
 - run this after Bitrix web installation, before final `site_checker` / `perfmon` acceptance checks.
+
+## Perf Status
+
+```bash
+simai-admin.sh bitrix perf-status --domain <domain>
+```
+
+Shows:
+- managed site performance mode (`site perf-tune` state)
+- install stage (`installer` vs `post-install`)
+- Bitrix DB/runtime compatibility markers:
+  - `.settings.php` init commands
+  - `after_connect_d7.php`
+  - agents-via-cron readiness
+- effective PHP-FPM runtime values used by Bitrix checker-sensitive paths
+- cache directory presence
+- Redis extension/service availability
+
+## Perf Apply
+
+```bash
+simai-admin.sh bitrix perf-apply --domain <domain> --mode standard --confirm yes
+```
+
+Supported modes:
+- `standard`
+- `high-load`
+
+Behavior:
+- Applies a managed site PHP-FPM governance block (`balanced` for `standard`, `aggressive` for `high-load`).
+- Runs `bitrix php-baseline-sync` for PHP/FPM runtime enforcement.
+- Applies `bitrix agents-sync` automatically only after installer stage is over (`SHORT_INSTALL != true`).
+- Clears Bitrix caches automatically only after installer stage is over.
+
+Notes:
+- Requires `--confirm yes` outside interactive menu.
+- Installer-stage Bitrix sites keep agents/cache steps in `skipped (installer)` state by design.

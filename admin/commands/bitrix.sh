@@ -118,6 +118,84 @@ bitrix_agents_ready_state() {
   echo "no"
 }
 
+bitrix_perf_read_mode() {
+  local domain="$1"
+  local mode="none"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry%%|*}" == "mode" ]]; then
+      mode="${entry#*|}"
+      break
+    fi
+  done < <(read_site_perf_settings "$domain")
+  echo "$mode"
+}
+
+bitrix_perf_install_stage() {
+  local short_install="$1"
+  case "$short_install" in
+    true) echo "installer" ;;
+    false) echo "post-install" ;;
+    missing|unknown|"") echo "unknown" ;;
+    *) echo "unknown" ;;
+  esac
+}
+
+bitrix_perf_settings_init_state() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if grep -q "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci" "$file" 2>/dev/null \
+    && grep -q "SET SESSION sql_mode=''" "$file" 2>/dev/null \
+    && grep -q "SET SESSION innodb_strict_mode=0" "$file" 2>/dev/null; then
+    echo "ready"
+    return 0
+  fi
+  echo "partial"
+}
+
+bitrix_perf_after_connect_state() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if grep -q "innodb_strict_mode" "$file" 2>/dev/null \
+    && grep -q "sql_mode=''" "$file" 2>/dev/null \
+    && grep -q "utf8mb4_unicode_ci" "$file" 2>/dev/null; then
+    echo "ready"
+    return 0
+  fi
+  echo "partial"
+}
+
+bitrix_perf_cache_dirs_state() {
+  local doc_root="$1"
+  local present=0 total=3
+  local dir
+  for dir in \
+    "${doc_root}/bitrix/cache" \
+    "${doc_root}/bitrix/managed_cache" \
+    "${doc_root}/bitrix/stack_cache"; do
+    [[ -d "$dir" ]] && present=$((present + 1))
+  done
+  echo "${present}/${total} present"
+}
+
+bitrix_perf_site_mode_for_apply() {
+  local mode="$1"
+  case "$mode" in
+    standard) echo "balanced" ;;
+    high-load) echo "aggressive" ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 bitrix_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -718,6 +796,206 @@ bitrix_php_baseline_sync_handler() {
   return 0
 }
 
+bitrix_perf_status_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  if ! bitrix_prepare_site "$domain"; then
+    return $?
+  fi
+
+  local managed_mode="none"
+  managed_mode=$(bitrix_perf_read_mode "$domain")
+  local settings_present="no"
+  local dbconn_present="no"
+  local after_connect_state="missing"
+  local settings_init_state="missing"
+  local bx_crontab="missing"
+  local bx_crontab_support="missing"
+  local short_install="unknown"
+  local install_stage="unknown"
+  local cron_file_state="missing"
+  local cron_managed="no"
+  local cron_domain_match="no"
+  local cron_slug_match="no"
+  local cron_entry_match="no"
+  local agents_ready="no"
+  local cache_dirs="0/3 present"
+  local php_bin=""
+  local redis_ext="no"
+  local redis_service="n/a"
+  local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$BX_SLUG}}"
+  local pool_file="/etc/php/${BX_PHP_VERSION}/fpm/pool.d/${socket_project}.conf"
+  local memory_limit="n/a"
+  local upload_max="n/a"
+  local post_max="n/a"
+  local max_input_vars="n/a"
+  local max_execution_time="n/a"
+  local short_open_tag="n/a"
+  local opcache_revalidate="n/a"
+  local opcache_memory="n/a"
+
+  [[ -f "$BX_SETTINGS_FILE" ]] && settings_present="yes"
+  if [[ -f "$BX_SETTINGS_FILE" ]]; then
+    settings_init_state=$(bitrix_perf_settings_init_state "$BX_SETTINGS_FILE")
+  fi
+  if [[ -f "$BX_DBCONN_FILE" ]]; then
+    dbconn_present="yes"
+    bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
+    bx_crontab_support=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB_SUPPORT")
+    short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
+  fi
+  install_stage=$(bitrix_perf_install_stage "$short_install")
+  after_connect_state=$(bitrix_perf_after_connect_state "${BX_DOC_ROOT}/bitrix/php_interface/after_connect_d7.php")
+  if [[ -f "$BX_CRON_FILE" ]]; then
+    cron_file_state="present"
+    bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
+    cron_managed="${BX_CRON_MANAGED:-no}"
+    cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
+    cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
+    cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
+  fi
+  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  cache_dirs=$(bitrix_perf_cache_dirs_state "$BX_DOC_ROOT")
+
+  if [[ -f "$pool_file" ]]; then
+    memory_limit=$(doctor_php_pool_ini_get "$pool_file" "memory_limit" || true)
+    upload_max=$(doctor_php_pool_ini_get "$pool_file" "upload_max_filesize" || true)
+    post_max=$(doctor_php_pool_ini_get "$pool_file" "post_max_size" || true)
+    max_input_vars=$(doctor_php_pool_ini_get "$pool_file" "max_input_vars" || true)
+    max_execution_time=$(doctor_php_pool_ini_get "$pool_file" "max_execution_time" || true)
+    short_open_tag=$(doctor_php_pool_ini_get "$pool_file" "short_open_tag" || true)
+    opcache_revalidate=$(doctor_php_pool_ini_get "$pool_file" "opcache.revalidate_freq" || true)
+    opcache_memory=$(doctor_php_pool_ini_get "$pool_file" "opcache.memory_consumption" || true)
+  fi
+  php_bin=$(resolve_php_bin "$BX_PHP_VERSION")
+  if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^redis$'; then
+    redis_ext="yes"
+  fi
+  if os_svc_has_unit "redis-server"; then
+    if os_svc_is_active "redis-server"; then
+      redis_service="active"
+    else
+      redis_service="inactive"
+    fi
+  fi
+
+  ui_header "SIMAI ENV · Bitrix performance"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${BX_DOMAIN}" \
+    "Managed mode|${managed_mode}" \
+    "Install stage|${install_stage}" \
+    "PHP|${BX_PHP_VERSION:-none}" \
+    "Core files|${BX_HAS_CORE}" \
+    ".settings.php|${settings_present}" \
+    "dbconn.php|${dbconn_present}" \
+    "Settings init_commands|${settings_init_state}" \
+    "after_connect_d7.php|${after_connect_state}" \
+    "Agents via cron ready|${agents_ready}" \
+    "Cache dirs|${cache_dirs}" \
+    "memory_limit|${memory_limit:-n/a}" \
+    "upload_max_filesize|${upload_max:-n/a}" \
+    "post_max_size|${post_max:-n/a}" \
+    "max_input_vars|${max_input_vars:-n/a}" \
+    "max_execution_time|${max_execution_time:-n/a}" \
+    "short_open_tag|${short_open_tag:-n/a}" \
+    "opcache.revalidate_freq|${opcache_revalidate:-n/a}" \
+    "opcache.memory_consumption|${opcache_memory:-n/a}" \
+    "Redis extension|${redis_ext}" \
+    "Redis service|${redis_service}"
+  ui_section "Next steps"
+  ui_kv "Apply standard" "simai-admin.sh bitrix perf-apply --domain ${BX_DOMAIN} --mode standard --confirm yes"
+  ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
+  ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
+}
+
+bitrix_perf_apply_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local mode="${PARSED_ARGS[mode]:-standard}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  local include_recommended="${PARSED_ARGS[include-recommended]:-yes}"
+  [[ "${confirm,,}" == "yes" ]] && confirm="yes" || confirm="no"
+  [[ "${include_recommended,,}" == "yes" ]] && include_recommended="yes" || include_recommended="no"
+  mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$mode" in
+    standard|high-load) ;;
+    *)
+      error "Unsupported Bitrix performance mode: ${mode}"
+      return 1
+      ;;
+  esac
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to apply Bitrix performance tuning"
+    return 1
+  fi
+  if ! bitrix_prepare_site "$domain"; then
+    return $?
+  fi
+
+  local site_mode=""
+  site_mode=$(bitrix_perf_site_mode_for_apply "$mode") || return 1
+  local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$BX_SLUG}}"
+  if ! validate_project_slug "$socket_project"; then
+    socket_project="$(project_slug_from_domain "$domain")"
+  fi
+  local -a settings=()
+  mapfile -t settings < <(site_perf_mode_defaults "bitrix" "$site_mode")
+  write_site_perf_settings "$domain" "${settings[@]}"
+  apply_site_perf_settings_to_pool "$domain" "$BX_PHP_VERSION" "$socket_project" || return 1
+
+  local php_status="ok"
+  local agents_status="skipped"
+  local cache_status="skipped"
+  if ! run_command bitrix php-baseline-sync --domain "$domain" --include-recommended "$include_recommended"; then
+    php_status="failed"
+    error "Bitrix PHP baseline sync failed for ${domain}"
+    return 1
+  fi
+
+  local short_install="unknown"
+  if [[ -f "$BX_DBCONN_FILE" ]]; then
+    short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
+  fi
+  if [[ "$short_install" != "true" && -f "$BX_DBCONN_FILE" ]]; then
+    if run_command bitrix agents-sync --domain "$domain" --apply yes --confirm yes; then
+      agents_status="applied"
+    else
+      agents_status="failed"
+      error "Bitrix agents sync failed for ${domain}"
+      return 1
+    fi
+  else
+    agents_status="skipped (installer)"
+  fi
+
+  if [[ "$BX_HAS_CORE" == "yes" && "$short_install" != "true" ]]; then
+    if run_command bitrix cache-clear --domain "$domain"; then
+      cache_status="cleared"
+    else
+      cache_status="failed"
+      error "Bitrix cache clear failed for ${domain}"
+      return 1
+    fi
+  else
+    cache_status="skipped (installer)"
+  fi
+
+  ui_header "SIMAI ENV · Bitrix performance apply"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${BX_DOMAIN}" \
+    "Mode|${mode}" \
+    "Site tune|applied (${site_mode})" \
+    "PHP baseline|${php_status}" \
+    "Agents sync|${agents_status}" \
+    "Cache clear|${cache_status}"
+  ui_section "Next steps"
+  ui_kv "Review status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
+}
+
 register_cmd "bitrix" "status" "Show Bitrix operational status" "bitrix_status_handler" "domain" ""
 register_cmd "bitrix" "cron-status" "Show Bitrix cron status" "bitrix_cron_status_handler" "domain" ""
 register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix cron file" "bitrix_cron_sync_handler" "domain" ""
@@ -727,3 +1005,5 @@ register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cac
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
+register_cmd "bitrix" "perf-status" "Show Bitrix performance readiness" "bitrix_perf_status_handler" "domain" ""
+register_cmd "bitrix" "perf-apply" "Apply Bitrix performance baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="

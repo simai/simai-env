@@ -30,6 +30,7 @@ If any command fails, check logs:
 /root/simai-env/simai-admin.sh site perf-status --domain <domain>
 /root/simai-env/simai-admin.sh laravel perf-status --domain <laravel-domain>
 /root/simai-env/simai-admin.sh wp perf-status --domain <wordpress-domain>
+/root/simai-env/simai-admin.sh bitrix perf-status --domain <bitrix-domain>
 /root/simai-env/simai-admin.sh site doctor --domain <domain>
 /root/simai-env/simai-admin.sh site drift --domain <domain>
 /root/simai-env/simai-admin.sh ssl status --domain <domain>
@@ -99,6 +100,7 @@ bash /root/simai-env/testing/run-regression.sh full
 5. If config drift detected, use `site drift --domain <domain>` first, and only then apply fixes.
 6. If one site is too heavy, inspect `site perf-status --domain <domain>` before changing global baseline.
 7. Use `laravel perf-apply` / `wp perf-apply` only after the generic site baseline is healthy.
+8. For Bitrix, prefer `bitrix perf-apply` only after installer flow is complete; installer-stage sites intentionally skip agents/cache steps.
 
 ## 7) Safety notes
 

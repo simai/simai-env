@@ -47,6 +47,7 @@ See `docs/architecture/profiles.md`.
 - `site perf-tune --domain <domain> --mode safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel profile performance readiness and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress performance readiness and apply flow.
+- `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix profile performance readiness and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).
