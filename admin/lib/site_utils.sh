@@ -1080,7 +1080,7 @@ site_runtime_nginx_block_render() {
   cat <<'EOF'
     # simai-runtime-suspend-begin
     error_page 503 @simai_runtime_suspended;
-    if ($request_uri !~ "^/\.well-known/acme-challenge/") { return 503; }
+    if ($request_uri !~ "^/[.]well-known/acme-challenge/") { return 503; }
     location @simai_runtime_suspended {
         internal;
         default_type text/plain;

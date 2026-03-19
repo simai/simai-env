@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.47] - 2026-03-19
+### Fixed
+- `site runtime-suspend` no longer emits awk regex warnings while inserting the managed nginx `503` runtime block.
+
 ## [1.11.46] - 2026-03-19
 ### Added
 - Added reversible site runtime management: `site runtime-status`, `site runtime-suspend`, and `site runtime-resume`.
