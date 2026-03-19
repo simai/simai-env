@@ -1,6 +1,24 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.23] - 2026-03-19
+### Changed
+- Bitrix nginx template is now closer to default Bitrix `.htaccess` behavior on fresh installs:
+  - `try_files ... /bitrix/urlrewrite.php?$args`
+  - `error_page 404 /404.php`
+  - `autoindex off`
+  - 3-day cache headers for common static assets (`css`, `js`, `gif`, `png`, `jpg`, `jpeg`)
+### Fixed
+- Bitrix PHP locations now forward auth context more explicitly for checker and 1C integration compatibility:
+  - `HTTP_AUTHORIZATION`
+  - `REMOTE_USER`
+  - `REDIRECT_REMOTE_USER`
+
+## [1.11.22] - 2026-03-19
+### Fixed
+- Bitrix nginx template now explicitly forwards `Authorization` to PHP-FPM via `fastcgi_param HTTP_AUTHORIZATION $http_authorization`.
+- This makes HTTP auth behavior deterministic for Bitrix/1C integrations on nginx+php-fpm instead of relying on distro-specific fastcgi defaults.
+
 ## [1.11.21] - 2026-03-19
 ### Fixed
 - Bitrix DB preseed no longer writes `BX_CRONTAB_SUPPORT` into `dbconn.php` during initial install.
