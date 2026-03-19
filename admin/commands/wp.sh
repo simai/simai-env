@@ -54,7 +54,15 @@ wp_prepare_site() {
   WP_CONFIG_FILE="${doc_root}/wp-config.php"
   WP_CRON_ENTRYPOINT="${doc_root}/wp-cron.php"
   WP_HAS_CORE="no"
+  WP_CONFIG_READY="no"
   [[ -d "${doc_root}/wp-includes" && -f "${doc_root}/index.php" ]] && WP_HAS_CORE="yes"
+  if [[ -f "$WP_CONFIG_FILE" ]]; then
+    if grep -q "SIMAI placeholder" "$WP_CONFIG_FILE" 2>/dev/null; then
+      WP_CONFIG_READY="placeholder"
+    else
+      WP_CONFIG_READY="yes"
+    fi
+  fi
   return 0
 }
 
@@ -73,7 +81,7 @@ wp_status_handler() {
   ui_header "SIMAI ENV · WordPress status"
   local wp_cli="missing"
   local core_version="n/a"
-  local config_present="no"
+  local config_present="${WP_CONFIG_READY:-no}"
   local cron_entrypoint="missing"
   local disable_wp_cron="unknown"
   local cron_file_state="missing"
@@ -87,8 +95,7 @@ wp_status_handler() {
   if command -v wp >/dev/null 2>&1; then
     wp_cli="present"
   fi
-  if [[ -f "$WP_CONFIG_FILE" ]]; then
-    config_present="yes"
+  if [[ "$config_present" == "yes" ]]; then
     if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
       disable_wp_cron="true"
     else
@@ -151,6 +158,7 @@ wp_cron_status_handler() {
   fi
 
   ui_header "SIMAI ENV · WordPress cron status"
+  local config_present="${WP_CONFIG_READY:-no}"
   local cron_file_state="missing"
   local cron_line_state="missing"
   local disable_wp_cron="unknown"
@@ -167,7 +175,7 @@ wp_cron_status_handler() {
       cron_line_state="present"
     fi
   fi
-  if [[ -f "$WP_CONFIG_FILE" ]]; then
+  if [[ "$config_present" == "yes" ]]; then
     if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
       disable_wp_cron="true"
     else
@@ -230,7 +238,7 @@ wp_cache_clear_handler() {
     error "wp-cli is not installed."
     return 1
   fi
-  if [[ "$WP_HAS_CORE" != "yes" || ! -f "$WP_CONFIG_FILE" ]]; then
+  if [[ "$WP_HAS_CORE" != "yes" || "${WP_CONFIG_READY:-no}" != "yes" ]]; then
     error "WordPress core/config not ready in ${WP_DOC_ROOT}."
     return 1
   fi
@@ -302,7 +310,7 @@ wp_perf_status_handler() {
 
   local managed_mode
   managed_mode=$(wp_perf_read_mode "$domain")
-  local config_present="no"
+  local config_present="${WP_CONFIG_READY:-no}"
   local disable_wp_cron="unknown"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -316,8 +324,7 @@ wp_perf_status_handler() {
   local redis_service="n/a"
   local redis_ext="no"
   local woo_plugin="n/a"
-  if [[ -f "$WP_CONFIG_FILE" ]]; then
-    config_present="yes"
+  if [[ "$config_present" == "yes" ]]; then
     if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
       disable_wp_cron="true"
     else
@@ -444,7 +451,7 @@ wp_perf_apply_handler() {
   }
 
   local disable_cron_status="skipped"
-  if [[ -f "$WP_CONFIG_FILE" ]]; then
+  if [[ "${WP_CONFIG_READY:-no}" == "yes" ]]; then
     if wp_perf_set_disable_cron_true; then
       disable_cron_status="true"
     else
@@ -452,6 +459,8 @@ wp_perf_apply_handler() {
       error "Failed to set DISABLE_WP_CRON=true in ${WP_CONFIG_FILE}"
       return 1
     fi
+  elif [[ "${WP_CONFIG_READY:-no}" == "placeholder" ]]; then
+    disable_cron_status="skipped (placeholder)"
   fi
 
   ui_header "SIMAI ENV · WordPress performance apply"

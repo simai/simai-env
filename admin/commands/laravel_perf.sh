@@ -235,7 +235,9 @@ laravel_perf_apply_handler() {
   if validate_project_slug "$LARAVEL_PERF_PROJECT"; then
     queue_unit=$(queue_unit_name "$LARAVEL_PERF_PROJECT" 2>/dev/null || true)
   fi
-  if [[ -n "$queue_unit" ]] && os_svc_has_unit "$queue_unit"; then
+  if [[ "$LARAVEL_PERF_REAL_APP" != "yes" ]]; then
+    queue_status="skipped (placeholder)"
+  elif [[ -n "$queue_unit" ]] && os_svc_has_unit "$queue_unit"; then
     if os_svc_restart "$queue_unit"; then
       queue_status="restarted"
     else

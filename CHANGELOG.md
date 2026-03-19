@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.39] - 2026-03-19
+### Fixed
+- `laravel perf-apply` no longer restarts placeholder queue units, avoiding misleading auto-restart loops on bootstrap sites.
+- WordPress performance commands now distinguish placeholder `wp-config.php` bootstrap files from real configs, so `DISABLE_WP_CRON` reporting/apply is no longer misleading on non-installed sites.
+
 ## [1.11.38] - 2026-03-19
 ### Added
 - Added `laravel perf-status` and `laravel perf-apply` for profile-aware Laravel performance tuning (site governance, cron, artisan cache warmup, queue restart).
