@@ -504,7 +504,11 @@ site_doctor_handler() {
       nginx_ssl_declared="yes"
     fi
   fi
-  if [[ "${ssl_flag}" == "on" || "${nginx_ssl_declared}" == "yes" ]]; then
+  local ssl_meta_enabled="no"
+  if site_ssl_meta_is_enabled "$ssl_flag"; then
+    ssl_meta_enabled="yes"
+  fi
+  if [[ "${ssl_meta_enabled}" == "yes" || "${nginx_ssl_declared}" == "yes" ]]; then
     if [[ -n "$nginx_cert" && -n "$nginx_key" ]]; then
       if [[ -f "$nginx_cert" && -f "$nginx_key" ]]; then
         doctor_add_result "PASS" "ssl" "Certificates" "Nginx cert/key files present" ""
@@ -519,10 +523,10 @@ site_doctor_handler() {
         doctor_add_result "WARN" "ssl" "Certificates" "SSL enabled but nginx cert/key directives are missing" "Re-run ssl letsencrypt or install custom certs"
       fi
     fi
-    if [[ "${ssl_flag}" != "on" && "${nginx_ssl_declared}" == "yes" ]]; then
-      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=off, but nginx uses SSL directives" "Run ssl status and refresh site metadata via SSL commands"
-    elif [[ "${ssl_flag}" == "on" && "${nginx_ssl_declared}" != "yes" ]]; then
-      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=on, but nginx has no SSL directives" "Run ssl status and re-apply SSL configuration"
+    if [[ "${ssl_meta_enabled}" != "yes" && "${nginx_ssl_declared}" == "yes" ]]; then
+      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=${ssl_flag:-none}, but nginx uses SSL directives" "Run ssl status and refresh site metadata via SSL commands"
+    elif [[ "${ssl_meta_enabled}" == "yes" && "${nginx_ssl_declared}" != "yes" ]]; then
+      doctor_add_result "WARN" "ssl" "Metadata drift" "Metadata says SSL=${ssl_flag:-none}, but nginx has no SSL directives" "Run ssl status and re-apply SSL configuration"
     fi
   else
     doctor_add_result "SKIP" "ssl" "SSL" "Disabled (metadata and nginx)" ""

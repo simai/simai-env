@@ -1467,6 +1467,14 @@ site_ssl_brief() {
   fi
 }
 
+site_ssl_meta_is_enabled() {
+  local ssl_value="${1:-${SITE_META[ssl]:-none}}"
+  case "${ssl_value,,}" in
+    on|yes|true|1|letsencrypt|custom|unknown) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 ssl_cert_is_staging() {
   local cert="$1"
   if [[ -z "$cert" || ! -f "$cert" ]]; then
@@ -1744,7 +1752,7 @@ site_ssl_info() {
   local domain="$1"
   local cfg="/etc/nginx/sites-available/${domain}.conf"
   local enabled="false" type="none"
-  if [[ "${SITE_META[ssl]:-off}" == "on" ]]; then
+  if site_ssl_meta_is_enabled "${SITE_META[ssl]:-none}"; then
     enabled="true"
     if grep -q "/etc/letsencrypt/live/${domain}/" "$cfg" 2>/dev/null; then
       type="letsencrypt"

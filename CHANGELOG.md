@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.27] - 2026-03-19
+### Fixed
+- SSL metadata checks now understand normalized site metadata values like `letsencrypt` and `custom`, avoiding false `Metadata drift` warnings in `site doctor`.
+
 ## [1.11.26] - 2026-03-19
 ### Fixed
 - `site doctor` and `site fix` now evaluate PHP INI against the effective PHP-FPM pool config when available, avoiding false Bitrix runtime warnings caused by CLI `php.ini`.
