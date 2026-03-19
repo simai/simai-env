@@ -2,6 +2,7 @@
 set -euo pipefail
 
 SIMAI_USER=${SIMAI_USER:-simai}
+SIMAI_HOME=${SIMAI_HOME:-/home/${SIMAI_USER}}
 WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_USER}/www}
 NGINX_TEMPLATE=${NGINX_TEMPLATE:-${SCRIPT_DIR}/templates/nginx-laravel.conf}
 NGINX_TEMPLATE_GENERIC=${NGINX_TEMPLATE_GENERIC:-${SCRIPT_DIR}/templates/nginx-generic.conf}
