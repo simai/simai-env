@@ -139,6 +139,7 @@ bitrix_status_handler() {
   local setup_script=""
   local setup_state="missing"
   local setup_kind="missing"
+  local archives="none"
   local cron_entrypoint="missing"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -156,6 +157,7 @@ bitrix_status_handler() {
       *) setup_state="present" ;;
     esac
   fi
+  archives=$(bitrix_detect_distribution_archives "$BX_DOC_ROOT")
   if [[ -f "$BX_DBCONN_FILE" ]]; then
     dbconn_present="yes"
     bx_crontab=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")
@@ -183,6 +185,7 @@ bitrix_status_handler() {
     "dbconn.php|${dbconn_present}" \
     "bitrixsetup.php|${setup_script} (${setup_state})" \
     "Setup kind|${setup_kind}" \
+    "Archives|${archives}" \
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
     "SHORT_INSTALL|${short_install}" \
@@ -193,7 +196,7 @@ bitrix_status_handler() {
     "Cron domain marker|${cron_domain_match}" \
     "Cron slug marker|${cron_slug_match}"
   ui_section "Next steps"
-  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php"
+  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
   ui_kv "Installer ready" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
   ui_kv "Cron sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
@@ -518,9 +521,18 @@ bitrix_installer_ready_handler() {
   local overwrite="${PARSED_ARGS[overwrite]:-no}"
   local short_install="${PARSED_ARGS[short-install]:-yes}"
   local setup_overwrite="${PARSED_ARGS[setup-overwrite]:-no}"
+  local archive="${PARSED_ARGS[archive]:-yes}"
+  local edition="${PARSED_ARGS[edition]:-standard}"
+  local archive_overwrite="${PARSED_ARGS[archive-overwrite]:-no}"
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
   [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
   [[ "${setup_overwrite,,}" == "yes" ]] || setup_overwrite="no"
+  [[ "${archive,,}" == "yes" ]] && archive="yes" || archive="no"
+  [[ "${archive_overwrite,,}" == "yes" ]] || archive_overwrite="no"
+  edition=$(bitrix_distribution_edition_normalize "$edition") || {
+    error "Unsupported Bitrix edition '${edition}'. Use: start, standard, small-business, business"
+    return 1
+  }
 
   if ! bitrix_prepare_site "$domain"; then
     return $?
@@ -538,6 +550,8 @@ bitrix_installer_ready_handler() {
   local setup_state="failed"
   local setup_script
   local setup_kind="missing"
+  local archive_state="skipped"
+  local archive_path="n/a"
   setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
   if bitrix_download_setup_script "$BX_DOC_ROOT" "$setup_overwrite"; then
     setup_kind=$(bitrix_setup_script_kind "$setup_script")
@@ -547,8 +561,24 @@ bitrix_installer_ready_handler() {
       *) setup_state="downloaded" ;;
     esac
   fi
+  if [[ "$archive" == "yes" ]]; then
+    archive_path=$(bitrix_distribution_archive_path "$BX_DOC_ROOT" "$edition") || archive_path="n/a"
+    if bitrix_download_distribution_archive "$BX_DOC_ROOT" "$edition" "$archive_overwrite"; then
+      archive_state="ready"
+    else
+      archive_state="failed"
+    fi
+  fi
   local status="ready"
-  [[ "$preseed_state" == "ready" && "$setup_state" == "ready" ]] || status="partial"
+  if [[ "$preseed_state" != "ready" ]]; then
+    status="partial"
+  elif [[ "$setup_state" == "ready" ]]; then
+    status="ready"
+  elif [[ "$setup_kind" == "bitrix24-loader" && "$archive_state" == "ready" ]]; then
+    status="ready"
+  else
+    status="partial"
+  fi
 
   ui_section "Result"
   print_kv_table \
@@ -558,14 +588,17 @@ bitrix_installer_ready_handler() {
     "SHORT_INSTALL|${short_install}" \
     "Setup script|${setup_state}" \
     "Setup kind|${setup_kind}" \
+    "Edition|${edition}" \
+    "Archive|${archive_state}" \
+    "Archive path|${archive_path}" \
     "bitrixsetup.php|${setup_script}" \
     "Status|${status}"
   if [[ "$status" != "ready" ]]; then
-    warn "Installer ready is partial. Check network access, db.env values, and whether bitrixsetup.php is a Site Management installer."
+    warn "Installer ready is partial. Check network access, db.env values, and whether the setup script plus local distro archive form a valid Site Management installer flow."
     return 1
   fi
   ui_section "Next steps"
-  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php"
+  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
@@ -670,5 +703,5 @@ register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bit
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
-register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite="
+register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="

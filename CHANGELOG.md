@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.32] - 2026-03-19
+### Added
+- `bitrix installer-ready` now supports archive-based Site Management setup with edition-aware `.tar.gz` downloads (`start`, `standard`, `small-business`, `business`).
+### Changed
+- Bitrix status now reports local distro archives and points installer next steps to `bitrixsetup.php?test=1`.
+
 ## [1.11.31] - 2026-03-19
 ### Changed
 - Bitrix installer/status output now uses `http://` before SSL is enabled, avoiding misleading fresh-site `https://.../bitrixsetup.php` checks.

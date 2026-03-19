@@ -93,17 +93,20 @@ Notes:
 ## Installer Ready
 
 ```bash
-simai-admin.sh bitrix installer-ready --domain <domain> [--overwrite yes] [--short-install yes|no] [--setup-overwrite yes|no]
+simai-admin.sh bitrix installer-ready --domain <domain> [--overwrite yes] [--short-install yes|no] [--setup-overwrite yes|no] [--archive yes|no] [--edition start|standard|small-business|business] [--archive-overwrite yes|no]
 ```
 
 Prepares Bitrix installer flow in one step:
 - generates/updates DB preseed files from `db.env`
 - downloads `public/bitrixsetup.php` from official Bitrix URL (best effort)
+- downloads a local Site Management distro archive (`.tar.gz`) for the selected edition by default
 
 Notes:
-- default mode keeps existing files (`--overwrite no`, `--setup-overwrite no`).
+- default mode keeps existing files (`--overwrite no`, `--setup-overwrite no`, `--archive-overwrite no`).
 - command is safe for repeat runs (idempotent).
 - if network is unavailable, setup script step can fail while DB preseed still stays valid.
+- default `--edition standard` is used for a predictable fresh trial flow.
+- when archive download succeeds, open `bitrixsetup.php?test=1` so BitrixSetup can work with the local distro archive.
 - recommended usage order for fresh sites:
   1. `site add --profile bitrix --db yes`
   2. `bitrix installer-ready --domain <domain>`

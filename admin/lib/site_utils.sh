@@ -1630,6 +1630,92 @@ site_primary_url() {
   echo "$(site_primary_scheme "$domain")://${domain}"
 }
 
+bitrix_distribution_edition_normalize() {
+  local edition="${1:-standard}"
+  edition=$(echo "$edition" | tr '[:upper:]' '[:lower:]')
+  case "$edition" in
+    start|standard|small-business|business)
+      echo "$edition"
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+bitrix_distribution_archive_url() {
+  local edition
+  edition=$(bitrix_distribution_edition_normalize "${1:-standard}") || return 1
+  case "$edition" in
+    start) echo "https://www.1c-bitrix.ru/download/start_encode.tar.gz" ;;
+    standard) echo "https://www.1c-bitrix.ru/download/standard_encode.tar.gz" ;;
+    small-business) echo "https://www.1c-bitrix.ru/download/small_business_encode.tar.gz" ;;
+    business) echo "https://www.1c-bitrix.ru/download/business_encode.tar.gz" ;;
+  esac
+}
+
+bitrix_distribution_archive_path() {
+  local doc_root="$1" edition="${2:-standard}"
+  local url
+  url=$(bitrix_distribution_archive_url "$edition") || return 1
+  echo "${doc_root}/$(basename "$url")"
+}
+
+bitrix_download_distribution_archive() {
+  local doc_root="$1" edition="${2:-standard}" overwrite="${3:-no}"
+  local url target tmp
+  url=$(bitrix_distribution_archive_url "$edition") || return 1
+  target=$(bitrix_distribution_archive_path "$doc_root" "$edition") || return 1
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -s "$target" ]]; then
+    return 0
+  fi
+
+  tmp=$(mktemp)
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL "$url" -o "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget -qO "$tmp" "$url"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+
+  if [[ ! -s "$tmp" ]] || ! tar -tzf "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 1
+  fi
+
+  mv "$tmp" "$target"
+  chmod 0644 "$target"
+  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  return 0
+}
+
+bitrix_detect_distribution_archives() {
+  local doc_root="$1"
+  local pattern
+  shopt -s nullglob
+  local files=("${doc_root}/"*_encode.tar.gz)
+  shopt -u nullglob
+  if [[ ${#files[@]} -eq 0 ]]; then
+    echo "none"
+    return
+  fi
+  local names=()
+  local f
+  for f in "${files[@]}"; do
+    names+=("$(basename "$f")")
+  done
+  local IFS=','
+  echo "${names[*]}"
+}
+
 bitrix_download_setup_script() {
   local doc_root="$1" overwrite="${2:-no}"
   local target
