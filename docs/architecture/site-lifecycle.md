@@ -12,6 +12,7 @@
 - For laravel: create cron in `/etc/cron.d/<project-slug>` and render queue unit `laravel-queue-<project-slug>.service`.
 - Queue autostart is enabled only when the project looks like a real Laravel app (not SIMAI bootstrap placeholders); otherwise the unit is rendered but left disabled.
 - Optional DB/user creation when requested.
+- Optional post-create Let's Encrypt issuance can run immediately after `site add` (`--ssl ask|yes|no` or `/etc/simai-env.conf` defaults); TLS failure must not roll back site creation.
 
 ## Removal (site remove)
 - Reads profile from nginx metadata and validates domain/path/slug (fallback slug for derived names).

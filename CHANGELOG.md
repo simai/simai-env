@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.34] - 2026-03-19
+### Changed
+- Bitrix profile now treats upload/time limits as baseline runtime requirements (`post_max_size`, `upload_max_filesize`, `max_execution_time`, `max_input_time`) so fresh installs are checker-safe by default.
+- `site add` now supports optional post-create Let's Encrypt issuance via `--ssl ask|yes|no` and central `/etc/simai-env.conf` defaults (`SIMAI_SSL_*`).
+
 ## [1.11.33] - 2026-03-19
 ### Changed
 - `bitrix installer-ready` now unpacks the selected Site Management distro into docroot by default, exposing the regular web installer at `/` instead of relying on `bitrixsetup.php` alone.

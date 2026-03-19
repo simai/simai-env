@@ -15,7 +15,7 @@ to post-install hardening and daily operations.
 Create the site, PHP-FPM pool, DB user, managed cron file, and initial nginx config:
 
 ```bash
-/root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php-version 8.3 --db yes --force
+/root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php 8.3 --db yes --force
 ```
 
 Recommended immediate checks:

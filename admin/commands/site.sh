@@ -1,6 +1,68 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+site_ssl_mode_normalize() {
+  local mode="${1:-no}"
+  mode=$(echo "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$mode" in
+    yes|no|ask) echo "$mode" ;;
+    *) echo "no" ;;
+  esac
+}
+
+site_ssl_bool_normalize() {
+  local val="${1:-no}"
+  val=$(echo "$val" | tr '[:upper:]' '[:lower:]')
+  case "$val" in
+    yes|true|on|1) echo "yes" ;;
+    *) echo "no" ;;
+  esac
+}
+
+site_issue_default_ssl_after_create() {
+  SITE_SSL_ISSUE_SUMMARY="not requested"
+  local domain="$1"
+  local ssl_mode="$2"
+  local ssl_email="$3"
+  local ssl_redirect="$4"
+  local ssl_hsts="$5"
+  local ssl_staging="$6"
+
+  ssl_mode=$(site_ssl_mode_normalize "$ssl_mode")
+  ssl_redirect=$(site_ssl_bool_normalize "$ssl_redirect")
+  ssl_hsts=$(site_ssl_bool_normalize "$ssl_hsts")
+  ssl_staging=$(site_ssl_bool_normalize "$ssl_staging")
+
+  if [[ "$ssl_mode" == "ask" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      ssl_mode=$(select_from_list "Issue Let's Encrypt certificate now?" "no" "no" "yes")
+      [[ -z "$ssl_mode" ]] && ssl_mode="no"
+    else
+      ssl_mode="no"
+    fi
+  fi
+
+  if [[ "$ssl_mode" != "yes" ]]; then
+    return 0
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && -z "$ssl_email" ]]; then
+    warn "Skipping Let's Encrypt for ${domain}: email is required (use --ssl-email or SIMAI_SSL_LE_EMAIL_DEFAULT)"
+    SITE_SSL_ISSUE_SUMMARY="skipped (missing email)"
+    return 0
+  fi
+
+  local -a ssl_args=(--domain "$domain" --redirect "$ssl_redirect" --hsts "$ssl_hsts" --staging "$ssl_staging")
+  [[ -n "$ssl_email" ]] && ssl_args+=(--email "$ssl_email")
+
+  if run_command ssl letsencrypt "${ssl_args[@]}"; then
+    SITE_SSL_ISSUE_SUMMARY="issued"
+  else
+    warn "Let's Encrypt issuance failed for ${domain}; site stays created without SSL"
+    SITE_SSL_ISSUE_SUMMARY="failed"
+  fi
+}
+
 site_add_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -23,6 +85,11 @@ site_add_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
+  local ssl_mode="${PARSED_ARGS[ssl]:-${SIMAI_SSL_AUTO_ISSUE_ON_CREATE:-no}}"
+  local ssl_email="${PARSED_ARGS[ssl-email]:-${SIMAI_SSL_LE_EMAIL_DEFAULT:-}}"
+  local ssl_redirect="${PARSED_ARGS[ssl-redirect]:-${SIMAI_SSL_REDIRECT_DEFAULT:-no}}"
+  local ssl_hsts="${PARSED_ARGS[ssl-hsts]:-${SIMAI_SSL_HSTS_DEFAULT:-no}}"
+  local ssl_staging="${PARSED_ARGS[ssl-staging]:-${SIMAI_SSL_STAGING_DEFAULT:-no}}"
   local create_db="${PARSED_ARGS[create-db]:-${PARSED_ARGS[db]:-}}"
   local db_export_opt="${PARSED_ARGS[db-export]:-}"
   local db_name="${PARSED_ARGS[db-name]:-}"
@@ -354,6 +421,12 @@ site_add_handler() {
     fi
   fi
 
+  local ssl_issue_summary="not requested"
+  if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+    site_issue_default_ssl_after_create "$domain" "$ssl_mode" "$ssl_email" "$ssl_redirect" "$ssl_hsts" "$ssl_staging"
+    ssl_issue_summary="${SITE_SSL_ISSUE_SUMMARY:-not requested}"
+  fi
+
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
 
   echo "===== Site summary ====="
@@ -386,6 +459,7 @@ site_add_handler() {
       echo "Bitrix setup kind: ${bitrix_setup_kind}"
     fi
   fi
+  echo "SSL issue   : ${ssl_issue_summary}"
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"
 }
@@ -1196,7 +1270,7 @@ site_info_handler() {
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

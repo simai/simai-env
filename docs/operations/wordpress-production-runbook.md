@@ -12,7 +12,7 @@ This runbook describes a practical production workflow for WordPress sites on `s
 ## 2) Initial Provisioning (new WordPress site)
 
 ```bash
-/root/simai-env/simai-admin.sh site add --domain <domain> --profile wordpress --php-version 8.3 --db yes --force
+/root/simai-env/simai-admin.sh site add --domain <domain> --profile wordpress --php 8.3 --db yes --force
 ```
 
 Verify baseline:

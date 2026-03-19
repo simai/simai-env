@@ -823,6 +823,10 @@ EOF
 php_admin_flag[short_open_tag] = on
 php_admin_value[memory_limit] = 512M
 php_admin_value[max_input_vars] = 10000
+php_admin_value[max_execution_time] = 300
+php_admin_value[max_input_time] = 300
+php_admin_value[post_max_size] = 64M
+php_admin_value[upload_max_filesize] = 64M
 php_admin_value[opcache.validate_timestamps] = 1
 php_admin_value[opcache.revalidate_freq] = 0
 ; simai-profile-ini-end
