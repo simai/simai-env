@@ -1101,14 +1101,17 @@ site_runtime_nginx_suspend() {
   backup=$(mktemp)
   cp -p "$cfg" "$backup"
   tmp=$(mktemp)
-  SIMAI_RUNTIME_BLOCK="$(site_runtime_nginx_block_render)" \
-    perl -0pe 's#(\n[ \t]*location \^~ /\\.well-known/acme-challenge/ \{)#"\n" . $ENV{SIMAI_RUNTIME_BLOCK} . "$1"#e' "$cfg" >"$tmp"
-  if cmp -s "$cfg" "$tmp"; then
-    rm -f "$tmp"
-    tmp=$(mktemp)
-    cat "$cfg" >"$tmp"
-    printf "\n%s\n" "$(site_runtime_nginx_block_render)" >>"$tmp"
-  fi
+  awk -v block="$(site_runtime_nginx_block_render)" '
+    { lines[NR]=$0 }
+    END {
+      for (i=1; i<=NR; i++) {
+        if (i==NR && lines[i] ~ /^[[:space:]]*}[[:space:]]*$/) {
+          print block
+        }
+        print lines[i]
+      }
+    }
+  ' "$cfg" >"$tmp"
   mv "$tmp" "$cfg"
   if ! nginx -t >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
     cp -p "$backup" "$cfg" >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1 || true

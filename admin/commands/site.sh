@@ -167,6 +167,18 @@ site_runtime_suspend_handler() {
     fi
   fi
   if ! site_runtime_nginx_suspend "$domain"; then
+    if [[ "$php" != "none" && "$pool_status" == "disabled" ]]; then
+      site_runtime_enable_pool "$php" "$socket_project" >/dev/null 2>&1 || true
+    fi
+    if [[ "$cron_policy" == "disabled" ]]; then
+      site_runtime_enable_cron "$slug" >/dev/null 2>&1 || true
+    fi
+    if [[ "$queue_policy" == "disabled" ]]; then
+      local queue_unit="laravel-queue-${project}.service"
+      if os_svc_has_unit "$queue_unit"; then
+        os_svc_enable_now "$queue_unit" || os_svc_restart "$queue_unit" || true
+      fi
+    fi
     return 1
   fi
   write_site_runtime_state "$domain" \
