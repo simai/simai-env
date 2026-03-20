@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.52] - 2026-03-20
+### Fixed
+- Scheduler config persistence now keeps the new usage-aware `auto` rebalance default instead of falling back to the older `safe` default.
+
 ## [1.11.51] - 2026-03-20
 ### Changed
 - `self perf-plan`, `self perf-rebalance --mode auto`, and the scheduler `auto_optimize` job now honor the user-facing site usage class so high-traffic sites are reduced more conservatively while rarely used sites are parked first.

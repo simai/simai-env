@@ -712,7 +712,7 @@ self_scheduler_persist_config() {
     "${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}" \
     "${SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES:-60}" \
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
-    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-safe}"
+    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}"
 }
 
 self_scheduler_handler() {
