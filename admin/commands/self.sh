@@ -504,7 +504,7 @@ self_perf_plan_handler() {
   safe_floor=$(perf_fpm_mode_floor "safe")
   parked_floor=$(perf_fpm_mode_floor "parked")
 
-  ui_header "SIMAI ENV · FPM reduction plan"
+  ui_header "SIMAI ENV · Server optimization plan"
   ui_section "Summary"
   print_kv_table \
     "Configured children|${total_children}" \
@@ -517,7 +517,7 @@ self_perf_plan_handler() {
 
   if [[ "$excess" == "0" ]]; then
     ui_section "Result"
-    ui_info "No FPM reduction plan is needed."
+    ui_info "No server optimization changes are needed."
     return 0
   fi
 
@@ -537,7 +537,7 @@ self_perf_plan_handler() {
 
   if (( ${#rows[@]} == 0 )); then
     ui_section "Result"
-    ui_warn "No FPM pools were found."
+    ui_warn "No PHP site pools were found."
     return 0
   fi
 
@@ -567,7 +567,7 @@ self_perf_rebalance_handler() {
   esac
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply FPM rebalancing changes"
+    error "Use --confirm yes to apply server optimization changes"
     return 1
   fi
 
@@ -577,9 +577,9 @@ self_perf_rebalance_handler() {
   before_excess=$(perf_fpm_excess_children "$before_total" "$budget")
 
   if [[ "$before_excess" == "0" ]]; then
-    ui_header "SIMAI ENV · FPM rebalance"
+    ui_header "SIMAI ENV · Apply server optimization"
     ui_section "Result"
-    ui_info "No FPM rebalance is needed."
+    ui_info "No server optimization changes are needed."
     return 0
   fi
 
@@ -620,7 +620,7 @@ self_perf_rebalance_handler() {
   after_excess=$(perf_fpm_excess_children "$after_total" "$budget")
   after_risk=$(perf_fpm_oversubscription_risk "$after_total" "$budget")
 
-  ui_header "SIMAI ENV · FPM rebalance"
+  ui_header "SIMAI ENV · Apply server optimization"
   ui_section "Summary"
   print_kv_table \
     "Mode|${mode}" \

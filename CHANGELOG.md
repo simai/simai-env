@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.58] - 2026-03-20
+### Changed
+- Daily site and system UX now uses more user-facing labels such as `Activity & optimization`, `Site availability`, `Pause site`, and `Server optimization plan`, while keeping low-level controls in Advanced/CLI.
+
 ## [1.11.57] - 2026-03-20
 ### Changed
 - Site-related menu and status output now use more user-facing wording such as `activity`, `optimization`, and `pause/resume`, reducing low-level terminology in everyday workflows.

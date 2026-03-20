@@ -49,7 +49,7 @@ site_pick_existing_domain() {
 
 site_runtime_status_handler() {
   parse_kv_args "$@"
-  ui_header "SIMAI ENV · Site runtime"
+  ui_header "SIMAI ENV · Site availability"
   local domain
   domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
   [[ -z "$domain" ]] && return 0
@@ -108,7 +108,7 @@ site_runtime_status_handler() {
   print_kv_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
-    "Runtime state|${state}" \
+    "Availability|${state}" \
     "PHP pool|${pool_state}" \
     "Cron file|${cron_file_state}" \
     "Queue unit|${queue_unit}" \
@@ -186,11 +186,11 @@ site_runtime_suspend_handler() {
     "SITE_RUNTIME_CRON|${cron_policy}" \
     "SITE_RUNTIME_QUEUE|${queue_policy}"
 
-  ui_header "SIMAI ENV · Site runtime suspend"
+  ui_header "SIMAI ENV · Pause site"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
-    "Runtime state|suspended" \
+    "Availability|suspended" \
     "PHP pool|${pool_status}" \
     "Cron|${cron_policy}" \
     "Queue|${queue_policy}"
@@ -244,11 +244,11 @@ site_runtime_resume_handler() {
     "SITE_RUNTIME_CRON|${cron_policy:-unchanged}" \
     "SITE_RUNTIME_QUEUE|${queue_policy:-unchanged}"
 
-  ui_header "SIMAI ENV · Site runtime resume"
+  ui_header "SIMAI ENV · Resume site"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
-    "Runtime state|active" \
+    "Availability|active" \
     "PHP pool|${pool_status}" \
     "Cron|${cron_policy:-unchanged}" \
     "Queue|${queue_policy:-unchanged}"
