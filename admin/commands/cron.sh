@@ -45,6 +45,9 @@ cron_add_handler() {
     "Scheduler file|/etc/cron.d/${slug}" \
     "PHP|${php}" \
     "User|${user}"
+  ui_section "Next steps"
+  ui_kv "Disable scheduler" "simai-admin.sh cron remove --domain ${domain}"
+  ui_kv "Review worker status" "simai-admin.sh queue status --domain ${domain}"
 }
 
 cron_remove_handler() {
@@ -79,6 +82,9 @@ cron_remove_handler() {
     "Domain|${domain}" \
     "Scheduler file|/etc/cron.d/${slug}" \
     "State|removed"
+  ui_section "Next steps"
+  ui_kv "Enable scheduler" "simai-admin.sh cron add --domain ${domain}"
+  ui_kv "Review site status" "simai-admin.sh site info --domain ${domain}"
 }
 
 register_cmd "cron" "add" "Enable schedule:run scheduler entry for site" "cron_add_handler" "domain" "user="

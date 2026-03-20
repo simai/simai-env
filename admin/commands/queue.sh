@@ -98,6 +98,9 @@ queue_status_handler() {
   )
   ui_section "Result"
   print_kv_table "${rows[@]}"
+  ui_section "Next steps"
+  ui_kv "Restart worker" "simai-admin.sh queue restart --domain ${domain}"
+  ui_kv "View logs" "simai-admin.sh queue logs --domain ${domain}"
   return 0
 }
 
@@ -143,6 +146,9 @@ queue_restart_handler() {
     "Service|${QUEUE_UNIT_NAME}" \
     "State|${QUEUE_ACTIVE_STATE}" \
     "Detail|${QUEUE_SUB_STATE}"
+  ui_section "Next steps"
+  ui_kv "Review worker status" "simai-admin.sh queue status --domain ${domain}"
+  ui_kv "View logs" "simai-admin.sh queue logs --domain ${domain}"
   return 0
 }
 
@@ -176,6 +182,9 @@ queue_logs_handler() {
   ui_section "Result"
   ui_info "Showing last ${lines} lines for ${QUEUE_UNIT_NAME}"
   journalctl -u "$QUEUE_UNIT_NAME" -n "$lines" --no-pager
+  ui_section "Next steps"
+  ui_kv "Review worker status" "simai-admin.sh queue status --domain ${domain}"
+  ui_kv "Restart worker" "simai-admin.sh queue restart --domain ${domain}"
 }
 
 register_cmd "queue" "status" "Show Laravel worker status (laravel-only)" "queue_status_handler" "domain" ""

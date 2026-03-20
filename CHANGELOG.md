@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.64] - 2026-03-20
+### Changed
+- Laravel worker and scheduler flows now show clearer next-step guidance, so everyday status screens lead directly to the most common follow-up actions.
+
 ## [1.11.63] - 2026-03-20
 ### Changed
 - Daily Laravel, WordPress, and Bitrix status flows now use clearer scheduler/worker wording in command output, reducing raw cron/systemd terminology for ordinary users.
