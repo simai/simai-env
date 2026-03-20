@@ -115,6 +115,8 @@ site_perf_status_handler() {
   local auto_optimize_state auto_optimize_effective
   auto_optimize_state=$(site_auto_optimize_state_get "$domain")
   auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
+  local optimization_mode optimization_recommendation
+  optimization_mode=$(site_user_optimization_mode "$domain")
 
   declare -A perf_settings=()
   local entry
@@ -156,6 +158,7 @@ site_perf_status_handler() {
       total_children=$(perf_fpm_total_max_children)
       fpm_budget=$(perf_fpm_recommended_total_children)
       fpm_oversub=$(perf_fpm_oversubscription_risk "$total_children" "$fpm_budget")
+      optimization_recommendation=$(site_user_recommendation "$domain" "$fpm_oversub")
       mem_available=$(perf_memory_available_summary)
       pool_share=$(perf_ratio_band "${max_children:-0}" "${total_children:-0}")
       if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^Zend OPcache$'; then
@@ -178,6 +181,7 @@ site_perf_status_handler() {
       redis_service="inactive"
     fi
   fi
+  [[ -n "${optimization_recommendation:-}" ]] || optimization_recommendation=$(site_user_recommendation "$domain" "$fpm_oversub")
 
   ui_header "SIMAI ENV · Site performance"
   ui_section "Result"
@@ -185,8 +189,10 @@ site_perf_status_handler() {
     "Domain|${domain}" \
     "Profile|${profile}" \
     "Usage class|${usage_class}" \
+    "Optimization|${optimization_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
     "Site auto optimize override|${auto_optimize_state}" \
+    "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}" \
     "Managed mode|${mode}" \
     "PHP|${php_version}" \
@@ -297,15 +303,20 @@ site_usage_status_handler() {
   local auto_optimize_state auto_optimize_effective
   auto_optimize_state=$(site_auto_optimize_state_get "$domain")
   auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
+  local optimization_mode optimization_recommendation
+  optimization_mode=$(site_user_optimization_mode "$domain")
+  optimization_recommendation=$(site_user_recommendation "$domain")
 
   ui_header "SIMAI ENV · Site usage"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
     "Usage class|${usage_class}" \
+    "Optimization|${optimization_mode}" \
     "Mapped perf mode|${perf_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
     "Site auto optimize override|${auto_optimize_state}" \
+    "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}"
   ui_section "Next steps"
   ui_kv "Set standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
@@ -356,15 +367,20 @@ site_auto_optimize_status_handler() {
   runtime_state=$(site_runtime_state "$domain")
   auto_optimize_state=$(site_auto_optimize_state_get "$domain")
   auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
+  local optimization_mode optimization_recommendation
+  optimization_mode=$(site_user_optimization_mode "$domain")
+  optimization_recommendation=$(site_user_recommendation "$domain")
 
   ui_header "SIMAI ENV · Site automatic optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
+    "Optimization|${optimization_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
     "Site override|${auto_optimize_state}" \
     "Usage class|${usage_class}" \
     "Mapped perf mode|${perf_mode}" \
+    "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}"
   ui_section "Next steps"
   ui_kv "Enable for site" "simai-admin.sh site auto-optimize-enable --domain ${domain} --confirm yes"

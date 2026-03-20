@@ -1495,12 +1495,18 @@ site_info_handler() {
   runtime_state=$(site_runtime_state "$domain")
   local usage_class
   usage_class=$(site_usage_class_get "$domain")
+  local optimization_mode
+  optimization_mode=$(site_user_optimization_mode "$domain")
+  local optimization_recommendation
+  optimization_recommendation=$(site_user_recommendation "$domain")
 
   local -a rows=(
     "Domain|${domain}"
     "Slug|${slug}"
     "Profile|${profile}"
     "Usage class|${usage_class}"
+    "Optimization|${optimization_mode}"
+    "Recommendation|${optimization_recommendation}"
     "Project|${project}"
     "Root|${root}"
     "Public dir|${public_dir}"

@@ -582,6 +582,66 @@ site_auto_optimize_effective_enabled() {
   esac
 }
 
+site_user_optimization_mode() {
+  local domain="$1"
+  local runtime_state auto_effective
+  runtime_state="$(site_runtime_state "$domain")"
+  auto_effective="$(site_auto_optimize_effective_enabled "$domain")"
+  if [[ "$runtime_state" == "suspended" ]]; then
+    echo "paused"
+  elif [[ "$auto_effective" == yes* ]]; then
+    echo "automatic"
+  else
+    echo "manual"
+  fi
+}
+
+site_user_recommendation() {
+  local domain="$1"
+  local usage_class runtime_state auto_effective oversub
+  usage_class="$(site_usage_class_get "$domain")"
+  runtime_state="$(site_runtime_state "$domain")"
+  auto_effective="$(site_auto_optimize_effective_enabled "$domain")"
+  oversub="${2:-unknown}"
+
+  if [[ "$runtime_state" == "suspended" ]]; then
+    echo "Site is paused; resume it only when you need it again."
+    return 0
+  fi
+  if [[ "$auto_effective" != yes* ]]; then
+    echo "This site is excluded from automatic optimization; manage performance manually."
+    return 0
+  fi
+  case "$oversub" in
+    critical*|high*)
+      case "$usage_class" in
+        rarely-used)
+          echo "Server is tight; this site is a good candidate for suspend if not actively used."
+          ;;
+        high-traffic)
+          echo "Server is tight; keep automatic optimization enabled and monitor this busy site closely."
+          ;;
+        *)
+          echo "Server is tight; leave automatic optimization enabled so the platform can rebalance safely."
+          ;;
+      esac
+      ;;
+    *)
+      case "$usage_class" in
+        high-traffic)
+          echo "Current posture is fine; keep this site active and watch for traffic growth."
+          ;;
+        rarely-used)
+          echo "Current posture is fine; use suspend if the site becomes mostly idle."
+          ;;
+        *)
+          echo "Current posture is fine."
+          ;;
+      esac
+      ;;
+  esac
+}
+
 site_usage_class_to_perf_mode() {
   local usage
   usage=$(site_usage_class_normalize "${1:-standard}") || return 1

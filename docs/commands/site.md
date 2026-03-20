@@ -108,6 +108,8 @@ Options:
 
 Output includes:
 - usage class and its mapped governance baseline
+- human-readable optimization posture (`automatic`, `manual`, `paused`)
+- a plain-language recommendation based on current runtime state and server pressure
 - profile and PHP version
 - current pool mode / children / request limits
 - current request timeout
@@ -137,7 +139,9 @@ Options:
 
 Output includes:
 - usage class (`standard`, `high-traffic`, `rarely-used`)
+- human-readable optimization posture
 - mapped internal performance mode
+- a plain-language recommendation
 - current runtime state
 
 ## usage-set

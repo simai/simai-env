@@ -52,6 +52,7 @@ See `docs/architecture/profiles.md`.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
+- `site info`, `site usage-status`, and `site perf-status` now include a simple optimization posture plus a plain-language recommendation so ordinary users can understand the current state without reading raw FPM values first.
 - `site perf-tune --domain <domain> --mode parked|safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
 - `site usage-status --domain <domain>` / `site usage-set --domain <domain> --class standard|high-traffic|rarely-used --confirm yes`: simple user-facing site activity intent mapped to the internal performance engine.
 - `site auto-optimize-status --domain <domain>` / `site auto-optimize-enable|disable|reset --domain <domain> --confirm yes`: per-site override for automatic optimization; useful when one site should be excluded from scheduler-driven automatic changes.

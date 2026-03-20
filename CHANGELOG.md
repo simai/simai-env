@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.56] - 2026-03-20
+### Changed
+- `site info`, `site usage-status`, `site auto-optimize-status`, and `site perf-status` now show a simple optimization posture plus a plain-language recommendation, making the performance layer easier to understand for non-technical users.
+
 ## [1.11.55] - 2026-03-20
 ### Fixed
 - Update channel now resolves the target branch/tag to a concrete commit SHA before downloading archives or checking remote version, avoiding stale GitHub branch-cache results on long-lived servers.
