@@ -700,11 +700,138 @@ self_perf_apply_handler() {
   ui_kv "Check platform" "simai-admin.sh self platform-status"
 }
 
+self_scheduler_persist_config() {
+  scheduler_write_config \
+    "${SIMAI_SCHEDULER_ENABLED:-yes}" \
+    "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}" \
+    "${SIMAI_AUTO_OPTIMIZE_MODE:-assist}" \
+    "${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}" \
+    "${SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES:-60}" \
+    "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
+    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-safe}"
+}
+
+self_scheduler_handler() {
+  scheduler_tick
+}
+
+self_scheduler_status_handler() {
+  ui_header "SIMAI ENV · Scheduler status"
+
+  local cron_file cron_state cron_cmd
+  cron_file=$(scheduler_cron_file)
+  cron_cmd=$(scheduler_scheduler_cmd)
+  cron_state="missing"
+  [[ -f "$cron_file" ]] && cron_state="installed"
+
+  local rows=()
+  rows+=("Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")")
+  rows+=("Cron entry|${cron_state} (${cron_file})")
+  rows+=("Cron command|${cron_cmd}")
+
+  local job enabled mode interval cooldown limit rebalance_mode last_run next_due last_status last_message last_action
+  while IFS= read -r job; do
+    [[ -z "$job" ]] && continue
+    enabled=$(scheduler_job_enabled "$job")
+    mode=$(scheduler_job_mode "$job")
+    interval=$(scheduler_job_interval_minutes "$job")
+    cooldown=$(scheduler_job_cooldown_minutes "$job")
+    limit=$(scheduler_job_limit "$job")
+    rebalance_mode=$(scheduler_job_rebalance_mode "$job")
+    last_run=$(scheduler_job_state_get "$job" "last_run_epoch" 2>/dev/null || true)
+    next_due=$(scheduler_job_next_due_epoch "$job")
+    last_status=$(scheduler_job_state_get "$job" "last_status" 2>/dev/null || true)
+    last_message=$(scheduler_job_state_get "$job" "last_message" 2>/dev/null || true)
+    last_action=$(scheduler_job_state_get "$job" "last_action_epoch" 2>/dev/null || true)
+    [[ -z "$last_run" ]] && last_run="never"
+    [[ -z "$last_status" ]] && last_status="n/a"
+    [[ -z "$last_message" ]] && last_message="n/a"
+    [[ -z "$last_action" ]] && last_action="never"
+    rows+=("Job ${job}|enabled=${enabled}, mode=${mode}, interval=${interval}m, cooldown=${cooldown}m, limit=${limit}, rebalance=${rebalance_mode}")
+    rows+=("Job ${job} last run|$(scheduler_epoch_human "$last_run")")
+    rows+=("Job ${job} last action|$(scheduler_epoch_human "$last_action")")
+    rows+=("Job ${job} next due|$(scheduler_epoch_human "$next_due")")
+    rows+=("Job ${job} last status|${last_status}")
+    rows+=("Job ${job} last message|${last_message}")
+  done < <(scheduler_jobs_list)
+
+  ui_section "Result"
+  print_kv_table "${rows[@]}"
+  ui_section "Next steps"
+  ui_kv "Run scheduler now" "simai-admin.sh self scheduler"
+  ui_kv "Disable auto optimize" "simai-admin.sh self scheduler-disable --job auto-optimize"
+}
+
+self_scheduler_enable_handler() {
+  parse_kv_args "$@"
+  local job="${PARSED_ARGS[job]:-all}"
+  job=$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+
+  case "$job" in
+    all)
+      SIMAI_SCHEDULER_ENABLED="yes"
+      ;;
+    auto-optimize)
+      SIMAI_AUTO_OPTIMIZE_ENABLED="yes"
+      ;;
+    *)
+      error "Unsupported scheduler job: ${job}"
+      return 1
+      ;;
+  esac
+
+  self_scheduler_persist_config
+  ui_success "Scheduler config updated"
+  print_kv_table \
+    "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
+    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+}
+
+self_scheduler_disable_handler() {
+  parse_kv_args "$@"
+  local job="${PARSED_ARGS[job]:-all}"
+  job=$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+
+  case "$job" in
+    all)
+      SIMAI_SCHEDULER_ENABLED="no"
+      ;;
+    auto-optimize)
+      SIMAI_AUTO_OPTIMIZE_ENABLED="no"
+      ;;
+    *)
+      error "Unsupported scheduler job: ${job}"
+      return 1
+      ;;
+  esac
+
+  self_scheduler_persist_config
+  ui_success "Scheduler config updated"
+  print_kv_table \
+    "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
+    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+}
+
+self_scheduler_run_handler() {
+  parse_kv_args "$@"
+  local job="${PARSED_ARGS[job]:-auto-optimize}"
+  job=$(scheduler_job_normalize "$job") || {
+    error "Unsupported scheduler job: ${PARSED_ARGS[job]:-}"
+    return 1
+  }
+  scheduler_run_job "$job"
+}
+
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
+register_cmd "self" "scheduler" "Run the internal simai scheduler tick" "self_scheduler_handler" "" ""
+register_cmd "self" "scheduler-status" "Show internal scheduler status" "self_scheduler_status_handler" "" ""
+register_cmd "self" "scheduler-enable" "Enable scheduler globally or by job" "self_scheduler_enable_handler" "" "job="
+register_cmd "self" "scheduler-disable" "Disable scheduler globally or by job" "self_scheduler_disable_handler" "" "job="
+register_cmd "self" "scheduler-run" "Run one scheduler job immediately" "self_scheduler_run_handler" "" "job="
 register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
 register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
 register_cmd "self" "perf-rebalance" "Apply safe/parked FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= mode= confirm="

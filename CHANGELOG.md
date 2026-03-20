@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.49] - 2026-03-20
+### Added
+- Added a shared internal scheduler (`self scheduler`) with one managed cron entry installed during bootstrap, plus status/enable/disable/run commands for future background jobs.
+### Changed
+- Automatic optimization is now modeled as a scheduler job (`auto_optimize`) with central policy config, interval, cooldown, and safe assist/observe/manual modes.
+
 ## [1.11.48] - 2026-03-20
 ### Changed
 - Interactive menu now exposes site runtime actions and system-level performance planning/rebalance commands.

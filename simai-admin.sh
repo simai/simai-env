@@ -8,6 +8,7 @@ LOG_FILE=${LOG_FILE:-/var/log/simai-admin.log}
 source "${ADMIN_DIR}/core.sh"
 source "${ADMIN_DIR}/menu.sh"
 source "${ADMIN_DIR}/lib/profile_utils.sh"
+source "${ADMIN_DIR}/lib/scheduler_utils.sh"
 source "${ADMIN_DIR}/lib/perf_utils.sh"
 source "${ADMIN_DIR}/lib/site_utils.sh"
 source "${ADMIN_DIR}/lib/profile_apply.sh"

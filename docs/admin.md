@@ -41,6 +41,10 @@ See `docs/architecture/profiles.md`.
   - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
   - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
+- `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
+- `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
+- `self scheduler-enable --job all|auto-optimize` / `self scheduler-disable --job all|auto-optimize`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
+- `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
 - `self perf-status`: show current managed performance baseline, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus the `safe` / `parked` floor for the full server footprint.
 - `self perf-rebalance --limit <n> --mode safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches.
@@ -53,6 +57,21 @@ See `docs/architecture/profiles.md`.
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel profile performance readiness and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress performance readiness and apply flow.
 - `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix profile performance readiness and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
+
+## Internal scheduler
+- Bootstrap now installs one shared cron entry: `/etc/cron.d/simai-scheduler`.
+- The cron entry stays stable and always calls `simai-admin.sh self scheduler`.
+- Individual background capabilities are enabled/disabled inside simai-env, not by editing cron lines.
+- Current built-in job:
+  - `auto_optimize`: policy-driven performance maintenance for oversubscribed PHP-FPM servers.
+- Managed config keys in `/etc/simai-env.conf`:
+  - `SIMAI_SCHEDULER_ENABLED=yes|no`
+  - `SIMAI_AUTO_OPTIMIZE_ENABLED=yes|no`
+  - `SIMAI_AUTO_OPTIMIZE_MODE=observe|assist|manual`
+  - `SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES=<n>`
+  - `SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES=<n>`
+  - `SIMAI_AUTO_OPTIMIZE_LIMIT=<n>`
+  - `SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE=safe|parked`
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).

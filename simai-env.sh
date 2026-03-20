@@ -44,6 +44,7 @@ ALLOW_RESERVED_DOMAIN=0
 source "${SCRIPT_DIR}/lib/site_metadata.sh"
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
+source "${SIMAI_ENV_ROOT}/admin/lib/scheduler_utils.sh"
 if [[ -f /etc/simai-env.conf ]]; then
   # shellcheck disable=SC1091
   source /etc/simai-env.conf
@@ -998,7 +999,7 @@ clean_flow() {
 
 bootstrap_flow() {
   info "Starting bootstrap (no sites will be created)"
-  progress_init 10
+  progress_init 11
   progress_step "Checking OS compatibility"
   platform_detect_os
   platform_print_os_support_status || fail "Unsupported OS. Supported only on $(platform_supported_matrix_string)"
@@ -1023,6 +1024,8 @@ bootstrap_flow() {
   install_node
   progress_step "Installing Composer"
   install_composer
+  progress_step "Installing simai scheduler"
+  scheduler_bootstrap_install
   progress_done "Bootstrap completed"
 }
 
