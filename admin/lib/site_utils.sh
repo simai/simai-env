@@ -1845,14 +1845,100 @@ bitrix_web_probe_fetch() {
     "$(site_primary_scheme "$domain")://${domain}${path}" 2>/dev/null
 }
 
+bitrix_db_state_probe() {
+  local domain="$1"
+  local db_name="" db_user="" db_pass="" db_host="localhost"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) db_name="$v" ;;
+      DB_USER) db_user="$v" ;;
+      DB_PASS) db_pass="$v" ;;
+      DB_HOST) db_host="$v" ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+
+  if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if ! command -v mysql >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+
+  local query output user_count=0
+  query=$(cat <<'SQL'
+SELECT
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'b_user'
+    ) THEN 'b_user'
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'b_option'
+    ) THEN 'schema'
+    ELSE 'empty'
+  END AS state,
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'b_user'
+    ) THEN (SELECT COUNT(*) FROM b_user)
+    ELSE 0
+  END AS user_count;
+SQL
+)
+  output=$(MYSQL_PWD="$db_pass" mysql \
+    --batch --skip-column-names \
+    --host="$db_host" \
+    --user="$db_user" \
+    "$db_name" \
+    -e "$query" 2>/dev/null || true)
+  [[ -z "$output" ]] && {
+    echo "unknown"
+    return 0
+  }
+
+  local state="${output%%$'\t'*}"
+  if [[ "$output" == *$'\t'* ]]; then
+    user_count="${output#*$'\t'}"
+  fi
+  case "$state" in
+    b_user)
+      if [[ "${user_count:-0}" =~ ^[0-9]+$ ]] && (( user_count > 0 )); then
+        echo "installed"
+      else
+        echo "schema"
+      fi
+      ;;
+    schema)
+      echo "schema"
+      ;;
+    empty)
+      echo "empty"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
 bitrix_web_state_probe() {
   local domain="$1"
-  local root_body="" admin_body=""
+  local root_body="" admin_body="" db_state="unknown"
+  db_state=$(bitrix_db_state_probe "$domain")
   root_body=$(bitrix_web_probe_fetch "$domain" "/" || true)
   admin_body=$(bitrix_web_probe_fetch "$domain" "/bitrix/admin/index.php" || true)
 
-  if printf '%s' "$root_body" | grep -Eq '__wizard_form|wizard-next-button|installer_style\.css|Установка .*1С-Битрикс|Регистрация продукта|Установка продукта'; then
-    echo "installer"
+  if [[ "$db_state" == "installed" ]]; then
+    echo "installed"
     return 0
   fi
   if printf '%s' "$root_body" | grep -q "SIMAI placeholder"; then
@@ -1861,6 +1947,14 @@ bitrix_web_state_probe() {
   fi
   if printf '%s' "$admin_body" | grep -Eq 'name="USER_LOGIN"|AUTH_FORM|login-popup-title|Пожалуйста, авторизуйтесь|Авторизация -'; then
     echo "installed"
+    return 0
+  fi
+  if printf '%s' "$root_body" | grep -Eq '__wizard_form|wizard-next-button|installer_style\.css|Установка .*1С-Битрикс|Регистрация продукта|Установка продукта'; then
+    echo "installer"
+    return 0
+  fi
+  if [[ "$db_state" == "schema" ]]; then
+    echo "installer"
     return 0
   fi
   echo "unknown"

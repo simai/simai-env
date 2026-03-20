@@ -238,6 +238,7 @@ bitrix_status_handler() {
   local cron_managed="no"
   local cron_domain_match="no"
   local cron_slug_match="no"
+  local db_state="unknown"
   local web_state="unknown"
   local install_stage="unknown"
   local open_url=""
@@ -270,6 +271,7 @@ bitrix_status_handler() {
       cron_line_state="present"
     fi
   fi
+  db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
   install_stage=$(bitrix_perf_install_stage "$short_install" "$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "${BX_CRON_ENTRY_MATCH:-no}" "$bx_crontab" "$bx_crontab_support")" "$web_state")
   open_url=$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")
@@ -278,6 +280,7 @@ bitrix_status_handler() {
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
+    "Database state|${db_state}" \
     "Web state|${web_state}" \
     "Install stage|${install_stage}" \
     "Core files|${BX_HAS_CORE}" \
@@ -854,6 +857,7 @@ bitrix_perf_status_handler() {
   local cron_slug_match="no"
   local cron_entry_match="no"
   local agents_ready="no"
+  local db_state="unknown"
   local cache_dirs="0/3 present"
   local php_bin=""
   local redis_ext="no"
@@ -889,6 +893,7 @@ bitrix_perf_status_handler() {
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
   agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
   install_stage=$(bitrix_perf_install_stage "$short_install" "$agents_ready" "$web_state")
   cache_dirs=$(bitrix_perf_cache_dirs_state "$BX_DOC_ROOT")
@@ -920,6 +925,7 @@ bitrix_perf_status_handler() {
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
     "Optimization mode|${managed_mode}" \
+    "Database state|${db_state}" \
     "Web state|${web_state}" \
     "Install stage|${install_stage}" \
     "PHP|${BX_PHP_VERSION:-none}" \
@@ -1072,12 +1078,15 @@ bitrix_finalize_handler() {
   fi
 
   local web_state="unknown"
+  local db_state="unknown"
+  db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
   if [[ "$web_state" != "installed" ]]; then
     ui_header "SIMAI ENV · Bitrix finalize setup"
     ui_section "Result"
     print_kv_table \
       "Domain|${BX_DOMAIN}" \
+      "Database state|${db_state}" \
       "Web state|${web_state}" \
       "Status|blocked"
     ui_section "Next steps"

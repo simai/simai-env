@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.69] - 2026-03-21
+### Fixed
+- Bitrix lifecycle detection now uses site database readiness in addition to web probes, so fresh installs can transition to `installed` correctly before running `bitrix finalize`.
+### Changed
+- Bitrix status and optimization screens now show `Database state` alongside web lifecycle state for clearer post-install diagnostics.
+
 ## [1.11.68] - 2026-03-20
 ### Added
 - Added `bitrix finalize` as a single post-install lifecycle step for Bitrix sites (PHP baseline, agents sync, optional Let's Encrypt).
