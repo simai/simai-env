@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.60] - 2026-03-20
+### Changed
+- Optimization status screens now use clearer everyday labels such as `Server optimization status`, `Optimization mode`, `Active preset`, and `Default site settings`.
+
 ## [1.11.59] - 2026-03-20
 ### Changed
 - Laravel, WordPress, Bitrix, and System optimization commands now use more user-facing wording such as `optimization`, `Apply ... optimization`, and `Review ... status` instead of lower-level performance terminology in everyday flows.

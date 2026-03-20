@@ -158,7 +158,7 @@ laravel_perf_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
-    "Managed mode|${managed_mode}" \
+    "Optimization mode|${managed_mode}" \
     "Root|${LARAVEL_PERF_ROOT}" \
     "PHP|${LARAVEL_PERF_PHP_VERSION:-none}" \
     "Artisan|${artisan_state}" \

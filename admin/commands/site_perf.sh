@@ -194,7 +194,7 @@ site_perf_status_handler() {
     "Site auto optimize override|${auto_optimize_state}" \
     "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}" \
-    "Managed mode|${mode}" \
+    "Optimization mode|${mode}" \
     "PHP|${php_version}" \
     "Pool file|${pool_file}" \
     "Pool service|${pool_service}" \

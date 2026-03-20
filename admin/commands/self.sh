@@ -366,7 +366,7 @@ self_platform_status_handler() {
 }
 
 self_perf_status_handler() {
-  ui_header "SIMAI ENV · Performance baseline"
+  ui_header "SIMAI ENV · Server optimization status"
 
   perf_detect_resources
   local recommended_preset
@@ -456,8 +456,8 @@ self_perf_status_handler() {
     "Server size|cpu=${PERF_CPU_COUNT}, mem=${PERF_MEM_MB}M, swap=${PERF_SWAP_MB}M" \
     "Memory available|${mem_available}" \
     "Recommended preset|${recommended_preset}" \
-    "Managed preset|${managed_preset}" \
-    "FPM site defaults|${fpm_defaults}" \
+    "Active preset|${managed_preset}" \
+    "Default site settings|${fpm_defaults}" \
     "FPM services|${fpm_services}" \
     "FPM pools|${fpm_pools}" \
     "FPM configured children|${fpm_total_children}" \
@@ -674,7 +674,7 @@ self_perf_apply_handler() {
   progress_step "Writing managed simai performance defaults (${PERF_PRESET})"
   perf_apply_env_defaults || return 1
 
-  progress_done "Performance baseline applied"
+  progress_done "Server optimization baseline applied"
 
   ui_section "Result"
   print_kv_table \

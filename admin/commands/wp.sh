@@ -385,7 +385,7 @@ wp_perf_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
-    "Managed mode|${managed_mode}" \
+    "Optimization mode|${managed_mode}" \
     "Docroot|${WP_DOC_ROOT}" \
     "PHP|${WP_PHP_VERSION:-none}" \
     "Core files|${WP_HAS_CORE}" \

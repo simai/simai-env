@@ -888,7 +888,7 @@ bitrix_perf_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
-    "Managed mode|${managed_mode}" \
+    "Optimization mode|${managed_mode}" \
     "Install stage|${install_stage}" \
     "PHP|${BX_PHP_VERSION:-none}" \
     "Core files|${BX_HAS_CORE}" \
