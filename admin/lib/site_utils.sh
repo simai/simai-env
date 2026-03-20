@@ -1834,6 +1834,47 @@ bitrix_setup_script_kind() {
   echo "unknown"
 }
 
+bitrix_web_probe_fetch() {
+  local domain="$1" path="${2:-/}"
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl -ksS --location --max-time 15 --connect-timeout 5 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --resolve "${domain}:443:127.0.0.1" \
+    "$(site_primary_scheme "$domain")://${domain}${path}" 2>/dev/null
+}
+
+bitrix_web_state_probe() {
+  local domain="$1"
+  local root_body="" admin_body=""
+  root_body=$(bitrix_web_probe_fetch "$domain" "/" || true)
+  admin_body=$(bitrix_web_probe_fetch "$domain" "/bitrix/admin/index.php" || true)
+
+  if printf '%s' "$root_body" | grep -Eq '__wizard_form|wizard-next-button|installer_style\.css|Установка .*1С-Битрикс|Регистрация продукта|Установка продукта'; then
+    echo "installer"
+    return 0
+  fi
+  if printf '%s' "$root_body" | grep -q "SIMAI placeholder"; then
+    echo "placeholder"
+    return 0
+  fi
+  if printf '%s' "$admin_body" | grep -Eq 'name="USER_LOGIN"|AUTH_FORM|login-popup-title|Пожалуйста, авторизуйтесь|Авторизация -'; then
+    echo "installed"
+    return 0
+  fi
+  echo "unknown"
+}
+
+bitrix_installer_open_url() {
+  local domain="$1" doc_root="$2"
+  if [[ -f "${doc_root}/install.config" && -f "${doc_root}/index.php" ]]; then
+    echo "$(site_primary_url "$domain")/"
+    return 0
+  fi
+  echo "$(site_primary_url "$domain")/bitrixsetup.php?test=1"
+}
+
 site_primary_scheme() {
   local domain="$1"
   local cfg="/etc/nginx/sites-available/${domain}.conf"

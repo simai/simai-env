@@ -113,9 +113,29 @@ Notes:
   1. `site add --profile bitrix --db yes`
   2. `bitrix installer-ready --domain <domain>`
   3. complete web installer
-  4. `bitrix php-baseline-sync --domain <domain>`
-  5. `bitrix agents-sync --domain <domain> --apply yes --confirm yes`
-  6. `ssl letsencrypt --domain <domain> --email <email>`
+  4. `bitrix finalize --domain <domain> --confirm yes`
+  5. `ssl letsencrypt --domain <domain> --email <email>` (or use `bitrix finalize --ssl yes --email <email>`)
+
+Notes:
+- `bitrix status` now probes the real web state and distinguishes `installer`, `installed`, `placeholder`, and `unknown`.
+- When unpacked distro files are present, the recommended installer URL is the site root `/`, not `bitrixsetup.php`.
+
+## Finalize
+
+```bash
+simai-admin.sh bitrix finalize --domain <domain> --confirm yes [--ssl yes --email <email>] [--redirect yes|no] [--hsts yes|no] [--staging yes|no]
+```
+
+Safe post-install orchestration for Bitrix sites after the web installer has finished:
+- verifies that Bitrix web installation is already complete (`web state = installed`)
+- runs `bitrix php-baseline-sync`
+- applies `bitrix agents-sync --apply yes`
+- optionally issues Let's Encrypt if `--ssl yes --email <email>` is provided
+
+Notes:
+- In CLI mode `--confirm yes` is required.
+- If the site is still in installer mode, the command stops with a clear error and prints the correct installer URL.
+- This is the recommended single step after finishing the Bitrix web installer.
 
 ## PHP Baseline Sync
 

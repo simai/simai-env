@@ -51,76 +51,55 @@ Recommended verification:
 /root/simai-env/simai-admin.sh bitrix status --domain <domain>
 ```
 
+Expected outcome:
+- `Web state = installer`
+- `Open installer` points to the site root `/` when the local distro has already been unpacked
+
 ## 4) Phase 3: Complete Bitrix Web Installation
 
 Open the installer in a browser:
 
 ```text
-https://<domain>/bitrixsetup.php
+http://<domain>/
 ```
 
 Important:
 - Use the DB credentials already created by `site add` / `site db-create`.
 - Keep installer flow web-safe until the site finishes installation.
 - Do not enable agents-via-cron before the Bitrix application/database side is ready.
+- If `bitrix status` reports `Web state = installed`, move directly to Phase 4.
 
-## 5) Phase 4: Apply Bitrix Runtime Baseline
+## 5) Phase 4: Finalize Post-Install Baseline
 
-After Bitrix installation completes, apply the profile PHP baseline:
+After Bitrix installation completes, run the single post-install orchestration step:
 
 ```bash
-/root/simai-env/simai-admin.sh bitrix php-baseline-sync --domain <domain>
+/root/simai-env/simai-admin.sh bitrix finalize --domain <domain> --confirm yes
 ```
 
-This normalizes the effective PHP-FPM runtime for Bitrix:
-- `short_open_tag=on`
-- `memory_limit=512M`
-- `max_input_vars=10000`
-- `opcache.validate_timestamps=1`
-- `opcache.revalidate_freq=0`
-- recommended upload/opcache values
+This step:
+- verifies that the web installer is already complete
+- normalizes the effective PHP-FPM runtime for Bitrix
+- enables agents via scheduler
+
+If you want to issue Let's Encrypt in the same step:
+
+```bash
+/root/simai-env/simai-admin.sh bitrix finalize --domain <domain> --confirm yes --ssl yes --email <email>
+```
 
 Verify:
 
 ```bash
 /root/simai-env/simai-admin.sh site doctor --domain <domain>
-```
-
-Expected outcome: no PHP runtime drift in `site doctor`.
-
-## 6) Phase 5: Enable Agents via Cron
-
-Check current state:
-
-```bash
 /root/simai-env/simai-admin.sh bitrix agents-status --domain <domain>
-```
-
-Plan sync:
-
-```bash
-/root/simai-env/simai-admin.sh bitrix agents-sync --domain <domain>
-```
-
-Apply sync:
-
-```bash
-/root/simai-env/simai-admin.sh bitrix agents-sync --domain <domain> --apply yes --confirm yes
-```
-
-Re-check:
-
-```bash
-/root/simai-env/simai-admin.sh bitrix agents-status --domain <domain>
-/root/simai-env/simai-admin.sh bitrix cron-status --domain <domain>
 ```
 
 Expected outcome:
-- `BX_CRONTAB_SUPPORT=true`
-- managed cron file is present
-- `Agents via cron ready = yes`
+- no PHP runtime drift in `site doctor`
+- `Agents via scheduler = yes`
 
-## 7) Phase 6: TLS Go-Live
+## 6) Phase 5: TLS Go-Live
 
 Issue a production Let's Encrypt certificate:
 
@@ -135,7 +114,7 @@ For custom certs:
 /root/simai-env/simai-admin.sh ssl install --domain <domain> --cert <fullchain.pem> --key <privkey.pem> --chain <chain.pem>
 ```
 
-## 8) Phase 7: Final Acceptance Checks
+## 7) Phase 6: Final Acceptance Checks
 
 CLI acceptance:
 
@@ -158,7 +137,7 @@ Recommended target state:
 - Bitrix `site_checker` has no infrastructure/runtime errors
 - Bitrix `perfmon_panel` opens and shows a valid configuration score
 
-## 9) Daily Operations
+## 8) Daily Operations
 
 ```bash
 NO_COLOR=1 /root/simai-env/simai-admin.sh self status
@@ -174,7 +153,7 @@ Cache maintenance when needed:
 /root/simai-env/simai-admin.sh bitrix cache-clear --domain <domain>
 ```
 
-## 10) Safe Change Workflow
+## 9) Safe Change Workflow
 
 Before risky changes (PHP switch, SSL migration, profile-level fixes):
 
@@ -184,7 +163,7 @@ Before risky changes (PHP switch, SSL migration, profile-level fixes):
 /root/simai-env/simai-admin.sh backup import --file <archive.tar.gz> --apply no
 ```
 
-## 11) Incident Fast Path
+## 10) Incident Fast Path
 
 1. `self platform-status`
 2. `site doctor --domain <domain>`

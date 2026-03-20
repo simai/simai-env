@@ -133,7 +133,17 @@ bitrix_perf_read_mode() {
 }
 
 bitrix_perf_install_stage() {
-  local short_install="$1" agents_ready="${2:-no}"
+  local short_install="$1" agents_ready="${2:-no}" web_state="${3:-unknown}"
+  case "$web_state" in
+    installed)
+      echo "post-install"
+      return 0
+      ;;
+    installer)
+      echo "installer"
+      return 0
+      ;;
+  esac
   if [[ "$agents_ready" == "yes" ]]; then
     echo "post-install"
     return 0
@@ -228,6 +238,9 @@ bitrix_status_handler() {
   local cron_managed="no"
   local cron_domain_match="no"
   local cron_slug_match="no"
+  local web_state="unknown"
+  local install_stage="unknown"
+  local open_url=""
 
   [[ -f "$BX_SETTINGS_FILE" ]] && settings_present="yes"
   setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
@@ -257,11 +270,16 @@ bitrix_status_handler() {
       cron_line_state="present"
     fi
   fi
+  web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
+  install_stage=$(bitrix_perf_install_stage "$short_install" "$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "${BX_CRON_ENTRY_MATCH:-no}" "$bx_crontab" "$bx_crontab_support")" "$web_state")
+  open_url=$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")
 
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
+    "Web state|${web_state}" \
+    "Install stage|${install_stage}" \
     "Core files|${BX_HAS_CORE}" \
     ".settings.php|${settings_present}" \
     "dbconn.php|${dbconn_present}" \
@@ -278,10 +296,21 @@ bitrix_status_handler() {
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
   ui_section "Next steps"
-  ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
+  case "$web_state" in
+    installer)
+      ui_kv "Open installer" "$open_url"
+      ui_kv "Finalize setup" "simai-admin.sh bitrix finalize --domain ${BX_DOMAIN}"
+      ;;
+    installed)
+      ui_kv "Open admin" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/"
+      ui_kv "Finalize setup" "simai-admin.sh bitrix finalize --domain ${BX_DOMAIN}"
+      ;;
+    *)
+      ui_kv "Prepare installer" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
+      ui_kv "Open installer" "$open_url"
+      ;;
+  esac
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
-  ui_kv "Installer ready" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
-  ui_kv "Scheduler sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
   ui_kv "Agents status" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
 
@@ -818,6 +847,7 @@ bitrix_perf_status_handler() {
   local bx_crontab_support="missing"
   local short_install="unknown"
   local install_stage="unknown"
+  local web_state="unknown"
   local cron_file_state="missing"
   local cron_managed="no"
   local cron_domain_match="no"
@@ -859,7 +889,8 @@ bitrix_perf_status_handler() {
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
   agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
-  install_stage=$(bitrix_perf_install_stage "$short_install" "$agents_ready")
+  web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
+  install_stage=$(bitrix_perf_install_stage "$short_install" "$agents_ready" "$web_state")
   cache_dirs=$(bitrix_perf_cache_dirs_state "$BX_DOC_ROOT")
 
   if [[ -f "$pool_file" ]]; then
@@ -889,6 +920,7 @@ bitrix_perf_status_handler() {
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
     "Optimization mode|${managed_mode}" \
+    "Web state|${web_state}" \
     "Install stage|${install_stage}" \
     "PHP|${BX_PHP_VERSION:-none}" \
     "Core files|${BX_HAS_CORE}" \
@@ -909,9 +941,14 @@ bitrix_perf_status_handler() {
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
   ui_section "Next steps"
+  if [[ "$web_state" == "installer" ]]; then
+    ui_kv "Open installer" "$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")"
+  else
+    ui_kv "Finalize setup" "simai-admin.sh bitrix finalize --domain ${BX_DOMAIN}"
+    ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
+    ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
+  fi
   ui_kv "Apply standard optimization" "simai-admin.sh bitrix perf-apply --domain ${BX_DOMAIN} --mode standard --confirm yes"
-  ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
-  ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
 }
 
 bitrix_perf_apply_handler() {
@@ -1013,6 +1050,91 @@ bitrix_perf_apply_handler() {
   ui_kv "Review Bitrix status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
 }
 
+bitrix_finalize_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  local ssl_mode="${PARSED_ARGS[ssl]:-no}"
+  local email="${PARSED_ARGS[email]:-}"
+  local redirect="${PARSED_ARGS[redirect]:-}"
+  local hsts="${PARSED_ARGS[hsts]:-}"
+  local staging="${PARSED_ARGS[staging]:-}"
+  [[ "${confirm,,}" == "yes" ]] && confirm="yes" || confirm="no"
+  [[ "${ssl_mode,,}" == "yes" ]] && ssl_mode="yes" || ssl_mode="no"
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to finalize Bitrix setup in CLI mode."
+    return 1
+  fi
+  if ! bitrix_prepare_site "$domain"; then
+    return $?
+  fi
+
+  local web_state="unknown"
+  web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
+  if [[ "$web_state" != "installed" ]]; then
+    ui_header "SIMAI ENV · Bitrix finalize setup"
+    ui_section "Result"
+    print_kv_table \
+      "Domain|${BX_DOMAIN}" \
+      "Web state|${web_state}" \
+      "Status|blocked"
+    ui_section "Next steps"
+    ui_kv "Open installer" "$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")"
+    ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
+    error "Bitrix web installation is not complete for ${BX_DOMAIN}."
+    return 1
+  fi
+
+  local php_status="failed"
+  local agents_status="failed"
+  local ssl_status="skipped"
+  if run_command bitrix php-baseline-sync --domain "$BX_DOMAIN"; then
+    php_status="ok"
+  else
+    error "Bitrix PHP baseline sync failed for ${BX_DOMAIN}"
+    return 1
+  fi
+
+  if run_command bitrix agents-sync --domain "$BX_DOMAIN" --apply yes --confirm yes; then
+    agents_status="applied"
+  else
+    error "Bitrix agents sync failed for ${BX_DOMAIN}"
+    return 1
+  fi
+
+  if [[ "$ssl_mode" == "yes" ]]; then
+    if [[ -z "$email" ]]; then
+      error "Use --email with --ssl yes to issue Let's Encrypt during finalize."
+      return 1
+    fi
+    local -a ssl_args=(--domain "$BX_DOMAIN" --email "$email")
+    [[ -n "$redirect" ]] && ssl_args+=(--redirect "$redirect")
+    [[ -n "$hsts" ]] && ssl_args+=(--hsts "$hsts")
+    [[ -n "$staging" ]] && ssl_args+=(--staging "$staging")
+    if run_command ssl letsencrypt "${ssl_args[@]}"; then
+      ssl_status="issued"
+    else
+      error "Let's Encrypt issuance failed for ${BX_DOMAIN}"
+      return 1
+    fi
+  fi
+
+  ui_header "SIMAI ENV · Bitrix finalize setup"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${BX_DOMAIN}" \
+    "Web state|${web_state}" \
+    "PHP baseline|${php_status}" \
+    "Agents sync|${agents_status}" \
+    "SSL|${ssl_status}"
+  ui_section "Next steps"
+  ui_kv "Bitrix status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
+  ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
+  ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
+}
+
 register_cmd "bitrix" "status" "Show Bitrix status" "bitrix_status_handler" "domain" ""
 register_cmd "bitrix" "cron-status" "Show Bitrix scheduler status" "bitrix_cron_status_handler" "domain" ""
 register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix scheduler file" "bitrix_cron_sync_handler" "domain" ""
@@ -1024,3 +1146,4 @@ register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db pres
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""
 register_cmd "bitrix" "perf-apply" "Apply Bitrix optimization baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="
+register_cmd "bitrix" "finalize" "Finalize Bitrix post-install baseline" "bitrix_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging="

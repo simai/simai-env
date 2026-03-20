@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.68] - 2026-03-20
+### Added
+- Added `bitrix finalize` as a single post-install lifecycle step for Bitrix sites (PHP baseline, agents sync, optional Let's Encrypt).
+### Changed
+- Bitrix status and optimization screens now probe the real web state (`installer` vs `installed`) and show lifecycle-aware next steps and installer URLs.
+- The regular CMS menu now includes `Bitrix complete setup` for the common post-install path.
+
 ## [1.11.67] - 2026-03-20
 ### Fixed
 - Final UX consistency fixes for this phase: `site remove` now reports apply mode correctly, and Bitrix agents status now uses scheduler wording consistently.

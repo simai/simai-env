@@ -628,10 +628,11 @@ actsellistbox=black,cyan
         "8|WordPress optimization"
         "9|Bitrix status"
         "10|Bitrix optimization"
+        "11|Bitrix complete setup"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress optimization" "9|WordPress scheduler status" "10|WordPress scheduler sync" "11|WordPress cache clear" "12|Bitrix status" "13|Bitrix optimization" "14|Bitrix scheduler status" "15|Bitrix scheduler sync" "16|Bitrix cache clear" "17|Bitrix agents status" "18|Bitrix agents readiness" "19|Bitrix DB preseed" "20|Bitrix installer ready" "21|Bitrix PHP baseline sync (all)" "22|Bitrix agents sync (apply)" "0|Back")
+        items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress optimization" "9|WordPress scheduler status" "10|WordPress scheduler sync" "11|WordPress cache clear" "12|Bitrix status" "13|Bitrix optimization" "14|Bitrix complete setup" "15|Bitrix scheduler status" "16|Bitrix scheduler sync" "17|Bitrix cache clear" "18|Bitrix agents status" "19|Bitrix agents readiness" "20|Bitrix DB preseed" "21|Bitrix installer ready" "22|Bitrix PHP baseline sync (all)" "23|Bitrix agents sync (apply)" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
@@ -668,7 +669,7 @@ actsellistbox=black,cyan
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cache-clear
           else
-            menu_invalid_choice
+            run_menu_command bitrix finalize
           fi
           ;;
         12)
@@ -687,61 +688,68 @@ actsellistbox=black,cyan
           ;;
         14)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-status
+            run_menu_command bitrix finalize
           else
             menu_invalid_choice
           fi
           ;;
         15)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-sync
+            run_menu_command bitrix cron-status
           else
             menu_invalid_choice
           fi
           ;;
         16)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cache-clear
+            run_menu_command bitrix cron-sync
           else
             menu_invalid_choice
           fi
           ;;
         17)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-status
+            run_menu_command bitrix cache-clear
           else
             menu_invalid_choice
           fi
           ;;
         18)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-sync
+            run_menu_command bitrix agents-status
           else
             menu_invalid_choice
           fi
           ;;
         19)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix db-preseed
+            run_menu_command bitrix agents-sync
           else
             menu_invalid_choice
           fi
           ;;
         20)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix installer-ready
+            run_menu_command bitrix db-preseed
           else
             menu_invalid_choice
           fi
           ;;
         21)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix php-baseline-sync --all yes
+            run_menu_command bitrix installer-ready
           else
             menu_invalid_choice
           fi
           ;;
         22)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command bitrix php-baseline-sync --all yes
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        23)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix agents-sync --apply yes
           else
