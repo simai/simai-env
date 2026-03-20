@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.65] - 2026-03-20
+### Changed
+- `site info`, `ssl status`, and backup archive errors now use more consistent everyday wording and give clearer follow-up actions for ordinary users.
+
 ## [1.11.64] - 2026-03-20
 ### Changed
 - Laravel worker and scheduler flows now show clearer next-step guidance, so everyday status screens lead directly to the most common follow-up actions.

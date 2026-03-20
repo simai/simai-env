@@ -140,6 +140,7 @@ backup_inspect_handler() {
   local file="${PARSED_ARGS[file]:-}"
   if [[ ! -f "$file" ]]; then
     error "Backup file not found: ${file}"
+    echo "Use: simai-admin.sh backup export --domain <domain>"
     return 1
   fi
   local tmpdir
@@ -184,6 +185,7 @@ backup_import_handler() {
 
   if [[ ! -f "$file" ]]; then
     error "Backup file not found: ${file}"
+    echo "Use: simai-admin.sh backup export --domain <domain>"
     return 1
   fi
 

@@ -1521,8 +1521,8 @@ site_info_handler() {
     "SSL|${ssl_brief}"
     "Redirect|${ssl_redirect}"
     "HSTS|${ssl_hsts}"
-    "Cron file|${cron_file}"
-    "Cron status|${cron_status}"
+    "Scheduler file|${cron_file}"
+    "Scheduler status|${cron_status}"
     "Worker unit|${worker_unit}"
     "Worker status|${worker_status}"
     "Target|${target}"
@@ -1532,6 +1532,7 @@ site_info_handler() {
   print_kv_table "${rows[@]}"
   ui_section "Next steps"
   ui_kv "SSL status" "simai-admin.sh ssl status --domain ${domain}"
+  ui_kv "Optimization status" "simai-admin.sh site perf-status --domain ${domain}"
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
 }
 

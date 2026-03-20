@@ -485,7 +485,6 @@ ssl_status_handler() {
     return 1
   fi
   ui_header "SIMAI ENV · SSL status"
-  ui_kv "Domain" "$domain"
   local le_cert="/etc/letsencrypt/live/${domain}/fullchain.pem"
   local le_key="/etc/letsencrypt/live/${domain}/privkey.pem"
   local custom_cert="/etc/nginx/ssl/${domain}/fullchain.pem"
@@ -571,6 +570,7 @@ ssl_status_handler() {
   ui_section "Next steps"
   ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   ui_kv "Remove SSL" "simai-admin.sh ssl remove --domain ${domain}"
+  ui_kv "Site info" "simai-admin.sh site info --domain ${domain}"
 }
 
 ssl_list_handler() {
