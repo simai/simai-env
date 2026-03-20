@@ -24,11 +24,8 @@ prompt() {
 
 print_version_banner() {
   local update_ref="${SIMAI_UPDATE_REF:-refs/heads/${SIMAI_UPDATE_BRANCH:-main}}"
-  local remote_version_url="https://raw.githubusercontent.com/simai/simai-env/main/VERSION"
-  case "$update_ref" in
-    refs/heads/*) remote_version_url="https://raw.githubusercontent.com/simai/simai-env/${update_ref#refs/heads/}/VERSION" ;;
-    refs/tags/*) remote_version_url="https://raw.githubusercontent.com/simai/simai-env/${update_ref#refs/tags/}/VERSION" ;;
-  esac
+  local remote_version_url
+  remote_version_url="$(update_remote_version_url "$update_ref" "${REPO_URL:-https://github.com/simai/simai-env}")"
   local local_version="(unknown)"
   local remote_version="(unavailable)"
   [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"

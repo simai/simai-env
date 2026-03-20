@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.55] - 2026-03-20
+### Fixed
+- Update channel now resolves the target branch/tag to a concrete commit SHA before downloading archives or checking remote version, avoiding stale GitHub branch-cache results on long-lived servers.
+
 ## [1.11.54] - 2026-03-20
 ### Added
 - Added per-site automatic optimization overrides with `site auto-optimize-status`, `site auto-optimize-enable`, `site auto-optimize-disable`, and `site auto-optimize-reset`.

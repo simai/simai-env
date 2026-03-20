@@ -2,29 +2,11 @@
 set -euo pipefail
 
 self_update_ref() {
-  local branch="${SIMAI_UPDATE_BRANCH:-main}"
-  local ref="${SIMAI_UPDATE_REF:-refs/heads/${branch}}"
-  if [[ "$ref" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]; then
-    echo "$ref"
-    return 0
-  fi
-  echo "refs/heads/main"
+  update_ref_default
 }
 
 self_remote_version_url() {
-  local ref
-  ref="$(self_update_ref)"
-  case "$ref" in
-    refs/heads/*)
-      echo "https://raw.githubusercontent.com/simai/simai-env/${ref#refs/heads/}/VERSION"
-      ;;
-    refs/tags/*)
-      echo "https://raw.githubusercontent.com/simai/simai-env/${ref#refs/tags/}/VERSION"
-      ;;
-    *)
-      echo "https://raw.githubusercontent.com/simai/simai-env/main/VERSION"
-      ;;
-  esac
+  update_remote_version_url "$(self_update_ref)" "${REPO_URL:-https://github.com/simai/simai-env}"
 }
 
 self_post_update_smoke() {
