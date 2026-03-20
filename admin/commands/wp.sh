@@ -133,16 +133,16 @@ wp_status_handler() {
     "wp-config.php|${config_present}" \
     "Ready for WP-CLI actions|${ready_cli}" \
     "Home URL|${home_url}" \
-    "wp-cron.php|${cron_entrypoint}" \
+    "Built-in scheduler|${cron_entrypoint}" \
     "DISABLE_WP_CRON|${disable_wp_cron}" \
-    "Cron file|${WP_CRON_FILE} (${cron_file_state})" \
-    "Cron entry|${cron_line_state}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}"
+    "Server scheduler file|${WP_CRON_FILE} (${cron_file_state})" \
+    "Server scheduler entry|${cron_line_state}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${WP_DOMAIN}"
-  ui_kv "Cron sync" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
+  ui_kv "Scheduler sync" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
 }
 
 wp_cron_status_handler() {
@@ -157,7 +157,7 @@ wp_cron_status_handler() {
     return $rc
   fi
 
-  ui_header "SIMAI ENV · WordPress cron status"
+  ui_header "SIMAI ENV · WordPress scheduler status"
   local config_present="${WP_CONFIG_READY:-no}"
   local cron_file_state="missing"
   local cron_line_state="missing"
@@ -185,14 +185,14 @@ wp_cron_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
-    "Cron file|${WP_CRON_FILE} (${cron_file_state})" \
-    "Cron line (wp-cron.php)|${cron_line_state}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}" \
+    "Scheduler file|${WP_CRON_FILE} (${cron_file_state})" \
+    "Scheduler entry (wp-cron.php)|${cron_line_state}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}" \
     "DISABLE_WP_CRON|${disable_wp_cron}"
   ui_section "Next steps"
-  ui_kv "Sync cron" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
+  ui_kv "Sync scheduler" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
 }
 
 wp_cron_sync_handler() {
@@ -210,16 +210,16 @@ wp_cron_sync_handler() {
     error "WordPress site PHP version is missing for ${domain}."
     return 1
   fi
-  ui_header "SIMAI ENV · WordPress cron sync"
+  ui_header "SIMAI ENV · WordPress scheduler sync"
   cron_site_write "$WP_DOMAIN" "$WP_SLUG" "wordpress" "$WP_ROOT" "$WP_PHP_VERSION"
   ui_section "Result"
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
-    "Cron file|${WP_CRON_FILE}" \
+    "Scheduler file|${WP_CRON_FILE}" \
     "Profile|wordpress" \
     "PHP|${WP_PHP_VERSION}"
   ui_section "Next steps"
-  ui_kv "Check cron" "simai-admin.sh wp cron-status --domain ${WP_DOMAIN}"
+  ui_kv "Check scheduler" "simai-admin.sh wp cron-status --domain ${WP_DOMAIN}"
 }
 
 wp_cache_clear_handler() {
@@ -475,9 +475,9 @@ wp_perf_apply_handler() {
   ui_kv "Review WordPress status" "simai-admin.sh wp perf-status --domain ${WP_DOMAIN}"
 }
 
-register_cmd "wp" "status" "Show WordPress operational status" "wp_status_handler" "domain" ""
-register_cmd "wp" "cron-status" "Show WordPress cron status" "wp_cron_status_handler" "domain" ""
-register_cmd "wp" "cron-sync" "Write/rewrite WordPress cron file" "wp_cron_sync_handler" "domain" ""
+register_cmd "wp" "status" "Show WordPress status" "wp_status_handler" "domain" ""
+register_cmd "wp" "cron-status" "Show WordPress scheduler status" "wp_cron_status_handler" "domain" ""
+register_cmd "wp" "cron-sync" "Write/rewrite WordPress scheduler file" "wp_cron_sync_handler" "domain" ""
 register_cmd "wp" "cache-clear" "Flush WordPress object cache (wp-cli)" "wp_cache_clear_handler" "domain" ""
 register_cmd "wp" "perf-status" "Show WordPress optimization status" "wp_perf_status_handler" "" "domain="
 register_cmd "wp" "perf-apply" "Apply WordPress optimization baseline" "wp_perf_apply_handler" "" "domain= mode= confirm="

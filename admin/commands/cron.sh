@@ -36,9 +36,15 @@ cron_add_handler() {
   local user="${PARSED_ARGS[user]:-${SIMAI_USER:-simai}}"
   local prev_user="${SIMAI_USER:-simai}"
   SIMAI_USER="$user"
+  ui_header "SIMAI ENV · Enable Laravel scheduler"
   cron_site_write "$domain" "$slug" "$profile" "$root" "$php"
   SIMAI_USER="$prev_user"
-  echo "Cron created at /etc/cron.d/${slug} for ${domain} (php ${php}, user ${user})"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Scheduler file|/etc/cron.d/${slug}" \
+    "PHP|${php}" \
+    "User|${user}"
 }
 
 cron_remove_handler() {
@@ -66,9 +72,14 @@ cron_remove_handler() {
     echo "Then add/restore the # simai-* metadata header in ${cfg} (recreate site config if needed)."
     return 1
   fi
+  ui_header "SIMAI ENV · Disable Laravel scheduler"
   remove_cron_file "$slug" "$domain"
-  echo "Cron removed for domain ${domain} (slug ${slug})"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Scheduler file|/etc/cron.d/${slug}" \
+    "State|removed"
 }
 
-register_cmd "cron" "add" "Add schedule:run cron entry for site" "cron_add_handler" "domain" "user="
-register_cmd "cron" "remove" "Remove schedule:run cron entry for site" "cron_remove_handler" "domain" ""
+register_cmd "cron" "add" "Enable schedule:run scheduler entry for site" "cron_add_handler" "domain" "user="
+register_cmd "cron" "remove" "Disable schedule:run scheduler entry for site" "cron_remove_handler" "domain" ""

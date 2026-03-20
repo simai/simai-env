@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.63] - 2026-03-20
+### Changed
+- Daily Laravel, WordPress, and Bitrix status flows now use clearer scheduler/worker wording in command output, reducing raw cron/systemd terminology for ordinary users.
+
 ## [1.11.62] - 2026-03-20
 ### Changed
 - The regular Laravel/CMS tools menu now focuses on everyday actions and simple optimization status, while WordPress and Bitrix maintenance operations remain in Advanced mode.

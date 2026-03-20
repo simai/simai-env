@@ -271,17 +271,17 @@ bitrix_status_handler() {
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
     "SHORT_INSTALL|${short_install}" \
-    "cron_events.php|${cron_entrypoint}" \
-    "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
-    "Cron entry|${cron_line_state}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}"
+    "Scheduler script|${cron_entrypoint}" \
+    "Scheduler file|${BX_CRON_FILE} (${cron_file_state})" \
+    "Scheduler entry|${cron_line_state}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}"
   ui_section "Next steps"
   ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/bitrixsetup.php?test=1"
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${BX_DOMAIN}"
   ui_kv "Installer ready" "simai-admin.sh bitrix installer-ready --domain ${BX_DOMAIN}"
-  ui_kv "Cron sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
+  ui_kv "Scheduler sync" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
   ui_kv "Agents status" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
 
@@ -297,7 +297,7 @@ bitrix_cron_status_handler() {
     return $rc
   fi
 
-  ui_header "SIMAI ENV · Bitrix cron status"
+  ui_header "SIMAI ENV · Bitrix scheduler status"
   local cron_file_state="missing"
   local cron_line_state="missing"
   local cron_managed="no"
@@ -316,13 +316,13 @@ bitrix_cron_status_handler() {
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
-    "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
-    "Cron line (cron_events.php)|${cron_line_state}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}"
+    "Scheduler file|${BX_CRON_FILE} (${cron_file_state})" \
+    "Scheduler entry (cron_events.php)|${cron_line_state}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}"
   ui_section "Next steps"
-  ui_kv "Sync cron" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
+  ui_kv "Sync scheduler" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
 }
 
 bitrix_cron_sync_handler() {
@@ -340,16 +340,16 @@ bitrix_cron_sync_handler() {
     error "Bitrix site PHP version is missing for ${domain}."
     return 1
   fi
-  ui_header "SIMAI ENV · Bitrix cron sync"
+  ui_header "SIMAI ENV · Bitrix scheduler sync"
   cron_site_write "$BX_DOMAIN" "$BX_SLUG" "bitrix" "$BX_ROOT" "$BX_PHP_VERSION"
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
-    "Cron file|${BX_CRON_FILE}" \
+    "Scheduler file|${BX_CRON_FILE}" \
     "Profile|bitrix" \
     "PHP|${BX_PHP_VERSION}"
   ui_section "Next steps"
-  ui_kv "Check cron" "simai-admin.sh bitrix cron-status --domain ${BX_DOMAIN}"
+  ui_kv "Check scheduler" "simai-admin.sh bitrix cron-status --domain ${BX_DOMAIN}"
 }
 
 bitrix_agents_status_handler() {
@@ -1013,9 +1013,9 @@ bitrix_perf_apply_handler() {
   ui_kv "Review Bitrix status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
 }
 
-register_cmd "bitrix" "status" "Show Bitrix operational status" "bitrix_status_handler" "domain" ""
-register_cmd "bitrix" "cron-status" "Show Bitrix cron status" "bitrix_cron_status_handler" "domain" ""
-register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix cron file" "bitrix_cron_sync_handler" "domain" ""
+register_cmd "bitrix" "status" "Show Bitrix status" "bitrix_status_handler" "domain" ""
+register_cmd "bitrix" "cron-status" "Show Bitrix scheduler status" "bitrix_cron_status_handler" "domain" ""
+register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix scheduler file" "bitrix_cron_sync_handler" "domain" ""
 register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bitrix_agents_status_handler" "domain" ""
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""

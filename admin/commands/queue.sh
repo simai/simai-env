@@ -87,14 +87,16 @@ queue_status_handler() {
     fi
     return $rc
   fi
+  ui_header "SIMAI ENV · Laravel worker status"
   local -a rows=(
-    "Unit|$QUEUE_UNIT_NAME"
-    "Enabled|$QUEUE_ENABLED"
-    "ActiveState|$QUEUE_ACTIVE_STATE"
-    "SubState|$QUEUE_SUB_STATE"
-    "MainPID|$QUEUE_MAIN_PID"
-    "ExitStatus|$QUEUE_EXIT_STATUS"
+    "Service|$QUEUE_UNIT_NAME"
+    "Autostart|$QUEUE_ENABLED"
+    "State|$QUEUE_ACTIVE_STATE"
+    "Detail|$QUEUE_SUB_STATE"
+    "Process ID|$QUEUE_MAIN_PID"
+    "Exit code|$QUEUE_EXIT_STATUS"
   )
+  ui_section "Result"
   print_kv_table "${rows[@]}"
   return 0
 }
@@ -135,7 +137,12 @@ queue_restart_handler() {
   else
     return $?
   fi
-  info "Queue unit restarted: ActiveState=${QUEUE_ACTIVE_STATE}, SubState=${QUEUE_SUB_STATE}"
+  ui_header "SIMAI ENV · Restart Laravel worker"
+  ui_section "Result"
+  print_kv_table \
+    "Service|${QUEUE_UNIT_NAME}" \
+    "State|${QUEUE_ACTIVE_STATE}" \
+    "Detail|${QUEUE_SUB_STATE}"
   return 0
 }
 
@@ -165,10 +172,12 @@ queue_logs_handler() {
     fi
     return $rc
   fi
-  info "Last ${lines} lines for ${QUEUE_UNIT_NAME}"
+  ui_header "SIMAI ENV · Laravel worker logs"
+  ui_section "Result"
+  ui_info "Showing last ${lines} lines for ${QUEUE_UNIT_NAME}"
   journalctl -u "$QUEUE_UNIT_NAME" -n "$lines" --no-pager
 }
 
-register_cmd "queue" "status" "Show Laravel queue worker status (laravel-only)" "queue_status_handler" "domain" ""
-register_cmd "queue" "restart" "Restart Laravel queue worker (laravel-only)" "queue_restart_handler" "domain" ""
-register_cmd "queue" "logs" "Tail Laravel queue worker logs (laravel-only)" "queue_logs_handler" "domain" "lines=100"
+register_cmd "queue" "status" "Show Laravel worker status (laravel-only)" "queue_status_handler" "domain" ""
+register_cmd "queue" "restart" "Restart Laravel worker (laravel-only)" "queue_restart_handler" "domain" ""
+register_cmd "queue" "logs" "Tail Laravel worker logs (laravel-only)" "queue_logs_handler" "domain" "lines=100"
