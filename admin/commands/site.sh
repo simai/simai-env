@@ -1504,7 +1504,7 @@ site_info_handler() {
     "Domain|${domain}"
     "Slug|${slug}"
     "Profile|${profile}"
-    "Usage class|${usage_class}"
+    "Activity class|${usage_class}"
     "Optimization|${optimization_mode}"
     "Recommendation|${optimization_recommendation}"
     "Project|${project}"

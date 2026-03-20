@@ -8,7 +8,7 @@ site_usage_select_class() {
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
-    choice=$(select_from_list "Select site usage" "standard" "standard" "high-traffic" "rarely-used")
+    choice=$(select_from_list "Select site activity" "standard" "standard" "high-traffic" "rarely-used")
     [[ -z "$choice" ]] && {
       warn "Cancelled."
       return 1
@@ -188,7 +188,7 @@ site_perf_status_handler() {
   print_kv_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
-    "Usage class|${usage_class}" \
+    "Activity class|${usage_class}" \
     "Optimization|${optimization_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
     "Site auto optimize override|${auto_optimize_state}" \
@@ -307,11 +307,11 @@ site_usage_status_handler() {
   optimization_mode=$(site_user_optimization_mode "$domain")
   optimization_recommendation=$(site_user_recommendation "$domain")
 
-  ui_header "SIMAI ENV · Site usage"
+  ui_header "SIMAI ENV · Site activity"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
-    "Usage class|${usage_class}" \
+    "Activity class|${usage_class}" \
     "Optimization|${optimization_mode}" \
     "Mapped perf mode|${perf_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
@@ -345,11 +345,11 @@ site_usage_set_handler() {
   fi
   site_usage_apply_class "$domain" "$usage_class" "$confirm" || return 1
 
-  ui_header "SIMAI ENV · Site usage"
+  ui_header "SIMAI ENV · Site activity"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
-    "Usage class|${usage_class}" \
+    "Activity class|${usage_class}" \
     "Mapped perf mode|$(site_usage_class_to_perf_mode "$usage_class")"
   ui_section "Next steps"
   ui_kv "Review performance" "simai-admin.sh site perf-status --domain ${domain}"
@@ -378,7 +378,7 @@ site_auto_optimize_status_handler() {
     "Optimization|${optimization_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
     "Site override|${auto_optimize_state}" \
-    "Usage class|${usage_class}" \
+    "Activity class|${usage_class}" \
     "Mapped perf mode|${perf_mode}" \
     "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}"

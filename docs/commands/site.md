@@ -11,7 +11,7 @@ Options:
 - `--path` (optional; default uses path style under `/home/simai/www/`)
 - `--path-style` (`slug`|`domain`) controls default path when `--path` is not set. Default is `domain` (e.g., `/home/simai/www/your-domain.tld`). Use `--path-style slug` to restore legacy slug paths or set `/etc/simai-env.conf` with `SIMAI_DEFAULT_PATH_STYLE=domain|slug`. Menu does not prompt for path style; domain-based default is used unless overridden via CLI/config.
 - `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
-- `--usage` selects a user-facing runtime intent: `standard` (default), `high-traffic`, or `rarely-used`. simai-env maps this to the internal performance mode automatically.
+- `--usage` selects a user-facing activity class: `standard` (default), `high-traffic`, or `rarely-used`. simai-env maps this to the internal performance mode automatically.
 - `--target-domain` (alias only) set target non-interactively; required in CLI for alias when not in menu.
 - `--php` (optional; choose from installed if omitted; in menu you can pick supported versions 8.1–8.4 and optionally install if missing)
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
@@ -22,7 +22,7 @@ Behavior:
 - Creates PHP-FPM pool and nginx vhost for non-static profiles; installs `healthcheck.php` into the profile docroot when the profile healthcheck mode is `php`.
 - If `create-db=yes` (or `db=yes`), creates DB/user and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, export is controlled by `--db-export` (menu prompts). Required-DB profiles can be created without DB only when `--skip-db-required yes` is supplied (intended for migration); create DB later via `site db-create`.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, `--ssl=ask` can prompt after creation; in non-menu CLI, `ask` behaves as `no`.
-- After creation, simai-env automatically stores the selected usage class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
+- After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
   - `standard` -> `balanced`
   - `high-traffic` -> `aggressive`
   - `rarely-used` -> `parked`
@@ -107,7 +107,7 @@ Options:
 - `--domain` (required outside menu)
 
 Output includes:
-- usage class and its mapped governance baseline
+- activity class and its mapped governance baseline
 - human-readable optimization posture (`automatic`, `manual`, `paused`)
 - a plain-language recommendation based on current runtime state and server pressure
 - profile and PHP version
@@ -132,20 +132,20 @@ Behavior:
 - Validates php-fpm config before reload and restores the previous pool on failure.
 
 ## usage-status
-Show the simple user-facing usage class for a site.
+Show the simple user-facing activity class for a site.
 
 Options:
 - `--domain` (required outside menu)
 
 Output includes:
-- usage class (`standard`, `high-traffic`, `rarely-used`)
+- activity class (`standard`, `high-traffic`, `rarely-used`)
 - human-readable optimization posture
 - mapped internal performance mode
 - a plain-language recommendation
 - current runtime state
 
 ## usage-set
-Set the simple user-facing usage class for a site.
+Set the simple user-facing activity class for a site.
 
 Options:
 - `--domain` (required outside menu)

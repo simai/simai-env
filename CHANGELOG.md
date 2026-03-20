@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.57] - 2026-03-20
+### Changed
+- Site-related menu and status output now use more user-facing wording such as `activity`, `optimization`, and `pause/resume`, reducing low-level terminology in everyday workflows.
+
 ## [1.11.56] - 2026-03-20
 ### Changed
 - `site info`, `site usage-status`, `site auto-optimize-status`, and `site perf-status` now show a simple optimization posture plus a plain-language recommendation, making the performance layer easier to understand for non-technical users.
