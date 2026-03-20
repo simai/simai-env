@@ -47,7 +47,7 @@ See `docs/architecture/profiles.md`.
 - `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
 - `self auto-optimize-status`: show the simple user-facing automatic optimization state without exposing low-level scheduler details.
 - `self auto-optimize-enable` / `self auto-optimize-disable`: turn automatic optimization on or off globally while leaving the shared scheduler infrastructure in place.
-- `self perf-status`: show current managed performance baseline, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
+- `self perf-status`: show current server optimization status, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
@@ -60,9 +60,9 @@ See `docs/architecture/profiles.md`.
 - In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Site availability`, `Pause site`, `Resume site`, and `Server optimization plan`.
 - `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
-- `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel profile performance readiness and apply flow.
-- `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress performance readiness and apply flow.
-- `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix profile performance readiness and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
+- `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel optimization status and apply flow.
+- `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress optimization status and apply flow.
+- `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix optimization status and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
 
 ## Internal scheduler
 - Bootstrap now installs one shared cron entry: `/etc/cron.d/simai-scheduler`.

@@ -154,7 +154,7 @@ laravel_perf_status_handler() {
     redis_ext="yes"
   fi
 
-  ui_header "SIMAI ENV · Laravel performance"
+  ui_header "SIMAI ENV · Laravel optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
@@ -173,8 +173,8 @@ laravel_perf_status_handler() {
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
   ui_section "Next steps"
-  ui_kv "Site runtime" "simai-admin.sh site perf-status --domain ${domain}"
-  ui_kv "Apply balanced" "simai-admin.sh laravel perf-apply --domain ${domain} --mode balanced --confirm yes"
+  ui_kv "Site activity & optimization" "simai-admin.sh site perf-status --domain ${domain}"
+  ui_kv "Apply balanced optimization" "simai-admin.sh laravel perf-apply --domain ${domain} --mode balanced --confirm yes"
 }
 
 laravel_perf_apply_handler() {
@@ -193,7 +193,7 @@ laravel_perf_apply_handler() {
       ;;
   esac
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply Laravel performance tuning"
+    error "Use --confirm yes to apply Laravel optimization changes"
     return 1
   fi
 
@@ -246,7 +246,7 @@ laravel_perf_apply_handler() {
     fi
   fi
 
-  ui_header "SIMAI ENV · Laravel performance apply"
+  ui_header "SIMAI ENV · Apply Laravel optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${domain}" \
@@ -256,8 +256,8 @@ laravel_perf_apply_handler() {
     "Artisan optimize|${optimize_status}" \
     "Queue restart|${queue_status}"
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh laravel perf-status --domain ${domain}"
+  ui_kv "Review Laravel status" "simai-admin.sh laravel perf-status --domain ${domain}"
 }
 
-register_cmd "laravel" "perf-status" "Show Laravel performance readiness" "laravel_perf_status_handler" "" "domain="
-register_cmd "laravel" "perf-apply" "Apply Laravel performance baseline" "laravel_perf_apply_handler" "" "domain= mode= confirm="
+register_cmd "laravel" "perf-status" "Show Laravel optimization status" "laravel_perf_status_handler" "" "domain="
+register_cmd "laravel" "perf-apply" "Apply Laravel optimization baseline" "laravel_perf_apply_handler" "" "domain= mode= confirm="

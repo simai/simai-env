@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.59] - 2026-03-20
+### Changed
+- Laravel, WordPress, Bitrix, and System optimization commands now use more user-facing wording such as `optimization`, `Apply ... optimization`, and `Review ... status` instead of lower-level performance terminology in everyday flows.
+
 ## [1.11.58] - 2026-03-20
 ### Changed
 - Daily site and system UX now uses more user-facing labels such as `Activity & optimization`, `Site availability`, `Pause site`, and `Server optimization plan`, while keeping low-level controls in Advanced/CLI.

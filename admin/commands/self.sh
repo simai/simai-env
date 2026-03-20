@@ -641,7 +641,7 @@ self_perf_rebalance_handler() {
     print_kv_table "${skipped[@]}"
   fi
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh self perf-status"
+  ui_kv "Review current status" "simai-admin.sh self perf-status"
   ui_kv "Review plan" "simai-admin.sh self perf-plan"
 }
 
@@ -653,7 +653,7 @@ self_perf_apply_handler() {
     preset=$(perf_recommended_preset)
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply performance baseline changes"
+    error "Use --confirm yes to apply server optimization changes"
     return 1
   fi
   perf_use_preset "$preset" || return 1
@@ -686,7 +686,7 @@ self_perf_apply_handler() {
     "Redis maxmemory|${PERF_REDIS_MAXMEMORY}" \
     "Redis policy|${PERF_REDIS_POLICY}"
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh self perf-status"
+  ui_kv "Review current status" "simai-admin.sh self perf-status"
   ui_kv "Check platform" "simai-admin.sh self platform-status"
 }
 
@@ -890,7 +890,7 @@ register_cmd "self" "scheduler-status" "Show internal scheduler status" "self_sc
 register_cmd "self" "scheduler-enable" "Enable scheduler globally or by job" "self_scheduler_enable_handler" "" "job="
 register_cmd "self" "scheduler-disable" "Disable scheduler globally or by job" "self_scheduler_disable_handler" "" "job="
 register_cmd "self" "scheduler-run" "Run one scheduler job immediately" "self_scheduler_run_handler" "" "job="
-register_cmd "self" "perf-status" "Show performance baseline status" "self_perf_status_handler" "" ""
+register_cmd "self" "perf-status" "Show server optimization status" "self_perf_status_handler" "" ""
 register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
 register_cmd "self" "perf-rebalance" "Apply safe/parked FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= mode= confirm="
 register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="

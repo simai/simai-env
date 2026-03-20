@@ -381,7 +381,7 @@ wp_perf_status_handler() {
     fi
   fi
 
-  ui_header "SIMAI ENV · WordPress performance"
+  ui_header "SIMAI ENV · WordPress optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
@@ -404,8 +404,8 @@ wp_perf_status_handler() {
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
   ui_section "Next steps"
-  ui_kv "Site runtime" "simai-admin.sh site perf-status --domain ${WP_DOMAIN}"
-  ui_kv "Apply standard" "simai-admin.sh wp perf-apply --domain ${WP_DOMAIN} --mode standard --confirm yes"
+  ui_kv "Site activity & optimization" "simai-admin.sh site perf-status --domain ${WP_DOMAIN}"
+  ui_kv "Apply standard optimization" "simai-admin.sh wp perf-apply --domain ${WP_DOMAIN} --mode standard --confirm yes"
 }
 
 wp_perf_apply_handler() {
@@ -424,7 +424,7 @@ wp_perf_apply_handler() {
       ;;
   esac
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply WordPress performance tuning"
+    error "Use --confirm yes to apply WordPress optimization changes"
     return 1
   fi
 
@@ -463,7 +463,7 @@ wp_perf_apply_handler() {
     disable_cron_status="skipped (placeholder)"
   fi
 
-  ui_header "SIMAI ENV · WordPress performance apply"
+  ui_header "SIMAI ENV · Apply WordPress optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
@@ -472,12 +472,12 @@ wp_perf_apply_handler() {
     "Cron sync|ok" \
     "DISABLE_WP_CRON|${disable_cron_status}"
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh wp perf-status --domain ${WP_DOMAIN}"
+  ui_kv "Review WordPress status" "simai-admin.sh wp perf-status --domain ${WP_DOMAIN}"
 }
 
 register_cmd "wp" "status" "Show WordPress operational status" "wp_status_handler" "domain" ""
 register_cmd "wp" "cron-status" "Show WordPress cron status" "wp_cron_status_handler" "domain" ""
 register_cmd "wp" "cron-sync" "Write/rewrite WordPress cron file" "wp_cron_sync_handler" "domain" ""
 register_cmd "wp" "cache-clear" "Flush WordPress object cache (wp-cli)" "wp_cache_clear_handler" "domain" ""
-register_cmd "wp" "perf-status" "Show WordPress performance readiness" "wp_perf_status_handler" "" "domain="
-register_cmd "wp" "perf-apply" "Apply WordPress performance baseline" "wp_perf_apply_handler" "" "domain= mode= confirm="
+register_cmd "wp" "perf-status" "Show WordPress optimization status" "wp_perf_status_handler" "" "domain="
+register_cmd "wp" "perf-apply" "Apply WordPress optimization baseline" "wp_perf_apply_handler" "" "domain= mode= confirm="

@@ -884,7 +884,7 @@ bitrix_perf_status_handler() {
     fi
   fi
 
-  ui_header "SIMAI ENV · Bitrix performance"
+  ui_header "SIMAI ENV · Bitrix optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
@@ -909,7 +909,7 @@ bitrix_perf_status_handler() {
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
   ui_section "Next steps"
-  ui_kv "Apply standard" "simai-admin.sh bitrix perf-apply --domain ${BX_DOMAIN} --mode standard --confirm yes"
+  ui_kv "Apply standard optimization" "simai-admin.sh bitrix perf-apply --domain ${BX_DOMAIN} --mode standard --confirm yes"
   ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
   ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
 }
@@ -932,7 +932,7 @@ bitrix_perf_apply_handler() {
       ;;
   esac
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply Bitrix performance tuning"
+    error "Use --confirm yes to apply Bitrix optimization changes"
     return 1
   fi
   if ! bitrix_prepare_site "$domain"; then
@@ -1000,7 +1000,7 @@ bitrix_perf_apply_handler() {
     cache_status="skipped (installer)"
   fi
 
-  ui_header "SIMAI ENV · Bitrix performance apply"
+  ui_header "SIMAI ENV · Apply Bitrix optimization"
   ui_section "Result"
   print_kv_table \
     "Domain|${BX_DOMAIN}" \
@@ -1010,7 +1010,7 @@ bitrix_perf_apply_handler() {
     "Agents sync|${agents_status}" \
     "Cache clear|${cache_status}"
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
+  ui_kv "Review Bitrix status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
 }
 
 register_cmd "bitrix" "status" "Show Bitrix operational status" "bitrix_status_handler" "domain" ""
@@ -1022,5 +1022,5 @@ register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cac
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
-register_cmd "bitrix" "perf-status" "Show Bitrix performance readiness" "bitrix_perf_status_handler" "domain" ""
-register_cmd "bitrix" "perf-apply" "Apply Bitrix performance baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="
+register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""
+register_cmd "bitrix" "perf-apply" "Apply Bitrix optimization baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="

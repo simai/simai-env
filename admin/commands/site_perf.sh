@@ -242,7 +242,7 @@ site_perf_tune_handler() {
   esac
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to apply site performance tuning"
+    error "Use --confirm yes to apply site optimization changes"
     return 1
   fi
 
@@ -288,7 +288,7 @@ site_perf_tune_handler() {
     "PHP|${php_version}" \
     "Pool file|/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
   ui_section "Next steps"
-  ui_kv "Review status" "simai-admin.sh site perf-status --domain ${domain}"
+  ui_kv "Review site status" "simai-admin.sh site perf-status --domain ${domain}"
 }
 
 site_usage_status_handler() {
