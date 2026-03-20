@@ -542,14 +542,14 @@ self_perf_plan_handler() {
   local rows=()
   local commands=()
   local idx=0
-  local entry current domain profile mode safe_target reduction php_version pool_file
+  local entry current domain profile mode usage_class suggested_mode target_children reduction php_version pool_file
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
-    IFS='|' read -r current domain profile mode safe_target reduction php_version pool_file <<<"$entry"
+    IFS='|' read -r current domain profile mode usage_class suggested_mode target_children reduction php_version pool_file <<<"$entry"
     idx=$((idx + 1))
-    rows+=("${idx}. ${domain}|children=${current}, safe=${safe_target}, reduce=${reduction}, mode=${mode}, profile=${profile}, php=${php_version}")
+    rows+=("${idx}. ${domain}|children=${current}, usage=${usage_class}, suggest=${suggested_mode}, target=${target_children}, reduce=${reduction}, mode=${mode}, profile=${profile}, php=${php_version}")
     if [[ "$domain" == *.* && "$reduction" =~ ^[0-9]+$ && "$reduction" -gt 0 ]]; then
-      commands+=("Tune ${idx}|simai-admin.sh site perf-tune --domain ${domain} --mode safe --confirm yes")
+      commands+=("Tune ${idx}|simai-admin.sh site perf-tune --domain ${domain} --mode ${suggested_mode} --confirm yes")
     fi
   done < <(perf_fpm_top_pools "$limit")
 
@@ -572,12 +572,12 @@ self_perf_rebalance_handler() {
   parse_kv_args "$@"
   local limit="${PARSED_ARGS[limit]:-8}"
   local confirm="${PARSED_ARGS[confirm]:-no}"
-  local mode="${PARSED_ARGS[mode]:-safe}"
+  local mode="${PARSED_ARGS[mode]:-auto}"
   [[ "$limit" =~ ^[0-9]+$ ]] || limit=8
   (( limit < 1 )) && limit=1
   mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
   case "$mode" in
-    safe|parked) ;;
+    auto|safe|parked) ;;
     *)
       error "Unsupported rebalance mode: ${mode}"
       return 1
@@ -604,23 +604,27 @@ self_perf_rebalance_handler() {
   local changed=()
   local skipped=()
   local applied=0
-  local entry current domain profile current_mode target_children reduction php_version pool_file
+  local entry current domain profile current_mode usage_class suggested_mode target_children reduction php_version pool_file apply_mode
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
-    IFS='|' read -r current domain profile current_mode _safe_target _reduction php_version pool_file <<<"$entry"
+    IFS='|' read -r current domain profile current_mode usage_class suggested_mode _target _reduction php_version pool_file <<<"$entry"
     [[ "$domain" == *.* ]] || continue
-    target_children=$(perf_site_mode_target_children "$profile" "$mode")
+    apply_mode="$mode"
+    if [[ "$apply_mode" == "auto" ]]; then
+      apply_mode="$suggested_mode"
+    fi
+    target_children=$(perf_site_mode_target_children "$profile" "$apply_mode")
     [[ -n "$target_children" && "$target_children" =~ ^[0-9]+$ ]] || continue
     if (( current <= target_children )); then
-      skipped+=("${domain}|already within ${mode}")
+      skipped+=("${domain}|already within ${apply_mode} (usage=${usage_class})")
       continue
     fi
-    if site_perf_tune_handler --domain "$domain" --mode "$mode" --confirm yes >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
+    if site_perf_tune_handler --domain "$domain" --mode "$apply_mode" --confirm yes >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1; then
       reduction=$(( current - target_children ))
-      changed+=("${domain}|${current} -> ${target_children} (${profile}, php ${php_version}, reduce ${reduction})")
+      changed+=("${domain}|${current} -> ${target_children} (${profile}, usage=${usage_class}, mode=${apply_mode}, php ${php_version}, reduce ${reduction})")
       applied=$((applied + 1))
     else
-      skipped+=("${domain}|apply failed")
+      skipped+=("${domain}|apply failed (${apply_mode})")
     fi
     (( applied >= limit )) && break
   done < <(perf_fpm_top_pools "$limit")

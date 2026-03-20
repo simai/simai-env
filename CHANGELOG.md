@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.51] - 2026-03-20
+### Changed
+- `self perf-plan`, `self perf-rebalance --mode auto`, and the scheduler `auto_optimize` job now honor the user-facing site usage class so high-traffic sites are reduced more conservatively while rarely used sites are parked first.
+
 ## [1.11.50] - 2026-03-20
 ### Added
 - Added a simple user-facing site usage layer (`standard`, `high-traffic`, `rarely-used`) with `site usage-status` / `site usage-set`, plus automatic usage selection during `site add`.

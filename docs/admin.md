@@ -46,8 +46,8 @@ See `docs/architecture/profiles.md`.
 - `self scheduler-enable --job all|auto-optimize` / `self scheduler-disable --job all|auto-optimize`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
 - `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
 - `self perf-status`: show current managed performance baseline, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
-- `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus the `safe` / `parked` floor for the full server footprint.
-- `self perf-rebalance --limit <n> --mode safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches.
+- `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
+- `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
 - `site perf-tune --domain <domain> --mode parked|safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
@@ -64,7 +64,11 @@ See `docs/architecture/profiles.md`.
 - The cron entry stays stable and always calls `simai-admin.sh self scheduler`.
 - Individual background capabilities are enabled/disabled inside simai-env, not by editing cron lines.
 - Current built-in job:
-  - `auto_optimize`: policy-driven performance maintenance for oversubscribed PHP-FPM servers.
+- `auto_optimize`: policy-driven performance maintenance for oversubscribed PHP-FPM servers.
+- `auto_optimize` now uses usage-aware targets by default:
+  - `standard` -> `safe`
+  - `high-traffic` -> `balanced`
+  - `rarely-used` -> `parked`
 - Managed config keys in `/etc/simai-env.conf`:
   - `SIMAI_SCHEDULER_ENABLED=yes|no`
   - `SIMAI_AUTO_OPTIMIZE_ENABLED=yes|no`
@@ -72,7 +76,7 @@ See `docs/architecture/profiles.md`.
   - `SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES=<n>`
   - `SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES=<n>`
   - `SIMAI_AUTO_OPTIMIZE_LIMIT=<n>`
-  - `SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE=safe|parked`
+  - `SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE=auto|safe|parked`
 
 ## Non-Interactive Contract
 Use this section when running commands from automation (CI, cron, deploy scripts).

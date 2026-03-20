@@ -553,6 +553,16 @@ site_usage_class_to_perf_mode() {
   esac
 }
 
+site_usage_class_to_rebalance_mode() {
+  local usage
+  usage=$(site_usage_class_normalize "${1:-standard}") || return 1
+  case "$usage" in
+    standard) echo "safe" ;;
+    high-traffic) echo "balanced" ;;
+    rarely-used) echo "parked" ;;
+  esac
+}
+
 perf_site_mode_target_children() {
   local profile="$1" mode="$2"
   local entry
@@ -574,6 +584,7 @@ perf_fpm_top_pools() {
   declare -A domain_map=()
   declare -A profile_map=()
   declare -A mode_map=()
+  declare -A usage_map=()
   local domain socket_project profile project
   while IFS= read -r domain; do
     [[ -z "$domain" ]] && continue
@@ -587,10 +598,11 @@ perf_fpm_top_pools() {
     domain_map["$socket_project"]="$domain"
     profile_map["$socket_project"]="$profile"
     mode_map["$socket_project"]="$(perf_site_mode_get "$domain")"
+    usage_map["$socket_project"]="$(site_usage_class_get "$domain")"
   done < <(list_sites 2>/dev/null || true)
 
   local rows=()
-  local file pool_name current php_version mapped_domain mapped_profile managed_mode safe_target reduction
+  local file pool_name current php_version mapped_domain mapped_profile managed_mode usage_class suggested_mode target_children reduction
   shopt -s nullglob
   for file in /etc/php/*/fpm/pool.d/*.conf; do
     [[ -f "$file" ]] || continue
@@ -602,13 +614,15 @@ perf_fpm_top_pools() {
     mapped_domain="${domain_map[$pool_name]:-$pool_name}"
     mapped_profile="${profile_map[$pool_name]:-unknown}"
     managed_mode="${mode_map[$pool_name]:-none}"
-    safe_target=$(perf_site_mode_target_children "$mapped_profile" "safe")
-    [[ -n "$safe_target" && "$safe_target" =~ ^[0-9]+$ ]] || safe_target=0
+    usage_class="${usage_map[$pool_name]:-standard}"
+    suggested_mode=$(site_usage_class_to_rebalance_mode "$usage_class")
+    target_children=$(perf_site_mode_target_children "$mapped_profile" "$suggested_mode")
+    [[ -n "$target_children" && "$target_children" =~ ^[0-9]+$ ]] || target_children=0
     reduction=0
-    if (( current > safe_target && safe_target > 0 )); then
-      reduction=$(( current - safe_target ))
+    if (( current > target_children && target_children > 0 )); then
+      reduction=$(( current - target_children ))
     fi
-    rows+=("${current}|${mapped_domain}|${mapped_profile}|${managed_mode}|${safe_target}|${reduction}|${php_version}|${file}")
+    rows+=("${current}|${mapped_domain}|${mapped_profile}|${managed_mode}|${usage_class}|${suggested_mode}|${target_children}|${reduction}|${php_version}|${file}")
   done
   shopt -u nullglob
 

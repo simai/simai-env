@@ -61,7 +61,7 @@ scheduler_install_defaults() {
     "${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}" \
     "${SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES:-60}" \
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
-    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-safe}"
+    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}"
 }
 
 scheduler_write_config() {
@@ -71,7 +71,7 @@ scheduler_write_config() {
   local auto_interval="${4:-5}"
   local auto_cooldown="${5:-60}"
   local auto_limit="${6:-3}"
-  local auto_rebalance_mode="${7:-safe}"
+  local auto_rebalance_mode="${7:-auto}"
   local file content
   file=$(scheduler_config_file)
   content=$(cat <<EOF
@@ -211,8 +211,8 @@ scheduler_job_rebalance_mode() {
       local value="${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-safe}"
       value=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
       case "$value" in
-        safe|parked) echo "$value" ;;
-        *) echo "safe" ;;
+        auto|safe|parked) echo "$value" ;;
+        *) echo "auto" ;;
       esac
       ;;
   esac
