@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.61] - 2026-03-20
+### Changed
+- The regular Laravel and System menus now use clearer user-facing labels such as `Enable scheduler`, `Optimization status`, and `Optimization recommendations`, while keeping low-level controls in Advanced mode.
+
 ## [1.11.60] - 2026-03-20
 ### Changed
 - Optimization status screens now use clearer everyday labels such as `Server optimization status`, `Optimization mode`, `Active preset`, and `Default site settings`.

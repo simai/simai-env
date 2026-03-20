@@ -619,27 +619,27 @@ actsellistbox=black,cyan
     while true; do
       local -a items=(
         "1|Clear cache"
-        "2|Scheduler add (schedule:run)"
-        "3|Scheduler remove (schedule:run)"
+        "2|Enable scheduler (schedule:run)"
+        "3|Disable scheduler (schedule:run)"
         "4|Worker status"
         "5|Worker restart"
         "6|Worker logs"
         "7|WordPress status"
-        "8|WordPress cron status"
-        "9|WordPress cron sync"
+        "8|WordPress scheduler status"
+        "9|WordPress scheduler sync"
         "10|WordPress cache clear"
         "11|Bitrix status"
-        "12|Bitrix cron status"
-        "13|Bitrix cron sync"
+        "12|Bitrix scheduler status"
+        "13|Bitrix scheduler sync"
         "14|Bitrix cache clear"
         "15|Bitrix agents status"
-        "16|Bitrix agents sync (plan)"
+        "16|Bitrix agents readiness"
         "17|Bitrix DB preseed"
         "18|Bitrix installer ready"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Clear cache" "2|Scheduler add (schedule:run)" "3|Scheduler remove (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress cron status" "9|WordPress cron sync" "10|WordPress cache clear" "11|Bitrix status" "12|Bitrix cron status" "13|Bitrix cron sync" "14|Bitrix cache clear" "15|Bitrix agents status" "16|Bitrix agents sync (plan)" "17|Bitrix DB preseed" "18|Bitrix installer ready" "19|Bitrix PHP baseline sync (all)" "20|Bitrix agents sync (apply)" "0|Back")
+        items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress scheduler status" "9|WordPress scheduler sync" "10|WordPress cache clear" "11|Bitrix status" "12|Bitrix scheduler status" "13|Bitrix scheduler sync" "14|Bitrix cache clear" "15|Bitrix agents status" "16|Bitrix agents readiness" "17|Bitrix DB preseed" "18|Bitrix installer ready" "19|Bitrix PHP baseline sync (all)" "20|Bitrix agents sync (apply)" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
@@ -721,9 +721,9 @@ actsellistbox=black,cyan
       local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
       local -a items=(
         "1|System status"
-        "2|Performance status"
+        "2|Optimization status"
         "3|${auto_opt_label}"
-        "4|Server optimization plan"
+        "4|Optimization recommendations"
         "5|Repair environment"
         "6|Update simai-env"
         "7|Version"
@@ -732,7 +732,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|System status" "2|Performance status" "3|${auto_opt_label}" "4|Server optimization plan" "5|Apply server optimization" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "0|Back")
+        items=("1|System status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization recommendations" "5|Apply optimization recommendations" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
