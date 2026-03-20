@@ -157,6 +157,32 @@ Behavior:
 - Applies the mapped pool governance immediately for PHP sites.
 - Non-PHP profiles still store the usage class so future tooling can respect the same user intent.
 
+## auto-optimize-status
+Show whether a site participates in automatic optimization.
+
+Options:
+- `--domain` (required outside menu)
+
+Output includes:
+- effective automatic optimization state
+- current site-level override (`inherit`, `yes`, `no`)
+- usage class and mapped performance mode
+- runtime state
+
+## auto-optimize-enable / auto-optimize-disable / auto-optimize-reset
+Control the per-site automatic optimization override.
+
+Options:
+- `--domain` (required outside menu)
+- `--confirm` (`yes|no`, default `no`; required outside menu)
+
+Behavior:
+- Stores `auto_optimize` in `/etc/simai-env/sites/<domain>/perf.env`.
+- `enable` forces the site to participate in automatic optimization when the global scheduler job is enabled.
+- `disable` excludes the site from scheduler-driven `auto` rebalance actions.
+- `reset` removes the explicit decision and returns the site to the global default (`inherit`).
+- Manual commands like `site perf-tune` still work even when automatic optimization is disabled for the site.
+
 ## runtime-status
 Show whether a site runtime is active or suspended.
 

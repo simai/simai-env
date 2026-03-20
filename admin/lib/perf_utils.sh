@@ -543,6 +543,45 @@ site_usage_class_get() {
   echo "standard"
 }
 
+site_auto_optimize_state_normalize() {
+  local raw="${1:-inherit}"
+  raw=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+  case "$raw" in
+    ""|inherit|default|auto) echo "inherit" ;;
+    yes|enabled|enable|on) echo "yes" ;;
+    no|disabled|disable|off) echo "no" ;;
+    *) return 1 ;;
+  esac
+}
+
+site_auto_optimize_state_get() {
+  local domain="$1"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry%%|*}" == "auto_optimize" ]]; then
+      local value="${entry#*|}"
+      site_auto_optimize_state_normalize "$value" && return 0
+    fi
+  done < <(read_site_perf_settings "$domain")
+  echo "inherit"
+}
+
+site_auto_optimize_effective_enabled() {
+  local domain="$1"
+  local global_enabled site_state
+  global_enabled="$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+  [[ "$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" == "yes" ]] || global_enabled="no"
+  site_state="$(site_auto_optimize_state_get "$domain")"
+  case "$site_state" in
+    no) echo "no" ;;
+    yes) [[ "$global_enabled" == "yes" ]] && echo "yes" || echo "no (global off)" ;;
+    *)
+      [[ "$global_enabled" == "yes" ]] && echo "yes (inherit)" || echo "no (global off)"
+      ;;
+  esac
+}
+
 site_usage_class_to_perf_mode() {
   local usage
   usage=$(site_usage_class_normalize "${1:-standard}") || return 1
@@ -585,6 +624,7 @@ perf_fpm_top_pools() {
   declare -A profile_map=()
   declare -A mode_map=()
   declare -A usage_map=()
+  declare -A auto_optimize_map=()
   local domain socket_project profile project
   while IFS= read -r domain; do
     [[ -z "$domain" ]] && continue
@@ -599,10 +639,11 @@ perf_fpm_top_pools() {
     profile_map["$socket_project"]="$profile"
     mode_map["$socket_project"]="$(perf_site_mode_get "$domain")"
     usage_map["$socket_project"]="$(site_usage_class_get "$domain")"
+    auto_optimize_map["$socket_project"]="$(site_auto_optimize_state_get "$domain")"
   done < <(list_sites 2>/dev/null || true)
 
   local rows=()
-  local file pool_name current php_version mapped_domain mapped_profile managed_mode usage_class suggested_mode target_children reduction
+  local file pool_name current php_version mapped_domain mapped_profile managed_mode usage_class auto_optimize_state suggested_mode target_children reduction
   shopt -s nullglob
   for file in /etc/php/*/fpm/pool.d/*.conf; do
     [[ -f "$file" ]] || continue
@@ -615,6 +656,7 @@ perf_fpm_top_pools() {
     mapped_profile="${profile_map[$pool_name]:-unknown}"
     managed_mode="${mode_map[$pool_name]:-none}"
     usage_class="${usage_map[$pool_name]:-standard}"
+    auto_optimize_state="${auto_optimize_map[$pool_name]:-inherit}"
     suggested_mode=$(site_usage_class_to_rebalance_mode "$usage_class")
     target_children=$(perf_site_mode_target_children "$mapped_profile" "$suggested_mode")
     [[ -n "$target_children" && "$target_children" =~ ^[0-9]+$ ]] || target_children=0
@@ -622,7 +664,7 @@ perf_fpm_top_pools() {
     if (( current > target_children && target_children > 0 )); then
       reduction=$(( current - target_children ))
     fi
-    rows+=("${current}|${mapped_domain}|${mapped_profile}|${managed_mode}|${usage_class}|${suggested_mode}|${target_children}|${reduction}|${php_version}|${file}")
+    rows+=("${current}|${mapped_domain}|${mapped_profile}|${managed_mode}|${usage_class}|${auto_optimize_state}|${suggested_mode}|${target_children}|${reduction}|${php_version}|${file}")
   done
   shopt -u nullglob
 
@@ -720,6 +762,45 @@ write_site_perf_settings() {
     rm -f "$tmp"
     rm -f "$file"
   fi
+}
+
+write_site_perf_settings_merged() {
+  local domain="$1"
+  shift
+  declare -A kv=()
+  local entry key
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    kv["${entry%%|*}"]="${entry#*|}"
+  done < <(read_site_perf_settings "$domain")
+
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    key="${entry%%|*}"
+    kv["$key"]="${entry#*|}"
+  done
+
+  local ordered=()
+  local known_keys=(
+    mode
+    usage_class
+    auto_optimize
+    pm
+    pm.max_children
+    pm.process_idle_timeout
+    pm.max_requests
+    request_terminate_timeout
+  )
+  for key in "${known_keys[@]}"; do
+    [[ -n "${kv[$key]:-}" ]] || continue
+    ordered+=("${key}|${kv[$key]}")
+    unset 'kv[$key]'
+  done
+  for key in $(printf '%s\n' "${!kv[@]}" | sort); do
+    [[ -n "${kv[$key]:-}" ]] || continue
+    ordered+=("${key}|${kv[$key]}")
+  done
+  write_site_perf_settings "$domain" "${ordered[@]}"
 }
 
 perf_pool_directive_get() {

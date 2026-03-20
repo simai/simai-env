@@ -342,6 +342,25 @@ actsellistbox=black,cyan
         "10|Remove site"
         "0|Back"
       )
+      if [[ $show_advanced -eq 1 ]]; then
+        items=(
+          "1|List sites"
+          "2|Create site"
+          "3|Site info"
+          "4|Usage status"
+          "5|Set usage class"
+          "6|Auto optimization status"
+          "7|Disable auto optimization"
+          "8|Enable auto optimization"
+          "9|Reset auto optimization"
+          "10|Runtime status"
+          "11|Suspend site runtime"
+          "12|Resume site runtime"
+          "13|Change site PHP"
+          "14|Remove site"
+          "0|Back"
+        )
+      fi
       local ch=""
       ch=$(menu_choose_key "Sites" "Enter choice" "" "${items[@]}")
       case "$ch" in
@@ -350,11 +369,69 @@ actsellistbox=black,cyan
         3) run_menu_command site info ;;
         4) run_menu_command site usage-status ;;
         5) run_menu_command site usage-set ;;
-        6) run_menu_command site runtime-status ;;
-        7) run_menu_command site runtime-suspend ;;
-        8) run_menu_command site runtime-resume ;;
-        9) run_menu_command site set-php ;;
-        10) run_menu_command site remove ;;
+        6)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site auto-optimize-status
+          else
+            run_menu_command site runtime-status
+          fi
+          ;;
+        7)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site auto-optimize-disable
+          else
+            run_menu_command site runtime-suspend
+          fi
+          ;;
+        8)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site auto-optimize-enable
+          else
+            run_menu_command site runtime-resume
+          fi
+          ;;
+        9)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site auto-optimize-reset
+          else
+            run_menu_command site set-php
+          fi
+          ;;
+        10)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site runtime-status
+          else
+            run_menu_command site remove
+          fi
+          ;;
+        11)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site runtime-suspend
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        12)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site runtime-resume
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        13)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site set-php
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        14)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command site remove
+          else
+            menu_invalid_choice
+          fi
+          ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

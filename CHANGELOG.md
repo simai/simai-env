@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.54] - 2026-03-20
+### Added
+- Added per-site automatic optimization overrides with `site auto-optimize-status`, `site auto-optimize-enable`, `site auto-optimize-disable`, and `site auto-optimize-reset`.
+### Changed
+- Usage-aware `auto` rebalance now skips sites that explicitly disable automatic optimization, and the Sites menu exposes those overrides in Advanced mode.
+
 ## [1.11.53] - 2026-03-20
 ### Added
 - Added simple `self auto-optimize-status`, `self auto-optimize-enable`, and `self auto-optimize-disable` commands so ordinary users can manage automatic optimization without dealing with scheduler internals.

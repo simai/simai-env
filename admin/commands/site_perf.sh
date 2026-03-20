@@ -73,13 +73,13 @@ site_usage_apply_class() {
       return 1
     fi
     settings+=("usage_class|${usage_class}")
-    write_site_perf_settings "$domain" "${settings[@]}"
+    write_site_perf_settings_merged "$domain" "${settings[@]}"
     if ! validate_project_slug "$socket_project"; then
       socket_project="$(project_slug_from_domain "$domain")"
     fi
     apply_site_perf_settings_to_pool "$domain" "$php_version" "$socket_project" || return 1
   else
-    write_site_perf_settings "$domain" "usage_class|${usage_class}"
+    write_site_perf_settings_merged "$domain" "usage_class|${usage_class}"
   fi
   return 0
 }
@@ -112,6 +112,9 @@ site_perf_status_handler() {
   runtime_state=$(site_runtime_state "$domain")
   local usage_class
   usage_class=$(site_usage_class_get "$domain")
+  local auto_optimize_state auto_optimize_effective
+  auto_optimize_state=$(site_auto_optimize_state_get "$domain")
+  auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
 
   declare -A perf_settings=()
   local entry
@@ -182,6 +185,8 @@ site_perf_status_handler() {
     "Domain|${domain}" \
     "Profile|${profile}" \
     "Usage class|${usage_class}" \
+    "Automatic optimization|${auto_optimize_effective}" \
+    "Site auto optimize override|${auto_optimize_state}" \
     "Runtime state|${runtime_state}" \
     "Managed mode|${mode}" \
     "PHP|${php_version}" \
@@ -259,7 +264,7 @@ site_perf_tune_handler() {
     return 1
   fi
 
-  write_site_perf_settings "$domain" "${settings[@]}"
+  write_site_perf_settings_merged "$domain" "${settings[@]}"
   if ! validate_project_slug "$socket_project"; then
     socket_project="$(project_slug_from_domain "$domain")"
   fi
@@ -289,6 +294,9 @@ site_usage_status_handler() {
   usage_class=$(site_usage_class_get "$domain")
   perf_mode=$(site_usage_class_to_perf_mode "$usage_class")
   runtime_state=$(site_runtime_state "$domain")
+  local auto_optimize_state auto_optimize_effective
+  auto_optimize_state=$(site_auto_optimize_state_get "$domain")
+  auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
 
   ui_header "SIMAI ENV · Site usage"
   ui_section "Result"
@@ -296,6 +304,8 @@ site_usage_status_handler() {
     "Domain|${domain}" \
     "Usage class|${usage_class}" \
     "Mapped perf mode|${perf_mode}" \
+    "Automatic optimization|${auto_optimize_effective}" \
+    "Site auto optimize override|${auto_optimize_state}" \
     "Runtime state|${runtime_state}"
   ui_section "Next steps"
   ui_kv "Set standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
@@ -334,7 +344,102 @@ site_usage_set_handler() {
   ui_kv "Review performance" "simai-admin.sh site perf-status --domain ${domain}"
 }
 
+site_auto_optimize_status_handler() {
+  parse_kv_args "$@"
+  local domain
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+
+  local usage_class perf_mode runtime_state auto_optimize_state auto_optimize_effective
+  usage_class=$(site_usage_class_get "$domain")
+  perf_mode=$(site_usage_class_to_perf_mode "$usage_class")
+  runtime_state=$(site_runtime_state "$domain")
+  auto_optimize_state=$(site_auto_optimize_state_get "$domain")
+  auto_optimize_effective=$(site_auto_optimize_effective_enabled "$domain")
+
+  ui_header "SIMAI ENV · Site automatic optimization"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Automatic optimization|${auto_optimize_effective}" \
+    "Site override|${auto_optimize_state}" \
+    "Usage class|${usage_class}" \
+    "Mapped perf mode|${perf_mode}" \
+    "Runtime state|${runtime_state}"
+  ui_section "Next steps"
+  ui_kv "Enable for site" "simai-admin.sh site auto-optimize-enable --domain ${domain} --confirm yes"
+  ui_kv "Disable for site" "simai-admin.sh site auto-optimize-disable --domain ${domain} --confirm yes"
+  ui_kv "Reset to inherit" "simai-admin.sh site auto-optimize-reset --domain ${domain} --confirm yes"
+}
+
+site_auto_optimize_write_override() {
+  local domain="$1" value="$2"
+  value=$(site_auto_optimize_state_normalize "$value") || {
+    error "Unsupported site automatic optimization override: ${value}"
+    return 1
+  }
+  write_site_perf_settings_merged "$domain" "auto_optimize|${value}"
+}
+
+site_auto_optimize_enable_handler() {
+  parse_kv_args "$@"
+  local domain confirm
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+  confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to update site automatic optimization"
+    return 1
+  fi
+  site_auto_optimize_write_override "$domain" "yes" || return 1
+  ui_success "Site automatic optimization enabled"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Site override|yes" \
+    "Effective state|$(site_auto_optimize_effective_enabled "$domain")"
+}
+
+site_auto_optimize_disable_handler() {
+  parse_kv_args "$@"
+  local domain confirm
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+  confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to update site automatic optimization"
+    return 1
+  fi
+  site_auto_optimize_write_override "$domain" "no" || return 1
+  ui_success "Site automatic optimization disabled"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Site override|no" \
+    "Effective state|$(site_auto_optimize_effective_enabled "$domain")"
+}
+
+site_auto_optimize_reset_handler() {
+  parse_kv_args "$@"
+  local domain confirm
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+  confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to reset site automatic optimization override"
+    return 1
+  fi
+  site_auto_optimize_write_override "$domain" "inherit" || return 1
+  ui_success "Site automatic optimization reset to inherit"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Site override|inherit" \
+    "Effective state|$(site_auto_optimize_effective_enabled "$domain")"
+}
+
 register_cmd "site" "perf-status" "Show per-site performance/runtime governance" "site_perf_status_handler" "" "domain="
 register_cmd "site" "perf-tune" "Apply per-site FPM governance mode" "site_perf_tune_handler" "" "domain= mode= confirm="
 register_cmd "site" "usage-status" "Show user-facing site usage class" "site_usage_status_handler" "" "domain="
 register_cmd "site" "usage-set" "Set user-facing site usage class" "site_usage_set_handler" "" "domain= class= usage= confirm="
+register_cmd "site" "auto-optimize-status" "Show per-site automatic optimization status" "site_auto_optimize_status_handler" "" "domain="
+register_cmd "site" "auto-optimize-enable" "Enable automatic optimization for one site" "site_auto_optimize_enable_handler" "" "domain= confirm="
+register_cmd "site" "auto-optimize-disable" "Disable automatic optimization for one site" "site_auto_optimize_disable_handler" "" "domain= confirm="
+register_cmd "site" "auto-optimize-reset" "Reset site automatic optimization to inherit" "site_auto_optimize_reset_handler" "" "domain= confirm="
