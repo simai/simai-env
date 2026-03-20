@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.66] - 2026-03-20
+### Changed
+- `site availability` and `db list` now use more consistent everyday labels and structured output, keeping scheduler/worker terminology aligned across daily status screens.
+
 ## [1.11.65] - 2026-03-20
 ### Changed
 - `site info`, `ssl status`, and backup archive errors now use more consistent everyday wording and give clearer follow-up actions for ordinary users.

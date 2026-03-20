@@ -110,11 +110,11 @@ site_runtime_status_handler() {
     "Profile|${profile}" \
     "Availability|${state}" \
     "PHP pool|${pool_state}" \
-    "Cron file|${cron_file_state}" \
+    "Scheduler file|${cron_file_state}" \
     "Queue unit|${queue_unit}" \
     "Queue status|${queue_unit_state}" \
-    "Runtime cron policy|${cron_state}" \
-    "Runtime queue policy|${queue_state}"
+    "Scheduler policy|${cron_state}" \
+    "Worker policy|${queue_state}"
   ui_section "Next steps"
   ui_kv "Suspend" "simai-admin.sh site runtime-suspend --domain ${domain} --confirm yes"
   ui_kv "Resume" "simai-admin.sh site runtime-resume --domain ${domain} --confirm yes"

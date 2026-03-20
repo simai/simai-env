@@ -252,13 +252,15 @@ db_list_handler() {
     return 0
   fi
   ui_section "Result"
-  echo "Databases:"
+  local -a rows=()
   while IFS= read -r db; do
     [[ -z "$db" ]] && continue
-    echo " - ${db}"
+    rows+=("${db}|present")
   done <<<"$dbs"
+  print_kv_table "${rows[@]}"
   ui_section "Next steps"
   ui_kv "Service status" "simai-admin.sh db status"
+  ui_kv "Platform diagnostics" "simai-admin.sh self platform-status"
 }
 
 register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" "" "menu:hidden"
