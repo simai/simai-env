@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.53] - 2026-03-20
+### Added
+- Added simple `self auto-optimize-status`, `self auto-optimize-enable`, and `self auto-optimize-disable` commands so ordinary users can manage automatic optimization without dealing with scheduler internals.
+### Changed
+- System menu now exposes automatic optimization as a simple global toggle, while scheduler diagnostics remain in Advanced mode.
+
 ## [1.11.52] - 2026-03-20
 ### Fixed
 - Scheduler config persistence now keeps the new usage-aware `auto` rebalance default instead of falling back to the older `safe` default.

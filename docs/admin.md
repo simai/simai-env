@@ -45,6 +45,8 @@ See `docs/architecture/profiles.md`.
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
 - `self scheduler-enable --job all|auto-optimize` / `self scheduler-disable --job all|auto-optimize`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
 - `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
+- `self auto-optimize-status`: show the simple user-facing automatic optimization state without exposing low-level scheduler details.
+- `self auto-optimize-enable` / `self auto-optimize-disable`: turn automatic optimization on or off globally while leaving the shared scheduler infrastructure in place.
 - `self perf-status`: show current managed performance baseline, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
@@ -63,6 +65,7 @@ See `docs/architecture/profiles.md`.
 - Bootstrap now installs one shared cron entry: `/etc/cron.d/simai-scheduler`.
 - The cron entry stays stable and always calls `simai-admin.sh self scheduler`.
 - Individual background capabilities are enabled/disabled inside simai-env, not by editing cron lines.
+- Ordinary users can treat this as one switch via `self auto-optimize-enable` / `self auto-optimize-disable`; Advanced mode still exposes scheduler details and manual job control.
 - Current built-in job:
 - `auto_optimize`: policy-driven performance maintenance for oversubscribed PHP-FPM servers.
 - `auto_optimize` now uses usage-aware targets by default:

@@ -826,11 +826,79 @@ self_scheduler_run_handler() {
   scheduler_run_job "$job"
 }
 
+self_auto_optimize_status_handler() {
+  ui_header "SIMAI ENV · Automatic optimization"
+
+  local enabled mode interval cooldown limit rebalance cron_state
+  enabled=$(scheduler_job_enabled "auto_optimize")
+  mode=$(scheduler_job_mode "auto_optimize")
+  interval=$(scheduler_job_interval_minutes "auto_optimize")
+  cooldown=$(scheduler_job_cooldown_minutes "auto_optimize")
+  limit=$(scheduler_job_limit "auto_optimize")
+  rebalance=$(scheduler_job_rebalance_mode "auto_optimize")
+  cron_state="missing"
+  [[ -f "$(scheduler_cron_file)" ]] && cron_state="installed"
+
+  local last_run last_action last_status last_message
+  last_run=$(scheduler_job_state_get "auto_optimize" "last_run_epoch" 2>/dev/null || true)
+  last_action=$(scheduler_job_state_get "auto_optimize" "last_action_epoch" 2>/dev/null || true)
+  last_status=$(scheduler_job_state_get "auto_optimize" "last_status" 2>/dev/null || true)
+  last_message=$(scheduler_job_state_get "auto_optimize" "last_message" 2>/dev/null || true)
+  [[ -z "$last_run" ]] && last_run="never"
+  [[ -z "$last_action" ]] && last_action="never"
+  [[ -z "$last_status" ]] && last_status="n/a"
+  [[ -z "$last_message" ]] && last_message="n/a"
+
+  ui_section "Result"
+  print_kv_table \
+    "Automatic optimization|${enabled}" \
+    "Mode|${mode}" \
+    "Shared scheduler cron|${cron_state}" \
+    "Interval|${interval}m" \
+    "Cooldown|${cooldown}m" \
+    "Batch size|${limit}" \
+    "Rebalance policy|${rebalance}" \
+    "Last run|$(scheduler_epoch_human "$last_run")" \
+    "Last action|$(scheduler_epoch_human "$last_action")" \
+    "Last status|${last_status}" \
+    "Last message|${last_message}"
+  ui_section "Next steps"
+  if [[ "$enabled" == "yes" ]]; then
+    ui_kv "Turn off" "simai-admin.sh self auto-optimize-disable"
+  else
+    ui_kv "Turn on" "simai-admin.sh self auto-optimize-enable"
+  fi
+  ui_kv "Advanced status" "simai-admin.sh self scheduler-status"
+}
+
+self_auto_optimize_enable_handler() {
+  SIMAI_AUTO_OPTIMIZE_ENABLED="yes"
+  self_scheduler_persist_config
+  ui_success "Automatic optimization enabled"
+  print_kv_table \
+    "Automatic optimization|yes" \
+    "Mode|$(scheduler_job_mode "auto_optimize")" \
+    "Rebalance policy|$(scheduler_job_rebalance_mode "auto_optimize")"
+}
+
+self_auto_optimize_disable_handler() {
+  SIMAI_AUTO_OPTIMIZE_ENABLED="no"
+  self_scheduler_persist_config
+  ui_success "Automatic optimization disabled"
+  print_kv_table \
+    "Automatic optimization|no" \
+    "Mode|$(scheduler_job_mode "auto_optimize")" \
+    "Rebalance policy|$(scheduler_job_rebalance_mode "auto_optimize")"
+}
+
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
+register_cmd "self" "auto-optimize-status" "Show simple automatic optimization status" "self_auto_optimize_status_handler" "" ""
+register_cmd "self" "auto-optimize-enable" "Enable simple automatic optimization" "self_auto_optimize_enable_handler" "" ""
+register_cmd "self" "auto-optimize-disable" "Disable simple automatic optimization" "self_auto_optimize_disable_handler" "" ""
 register_cmd "self" "scheduler" "Run the internal simai scheduler tick" "self_scheduler_handler" "" ""
 register_cmd "self" "scheduler-status" "Show internal scheduler status" "self_scheduler_status_handler" "" ""
 register_cmd "self" "scheduler-enable" "Enable scheduler globally or by job" "self_scheduler_enable_handler" "" "job="

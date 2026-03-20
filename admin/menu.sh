@@ -644,48 +644,63 @@ actsellistbox=black,cyan
     while true; do
       local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
+      local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
       local -a items=(
         "1|System status"
         "2|Performance status"
-        "3|FPM reduction plan"
-        "4|Repair environment"
-        "5|Update simai-env"
-        "6|Version"
-        "7|${adv_label}"
-        "8|${backend_label}"
+        "3|${auto_opt_label}"
+        "4|FPM reduction plan"
+        "5|Repair environment"
+        "6|Update simai-env"
+        "7|Version"
+        "8|${adv_label}"
+        "9|${backend_label}"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|System status" "2|Performance status" "3|FPM reduction plan" "4|FPM rebalance (safe)" "5|Repair environment" "6|Update simai-env" "7|Version" "8|${adv_label}" "9|${backend_label}" "0|Back")
+        items=("1|System status" "2|Performance status" "3|${auto_opt_label}" "4|FPM reduction plan" "5|FPM rebalance (auto)" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command self status ;;
         2) run_menu_command self perf-status ;;
-        3) run_menu_command self perf-plan ;;
+        3)
+          if [[ "$(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no)" == "yes" ]]; then
+            run_menu_command self auto-optimize-disable
+          else
+            run_menu_command self auto-optimize-enable
+          fi
+          ;;
         4)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self perf-rebalance --mode safe --confirm yes
+            run_menu_command self perf-plan
+          else
+            run_menu_command self perf-plan
+          fi
+          ;;
+        5)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self perf-rebalance --mode auto --confirm yes
           else
             run_menu_command self bootstrap
           fi
           ;;
-        5)
+        6)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self bootstrap
           else
             run_menu_command self update
           fi
           ;;
-        6)
+        7)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self update
           else
             run_menu_command self version
           fi
           ;;
-        7)
+        8)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self version
           else
@@ -693,7 +708,7 @@ actsellistbox=black,cyan
             export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
           fi
           ;;
-        8)
+        9)
           if [[ $show_advanced -eq 1 ]]; then
             show_advanced=0
             export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
@@ -710,7 +725,7 @@ actsellistbox=black,cyan
             fi
           fi
           ;;
-        9)
+        10)
           if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
             export SIMAI_MENU_BACKEND="text"
           else
@@ -720,6 +735,13 @@ actsellistbox=black,cyan
             else
               warn "whiptail is not installed; backend stays text."
             fi
+          fi
+          ;;
+        11)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self scheduler-status
+          else
+            menu_invalid_choice
           fi
           ;;
         0) break ;;
