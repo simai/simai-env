@@ -903,7 +903,7 @@ site_remove_handler() {
     else
       mode_desc="apply"
     fi
-    echo "===== Site remove plan (dry-run) ====="
+    echo "===== Site remove plan (${mode_desc}) ====="
     echo "Domain     : ${domain}"
     echo "Profile    : ${profile}"
     echo "Mode       : ${mode_desc}"

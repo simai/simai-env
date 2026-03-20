@@ -396,12 +396,12 @@ bitrix_agents_status_handler() {
     "dbconn.php|${dbconn_state}" \
     "BX_CRONTAB|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT|${bx_crontab_support}" \
-    "Cron file|${BX_CRON_FILE} (${cron_file_state})" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}" \
-    "Cron entry (cron_events.php)|${cron_entry_match}" \
-    "Agents via cron ready|${ready}"
+    "Scheduler file|${BX_CRON_FILE} (${cron_file_state})" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}" \
+    "Scheduler entry (cron_events.php)|${cron_entry_match}" \
+    "Agents via scheduler|${ready}"
   ui_section "Next steps"
   ui_kv "Plan sync" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN}"
   ui_kv "Apply sync" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN} --apply yes --confirm yes"
@@ -444,7 +444,7 @@ bitrix_agents_sync_handler() {
     "dbconn.php|${BX_DBCONN_FILE} (${dbconn_state})" \
     "BX_CRONTAB current|${bx_crontab}" \
     "BX_CRONTAB_SUPPORT current|${bx_crontab_support}" \
-    "Cron target|${BX_CRON_FILE}" \
+    "Scheduler target|${BX_CRON_FILE}" \
     "Apply mode|${apply}"
 
   if [[ "$apply" != "yes" ]]; then
@@ -494,11 +494,11 @@ bitrix_agents_sync_handler() {
     "dbconn backup|${backup}" \
     "BX_CRONTAB|$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")" \
     "BX_CRONTAB_SUPPORT|$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB_SUPPORT")" \
-    "Cron file|${BX_CRON_FILE}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}" \
-    "Cron entry (cron_events.php)|${cron_entry_match}"
+    "Scheduler file|${BX_CRON_FILE}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}" \
+    "Scheduler entry (cron_events.php)|${cron_entry_match}"
   ui_section "Next steps"
   ui_kv "Verify" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
