@@ -320,6 +320,7 @@ site_add_handler() {
   local project="${PARSED_ARGS[project-name]:-}"
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
+  local usage_class="${PARSED_ARGS[usage]:-${SIMAI_SITE_USAGE_DEFAULT:-}}"
   local ssl_mode="${PARSED_ARGS[ssl]:-${SIMAI_SSL_AUTO_ISSUE_ON_CREATE:-no}}"
   local ssl_email="${PARSED_ARGS[ssl-email]:-${SIMAI_SSL_LE_EMAIL_DEFAULT:-}}"
   local ssl_redirect="${PARSED_ARGS[ssl-redirect]:-${SIMAI_SSL_REDIRECT_DEFAULT:-no}}"
@@ -401,6 +402,19 @@ site_add_handler() {
   fi
 
   load_profile "$profile" || return 1
+
+  if [[ -z "$usage_class" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      usage_class=$(site_usage_select_class "") || return 0
+    else
+      usage_class="standard"
+    fi
+  else
+    usage_class=$(site_usage_class_normalize "$usage_class") || {
+      error "Unsupported site usage class: ${PARSED_ARGS[usage]:-}"
+      return 1
+    }
+  fi
 
   if [[ "${PROFILE_IS_ALIAS:-no}" == "yes" ]]; then
     local sites=()
@@ -486,6 +500,7 @@ site_add_handler() {
     echo "Profile     : alias"
     echo "Target site : ${target_domain}"
     echo "PHP version : ${php_version}"
+    echo "Usage class : ${usage_class}"
     echo "Root path   : ${target_path}"
     echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
     echo "Healthcheck : uses target site (${target_domain})"
@@ -662,12 +677,22 @@ site_add_handler() {
     ssl_issue_summary="${SITE_SSL_ISSUE_SUMMARY:-not requested}"
   fi
 
+  local usage_apply_summary="stored"
+  if site_usage_apply_class "$domain" "$usage_class" "yes"; then
+    usage_apply_summary="applied ($(site_usage_class_to_perf_mode "$usage_class"))"
+  else
+    usage_apply_summary="failed"
+    warn "Failed to apply site usage class ${usage_class} for ${domain}"
+  fi
+
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
 
   echo "===== Site summary ====="
   echo "Domain      : ${domain}"
   echo "Project     : ${project}"
   echo "Profile     : ${profile}"
+  echo "Usage class : ${usage_class}"
+  echo "Usage apply : ${usage_apply_summary}"
   echo "PHP version : ${php_version}"
   echo "Path        : ${path}"
   echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
@@ -1307,40 +1332,43 @@ site_list_handler() {
   local cols
   cols=$(tput cols 2>/dev/null || echo 120)
 
-  local domain_w=28 profile_w=10 php_w=6 ssl_w=12 runtime_w=10 root_w=30
-  local min_domain=15 min_profile=8 min_php=4 min_ssl=10 min_runtime=8 min_root=16
+  local domain_w=24 profile_w=10 usage_w=12 php_w=6 ssl_w=12 runtime_w=10 root_w=24
+  local min_domain=12 min_profile=8 min_usage=10 min_php=4 min_ssl=10 min_runtime=8 min_root=12
   if [[ $is_tty -eq 1 ]]; then
-    domain_w=$min_domain; profile_w=$min_profile; php_w=$min_php; ssl_w=$min_ssl; runtime_w=$min_runtime; root_w=$min_root
-    local ncols=6
-    local total=$((domain_w+profile_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
+    domain_w=$min_domain; profile_w=$min_profile; usage_w=$min_usage; php_w=$min_php; ssl_w=$min_ssl; runtime_w=$min_runtime; root_w=$min_root
+    local ncols=7
+    local total=$((domain_w+profile_w+usage_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
     if (( cols > total )); then
       local extra=$((cols - total))
       root_w=$((root_w + extra))
     else
       # compact mode
-      local compact_domain compact_profile compact_php compact_ssl compact_runtime
+      local compact_domain compact_profile compact_usage compact_php compact_ssl compact_runtime
       compact_domain=$min_domain
       compact_profile=$min_profile
+      compact_usage=$min_usage
       compact_php=$min_php
       compact_ssl=$min_ssl
       compact_runtime=$min_runtime
-      local available=$((cols - (3*5 + 1)))
-      if (( available < compact_profile+compact_php+compact_ssl+compact_runtime+8 )); then
+      local available=$((cols - (3*6 + 1)))
+      if (( available < compact_profile+compact_usage+compact_php+compact_ssl+compact_runtime+8 )); then
         compact_domain=8
       else
-        compact_domain=$((available - (compact_profile+compact_php+compact_ssl+compact_runtime)))
+        compact_domain=$((available - (compact_profile+compact_usage+compact_php+compact_ssl+compact_runtime)))
       fi
       ((compact_domain<8)) && compact_domain=8
       local sep
-      sep="+$(repeat '-' $((compact_domain+2)))+$(repeat '-' $((compact_profile+2)))+$(repeat '-' $((compact_php+2)))+$(repeat '-' $((compact_ssl+2)))+$(repeat '-' $((compact_runtime+2)))+"
+      sep="+$(repeat '-' $((compact_domain+2)))+$(repeat '-' $((compact_profile+2)))+$(repeat '-' $((compact_usage+2)))+$(repeat '-' $((compact_php+2)))+$(repeat '-' $((compact_ssl+2)))+$(repeat '-' $((compact_runtime+2)))+"
       printf "%s\n" "$sep"
-      printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
-        "$compact_domain" "Domain" "$compact_profile" "Profile" "$compact_php" "PHP" "$compact_ssl" "SSL" "$compact_runtime" "Runtime"
+      printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+        "$compact_domain" "Domain" "$compact_profile" "Profile" "$compact_usage" "Usage" "$compact_php" "PHP" "$compact_ssl" "SSL" "$compact_runtime" "Runtime"
       printf "%s\n" "$sep"
       while IFS= read -r s; do
         [[ -z "$s" ]] && continue
         read_site_metadata "$s"
         local profile="${SITE_META[profile]:-generic}"
+        local usage
+        usage=$(site_usage_class_get "$s")
         local php="${SITE_META[php]:-}"
         local root="${SITE_META[root]:-}"
         local target="${SITE_META[target]:-}"
@@ -1352,9 +1380,10 @@ site_list_handler() {
         if [[ "$profile" == "alias" && -n "$target" ]]; then
           summary="alias -> ${target}"
         fi
-        printf "| %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+        printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
           "$compact_domain" "$(truncate_cell "$compact_domain" "$s")" \
           "$compact_profile" "$(truncate_cell "$compact_profile" "$profile")" \
+          "$compact_usage" "$(truncate_cell "$compact_usage" "$usage")" \
           "$compact_php" "$(truncate_cell "$compact_php" "$php")" \
           "$compact_ssl" "$(truncate_cell "$compact_ssl" "$ssl_info")" \
           "$compact_runtime" "$(truncate_cell "$compact_runtime" "$runtime")"
@@ -1368,19 +1397,21 @@ site_list_handler() {
     fi
   fi
 
-  local ncols=6
-  local total=$((domain_w+profile_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
+  local ncols=7
+  local total=$((domain_w+profile_w+usage_w+php_w+ssl_w+runtime_w+root_w + 3*ncols + 1))
   local sep
-  sep="+$(repeat '-' $((domain_w+2)))+$(repeat '-' $((profile_w+2)))+$(repeat '-' $((php_w+2)))+$(repeat '-' $((ssl_w+2)))+$(repeat '-' $((runtime_w+2)))+$(repeat '-' $((root_w+2)))+"
+  sep="+$(repeat '-' $((domain_w+2)))+$(repeat '-' $((profile_w+2)))+$(repeat '-' $((usage_w+2)))+$(repeat '-' $((php_w+2)))+$(repeat '-' $((ssl_w+2)))+$(repeat '-' $((runtime_w+2)))+$(repeat '-' $((root_w+2)))+"
   printf "%s\n" "$sep"
-  printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
-    "$domain_w" "Domain" "$profile_w" "Profile" "$php_w" "PHP" "$ssl_w" "SSL" "$runtime_w" "Runtime" "$root_w" "Root/Target"
+  printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    "$domain_w" "Domain" "$profile_w" "Profile" "$usage_w" "Usage" "$php_w" "PHP" "$ssl_w" "SSL" "$runtime_w" "Runtime" "$root_w" "Root/Target"
   printf "%s\n" "$sep"
   local s
   while IFS= read -r s; do
     [[ -z "$s" ]] && continue
     read_site_metadata "$s"
     local profile="${SITE_META[profile]:-generic}"
+    local usage
+    usage=$(site_usage_class_get "$s")
     local php="${SITE_META[php]:-}"
     local root="${SITE_META[root]:-}"
     local target="${SITE_META[target]:-}"
@@ -1392,9 +1423,10 @@ site_list_handler() {
     if [[ "$profile" == "alias" && -n "$target" ]]; then
       summary="alias -> ${target}"
     fi
-    printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
+    printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
       "$domain_w" "$(truncate_cell "$domain_w" "$s")" \
       "$profile_w" "$(truncate_cell "$profile_w" "$profile")" \
+      "$usage_w" "$(truncate_cell "$usage_w" "$usage")" \
       "$php_w" "$(truncate_cell "$php_w" "$php")" \
       "$ssl_w" "$(truncate_cell "$ssl_w" "$ssl_info")" \
       "$runtime_w" "$(truncate_cell "$runtime_w" "$runtime")" \
@@ -1461,11 +1493,14 @@ site_info_handler() {
   [[ -z "$updated_at" ]] && updated_at="n/a"
   local runtime_state
   runtime_state=$(site_runtime_state "$domain")
+  local usage_class
+  usage_class=$(site_usage_class_get "$domain")
 
   local -a rows=(
     "Domain|${domain}"
     "Slug|${slug}"
     "Profile|${profile}"
+    "Usage class|${usage_class}"
     "Project|${project}"
     "Root|${root}"
     "Public dir|${public_dir}"
@@ -1494,7 +1529,7 @@ site_info_handler() {
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

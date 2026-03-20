@@ -519,6 +519,40 @@ perf_site_mode_get() {
   echo "none"
 }
 
+site_usage_class_normalize() {
+  local raw="${1:-standard}"
+  raw=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+  case "$raw" in
+    standard|default) echo "standard" ;;
+    high|high-traffic|hightraffic|busy) echo "high-traffic" ;;
+    rare|rarely-used|rarelyused|cold) echo "rarely-used" ;;
+    *) return 1 ;;
+  esac
+}
+
+site_usage_class_get() {
+  local domain="$1"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "${entry%%|*}" == "usage_class" ]]; then
+      local value="${entry#*|}"
+      site_usage_class_normalize "$value" && return 0
+    fi
+  done < <(read_site_perf_settings "$domain")
+  echo "standard"
+}
+
+site_usage_class_to_perf_mode() {
+  local usage
+  usage=$(site_usage_class_normalize "${1:-standard}") || return 1
+  case "$usage" in
+    standard) echo "balanced" ;;
+    high-traffic) echo "aggressive" ;;
+    rarely-used) echo "parked" ;;
+  esac
+}
+
 perf_site_mode_target_children() {
   local profile="$1" mode="$2"
   local entry

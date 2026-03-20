@@ -51,6 +51,7 @@ See `docs/architecture/profiles.md`.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
 - `site perf-tune --domain <domain> --mode parked|safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
+- `site usage-status --domain <domain>` / `site usage-set --domain <domain> --class standard|high-traffic|rarely-used --confirm yes`: simple user-facing site activity intent mapped to the internal performance engine.
 - `site runtime-status --domain <domain>`: show whether the site runtime is active or suspended and whether its pool/cron/queue are currently enabled.
 - `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.

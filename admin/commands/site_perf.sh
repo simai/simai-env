@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 
+site_usage_select_class() {
+  local usage="${1:-}"
+  if [[ -n "$usage" ]]; then
+    site_usage_class_normalize "$usage"
+    return $?
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Select site usage" "standard" "standard" "high-traffic" "rarely-used")
+    [[ -z "$choice" ]] && {
+      warn "Cancelled."
+      return 1
+    }
+    site_usage_class_normalize "$choice"
+    return $?
+  fi
+  echo "standard"
+}
+
 site_perf_select_domain() {
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -28,6 +47,43 @@ site_perf_select_domain() {
   echo "$domain"
 }
 
+site_usage_apply_class() {
+  local domain="$1" usage_class="$2" confirm="${3:-yes}"
+  local perf_mode
+  usage_class=$(site_usage_class_normalize "$usage_class") || {
+    error "Unsupported site usage class: ${usage_class}"
+    return 1
+  }
+  perf_mode=$(site_usage_class_to_perf_mode "$usage_class") || return 1
+
+  if ! read_site_metadata "$domain"; then
+    error "Failed to read site metadata for ${domain}"
+    return 1
+  fi
+  local profile="${SITE_META[profile]:-unknown}"
+  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+  local socket_project="${SITE_META[php_socket_project]:-$project}"
+  local php_version="${SITE_META[php]:-none}"
+
+  if [[ "$php_version" != "none" && -n "$php_version" ]]; then
+    local settings=()
+    mapfile -t settings < <(site_perf_mode_defaults "$profile" "$perf_mode")
+    if [[ ${#settings[@]} -eq 0 ]]; then
+      error "Failed to derive settings for usage class ${usage_class}"
+      return 1
+    fi
+    settings+=("usage_class|${usage_class}")
+    write_site_perf_settings "$domain" "${settings[@]}"
+    if ! validate_project_slug "$socket_project"; then
+      socket_project="$(project_slug_from_domain "$domain")"
+    fi
+    apply_site_perf_settings_to_pool "$domain" "$php_version" "$socket_project" || return 1
+  else
+    write_site_perf_settings "$domain" "usage_class|${usage_class}"
+  fi
+  return 0
+}
+
 site_perf_status_handler() {
   parse_kv_args "$@"
   local domain
@@ -54,6 +110,8 @@ site_perf_status_handler() {
   local total_children="0" pool_share="unknown" fpm_budget="0" fpm_oversub="unknown" mem_available="unknown"
   local runtime_state
   runtime_state=$(site_runtime_state "$domain")
+  local usage_class
+  usage_class=$(site_usage_class_get "$domain")
 
   declare -A perf_settings=()
   local entry
@@ -123,6 +181,7 @@ site_perf_status_handler() {
   print_kv_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
+    "Usage class|${usage_class}" \
     "Runtime state|${runtime_state}" \
     "Managed mode|${mode}" \
     "PHP|${php_version}" \
@@ -147,6 +206,9 @@ site_perf_status_handler() {
     "Cron footprint|${cron_summary}" \
     "Queue footprint|${queue_summary}"
   ui_section "Next steps"
+  ui_kv "Usage standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
+  ui_kv "Usage high traffic" "simai-admin.sh site usage-set --domain ${domain} --class high-traffic --confirm yes"
+  ui_kv "Usage rarely used" "simai-admin.sh site usage-set --domain ${domain} --class rarely-used --confirm yes"
   ui_kv "Tune balanced" "simai-admin.sh site perf-tune --domain ${domain} --mode balanced --confirm yes"
   ui_kv "Tune safe" "simai-admin.sh site perf-tune --domain ${domain} --mode safe --confirm yes"
   ui_kv "Tune parked" "simai-admin.sh site perf-tune --domain ${domain} --mode parked --confirm yes"
@@ -218,5 +280,61 @@ site_perf_tune_handler() {
   ui_kv "Review status" "simai-admin.sh site perf-status --domain ${domain}"
 }
 
+site_usage_status_handler() {
+  parse_kv_args "$@"
+  local domain
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+  local usage_class perf_mode runtime_state
+  usage_class=$(site_usage_class_get "$domain")
+  perf_mode=$(site_usage_class_to_perf_mode "$usage_class")
+  runtime_state=$(site_runtime_state "$domain")
+
+  ui_header "SIMAI ENV · Site usage"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Usage class|${usage_class}" \
+    "Mapped perf mode|${perf_mode}" \
+    "Runtime state|${runtime_state}"
+  ui_section "Next steps"
+  ui_kv "Set standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
+  ui_kv "Set high traffic" "simai-admin.sh site usage-set --domain ${domain} --class high-traffic --confirm yes"
+  ui_kv "Set rarely used" "simai-admin.sh site usage-set --domain ${domain} --class rarely-used --confirm yes"
+}
+
+site_usage_set_handler() {
+  parse_kv_args "$@"
+  local domain usage_class confirm
+  domain=$(site_perf_select_domain) || return $?
+  [[ -z "$domain" ]] && return 0
+  usage_class="${PARSED_ARGS[class]:-${PARSED_ARGS[usage]:-}}"
+  confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ -z "$usage_class" ]]; then
+    usage_class=$(site_usage_select_class "") || return 0
+  else
+    usage_class=$(site_usage_class_normalize "$usage_class") || {
+      error "Unsupported site usage class: ${PARSED_ARGS[class]:-${PARSED_ARGS[usage]:-}}"
+      return 1
+    }
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to update site usage"
+    return 1
+  fi
+  site_usage_apply_class "$domain" "$usage_class" "$confirm" || return 1
+
+  ui_header "SIMAI ENV · Site usage"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${domain}" \
+    "Usage class|${usage_class}" \
+    "Mapped perf mode|$(site_usage_class_to_perf_mode "$usage_class")"
+  ui_section "Next steps"
+  ui_kv "Review performance" "simai-admin.sh site perf-status --domain ${domain}"
+}
+
 register_cmd "site" "perf-status" "Show per-site performance/runtime governance" "site_perf_status_handler" "" "domain="
 register_cmd "site" "perf-tune" "Apply per-site FPM governance mode" "site_perf_tune_handler" "" "domain= mode= confirm="
+register_cmd "site" "usage-status" "Show user-facing site usage class" "site_usage_status_handler" "" "domain="
+register_cmd "site" "usage-set" "Set user-facing site usage class" "site_usage_set_handler" "" "domain= class= usage= confirm="

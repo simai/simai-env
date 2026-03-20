@@ -333,11 +333,13 @@ actsellistbox=black,cyan
         "1|List sites"
         "2|Create site"
         "3|Site info"
-        "4|Runtime status"
-        "5|Suspend site runtime"
-        "6|Resume site runtime"
-        "7|Change site PHP"
-        "8|Remove site"
+        "4|Usage status"
+        "5|Set usage class"
+        "6|Runtime status"
+        "7|Suspend site runtime"
+        "8|Resume site runtime"
+        "9|Change site PHP"
+        "10|Remove site"
         "0|Back"
       )
       local ch=""
@@ -346,11 +348,13 @@ actsellistbox=black,cyan
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
         3) run_menu_command site info ;;
-        4) run_menu_command site runtime-status ;;
-        5) run_menu_command site runtime-suspend ;;
-        6) run_menu_command site runtime-resume ;;
-        7) run_menu_command site set-php ;;
-        8) run_menu_command site remove ;;
+        4) run_menu_command site usage-status ;;
+        5) run_menu_command site usage-set ;;
+        6) run_menu_command site runtime-status ;;
+        7) run_menu_command site runtime-suspend ;;
+        8) run_menu_command site runtime-resume ;;
+        9) run_menu_command site set-php ;;
+        10) run_menu_command site remove ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

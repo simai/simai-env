@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.50] - 2026-03-20
+### Added
+- Added a simple user-facing site usage layer (`standard`, `high-traffic`, `rarely-used`) with `site usage-status` / `site usage-set`, plus automatic usage selection during `site add`.
+### Changed
+- `site list`, `site info`, and `site perf-status` now expose site usage intent so ordinary users can reason about runtime posture without low-level FPM details.
+
 ## [1.11.49] - 2026-03-20
 ### Added
 - Added a shared internal scheduler (`self scheduler`) with one managed cron entry installed during bootstrap, plus status/enable/disable/run commands for future background jobs.
