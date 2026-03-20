@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.62] - 2026-03-20
+### Changed
+- The regular Laravel/CMS tools menu now focuses on everyday actions and simple optimization status, while WordPress and Bitrix maintenance operations remain in Advanced mode.
+
 ## [1.11.61] - 2026-03-20
 ### Changed
 - The regular Laravel and System menus now use clearer user-facing labels such as `Enable scheduler`, `Optimization status`, and `Optimization recommendations`, while keeping low-level controls in Advanced mode.
