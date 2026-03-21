@@ -114,7 +114,7 @@ laravel_bootstrap_project() {
   tmpdir=$(mktemp -d)
   chown "${SIMAI_USER:-simai}:www-data" "$tmpdir" 2>/dev/null || true
   app_dir="${tmpdir}/app"
-  cmd="composer create-project --no-interaction --prefer-dist $(printf '%q' "$(laravel_distribution_package)") $(printf '%q' "$app_dir")"
+  cmd="cd /tmp && composer create-project --no-interaction --prefer-dist $(printf '%q' "$(laravel_distribution_package)") $(printf '%q' "$app_dir")"
   if ! run_long "Creating Laravel application" sudo -u "${SIMAI_USER:-simai}" -H bash -lc "$cmd"; then
     rm -rf "$tmpdir"
     return 1
