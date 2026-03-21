@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.71] - 2026-03-21
+### Fixed
+- WordPress lifecycle database probe now reports `empty`/`schema` correctly before web install instead of falling back to `unknown` on missing core tables.
+
 ## [1.11.70] - 2026-03-21
 ### Added
 - Added WordPress lifecycle commands `wp installer-ready` and `wp finalize` so fresh WordPress sites can move from scaffold to real browser install and post-install baseline.

@@ -2091,30 +2091,14 @@ wordpress_db_state_probe() {
   [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || prefix="wp_"
   local user_table="${prefix}users"
   local options_table="${prefix}options"
-  local query output user_count=0
+  local query output has_users=0 has_options=0 user_count=0
   query=$(cat <<SQL
 SELECT
-  CASE
-    WHEN EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE() AND table_name = '${user_table}'
-    ) THEN '${user_table}'
-    WHEN EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE() AND table_name = '${options_table}'
-    ) THEN 'schema'
-    ELSE 'empty'
-  END AS state,
-  CASE
-    WHEN EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = DATABASE() AND table_name = '${user_table}'
-    ) THEN (SELECT COUNT(*) FROM \`${user_table}\`)
-    ELSE 0
-  END AS user_count;
+  SUM(table_name = '${user_table}') AS has_users,
+  SUM(table_name = '${options_table}') AS has_options
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+  AND table_name IN ('${user_table}', '${options_table}');
 SQL
 )
   output=$(MYSQL_PWD="$db_pass" mysql \
@@ -2127,28 +2111,35 @@ SQL
     echo "unknown"
     return 0
   }
-  local state="${output%%$'\t'*}"
   if [[ "$output" == *$'\t'* ]]; then
-    user_count="${output#*$'\t'}"
+    has_users="${output%%$'\t'*}"
+    has_options="${output#*$'\t'}"
+  else
+    has_users="$output"
   fi
-  case "$state" in
-    "${user_table}")
-      if [[ "${user_count:-0}" =~ ^[0-9]+$ ]] && (( user_count > 0 )); then
-        echo "installed"
-      else
-        echo "schema"
-      fi
-      ;;
-    schema)
+  [[ "$has_users" =~ ^[0-9]+$ ]] || has_users=0
+  [[ "$has_options" =~ ^[0-9]+$ ]] || has_options=0
+
+  if (( has_users > 0 )); then
+    user_count=$(MYSQL_PWD="$db_pass" mysql \
+      --batch --skip-column-names \
+      --host="$db_host" \
+      --user="$db_user" \
+      "$db_name" \
+      -e "SELECT COUNT(*) FROM \`${user_table}\`;" 2>/dev/null || echo "0")
+    [[ "$user_count" =~ ^[0-9]+$ ]] || user_count=0
+    if (( user_count > 0 )); then
+      echo "installed"
+    else
       echo "schema"
-      ;;
-    empty)
-      echo "empty"
-      ;;
-    *)
-      echo "unknown"
-      ;;
-  esac
+    fi
+    return 0
+  fi
+  if (( has_options > 0 )); then
+    echo "schema"
+    return 0
+  fi
+  echo "empty"
 }
 
 wordpress_web_state_probe() {
