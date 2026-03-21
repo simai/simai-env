@@ -350,8 +350,15 @@ site_add_handler() {
   ensure_user
   local profiles_available=()
   mapfile -t profiles_available < <(list_enabled_profile_ids 2>/dev/null || true)
+  local all_profiles=()
+  mapfile -t all_profiles < <(list_profile_ids 2>/dev/null || true)
   local fallback_profiles=("generic" "laravel" "static" "alias")
   if [[ -z "$profile" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    if [[ ${#profiles_available[@]} -gt 0 && ${#all_profiles[@]} -gt ${#profiles_available[@]} ]]; then
+      info "Only enabled profiles are shown in this list."
+      info "Fresh install starts with core profiles: static, generic, alias."
+      info "Enable more profiles first if you need Bitrix, WordPress, or Laravel: simai-admin.sh profile init --mode all --force yes"
+    fi
     local ordered=()
     for p in "${fallback_profiles[@]}"; do
       if [[ ${#profiles_available[@]} -eq 0 ]]; then
@@ -377,7 +384,10 @@ site_add_handler() {
       default_profile="${ordered[0]}"
     fi
     profile=$(select_from_list "Select profile" "$default_profile" "${ordered[@]}")
-    [[ -z "$profile" ]] && profile="$default_profile"
+    if [[ -z "$profile" ]]; then
+      warn "Cancelled."
+      return 0
+    fi
   fi
   [[ -z "$profile" ]] && profile="generic"
   if [[ ${#profiles_available[@]} -eq 0 ]]; then

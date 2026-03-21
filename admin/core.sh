@@ -77,12 +77,19 @@ select_from_list() {
     echo "  [$i] $opt" >&2
     ((i++))
   done
+  echo "  [0] Cancel" >&2
   if [[ -n "$default" ]]; then
     read -r -p "Enter choice [${default}]: " choice || true
-    [[ -z "$choice" ]] && choice="$default"
   else
     read -r -p "Enter choice: " choice || true
   fi
+  case "${choice,,}" in
+    0|cancel|back|q|quit|exit)
+      echo ""
+      return 1
+      ;;
+  esac
+  [[ -z "$choice" && -n "$default" ]] && choice="$default"
   if [[ "$choice" =~ ^[0-9]+$ ]]; then
     local idx=$((choice-1))
     if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then

@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.2] - 2026-03-21
+### Fixed
+- Text-mode selection lists now support an explicit cancel path (`0`, `cancel`, `back`, `q`) instead of trapping users inside menu prompts with no visible way out.
+- `site add` now explains why Bitrix, WordPress, or Laravel may be missing from the profile list on fresh installs and points operators to `profile init --mode all --force yes` before selection.
+
 ## [1.12.1] - 2026-03-21
 ### Fixed
 - Menu command execution now streams live output instead of hiding it in a temporary buffer until completion, so interactive handlers such as `site add` no longer appear to hang after the first prompt when they ask follow-up questions.
