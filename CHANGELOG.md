@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.79] - 2026-03-21
+### Changed
+- Admin overview now reflects the current shared scheduler surface, including both `auto-optimize` and `health-review` job controls.
+
 ## [1.11.78] - 2026-03-21
 ### Changed
 - Clarified in the user guide and command docs that the current `Laravel` menu section is the shared daily-ops area for Laravel, WordPress, and Bitrix actions.

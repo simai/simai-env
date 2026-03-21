@@ -49,8 +49,8 @@ See `docs/architecture/profiles.md`.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 - `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
-- `self scheduler-enable --job all|auto-optimize` / `self scheduler-disable --job all|auto-optimize`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
-- `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
+- `self scheduler-enable --job all|auto-optimize|health-review` / `self scheduler-disable --job all|auto-optimize|health-review`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
+- `self scheduler-run --job auto-optimize|health-review`: run one scheduler job immediately for testing/debugging.
 - `self auto-optimize-status`: show the simple user-facing automatic optimization state without exposing low-level scheduler details.
 - `self auto-optimize-enable` / `self auto-optimize-disable`: turn automatic optimization on or off globally while leaving the shared scheduler infrastructure in place.
 - `self health-review-status`: show the latest read-only platform review produced by the shared scheduler.
