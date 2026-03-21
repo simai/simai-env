@@ -60,7 +60,8 @@ if ($dbName && $dbUser) {
     }
 }
 
-$allOk = $status['extensions']['pdo_mysql'] && $status['db']['ok'] !== false;
+$dbOk = !$status['db']['checked'] || $status['db']['ok'] === true;
+$allOk = $status['extensions']['pdo_mysql'] && $dbOk;
 
 http_response_code($allOk ? 200 : 500);
 header('Content-Type: application/json');
