@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.4] - 2026-03-22
+### Changed
+- Fresh-install `site add` now defaults to enabling all bundled profiles inline, so ordinary menu users get Bitrix, WordPress, and Laravel in the profile list without an extra detour. The redundant explicit `cancel` option was also removed; cancellation remains available through the shared `[0] Cancel` path.
+
 ## [1.12.3] - 2026-03-21
 ### Changed
 - `site add` in menu mode can now enable all bundled profiles inline before profile selection, so operators do not need to leave the flow and run `profile init --mode all --force yes` separately just to create a Bitrix, WordPress, or Laravel site.

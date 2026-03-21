@@ -359,11 +359,10 @@ site_add_handler() {
       info "Fresh install starts with core profiles: static, generic, alias."
       local profile_scope_choice=""
       profile_scope_choice=$(select_from_list \
-        "More bundled profiles are available. What do you want to do?" \
-        "continue" \
-        "continue" \
+        "Enable all bundled profiles now so Bitrix, WordPress, and Laravel appear in the list?" \
         "enable-all" \
-        "cancel")
+        "enable-all" \
+        "continue")
       case "$profile_scope_choice" in
         enable-all)
           if ! run_command profile init --mode all --force yes; then
@@ -373,7 +372,7 @@ site_add_handler() {
           mapfile -t profiles_available < <(list_enabled_profile_ids 2>/dev/null || true)
           mapfile -t all_profiles < <(list_profile_ids 2>/dev/null || true)
           ;;
-        cancel|"")
+        "")
           warn "Cancelled."
           return 0
           ;;
