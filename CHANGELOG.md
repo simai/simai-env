@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.82] - 2026-03-21
+### Fixed
+- Bootstrap no longer performs a recursive ownership reset on the entire sites root during the base-directory step, avoiding long hangs on servers with many existing projects.
+
 ## [1.11.81] - 2026-03-21
 ### Added
 - Added a dedicated production-readiness checklist documenting the platform gate, acceptance matrix, and reporting format for moving `simai-env` toward production rollout.

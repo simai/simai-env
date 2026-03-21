@@ -1006,7 +1006,7 @@ bootstrap_flow() {
   progress_step "Ensuring simai user and base directories"
   ensure_user
   mkdir -p "$WWW_ROOT"
-  chown -R "$SIMAI_USER":www-data "$WWW_ROOT"
+  chown "$SIMAI_USER":www-data "$WWW_ROOT"
   progress_step "Installing base utilities"
   install_packages
   progress_step "Installing PHP ${PHP_VERSION}"
