@@ -217,7 +217,24 @@ site_doctor_handler() {
   fi
 
   progress_step "Application checks"
-  if [[ "$profile" == "wordpress" ]]; then
+  if [[ "$profile" == "laravel" ]]; then
+    local laravel_env="${root}/.env"
+    if laravel_queue_has_real_app "$root"; then
+      doctor_add_result "PASS" "app" "Laravel application" "Real app detected" ""
+    else
+      doctor_add_result "WARN" "app" "Laravel application" "SIMAI bootstrap placeholders still present" "Run simai-admin.sh laravel app-ready --domain ${domain}"
+    fi
+    if [[ -f "$laravel_env" ]]; then
+      doctor_add_result "PASS" "app" "Laravel .env" "${laravel_env}" ""
+      if [[ "$(laravel_app_key_state "$root")" == "set" ]]; then
+        doctor_add_result "PASS" "app" "Laravel APP_KEY" "Present" ""
+      else
+        doctor_add_result "WARN" "app" "Laravel APP_KEY" "Missing in ${laravel_env}" "Run simai-admin.sh laravel finalize --domain ${domain} --confirm yes"
+      fi
+    else
+      doctor_add_result "WARN" "app" "Laravel .env" "Missing ${laravel_env}" "Run simai-admin.sh laravel app-ready --domain ${domain}"
+    fi
+  elif [[ "$profile" == "wordpress" ]]; then
     local wp_public="${root}/${PROFILE_PUBLIC_DIR}"
     local wp_config="${wp_public}/wp-config.php"
     if [[ -f "$wp_config" ]]; then

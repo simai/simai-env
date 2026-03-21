@@ -26,6 +26,7 @@ See `docs/architecture/profiles.md`.
 - Healthcheck copied to `public/healthcheck.php` for php-mode profiles; static uses nginx-served `/healthcheck` (local-only); alias inherits target.
 - Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
 - Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP, cron, SSL, DB) with PASS/WARN/FAIL summary; does not apply changes.
+- Laravel daily ops (`laravel status`, `laravel app-ready`, `laravel finalize`, `laravel perf-status`, `laravel perf-apply`) provide low-risk application bootstrap, post-bootstrap baseline, and optimization checks for laravel profile sites.
 - WordPress daily ops (`wp status`, `wp installer-ready`, `wp finalize`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and install/scheduler/cache maintenance for wordpress profile sites.
 - Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache maintenance for bitrix profile sites.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
@@ -61,6 +62,9 @@ See `docs/architecture/profiles.md`.
 - In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Site availability`, `Pause site`, `Resume site`, and `Server optimization plan`.
 - `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
+- `laravel status --domain <domain>`: show Laravel lifecycle state (`placeholder`, `app-ready`, `post-install`) and the next practical action.
+- `laravel app-ready --domain <domain>`: bootstrap a real Laravel application via Composer and prepare `.env` from SIMAI DB credentials.
+- `laravel finalize --domain <domain> --confirm yes [--migrate yes] [--ssl yes --email <email>]`: complete Laravel post-bootstrap baseline (APP_KEY, storage link, scheduler, baseline optimization, optional migrations and Let's Encrypt).
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel optimization status and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress optimization status and apply flow.
 - `wp installer-ready --domain <domain>`: prepare WordPress core files, generated `wp-config.php`, and `wp-cli` so the browser installer can run cleanly.

@@ -1852,6 +1852,229 @@ wordpress_distribution_archive_url() {
   echo "${SIMAI_WORDPRESS_ARCHIVE_URL:-https://wordpress.org/latest.tar.gz}"
 }
 
+laravel_distribution_package() {
+  echo "${SIMAI_LARAVEL_CREATE_PACKAGE:-laravel/laravel}"
+}
+
+laravel_env_file_path() {
+  local root="$1"
+  echo "${root}/.env"
+}
+
+laravel_env_example_file_path() {
+  local root="$1"
+  echo "${root}/.env.example"
+}
+
+laravel_env_get() {
+  local file="$1" key="$2"
+  [[ -f "$file" ]] || return 1
+  awk -F= -v target="$key" '
+    $0 ~ /^[[:space:]]*#/ { next }
+    $1 == target {
+      val=substr($0, index($0, "=")+1)
+      sub(/^[[:space:]]+/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      if (val ~ /^".*"$/ || val ~ /^'\''.*'\''$/) {
+        val=substr(val, 2, length(val)-2)
+      }
+      print val
+      found=1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$file"
+}
+
+laravel_composer_state() {
+  if command -v composer >/dev/null 2>&1; then
+    echo "present"
+  else
+    echo "missing"
+  fi
+}
+
+laravel_app_state() {
+  local root="$1"
+  if laravel_queue_has_real_app "$root"; then
+    echo "app"
+  else
+    echo "placeholder"
+  fi
+}
+
+laravel_app_key_state() {
+  local root="$1"
+  local env_file
+  env_file=$(laravel_env_file_path "$root")
+  if [[ ! -f "$env_file" ]]; then
+    echo "missing"
+    return 0
+  fi
+  local app_key=""
+  app_key=$(laravel_env_get "$env_file" "APP_KEY" 2>/dev/null || true)
+  if [[ -z "$app_key" ]]; then
+    echo "missing"
+  else
+    echo "set"
+  fi
+}
+
+laravel_prepare_env_file() {
+  local domain="$1" root="$2"
+  local env_file env_example
+  env_file=$(laravel_env_file_path "$root")
+  env_example=$(laravel_env_example_file_path "$root")
+  if [[ ! -f "$env_file" && -f "$env_example" ]]; then
+    cp "$env_example" "$env_file"
+    chmod 0640 "$env_file"
+    chown "${SIMAI_USER}:www-data" "$env_file" 2>/dev/null || true
+  fi
+  [[ -f "$env_file" ]] || touch "$env_file"
+  chmod 0640 "$env_file"
+  chown "${SIMAI_USER}:www-data" "$env_file" 2>/dev/null || true
+
+  env_set_kv "$env_file" "APP_ENV" "production"
+  env_set_kv "$env_file" "APP_DEBUG" "false"
+  env_set_kv "$env_file" "APP_URL" "$(site_primary_url "$domain")"
+  env_set_kv "$env_file" "DB_CONNECTION" "mysql"
+  env_set_kv "$env_file" "DB_HOST" "127.0.0.1"
+  env_set_kv "$env_file" "DB_PORT" "3306"
+
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) env_set_kv "$env_file" "DB_DATABASE" "$v" ;;
+      DB_USER) env_set_kv "$env_file" "DB_USERNAME" "$v" ;;
+      DB_PASS) env_set_kv "$env_file" "DB_PASSWORD" "$v" ;;
+      DB_HOST)
+        if [[ -n "$v" ]]; then
+          env_set_kv "$env_file" "DB_HOST" "$v"
+        fi
+        ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+}
+
+laravel_db_state_probe() {
+  local domain="$1"
+  local db_name="" db_user="" db_pass="" db_host="localhost"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) db_name="$v" ;;
+      DB_USER) db_user="$v" ;;
+      DB_PASS) db_pass="$v" ;;
+      DB_HOST) db_host="$v" ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+  if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if ! command -v mysql >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+
+  local query output
+  query=$(cat <<'SQL'
+SELECT
+  CASE
+    WHEN EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = 'migrations'
+    ) THEN 'migrated'
+    WHEN EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = DATABASE()
+    ) THEN 'schema'
+    ELSE 'empty'
+  END AS state;
+SQL
+)
+  output=$(MYSQL_PWD="$db_pass" mysql \
+    --batch --skip-column-names \
+    --host="$db_host" \
+    --user="$db_user" \
+    "$db_name" \
+    -e "$query" 2>/dev/null || true)
+  [[ -z "$output" ]] && {
+    echo "unknown"
+    return 0
+  }
+  case "$output" in
+    migrated|schema|empty) echo "$output" ;;
+    *) echo "unknown" ;;
+  esac
+}
+
+laravel_web_probe_fetch() {
+  local domain="$1" path="${2:-/}"
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl -ksS --location --max-time 15 --connect-timeout 5 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --resolve "${domain}:443:127.0.0.1" \
+    "$(site_primary_scheme "$domain")://${domain}${path}" 2>/dev/null
+}
+
+laravel_web_probe_status_code() {
+  local domain="$1" path="${2:-/}"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "000"
+    return 0
+  fi
+  curl -ksS --location --max-time 15 --connect-timeout 5 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --resolve "${domain}:443:127.0.0.1" \
+    --output /dev/null \
+    --write-out '%{http_code}' \
+    "$(site_primary_scheme "$domain")://${domain}${path}" 2>/dev/null || echo "000"
+}
+
+laravel_web_state_probe() {
+  local domain="$1" root="$2"
+  local body="" code="000"
+  body=$(laravel_web_probe_fetch "$domain" "/" || true)
+  code=$(laravel_web_probe_status_code "$domain" "/")
+  if printf '%s' "$body" | grep -q "SIMAI placeholder"; then
+    echo "placeholder"
+    return 0
+  fi
+  if [[ "$code" == "500" ]] || printf '%s' "$body" | grep -Eqi 'Whoops|Server Error|ParseError|Fatal error|Illuminate\\'; then
+    echo "error"
+    return 0
+  fi
+  if [[ "$(laravel_app_state "$root")" == "app" ]]; then
+    case "$code" in
+      200|301|302|403|404)
+        echo "app"
+        return 0
+        ;;
+    esac
+  fi
+  echo "unknown"
+}
+
+laravel_setup_stage() {
+  local app_state="${1:-placeholder}" web_state="${2:-unknown}" app_key_state="${3:-missing}"
+  if [[ "$app_state" != "app" ]]; then
+    echo "placeholder"
+    return 0
+  fi
+  if [[ "$web_state" == "app" && "$app_key_state" == "set" ]]; then
+    echo "post-install"
+    return 0
+  fi
+  echo "app-ready"
+}
+
 wordpress_distribution_archive_path() {
   local doc_root="$1"
   echo "${doc_root}/$(basename "$(wordpress_distribution_archive_url)")"

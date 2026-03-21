@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.72] - 2026-03-21
+### Added
+- Added Laravel lifecycle commands `laravel status`, `laravel app-ready`, and `laravel finalize` so fresh Laravel sites can move from SIMAI placeholder scaffold to a real application and post-bootstrap baseline.
+- Added a dedicated Laravel production runbook for the new scaffold -> bootstrap -> finalize flow.
+### Changed
+- Laravel optimization status now also reports lifecycle state (`Database state`, `Web state`, `Setup stage`, `.env`, `APP_KEY`) instead of only cache/worker signals.
+- The regular CMS/Laravel menu now exposes `Laravel status`, `Laravel prepare app`, and `Laravel complete setup`, while Advanced adds `Laravel optimization`.
+### Fixed
+- `site doctor` now performs Laravel-specific app checks instead of reporting a profile-level `SKIP`, so placeholder apps and missing `APP_KEY` are surfaced clearly.
+
 ## [1.11.71] - 2026-03-21
 ### Fixed
 - WordPress lifecycle database probe now reports `empty`/`schema` correctly before web install instead of falling back to `unknown` on missing core tables.
