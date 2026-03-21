@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.73] - 2026-03-21
+### Fixed
+- Laravel app bootstrap now runs Composer from an accessible working directory for the site user instead of inheriting the root-only admin cwd.
+- Managed `.env` updates now handle URL-like values safely, avoiding broken substitutions for keys such as `APP_URL`.
+- Laravel lifecycle baseline now forces file-backed cache/session drivers and sync queue by default so fresh apps boot cleanly before optional migrations/queue setup.
+
 ## [1.11.72] - 2026-03-21
 ### Added
 - Added Laravel lifecycle commands `laravel status`, `laravel app-ready`, and `laravel finalize` so fresh Laravel sites can move from SIMAI placeholder scaffold to a real application and post-bootstrap baseline.

@@ -669,11 +669,33 @@ env_set_kv() {
     encoded=${encoded//\"/\\\"}
     encoded="\"${encoded}\""
   fi
-  if grep -q "^${key}=" "$file"; then
-    perl -pi -e "s/^${key}=.*/${key}=${encoded}/" "$file"
-  else
-    printf "%s=%s\n" "$key" "$encoded" >>"$file"
-  fi
+  local tmp
+  tmp=$(mktemp)
+  awk -v target="$key" -v replacement="$encoded" '
+    BEGIN { done=0 }
+    {
+      pos = index($0, "=")
+      if (pos > 0) {
+        current = substr($0, 1, pos - 1)
+        if (current == target) {
+          if (!done) {
+            print target "=" replacement
+            done = 1
+          }
+          next
+        }
+      }
+      print $0
+    }
+    END {
+      if (!done) {
+        print target "=" replacement
+      }
+    }
+  ' "$file" >"$tmp"
+  mv "$tmp" "$file"
+  chmod 0640 "$file"
+  chown "${SIMAI_USER}:${SIMAI_USER}" "$file" 2>/dev/null || true
 }
 
 validate_domain() {
@@ -1940,6 +1962,9 @@ laravel_prepare_env_file() {
   env_set_kv "$env_file" "DB_CONNECTION" "mysql"
   env_set_kv "$env_file" "DB_HOST" "127.0.0.1"
   env_set_kv "$env_file" "DB_PORT" "3306"
+  env_set_kv "$env_file" "CACHE_STORE" "file"
+  env_set_kv "$env_file" "SESSION_DRIVER" "file"
+  env_set_kv "$env_file" "QUEUE_CONNECTION" "sync"
 
   local entry
   while IFS= read -r entry; do
