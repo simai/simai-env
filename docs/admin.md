@@ -36,6 +36,10 @@ See `docs/architecture/profiles.md`.
   - Audit log: `/var/log/simai-audit.log` records command start/finish with user, section/command, redacted args, exit code, and correlation ID.
   - Installer log: `/var/log/simai-env.log`.
 
+## System and automation
+- User guide for menu-driven work: `docs/guide/menu-user-guide.md`.
+- Command reference for this section: `docs/commands/self.md`.
+
 ## Self commands
 - `self update`: update scripts in place (reloads menu when invoked from menu).
   - Honors update source from `/etc/simai-env.conf`: `SIMAI_UPDATE_REF` (`refs/heads/...` or `refs/tags/...`) or `SIMAI_UPDATE_BRANCH`.
@@ -44,11 +48,11 @@ See `docs/architecture/profiles.md`.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 - `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
-- `self health-review-status`: show the latest scheduled platform review summary (site counts, setup backlog, SSL-soon hints, FPM pressure).
 - `self scheduler-enable --job all|auto-optimize` / `self scheduler-disable --job all|auto-optimize`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
 - `self scheduler-run --job auto-optimize`: run one scheduler job immediately for testing/debugging.
 - `self auto-optimize-status`: show the simple user-facing automatic optimization state without exposing low-level scheduler details.
 - `self auto-optimize-enable` / `self auto-optimize-disable`: turn automatic optimization on or off globally while leaving the shared scheduler infrastructure in place.
+- `self health-review-status`: show the latest read-only platform review produced by the shared scheduler.
 - `self perf-status`: show current server optimization status, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.

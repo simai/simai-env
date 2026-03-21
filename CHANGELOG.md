@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.75] - 2026-03-21
+### Added
+- Added a menu-first user guide covering the everyday interactive workflow for ordinary users.
+- Added a dedicated `self` command reference for system status, updates, scheduler, automation, and optimization commands.
+### Changed
+- Documentation navigation now links the new user guide and system command reference from the main docs index and admin overview.
+
 ## [1.11.74] - 2026-03-21
 ### Added
 - Added a read-only scheduler job `health-review` plus `self health-review-status` so the shared automation layer can produce recurring platform/site review summaries without changing live sites.
