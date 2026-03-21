@@ -29,6 +29,7 @@ See `docs/architecture/profiles.md`.
 - Laravel daily ops (`laravel status`, `laravel app-ready`, `laravel finalize`, `laravel perf-status`, `laravel perf-apply`) provide low-risk application bootstrap, post-bootstrap baseline, and optimization checks for laravel profile sites.
 - WordPress daily ops (`wp status`, `wp installer-ready`, `wp finalize`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and install/scheduler/cache maintenance for wordpress profile sites.
 - Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache maintenance for bitrix profile sites.
+- In the interactive menu, these daily application/CMS actions currently live under the section label `Laravel`.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
 - Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
 - Logging:

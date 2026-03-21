@@ -95,7 +95,10 @@ Common actions:
 - `Import archive (plan)`
 
 ### Laravel
-This section also contains the daily CMS/framework actions for Laravel, WordPress, and Bitrix.
+The menu label is currently `Laravel`, but this section is actually the shared application/CMS daily-ops area for:
+- Laravel
+- WordPress
+- Bitrix
 
 Regular mode keeps only the most common actions. Advanced mode shows installer/scheduler/cache maintenance commands.
 

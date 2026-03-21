@@ -1,6 +1,7 @@
 # Bitrix Commands
 
 Bitrix operational commands are available under the `bitrix` section.
+In the interactive menu, the daily Bitrix actions currently appear inside the shared `Laravel` section.
 
 All commands require a site with `bitrix` profile.
 

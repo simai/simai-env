@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.78] - 2026-03-21
+### Changed
+- Clarified in the user guide and command docs that the current `Laravel` menu section is the shared daily-ops area for Laravel, WordPress, and Bitrix actions.
+
 ## [1.11.77] - 2026-03-21
 ### Changed
 - Reworked the remaining everyday command docs (`php`, `logs`, `backup`, `profile`) into the same simple, command-first format as the newer documentation.
