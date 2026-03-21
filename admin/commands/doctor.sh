@@ -221,7 +221,7 @@ site_doctor_handler() {
     local wp_public="${root}/${PROFILE_PUBLIC_DIR}"
     local wp_config="${wp_public}/wp-config.php"
     if [[ -f "$wp_config" ]]; then
-      if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$wp_config"; then
+      if [[ "$(wordpress_wp_config_cron_mode "$wp_config")" == "true" ]]; then
         doctor_add_result "PASS" "app" "WordPress cron mode" "DISABLE_WP_CRON=true" ""
       else
         doctor_add_result "WARN" "app" "WordPress cron mode" "DISABLE_WP_CRON is not true in wp-config.php" "Set DISABLE_WP_CRON=true when using system cron"

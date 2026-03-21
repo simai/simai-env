@@ -26,7 +26,7 @@ See `docs/architecture/profiles.md`.
 - Healthcheck copied to `public/healthcheck.php` for php-mode profiles; static uses nginx-served `/healthcheck` (local-only); alias inherits target.
 - Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
 - Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP, cron, SSL, DB) with PASS/WARN/FAIL summary; does not apply changes.
-- WordPress daily ops (`wp status`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and cron/cache maintenance for wordpress profile sites.
+- WordPress daily ops (`wp status`, `wp installer-ready`, `wp finalize`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and install/scheduler/cache maintenance for wordpress profile sites.
 - Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache maintenance for bitrix profile sites.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
 - Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
@@ -63,6 +63,8 @@ See `docs/architecture/profiles.md`.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel optimization status and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress optimization status and apply flow.
+- `wp installer-ready --domain <domain>`: prepare WordPress core files, generated `wp-config.php`, and `wp-cli` so the browser installer can run cleanly.
+- `wp finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: complete a finished WordPress web install in one step (optimization baseline + scheduler baseline + optional Let's Encrypt).
 - `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix optimization status and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
 - `bitrix finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: finalize a completed Bitrix web install in one step (PHP baseline + agents sync + optional Let's Encrypt).
 

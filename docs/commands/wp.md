@@ -11,6 +11,9 @@ simai-admin.sh wp status --domain <domain>
 ```
 
 Shows:
+- database state (`missing-db` / `empty` / `schema` / `installed`)
+- web state (`placeholder` / `installer` / `installed`)
+- install stage
 - WP-CLI availability
 - core/config marker presence
 - readiness for WP-CLI actions
@@ -18,6 +21,35 @@ Shows:
 - `DISABLE_WP_CRON` mode
 - cron file/entry state with managed/domain/slug marker checks
 - core version (best effort, when WP-CLI + core are available)
+
+## Installer Ready
+
+```bash
+simai-admin.sh wp installer-ready --domain <domain> [--overwrite yes] [--archive yes|no] [--archive-overwrite yes|no] [--unpack yes|no] [--config-overwrite yes|no] [--cli-install yes|no]
+```
+
+Prepares a real WordPress install flow by:
+- provisioning `wp-cli` (best effort)
+- downloading the official WordPress archive
+- unpacking core files into docroot
+- generating `wp-config.php` from `db.env`
+
+This command does not complete the WordPress web installer; it prepares the site so `/wp-admin/install.php` can run cleanly.
+
+## Finalize
+
+```bash
+simai-admin.sh wp finalize --domain <domain> --confirm yes [--ssl yes --email <email>] [--redirect yes|no] [--hsts yes|no] [--staging yes|no] [--mode standard|woocommerce-safe]
+```
+
+Completes the post-install baseline for a WordPress site that has already finished the web installer:
+- ensures `wp-cli` is available (best effort)
+- applies WordPress optimization baseline
+- rewrites the managed scheduler file
+- enforces `DISABLE_WP_CRON=true`
+- optionally issues Let's Encrypt
+
+If the web installer is not finished yet, the command stops and points back to `/wp-admin/install.php`.
 
 ## Cron Status
 
@@ -56,6 +88,7 @@ simai-admin.sh wp perf-status --domain <domain>
 ```
 
 Shows:
+- lifecycle state (database/web/install stage)
 - managed site performance mode (`site perf-tune` state)
 - cron wiring and `DISABLE_WP_CRON`
 - permalink structure
@@ -81,3 +114,11 @@ Behavior:
 Notes:
 - Requires `--confirm yes` outside interactive menu.
 - Does not install cache plugins automatically.
+
+## Practical flow
+
+1. `simai-admin.sh site add --domain <domain> --profile wordpress --php 8.3 --db yes`
+2. `simai-admin.sh wp installer-ready --domain <domain>`
+3. Open `/wp-admin/install.php` in the browser and finish web install.
+4. `simai-admin.sh wp finalize --domain <domain> --confirm yes`
+5. `simai-admin.sh ssl letsencrypt --domain <domain> --email <email>` or use `--ssl yes` during finalize.

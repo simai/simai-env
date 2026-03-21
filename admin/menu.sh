@@ -626,13 +626,14 @@ actsellistbox=black,cyan
         "6|Worker logs"
         "7|WordPress status"
         "8|WordPress optimization"
-        "9|Bitrix status"
-        "10|Bitrix optimization"
-        "11|Bitrix complete setup"
+        "9|WordPress complete setup"
+        "10|Bitrix status"
+        "11|Bitrix optimization"
+        "12|Bitrix complete setup"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress optimization" "9|WordPress scheduler status" "10|WordPress scheduler sync" "11|WordPress cache clear" "12|Bitrix status" "13|Bitrix optimization" "14|Bitrix complete setup" "15|Bitrix scheduler status" "16|Bitrix scheduler sync" "17|Bitrix cache clear" "18|Bitrix agents status" "19|Bitrix agents readiness" "20|Bitrix DB preseed" "21|Bitrix installer ready" "22|Bitrix PHP baseline sync (all)" "23|Bitrix agents sync (apply)" "0|Back")
+        items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|WordPress status" "8|WordPress optimization" "9|WordPress complete setup" "10|WordPress installer ready" "11|WordPress scheduler status" "12|WordPress scheduler sync" "13|WordPress cache clear" "14|Bitrix status" "15|Bitrix optimization" "16|Bitrix complete setup" "17|Bitrix scheduler status" "18|Bitrix scheduler sync" "19|Bitrix cache clear" "20|Bitrix agents status" "21|Bitrix agents readiness" "22|Bitrix DB preseed" "23|Bitrix installer ready" "24|Bitrix PHP baseline sync (all)" "25|Bitrix agents sync (apply)" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
@@ -653,103 +654,117 @@ actsellistbox=black,cyan
           ;;
         9)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp cron-status
+            run_menu_command wp finalize
           else
-            run_menu_command bitrix status
+            run_menu_command wp finalize
           fi
           ;;
         10)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp cron-sync
+            run_menu_command wp installer-ready
           else
-            run_menu_command bitrix perf-status
+            run_menu_command bitrix status
           fi
           ;;
         11)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp cache-clear
+            run_menu_command wp cron-status
           else
-            run_menu_command bitrix finalize
+            run_menu_command bitrix perf-status
           fi
           ;;
         12)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix status
+            run_menu_command wp cron-sync
           else
-            menu_invalid_choice
+            run_menu_command bitrix finalize
           fi
           ;;
         13)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix perf-status
+            run_menu_command wp cache-clear
           else
             menu_invalid_choice
           fi
           ;;
         14)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix finalize
+            run_menu_command bitrix status
           else
             menu_invalid_choice
           fi
           ;;
         15)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-status
+            run_menu_command bitrix perf-status
           else
             menu_invalid_choice
           fi
           ;;
         16)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-sync
+            run_menu_command bitrix finalize
           else
             menu_invalid_choice
           fi
           ;;
         17)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cache-clear
+            run_menu_command bitrix cron-status
           else
             menu_invalid_choice
           fi
           ;;
         18)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-status
+            run_menu_command bitrix cron-sync
           else
             menu_invalid_choice
           fi
           ;;
         19)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-sync
+            run_menu_command bitrix cache-clear
           else
             menu_invalid_choice
           fi
           ;;
         20)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix db-preseed
+            run_menu_command bitrix agents-status
           else
             menu_invalid_choice
           fi
           ;;
         21)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix installer-ready
+            run_menu_command bitrix agents-sync
           else
             menu_invalid_choice
           fi
           ;;
         22)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix php-baseline-sync --all yes
+            run_menu_command bitrix db-preseed
           else
             menu_invalid_choice
           fi
           ;;
         23)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command bitrix installer-ready
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        24)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command bitrix php-baseline-sync --all yes
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        25)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix agents-sync --apply yes
           else

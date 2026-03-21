@@ -13,6 +13,19 @@ This runbook describes a practical production workflow for WordPress sites on `s
 
 ```bash
 /root/simai-env/simai-admin.sh site add --domain <domain> --profile wordpress --php 8.3 --db yes --force
+/root/simai-env/simai-admin.sh wp installer-ready --domain <domain>
+```
+
+Then open:
+
+```bash
+http://<domain>/wp-admin/install.php
+```
+
+Complete the web installer, then finalize:
+
+```bash
+/root/simai-env/simai-admin.sh wp finalize --domain <domain> --confirm yes
 ```
 
 Verify baseline:
@@ -23,7 +36,7 @@ Verify baseline:
 /root/simai-env/simai-admin.sh wp status --domain <domain>
 ```
 
-## 3) Cron Baseline
+## 3) Scheduler Baseline
 
 Check current state:
 
@@ -59,10 +72,10 @@ For custom certs:
 ## 5) Recommended Runtime Baseline
 
 - PHP: use 8.3 by default; evaluate 8.4 project-by-project.
-- Apply profile PHP baseline carefully:
+- Apply WordPress optimization baseline if not already done via `wp finalize`:
 
 ```bash
-/root/simai-env/simai-admin.sh site fix --domain <domain> --apply all --include-recommended yes --confirm yes
+/root/simai-env/simai-admin.sh wp perf-apply --domain <domain> --mode standard --confirm yes
 ```
 
 Then verify:
@@ -78,6 +91,7 @@ NO_COLOR=1 /root/simai-env/simai-admin.sh self status
 NO_COLOR=1 /root/simai-env/simai-admin.sh self platform-status
 /root/simai-env/simai-admin.sh wp status --domain <domain>
 /root/simai-env/simai-admin.sh wp cron-status --domain <domain>
+/root/simai-env/simai-admin.sh wp perf-status --domain <domain>
 /root/simai-env/simai-admin.sh ssl status --domain <domain>
 ```
 
@@ -103,8 +117,9 @@ Before risky changes (PHP switch, SSL migration, profile-level fixes):
 2. `site doctor --domain <domain>`
 3. `wp status --domain <domain>`
 4. `wp cron-status --domain <domain>`
-5. `ssl status --domain <domain>`
-6. logs:
+5. `wp perf-status --domain <domain>`
+6. `ssl status --domain <domain>`
+7. logs:
    - `simai-admin.sh logs admin`
    - `simai-admin.sh logs env`
    - `simai-admin.sh logs audit`

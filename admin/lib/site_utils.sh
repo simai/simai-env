@@ -1801,11 +1801,412 @@ site_worker_status() {
   fi
 }
 
-bitrix_php_quote() {
+php_single_quote() {
   local raw="${1:-}"
   raw="${raw//\\/\\\\}"
   raw="${raw//\'/\\\'}"
   printf "'%s'" "$raw"
+}
+
+wordpress_wp_cli_url() {
+  echo "${SIMAI_WORDPRESS_WPCLI_URL:-https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar}"
+}
+
+wordpress_wp_cli_install() {
+  if command -v wp >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v php >/dev/null 2>&1; then
+    return 1
+  fi
+  local url tmp target
+  url=$(wordpress_wp_cli_url)
+  target="/usr/local/bin/wp"
+  tmp=$(mktemp)
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL "$url" -o "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget -qO "$tmp" "$url"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+  chmod 0755 "$tmp"
+  if ! php "$tmp" --info >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$target"
+  chmod 0755 "$target"
+  chown root:root "$target" 2>/dev/null || true
+  return 0
+}
+
+wordpress_distribution_archive_url() {
+  echo "${SIMAI_WORDPRESS_ARCHIVE_URL:-https://wordpress.org/latest.tar.gz}"
+}
+
+wordpress_distribution_archive_path() {
+  local doc_root="$1"
+  echo "${doc_root}/$(basename "$(wordpress_distribution_archive_url)")"
+}
+
+wordpress_download_distribution_archive() {
+  local doc_root="$1" overwrite="${2:-no}"
+  local url target tmp
+  url=$(wordpress_distribution_archive_url)
+  target=$(wordpress_distribution_archive_path "$doc_root")
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -s "$target" ]]; then
+    return 0
+  fi
+  tmp=$(mktemp)
+  if command -v curl >/dev/null 2>&1; then
+    if ! curl -fsSL "$url" -o "$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    if ! wget -qO "$tmp" "$url"; then
+      rm -f "$tmp"
+      return 1
+    fi
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ ! -s "$tmp" ]] || ! tar -tzf "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$target"
+  chmod 0644 "$target"
+  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  return 0
+}
+
+wordpress_unpack_distribution_archive() {
+  local doc_root="$1" overwrite="${2:-no}"
+  local archive tmpdir src
+  archive=$(wordpress_distribution_archive_path "$doc_root")
+  [[ -s "$archive" ]] || return 1
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -d "${doc_root}/wp-includes" && -f "${doc_root}/wp-admin/install.php" ]]; then
+    return 0
+  fi
+  tmpdir=$(mktemp -d)
+  if ! tar -xzf "$archive" -C "$tmpdir"; then
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  src="${tmpdir}/wordpress"
+  if [[ ! -d "$src" ]]; then
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  mkdir -p "$doc_root"
+  cp -a "${src}/." "$doc_root/" || {
+    rm -rf "$tmpdir"
+    return 1
+  }
+  chown -R "${SIMAI_USER}:www-data" "$doc_root" 2>/dev/null || true
+  rm -rf "$tmpdir"
+  return 0
+}
+
+wordpress_random_secret() {
+  local value=""
+  if command -v openssl >/dev/null 2>&1; then
+    value=$(openssl rand -base64 48 2>/dev/null | tr -d '\r\n' || true)
+  fi
+  if [[ -z "$value" ]]; then
+    value=$(head -c 48 /dev/urandom | base64 | tr -d '\r\n' 2>/dev/null || true)
+  fi
+  if [[ -z "$value" ]]; then
+    value="simai$(date +%s%N)"
+  fi
+  printf '%s' "$value"
+}
+
+wordpress_wp_config_cron_mode() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if grep -q "SIMAI placeholder" "$file" 2>/dev/null; then
+    echo "placeholder"
+    return 0
+  fi
+  if grep -Eqi "define[[:space:]]*\\([[:space:]]*['\"]DISABLE_WP_CRON['\"][[:space:]]*,[[:space:]]*true[[:space:]]*\\)" "$file"; then
+    echo "true"
+    return 0
+  fi
+  if grep -Eqi "define[[:space:]]*\\([[:space:]]*['\"]DISABLE_WP_CRON['\"][[:space:]]*,[[:space:]]*false[[:space:]]*\\)" "$file"; then
+    echo "false"
+    return 0
+  fi
+  echo "missing"
+}
+
+wordpress_config_table_prefix() {
+  local file="$1"
+  local prefix="wp_"
+  if [[ -f "$file" ]]; then
+    local parsed=""
+    parsed=$(perl -ne 'if (/\$table_prefix\s*=\s*["'\'']([^"'\'']+)["'\'']\s*;/) { print $1; exit }' "$file" 2>/dev/null || true)
+    if [[ -n "$parsed" && "$parsed" =~ ^[A-Za-z0-9_]+$ ]]; then
+      prefix="$parsed"
+    fi
+  fi
+  printf '%s\n' "$prefix"
+}
+
+wordpress_write_config() {
+  local domain="$1" doc_root="$2" overwrite="${3:-no}"
+  local db_name="" db_user="" db_pass="" db_host="localhost"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) db_name="$v" ;;
+      DB_USER) db_user="$v" ;;
+      DB_PASS) db_pass="$v" ;;
+      DB_HOST) db_host="$v" ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+  if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    return 1
+  fi
+
+  local config_file="${doc_root}/wp-config.php"
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -f "$config_file" ]]; then
+    if [[ "$(wordpress_wp_config_cron_mode "$config_file")" != "placeholder" ]]; then
+      return 0
+    fi
+  fi
+
+  local q_name q_user q_pass q_host
+  q_name=$(php_single_quote "$db_name")
+  q_user=$(php_single_quote "$db_user")
+  q_pass=$(php_single_quote "$db_pass")
+  q_host=$(php_single_quote "${db_host:-localhost}")
+  local q_auth_key q_secure_auth_key q_logged_in_key q_nonce_key
+  local q_auth_salt q_secure_auth_salt q_logged_in_salt q_nonce_salt
+  q_auth_key=$(php_single_quote "$(wordpress_random_secret)")
+  q_secure_auth_key=$(php_single_quote "$(wordpress_random_secret)")
+  q_logged_in_key=$(php_single_quote "$(wordpress_random_secret)")
+  q_nonce_key=$(php_single_quote "$(wordpress_random_secret)")
+  q_auth_salt=$(php_single_quote "$(wordpress_random_secret)")
+  q_secure_auth_salt=$(php_single_quote "$(wordpress_random_secret)")
+  q_logged_in_salt=$(php_single_quote "$(wordpress_random_secret)")
+  q_nonce_salt=$(php_single_quote "$(wordpress_random_secret)")
+
+  local tmp
+  tmp=$(mktemp)
+  cat >"$tmp" <<EOF
+<?php
+define( 'DB_NAME', ${q_name} );
+define( 'DB_USER', ${q_user} );
+define( 'DB_PASSWORD', ${q_pass} );
+define( 'DB_HOST', ${q_host} );
+define( 'DB_CHARSET', 'utf8mb4' );
+define( 'DB_COLLATE', '' );
+
+define( 'AUTH_KEY',         ${q_auth_key} );
+define( 'SECURE_AUTH_KEY',  ${q_secure_auth_key} );
+define( 'LOGGED_IN_KEY',    ${q_logged_in_key} );
+define( 'NONCE_KEY',        ${q_nonce_key} );
+define( 'AUTH_SALT',        ${q_auth_salt} );
+define( 'SECURE_AUTH_SALT', ${q_secure_auth_salt} );
+define( 'LOGGED_IN_SALT',   ${q_logged_in_salt} );
+define( 'NONCE_SALT',       ${q_nonce_salt} );
+
+\$table_prefix = 'wp_';
+
+define( 'DISABLE_WP_CRON', true );
+
+if ( ! defined( 'ABSPATH' ) ) {
+    define( 'ABSPATH', __DIR__ . '/' );
+}
+
+require_once ABSPATH . 'wp-settings.php';
+EOF
+  if ! php -l "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$config_file"
+  chmod 0640 "$config_file"
+  chown "${SIMAI_USER}:www-data" "$config_file" 2>/dev/null || true
+  return 0
+}
+
+wordpress_web_probe_fetch() {
+  local domain="$1" path="${2:-/}"
+  if ! command -v curl >/dev/null 2>&1; then
+    return 1
+  fi
+  curl -ksS --location --max-time 15 --connect-timeout 5 \
+    --resolve "${domain}:80:127.0.0.1" \
+    --resolve "${domain}:443:127.0.0.1" \
+    "$(site_primary_scheme "$domain")://${domain}${path}" 2>/dev/null
+}
+
+wordpress_db_state_probe() {
+  local domain="$1"
+  local db_name="" db_user="" db_pass="" db_host="localhost"
+  local entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    local k="${entry%%|*}" v="${entry#*|}"
+    case "$k" in
+      DB_NAME) db_name="$v" ;;
+      DB_USER) db_user="$v" ;;
+      DB_PASS) db_pass="$v" ;;
+      DB_HOST) db_host="$v" ;;
+    esac
+  done < <(read_site_db_env "$domain" || true)
+  if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
+    echo "missing"
+    return 0
+  fi
+  if ! command -v mysql >/dev/null 2>&1; then
+    echo "unknown"
+    return 0
+  fi
+
+  local config_file
+  config_file="$(site_compute_doc_root "${SITE_META[root]:-${WWW_ROOT}/${domain}}" "${SITE_META[public_dir]:-public}" 2>/dev/null || true)/wp-config.php"
+  local prefix
+  prefix=$(wordpress_config_table_prefix "$config_file")
+  [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || prefix="wp_"
+  local user_table="${prefix}users"
+  local options_table="${prefix}options"
+  local query output user_count=0
+  query=$(cat <<SQL
+SELECT
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = '${user_table}'
+    ) THEN '${user_table}'
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = '${options_table}'
+    ) THEN 'schema'
+    ELSE 'empty'
+  END AS state,
+  CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = DATABASE() AND table_name = '${user_table}'
+    ) THEN (SELECT COUNT(*) FROM \`${user_table}\`)
+    ELSE 0
+  END AS user_count;
+SQL
+)
+  output=$(MYSQL_PWD="$db_pass" mysql \
+    --batch --skip-column-names \
+    --host="$db_host" \
+    --user="$db_user" \
+    "$db_name" \
+    -e "$query" 2>/dev/null || true)
+  [[ -z "$output" ]] && {
+    echo "unknown"
+    return 0
+  }
+  local state="${output%%$'\t'*}"
+  if [[ "$output" == *$'\t'* ]]; then
+    user_count="${output#*$'\t'}"
+  fi
+  case "$state" in
+    "${user_table}")
+      if [[ "${user_count:-0}" =~ ^[0-9]+$ ]] && (( user_count > 0 )); then
+        echo "installed"
+      else
+        echo "schema"
+      fi
+      ;;
+    schema)
+      echo "schema"
+      ;;
+    empty)
+      echo "empty"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+wordpress_web_state_probe() {
+  local domain="$1"
+  local root_body="" login_body="" install_body="" db_state="unknown"
+  db_state=$(wordpress_db_state_probe "$domain")
+  root_body=$(wordpress_web_probe_fetch "$domain" "/" || true)
+  login_body=$(wordpress_web_probe_fetch "$domain" "/wp-login.php" || true)
+  install_body=$(wordpress_web_probe_fetch "$domain" "/wp-admin/install.php" || true)
+
+  if [[ "$db_state" == "installed" ]]; then
+    echo "installed"
+    return 0
+  fi
+  if printf '%s' "$root_body" | grep -q "SIMAI placeholder"; then
+    echo "placeholder"
+    return 0
+  fi
+  if printf '%s' "$login_body" | grep -Eq 'id="loginform"|name="log"|name="pwd"|wp-submit'; then
+    echo "installed"
+    return 0
+  fi
+  if printf '%s' "$install_body" | grep -Eqi 'WordPress[^<]*Installation|Install WordPress|Welcome to WordPress|language-chooser'; then
+    echo "installer"
+    return 0
+  fi
+  if [[ "$db_state" == "schema" ]]; then
+    echo "installer"
+    return 0
+  fi
+  echo "unknown"
+}
+
+wordpress_install_stage() {
+  local db_state="${1:-unknown}" web_state="${2:-unknown}"
+  case "$web_state" in
+    installed) echo "post-install" ;;
+    installer) echo "installer" ;;
+    placeholder) echo "placeholder" ;;
+    *)
+      case "$db_state" in
+        installed) echo "post-install" ;;
+        schema) echo "installer" ;;
+        empty) echo "scaffold" ;;
+        missing) echo "missing-db" ;;
+        *) echo "unknown" ;;
+      esac
+      ;;
+  esac
+}
+
+wordpress_installer_open_url() {
+  local domain="$1"
+  echo "$(site_primary_url "$domain")/wp-admin/install.php"
+}
+
+bitrix_php_quote() {
+  php_single_quote "$1"
 }
 
 bitrix_setup_script_url() {

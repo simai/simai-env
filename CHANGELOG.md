@@ -1,6 +1,16 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.70] - 2026-03-21
+### Added
+- Added WordPress lifecycle commands `wp installer-ready` and `wp finalize` so fresh WordPress sites can move from scaffold to real browser install and post-install baseline.
+### Changed
+- WordPress status and optimization screens now show lifecycle state (`Database state`, `Web state`, `Install stage`) and give install-aware next steps.
+- Regular CMS menu now includes `WordPress complete setup`, while Advanced adds `WordPress installer ready`.
+- `self bootstrap` now installs `wp-cli` baseline best-effort for future WordPress operations.
+### Fixed
+- WordPress cron diagnostics now detect `DISABLE_WP_CRON=true` correctly instead of reporting a false warning from valid `wp-config.php` files.
+
 ## [1.11.69] - 2026-03-21
 ### Fixed
 - Bitrix lifecycle detection now uses site database readiness in addition to web probes, so fresh installs can transition to `installed` correctly before running `bitrix finalize`.

@@ -79,11 +79,15 @@ self_bootstrap_handler() {
   local mysql="${PARSED_ARGS[mysql]:-mysql}"
   local node="${PARSED_ARGS[node-version]:-20}"
   info "Repair Environment: installs/repairs base packages and may reload services; sites are not removed."
-  progress_init 3
+  progress_init 4
   progress_step "Running bootstrap (php=${php}, mysql=${mysql}, node=${node})"
   if ! "${SCRIPT_DIR}/simai-env.sh" bootstrap --php "$php" --mysql "$mysql" --node-version "$node"; then
     progress_done "Bootstrap failed"
     return 1
+  fi
+  progress_step "Installing wp-cli baseline"
+  if ! wordpress_wp_cli_install; then
+    warn "wp-cli baseline install failed"
   fi
   progress_step "Initializing profile activation defaults"
   if ! maybe_init_profiles_allowlist_core_defaults; then

@@ -66,6 +66,50 @@ wp_prepare_site() {
   return 0
 }
 
+wp_state_summary() {
+  WP_DB_STATE=$(wordpress_db_state_probe "$WP_DOMAIN")
+  WP_WEB_STATE=$(wordpress_web_state_probe "$WP_DOMAIN")
+  WP_INSTALL_STAGE=$(wordpress_install_stage "$WP_DB_STATE" "$WP_WEB_STATE")
+  WP_INSTALLER_URL=$(wordpress_installer_open_url "$WP_DOMAIN")
+  WP_ADMIN_URL="$(site_primary_url "$WP_DOMAIN")/wp-admin/"
+}
+
+wp_cron_disabled_state() {
+  if [[ "${WP_CONFIG_READY:-no}" != "yes" ]]; then
+    echo "unknown"
+    return 0
+  fi
+  wordpress_wp_config_cron_mode "$WP_CONFIG_FILE"
+}
+
+wp_apply_optimization_mode() {
+  local mode="$1"
+  local site_mode="balanced"
+  [[ "$mode" == "woocommerce-safe" ]] && site_mode="aggressive"
+  local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$WP_SLUG}}"
+  if ! validate_project_slug "$socket_project"; then
+    socket_project="$(project_slug_from_domain "$WP_DOMAIN")"
+  fi
+  local -a settings=()
+  mapfile -t settings < <(site_perf_mode_defaults "wordpress" "$site_mode")
+  write_site_perf_settings "$WP_DOMAIN" "${settings[@]}"
+  apply_site_perf_settings_to_pool "$WP_DOMAIN" "$WP_PHP_VERSION" "$socket_project" || return 1
+  cron_site_write "$WP_DOMAIN" "$WP_SLUG" "wordpress" "$WP_ROOT" "$WP_PHP_VERSION" || return 1
+
+  WP_OPTIMIZATION_SITE_MODE="$site_mode"
+  WP_OPTIMIZATION_CRON_SYNC="ok"
+  WP_OPTIMIZATION_DISABLE_CRON="skipped"
+  if [[ "${WP_CONFIG_READY:-no}" == "yes" ]]; then
+    if wp_perf_set_disable_cron_true; then
+      WP_OPTIMIZATION_DISABLE_CRON="true"
+    else
+      return 1
+    fi
+  elif [[ "${WP_CONFIG_READY:-no}" == "placeholder" ]]; then
+    WP_OPTIMIZATION_DISABLE_CRON="skipped (placeholder)"
+  fi
+}
+
 wp_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -79,6 +123,7 @@ wp_status_handler() {
   fi
 
   ui_header "SIMAI ENV · WordPress status"
+  wp_state_summary
   local wp_cli="missing"
   local core_version="n/a"
   local config_present="${WP_CONFIG_READY:-no}"
@@ -95,13 +140,7 @@ wp_status_handler() {
   if command -v wp >/dev/null 2>&1; then
     wp_cli="present"
   fi
-  if [[ "$config_present" == "yes" ]]; then
-    if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
-      disable_wp_cron="true"
-    else
-      disable_wp_cron="false"
-    fi
-  fi
+  disable_wp_cron=$(wp_cron_disabled_state)
   [[ -f "$WP_CRON_ENTRYPOINT" ]] && cron_entrypoint="present"
   if [[ -f "$WP_CRON_FILE" ]]; then
     cron_file_state="present"
@@ -127,6 +166,9 @@ wp_status_handler() {
   print_kv_table \
     "Domain|${WP_DOMAIN}" \
     "Docroot|${WP_DOC_ROOT}" \
+    "Database state|${WP_DB_STATE}" \
+    "Web state|${WP_WEB_STATE}" \
+    "Install stage|${WP_INSTALL_STAGE}" \
     "WP-CLI|${wp_cli}" \
     "Core files|${WP_HAS_CORE}" \
     "Core version|${core_version}" \
@@ -141,8 +183,21 @@ wp_status_handler() {
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
   ui_section "Next steps"
+  case "$WP_WEB_STATE" in
+    installer)
+      ui_kv "Open installer" "${WP_INSTALLER_URL}"
+      ui_kv "Complete setup" "simai-admin.sh wp finalize --domain ${WP_DOMAIN}"
+      ;;
+    installed)
+      ui_kv "Open admin" "${WP_ADMIN_URL}"
+      ui_kv "Complete setup" "simai-admin.sh wp finalize --domain ${WP_DOMAIN}"
+      ;;
+    *)
+      ui_kv "Prepare installer" "simai-admin.sh wp installer-ready --domain ${WP_DOMAIN}"
+      ui_kv "Open installer" "${WP_INSTALLER_URL}"
+      ;;
+  esac
   ui_kv "Doctor" "simai-admin.sh site doctor --domain ${WP_DOMAIN}"
-  ui_kv "Scheduler sync" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
 }
 
 wp_cron_status_handler() {
@@ -176,11 +231,7 @@ wp_cron_status_handler() {
     fi
   fi
   if [[ "$config_present" == "yes" ]]; then
-    if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
-      disable_wp_cron="true"
-    else
-      disable_wp_cron="false"
-    fi
+    disable_wp_cron=$(wp_cron_disabled_state)
   fi
   ui_section "Result"
   print_kv_table \
@@ -310,6 +361,7 @@ wp_perf_status_handler() {
 
   local managed_mode
   managed_mode=$(wp_perf_read_mode "$domain")
+  wp_state_summary
   local config_present="${WP_CONFIG_READY:-no}"
   local disable_wp_cron="unknown"
   local cron_file_state="missing"
@@ -325,11 +377,7 @@ wp_perf_status_handler() {
   local redis_ext="no"
   local woo_plugin="n/a"
   if [[ "$config_present" == "yes" ]]; then
-    if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
-      disable_wp_cron="true"
-    else
-      disable_wp_cron="false"
-    fi
+    disable_wp_cron=$(wp_cron_disabled_state)
   fi
   if [[ -f "$WP_CRON_FILE" ]]; then
     cron_file_state="present"
@@ -387,17 +435,20 @@ wp_perf_status_handler() {
     "Domain|${WP_DOMAIN}" \
     "Optimization mode|${managed_mode}" \
     "Docroot|${WP_DOC_ROOT}" \
+    "Database state|${WP_DB_STATE}" \
+    "Web state|${WP_WEB_STATE}" \
+    "Install stage|${WP_INSTALL_STAGE}" \
     "PHP|${WP_PHP_VERSION:-none}" \
     "Core files|${WP_HAS_CORE}" \
     "wp-config.php|${config_present}" \
     "Home URL|${home_url}" \
     "Permalink structure|${permalink_structure}" \
     "DISABLE_WP_CRON|${disable_wp_cron}" \
-    "Cron file|${WP_CRON_FILE} (${cron_file_state})" \
-    "Cron entry|${cron_line_state}" \
-    "Cron managed markers|${cron_managed}" \
-    "Cron domain marker|${cron_domain_match}" \
-    "Cron slug marker|${cron_slug_match}" \
+    "Scheduler file|${WP_CRON_FILE} (${cron_file_state})" \
+    "Scheduler entry|${cron_line_state}" \
+    "Managed file|${cron_managed}" \
+    "Domain marker|${cron_domain_match}" \
+    "Site marker|${cron_slug_match}" \
     "Object cache drop-in|${object_cache_dropin}" \
     "Redis plugin|${redis_plugin}" \
     "WooCommerce plugin|${woo_plugin}" \
@@ -435,33 +486,11 @@ wp_perf_apply_handler() {
   fi
 
   local site_mode="balanced"
-  [[ "$mode" == "woocommerce-safe" ]] && site_mode="aggressive"
-  local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$WP_SLUG}}"
-  if ! validate_project_slug "$socket_project"; then
-    socket_project="$(project_slug_from_domain "$domain")"
-  fi
-  local -a settings=()
-  mapfile -t settings < <(site_perf_mode_defaults "wordpress" "$site_mode")
-  write_site_perf_settings "$domain" "${settings[@]}"
-  apply_site_perf_settings_to_pool "$domain" "$WP_PHP_VERSION" "$socket_project" || return 1
-
-  cron_site_write "$WP_DOMAIN" "$WP_SLUG" "wordpress" "$WP_ROOT" "$WP_PHP_VERSION" || {
-    error "Failed to rewrite WordPress cron for ${domain}"
+  if ! wp_apply_optimization_mode "$mode"; then
+    error "Failed to apply WordPress optimization for ${domain}"
     return 1
-  }
-
-  local disable_cron_status="skipped"
-  if [[ "${WP_CONFIG_READY:-no}" == "yes" ]]; then
-    if wp_perf_set_disable_cron_true; then
-      disable_cron_status="true"
-    else
-      disable_cron_status="failed"
-      error "Failed to set DISABLE_WP_CRON=true in ${WP_CONFIG_FILE}"
-      return 1
-    fi
-  elif [[ "${WP_CONFIG_READY:-no}" == "placeholder" ]]; then
-    disable_cron_status="skipped (placeholder)"
   fi
+  site_mode="${WP_OPTIMIZATION_SITE_MODE:-balanced}"
 
   ui_header "SIMAI ENV · Apply WordPress optimization"
   ui_section "Result"
@@ -469,10 +498,180 @@ wp_perf_apply_handler() {
     "Domain|${WP_DOMAIN}" \
     "Mode|${mode}" \
     "Site tune|applied (${site_mode})" \
-    "Cron sync|ok" \
-    "DISABLE_WP_CRON|${disable_cron_status}"
+    "Scheduler sync|${WP_OPTIMIZATION_CRON_SYNC:-ok}" \
+    "DISABLE_WP_CRON|${WP_OPTIMIZATION_DISABLE_CRON:-skipped}"
   ui_section "Next steps"
   ui_kv "Review WordPress status" "simai-admin.sh wp perf-status --domain ${WP_DOMAIN}"
+}
+
+wp_installer_ready_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  local archive="${PARSED_ARGS[archive]:-yes}"
+  local archive_overwrite="${PARSED_ARGS[archive-overwrite]:-${overwrite}}"
+  local unpack="${PARSED_ARGS[unpack]:-yes}"
+  local config_overwrite="${PARSED_ARGS[config-overwrite]:-${overwrite}}"
+  local cli_install="${PARSED_ARGS[cli-install]:-yes}"
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  [[ "${archive,,}" == "yes" ]] || archive="no"
+  [[ "${archive_overwrite,,}" == "yes" ]] || archive_overwrite="no"
+  [[ "${unpack,,}" == "yes" ]] || unpack="no"
+  [[ "${config_overwrite,,}" == "yes" ]] || config_overwrite="no"
+  [[ "${cli_install,,}" == "yes" ]] || cli_install="no"
+
+  wp_prepare_site "$domain" || return $?
+  ui_header "SIMAI ENV · WordPress installer ready"
+  local cli_status="skipped"
+  local archive_status="skipped"
+  local unpack_status="skipped"
+  local config_status="skipped"
+  local overall="partial"
+
+  if [[ "$cli_install" == "yes" ]]; then
+    if wordpress_wp_cli_install; then
+      cli_status="ready"
+    else
+      cli_status="failed"
+      warn "Failed to install wp-cli"
+    fi
+  fi
+  if [[ "$archive" == "yes" ]]; then
+    if wordpress_download_distribution_archive "$WP_DOC_ROOT" "$archive_overwrite"; then
+      archive_status="ready"
+    else
+      archive_status="failed"
+      warn "Failed to download WordPress archive"
+    fi
+  fi
+  if [[ "$unpack" == "yes" ]]; then
+    if wordpress_unpack_distribution_archive "$WP_DOC_ROOT" "$overwrite"; then
+      unpack_status="ready"
+      WP_HAS_CORE="yes"
+      if [[ -f "$WP_CONFIG_FILE" ]]; then
+        if grep -q "SIMAI placeholder" "$WP_CONFIG_FILE" 2>/dev/null; then
+          WP_CONFIG_READY="placeholder"
+        else
+          WP_CONFIG_READY="yes"
+        fi
+      fi
+    else
+      unpack_status="failed"
+      warn "Failed to unpack WordPress archive"
+    fi
+  fi
+  if wordpress_write_config "$WP_DOMAIN" "$WP_DOC_ROOT" "$config_overwrite"; then
+    config_status="ready"
+    WP_CONFIG_READY="yes"
+  else
+    config_status="failed"
+    warn "Failed to generate wp-config.php from db.env"
+  fi
+
+  wp_state_summary
+  if [[ "$unpack_status" == "ready" && "$config_status" == "ready" ]]; then
+    overall="ready"
+  fi
+
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${WP_DOMAIN}" \
+    "Docroot|${WP_DOC_ROOT}" \
+    "WP-CLI|${cli_status}" \
+    "Archive|${archive_status}" \
+    "Unpack|${unpack_status}" \
+    "wp-config.php|${config_status}" \
+    "Database state|${WP_DB_STATE}" \
+    "Web state|${WP_WEB_STATE}" \
+    "Install stage|${WP_INSTALL_STAGE}" \
+    "Status|${overall}"
+  ui_section "Next steps"
+  ui_kv "Open installer" "${WP_INSTALLER_URL}"
+  ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
+}
+
+wp_finalize_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  local ssl="${PARSED_ARGS[ssl]:-no}"
+  local email="${PARSED_ARGS[email]:-}"
+  local redirect="${PARSED_ARGS[redirect]:-no}"
+  local hsts="${PARSED_ARGS[hsts]:-no}"
+  local staging="${PARSED_ARGS[staging]:-no}"
+  local mode="${PARSED_ARGS[mode]:-standard}"
+  mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  [[ "${ssl,,}" == "yes" ]] || ssl="no"
+  [[ "${redirect,,}" == "yes" ]] || redirect="no"
+  [[ "${hsts,,}" == "yes" ]] || hsts="no"
+  [[ "${staging,,}" == "yes" ]] || staging="no"
+  case "$mode" in
+    standard|woocommerce-safe) ;;
+    *)
+      error "Unsupported WordPress finalization mode: ${mode}"
+      return 1
+      ;;
+  esac
+
+  wp_prepare_site "$domain" || return $?
+  wp_state_summary
+  if [[ "$WP_INSTALL_STAGE" != "post-install" ]]; then
+    ui_header "SIMAI ENV · WordPress complete setup"
+    warn "WordPress web install is not completed yet."
+    ui_section "Result"
+    print_kv_table \
+      "Domain|${WP_DOMAIN}" \
+      "Database state|${WP_DB_STATE}" \
+      "Web state|${WP_WEB_STATE}" \
+      "Install stage|${WP_INSTALL_STAGE}"
+    ui_section "Next steps"
+    ui_kv "Open installer" "${WP_INSTALLER_URL}"
+    return 1
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
+    error "Use --confirm yes to complete WordPress setup in CLI mode."
+    return 1
+  fi
+
+  local cli_status="ready"
+  if ! wordpress_wp_cli_install; then
+    cli_status="failed"
+    warn "wp-cli is not available; continuing with scheduler/optimization baseline"
+  fi
+  if ! wp_apply_optimization_mode "$mode"; then
+    error "Failed to apply WordPress optimization baseline"
+    return 1
+  fi
+
+  local ssl_status="not requested"
+  if [[ "$ssl" == "yes" ]]; then
+    if [[ -z "$email" ]]; then
+      error "Use --email with --ssl yes to issue Let's Encrypt during finalize."
+      return 1
+    fi
+    if run_command ssl letsencrypt --domain "$WP_DOMAIN" --email "$email" --redirect "$redirect" --hsts "$hsts" --staging "$staging"; then
+      ssl_status="issued"
+    else
+      ssl_status="failed"
+      warn "Let's Encrypt issuance failed for ${WP_DOMAIN}"
+    fi
+  fi
+
+  ui_header "SIMAI ENV · WordPress complete setup"
+  ui_section "Result"
+  print_kv_table \
+    "Domain|${WP_DOMAIN}" \
+    "Install stage|${WP_INSTALL_STAGE}" \
+    "WP-CLI|${cli_status}" \
+    "Optimization|applied (${mode})" \
+    "Scheduler sync|${WP_OPTIMIZATION_CRON_SYNC:-ok}" \
+    "DISABLE_WP_CRON|${WP_OPTIMIZATION_DISABLE_CRON:-skipped}" \
+    "SSL|${ssl_status}"
+  ui_section "Next steps"
+  ui_kv "Open admin" "${WP_ADMIN_URL}"
+  ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
 }
 
 register_cmd "wp" "status" "Show WordPress status" "wp_status_handler" "domain" ""
@@ -481,3 +680,5 @@ register_cmd "wp" "cron-sync" "Write/rewrite WordPress scheduler file" "wp_cron_
 register_cmd "wp" "cache-clear" "Flush WordPress object cache (wp-cli)" "wp_cache_clear_handler" "domain" ""
 register_cmd "wp" "perf-status" "Show WordPress optimization status" "wp_perf_status_handler" "" "domain="
 register_cmd "wp" "perf-apply" "Apply WordPress optimization baseline" "wp_perf_apply_handler" "" "domain= mode= confirm="
+register_cmd "wp" "installer-ready" "Prepare WordPress installer files (core + config + wp-cli)" "wp_installer_ready_handler" "domain" "overwrite= archive= archive-overwrite= unpack= config-overwrite= cli-install="
+register_cmd "wp" "finalize" "Complete WordPress post-install baseline" "wp_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging= mode="
