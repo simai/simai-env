@@ -104,8 +104,7 @@ site_runtime_status_handler() {
     cron_file_state="missing"
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
     "Availability|${state}" \
@@ -115,7 +114,7 @@ site_runtime_status_handler() {
     "Queue status|${queue_unit_state}" \
     "Scheduler policy|${cron_state}" \
     "Worker policy|${queue_state}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Suspend" "simai-admin.sh site runtime-suspend --domain ${domain} --confirm yes"
   ui_kv "Resume" "simai-admin.sh site runtime-resume --domain ${domain} --confirm yes"
 }
@@ -187,8 +186,7 @@ site_runtime_suspend_handler() {
     "SITE_RUNTIME_QUEUE|${queue_policy}"
 
   ui_header "SIMAI ENV · Pause site"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Availability|suspended" \
     "PHP pool|${pool_status}" \
@@ -245,8 +243,7 @@ site_runtime_resume_handler() {
     "SITE_RUNTIME_QUEUE|${queue_policy:-unchanged}"
 
   ui_header "SIMAI ENV · Resume site"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Availability|active" \
     "PHP pool|${pool_status}" \
@@ -1528,9 +1525,8 @@ site_info_handler() {
     "Target|${target}"
     "Updated at|${updated_at}"
   )
-  ui_section "Result"
-  print_kv_table "${rows[@]}"
-  ui_section "Next steps"
+  ui_result_table "${rows[@]}"
+  ui_next_steps
   ui_kv "SSL status" "simai-admin.sh ssl status --domain ${domain}"
   ui_kv "Optimization status" "simai-admin.sh site perf-status --domain ${domain}"
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"

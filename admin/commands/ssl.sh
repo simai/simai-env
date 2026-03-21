@@ -219,12 +219,11 @@ ssl_issue_handler() {
   fi
   ensure_certbot_cron
   progress_step "Reloading nginx"
-  ui_section "Result"
   local hsts_display="${hsts}"
   if [[ "$staging" == "yes" ]]; then
     hsts_display="${hsts} (forced)"
   fi
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Type|Let's Encrypt" \
     "Cert|${cert}" \
@@ -233,7 +232,7 @@ ssl_issue_handler() {
     "Staging|${staging}" \
     "Redirect|${redirect}" \
     "HSTS|${hsts_display}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
   ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   progress_done "Done"
@@ -338,7 +337,6 @@ ssl_install_custom_handler() {
     return 1
   fi
   progress_step "Reloading nginx"
-  ui_section "Result"
   local -a rows=(
     "Domain|${domain}"
     "Type|custom"
@@ -350,8 +348,8 @@ ssl_install_custom_handler() {
   if [[ -n "$chain_arg" ]]; then
     rows+=("Chain|${chain_arg}")
   fi
-  print_kv_table "${rows[@]}"
-  ui_section "Next steps"
+  ui_result_table "${rows[@]}"
+  ui_next_steps
   ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
   ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   progress_done "Done"
@@ -449,12 +447,11 @@ ssl_remove_handler() {
     fi
     rm -rf "/etc/nginx/ssl/${domain}" >>"$LOG_FILE" 2>&1 || true
   fi
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "SSL|disabled" \
     "Cert|$([[ "$delete_cert" == "yes" ]] && echo deleted || echo kept)"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
   ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email>"
 }
@@ -565,9 +562,8 @@ ssl_status_handler() {
     rows+=("Note|staging cert is NOT trusted by browsers")
   fi
 
-  ui_section "Result"
-  print_kv_table "${rows[@]}"
-  ui_section "Next steps"
+  ui_result_table "${rows[@]}"
+  ui_next_steps
   ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   ui_kv "Remove SSL" "simai-admin.sh ssl remove --domain ${domain}"
   ui_kv "Site info" "simai-admin.sh site info --domain ${domain}"
@@ -643,7 +639,7 @@ ssl_list_handler() {
       "$domain_w" "$domain" "$type_w" "$type" "$exp_w" "$expires" "$days_w" "$days" "$staging_w" "$staging" "$redirect_w" "$redirect" "$hsts_w" "$hsts"
   done
   printf "%s\n" "$sep"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check domain" "simai-admin.sh ssl status --domain <domain>"
   ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain <domain> --email <email>"
 }

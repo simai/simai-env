@@ -3,6 +3,8 @@
 *.bak
 .idea/
 .vscode/
+.playwright-cli/
+output/
 testing/test-config.env
 testing/secrets/
 source/

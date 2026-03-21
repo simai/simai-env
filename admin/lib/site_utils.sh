@@ -1435,15 +1435,6 @@ ensure_project_cron_entries() {
   cron_site_write "${project}.invalid" "$project" "$profile_id" "$project_path" "$php_version"
 }
 
-# Backward compatibility helper for legacy callers
-ensure_project_cron() {
-  local project="$1" profile="$2" project_path="$3" php_version="$4"
-  if [[ "$profile" != "laravel" ]]; then
-    return
-  fi
-  cron_site_write "${project}.invalid" "$project" "$profile" "$project_path" "$php_version"
-}
-
 nginx_patch_php_socket() {
   local domain="$1" new_php="$2" socket_project="$3"
   local cfg="/etc/nginx/sites-available/${domain}.conf"

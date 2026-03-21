@@ -162,8 +162,7 @@ wp_status_handler() {
     [[ -z "$home_url" ]] && home_url="unknown"
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Docroot|${WP_DOC_ROOT}" \
     "Database state|${WP_DB_STATE}" \
@@ -182,7 +181,7 @@ wp_status_handler() {
     "Managed file|${cron_managed}" \
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
-  ui_section "Next steps"
+  ui_next_steps
   case "$WP_WEB_STATE" in
     installer)
       ui_kv "Open installer" "${WP_INSTALLER_URL}"
@@ -233,8 +232,7 @@ wp_cron_status_handler() {
   if [[ "$config_present" == "yes" ]]; then
     disable_wp_cron=$(wp_cron_disabled_state)
   fi
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Scheduler file|${WP_CRON_FILE} (${cron_file_state})" \
     "Scheduler entry (wp-cron.php)|${cron_line_state}" \
@@ -242,7 +240,7 @@ wp_cron_status_handler() {
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}" \
     "DISABLE_WP_CRON|${disable_wp_cron}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Sync scheduler" "simai-admin.sh wp cron-sync --domain ${WP_DOMAIN}"
 }
 
@@ -263,13 +261,12 @@ wp_cron_sync_handler() {
   fi
   ui_header "SIMAI ENV · WordPress scheduler sync"
   cron_site_write "$WP_DOMAIN" "$WP_SLUG" "wordpress" "$WP_ROOT" "$WP_PHP_VERSION"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Scheduler file|${WP_CRON_FILE}" \
     "Profile|wordpress" \
     "PHP|${WP_PHP_VERSION}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check scheduler" "simai-admin.sh wp cron-status --domain ${WP_DOMAIN}"
 }
 
@@ -299,12 +296,11 @@ wp_cache_clear_handler() {
     error "wp cache flush failed for ${WP_DOMAIN}"
     return 1
   fi
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Action|cache flush" \
     "Status|ok"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
 }
 
@@ -430,8 +426,7 @@ wp_perf_status_handler() {
   fi
 
   ui_header "SIMAI ENV · WordPress optimization"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Optimization mode|${managed_mode}" \
     "Docroot|${WP_DOC_ROOT}" \
@@ -454,7 +449,7 @@ wp_perf_status_handler() {
     "WooCommerce plugin|${woo_plugin}" \
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Site activity & optimization" "simai-admin.sh site perf-status --domain ${WP_DOMAIN}"
   ui_kv "Apply standard optimization" "simai-admin.sh wp perf-apply --domain ${WP_DOMAIN} --mode standard --confirm yes"
 }
@@ -493,14 +488,13 @@ wp_perf_apply_handler() {
   site_mode="${WP_OPTIMIZATION_SITE_MODE:-balanced}"
 
   ui_header "SIMAI ENV · Apply WordPress optimization"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Mode|${mode}" \
     "Site tune|applied (${site_mode})" \
     "Scheduler sync|${WP_OPTIMIZATION_CRON_SYNC:-ok}" \
     "DISABLE_WP_CRON|${WP_OPTIMIZATION_DISABLE_CRON:-skipped}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review WordPress status" "simai-admin.sh wp perf-status --domain ${WP_DOMAIN}"
 }
 
@@ -574,8 +568,7 @@ wp_installer_ready_handler() {
     overall="ready"
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Docroot|${WP_DOC_ROOT}" \
     "WP-CLI|${cli_status}" \
@@ -586,7 +579,7 @@ wp_installer_ready_handler() {
     "Web state|${WP_WEB_STATE}" \
     "Install stage|${WP_INSTALL_STAGE}" \
     "Status|${overall}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Open installer" "${WP_INSTALLER_URL}"
   ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
 }
@@ -620,13 +613,12 @@ wp_finalize_handler() {
   if [[ "$WP_INSTALL_STAGE" != "post-install" ]]; then
     ui_header "SIMAI ENV · WordPress complete setup"
     warn "WordPress web install is not completed yet."
-    ui_section "Result"
-    print_kv_table \
+    ui_result_table \
       "Domain|${WP_DOMAIN}" \
       "Database state|${WP_DB_STATE}" \
       "Web state|${WP_WEB_STATE}" \
       "Install stage|${WP_INSTALL_STAGE}"
-    ui_section "Next steps"
+    ui_next_steps
     ui_kv "Open installer" "${WP_INSTALLER_URL}"
     return 1
   fi
@@ -660,8 +652,7 @@ wp_finalize_handler() {
   fi
 
   ui_header "SIMAI ENV · WordPress complete setup"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${WP_DOMAIN}" \
     "Install stage|${WP_INSTALL_STAGE}" \
     "WP-CLI|${cli_status}" \
@@ -669,7 +660,7 @@ wp_finalize_handler() {
     "Scheduler sync|${WP_OPTIMIZATION_CRON_SYNC:-ok}" \
     "DISABLE_WP_CRON|${WP_OPTIMIZATION_DISABLE_CRON:-skipped}" \
     "SSL|${ssl_status}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Open admin" "${WP_ADMIN_URL}"
   ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
 }

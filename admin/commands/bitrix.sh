@@ -276,8 +276,7 @@ bitrix_status_handler() {
   install_stage=$(bitrix_perf_install_stage "$short_install" "$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "${BX_CRON_ENTRY_MATCH:-no}" "$bx_crontab" "$bx_crontab_support")" "$web_state")
   open_url=$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
     "Database state|${db_state}" \
@@ -298,7 +297,7 @@ bitrix_status_handler() {
     "Managed file|${cron_managed}" \
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
-  ui_section "Next steps"
+  ui_next_steps
   case "$web_state" in
     installer)
       ui_kv "Open installer" "$open_url"
@@ -345,15 +344,14 @@ bitrix_cron_status_handler() {
       cron_line_state="present"
     fi
   fi
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Scheduler file|${BX_CRON_FILE} (${cron_file_state})" \
     "Scheduler entry (cron_events.php)|${cron_line_state}" \
     "Managed file|${cron_managed}" \
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Sync scheduler" "simai-admin.sh bitrix cron-sync --domain ${BX_DOMAIN}"
 }
 
@@ -374,13 +372,12 @@ bitrix_cron_sync_handler() {
   fi
   ui_header "SIMAI ENV · Bitrix scheduler sync"
   cron_site_write "$BX_DOMAIN" "$BX_SLUG" "bitrix" "$BX_ROOT" "$BX_PHP_VERSION"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Scheduler file|${BX_CRON_FILE}" \
     "Profile|bitrix" \
     "PHP|${BX_PHP_VERSION}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check scheduler" "simai-admin.sh bitrix cron-status --domain ${BX_DOMAIN}"
 }
 
@@ -422,8 +419,7 @@ bitrix_agents_status_handler() {
   local ready
   ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "dbconn.php|${dbconn_state}" \
     "BX_CRONTAB|${bx_crontab}" \
@@ -434,7 +430,7 @@ bitrix_agents_status_handler() {
     "Site marker|${cron_slug_match}" \
     "Scheduler entry (cron_events.php)|${cron_entry_match}" \
     "Agents via scheduler|${ready}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Plan sync" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN}"
   ui_kv "Apply sync" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN} --apply yes --confirm yes"
 }
@@ -481,7 +477,7 @@ bitrix_agents_sync_handler() {
 
   if [[ "$apply" != "yes" ]]; then
     info "Plan only. No changes applied."
-    ui_section "Next steps"
+    ui_next_steps
     ui_kv "Apply" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN} --apply yes --confirm yes"
     return 0
   fi
@@ -520,8 +516,7 @@ bitrix_agents_sync_handler() {
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "dbconn backup|${backup}" \
     "BX_CRONTAB|$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "BX_CRONTAB")" \
@@ -531,7 +526,7 @@ bitrix_agents_sync_handler() {
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}" \
     "Scheduler entry (cron_events.php)|${cron_entry_match}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Verify" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
 
@@ -561,12 +556,11 @@ bitrix_cache_clear_handler() {
       missing=$((missing + 1))
     fi
   done
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Cache dirs cleared|${cleared}" \
     "Cache dirs missing|${missing}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
@@ -614,8 +608,7 @@ bitrix_db_preseed_handler() {
     return 1
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
     "Overwrite|${overwrite}" \
@@ -623,7 +616,7 @@ bitrix_db_preseed_handler() {
     ".settings.php|${BX_SETTINGS_FILE}" \
     "dbconn.php|${BX_DBCONN_FILE}" \
     "Status|${status}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Open installer" "https://${BX_DOMAIN}/bitrixsetup.php"
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
@@ -711,8 +704,7 @@ bitrix_installer_ready_handler() {
     status="partial"
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
     "DB preseed|${preseed_state}" \
@@ -729,7 +721,7 @@ bitrix_installer_ready_handler() {
     warn "Installer ready is partial. Check network access, db.env values, and whether the setup script plus local distro archive form a valid Site Management installer flow."
     return 1
   fi
-  ui_section "Next steps"
+  ui_next_steps
   if [[ "$unpack_state" == "ready" ]]; then
     ui_kv "Open installer" "$(site_primary_url "$BX_DOMAIN")/"
   else
@@ -816,8 +808,7 @@ bitrix_php_baseline_sync_handler() {
     fi
   done
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Scope|$([[ "$all" == "yes" ]] && echo all bitrix sites || echo single site)" \
     "Targets|${#targets[@]}" \
     "Applied|${ok}" \
@@ -827,7 +818,7 @@ bitrix_php_baseline_sync_handler() {
     warn "Failed sites: ${failed[*]}"
     return 1
   fi
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Verify one site" "simai-admin.sh site doctor --domain <bitrix-domain>"
   return 0
 }
@@ -921,8 +912,7 @@ bitrix_perf_status_handler() {
   fi
 
   ui_header "SIMAI ENV · Bitrix optimization"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Optimization mode|${managed_mode}" \
     "Database state|${db_state}" \
@@ -946,7 +936,7 @@ bitrix_perf_status_handler() {
     "opcache.memory_consumption|${opcache_memory:-n/a}" \
     "Redis extension|${redis_ext}" \
     "Redis service|${redis_service}"
-  ui_section "Next steps"
+  ui_next_steps
   if [[ "$web_state" == "installer" ]]; then
     ui_kv "Open installer" "$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")"
   else
@@ -1044,15 +1034,14 @@ bitrix_perf_apply_handler() {
   fi
 
   ui_header "SIMAI ENV · Apply Bitrix optimization"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Mode|${mode}" \
     "Site tune|applied (${site_mode})" \
     "PHP baseline|${php_status}" \
     "Agents sync|${agents_status}" \
     "Cache clear|${cache_status}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review Bitrix status" "simai-admin.sh bitrix perf-status --domain ${BX_DOMAIN}"
 }
 
@@ -1083,13 +1072,12 @@ bitrix_finalize_handler() {
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
   if [[ "$web_state" != "installed" ]]; then
     ui_header "SIMAI ENV · Bitrix finalize setup"
-    ui_section "Result"
-    print_kv_table \
+    ui_result_table \
       "Domain|${BX_DOMAIN}" \
       "Database state|${db_state}" \
       "Web state|${web_state}" \
       "Status|blocked"
-    ui_section "Next steps"
+    ui_next_steps
     ui_kv "Open installer" "$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")"
     ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
     error "Bitrix web installation is not complete for ${BX_DOMAIN}."
@@ -1131,14 +1119,13 @@ bitrix_finalize_handler() {
   fi
 
   ui_header "SIMAI ENV · Bitrix finalize setup"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Web state|${web_state}" \
     "PHP baseline|${php_status}" \
     "Agents sync|${agents_status}" \
     "SSL|${ssl_status}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Bitrix status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
   ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
   ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"

@@ -1,6 +1,19 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.86] - 2026-03-21
+### Changed
+- Continued consolidating the command presentation layer by introducing shared UI helpers for `Result` tables and result messages and wiring the main daily-ops commands to them (`self`, `site runtime`, `cron`, `site perf`, `ssl`, `wordpress`, `bitrix`).
+
+## [1.11.85] - 2026-03-21
+### Changed
+- Started consolidating the command presentation layer by introducing shared UI helpers for `Result` and `Next steps` blocks and wiring the first daily-ops commands to them (`self`, `site runtime`, `cron`, `site perf`, `ssl`, `wordpress`, `bitrix`).
+
+## [1.11.84] - 2026-03-21
+### Changed
+- Removed the unused legacy compatibility helper `ensure_project_cron()` after confirming there are no in-repo callers and all active flows use `ensure_project_cron_entries()`.
+- Ignored local Playwright and `output/` artifact directories so browser-test leftovers do not pollute working trees or accidental releases.
+
 ## [1.11.83] - 2026-03-21
 ### Fixed
 - PHP healthcheck now returns success for sites without configured database credentials instead of treating an unchecked DB probe as a hard failure.

@@ -238,8 +238,7 @@ self_status_handler() {
     fi
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Install dir|${install_dir}" \
     "OS|${os_name}" \
     "Supported|${supported}" \
@@ -253,7 +252,7 @@ self_status_handler() {
     "php cli|${php_cli_version}" \
     "certbot version|${certbot_version}" \
     "certbot timer|${certbot_timer}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Diagnostics" "simai-admin.sh self platform-status"
   ui_kv "Performance" "simai-admin.sh self perf-status"
   ui_kv "Update" "simai-admin.sh self update"
@@ -351,8 +350,7 @@ self_platform_status_handler() {
     fi
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "nginx|${nginx_state}" \
     "nginx test|${nginx_test}" \
     "mysql|${mysql_state}" \
@@ -363,7 +361,7 @@ self_platform_status_handler() {
     "inodes free /|${inodes_root}" \
     "memory (total/used/free)|${mem_summary}" \
     "certbot timer|${certbot_timer}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Validate nginx" "nginx -t"
   ui_kv "Repair stack" "simai-admin.sh self bootstrap"
   ui_kv "Performance" "simai-admin.sh self perf-status"
@@ -455,8 +453,7 @@ self_perf_status_handler() {
     fi
   fi
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Server size|cpu=${PERF_CPU_COUNT}, mem=${PERF_MEM_MB}M, swap=${PERF_SWAP_MB}M" \
     "Memory available|${mem_available}" \
     "Recommended preset|${recommended_preset}" \
@@ -487,7 +484,7 @@ self_perf_status_handler() {
     "redis clients/ops|${redis_clients} / ${redis_ops}" \
     "redis policy|${redis_policy}" \
     "redis snippet|$( [[ -f "$redis_conf" ]] && printf 'present (%s)' "$redis_conf" || printf 'missing (%s)' "$redis_conf" )"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Apply recommended preset" "simai-admin.sh self perf-apply --preset ${recommended_preset} --confirm yes"
   ui_kv "Apply medium preset" "simai-admin.sh self perf-apply --preset medium --confirm yes"
   ui_kv "Review FPM plan" "simai-admin.sh self perf-plan"
@@ -520,8 +517,7 @@ self_perf_plan_handler() {
     "Parked-mode floor|${parked_floor}"
 
   if [[ "$excess" == "0" ]]; then
-    ui_section "Result"
-    ui_info "No server optimization changes are needed."
+    ui_result_info "No server optimization changes are needed."
     return 0
   fi
 
@@ -540,8 +536,7 @@ self_perf_plan_handler() {
   done < <(perf_fpm_top_pools "$limit")
 
   if (( ${#rows[@]} == 0 )); then
-    ui_section "Result"
-    ui_warn "No PHP site pools were found."
+    ui_result_warn "No PHP site pools were found."
     return 0
   fi
 
@@ -582,8 +577,7 @@ self_perf_rebalance_handler() {
 
   if [[ "$before_excess" == "0" ]]; then
     ui_header "SIMAI ENV · Apply server optimization"
-    ui_section "Result"
-    ui_info "No server optimization changes are needed."
+    ui_result_info "No server optimization changes are needed."
     return 0
   fi
 
@@ -644,7 +638,7 @@ self_perf_rebalance_handler() {
     ui_section "Skipped"
     print_kv_table "${skipped[@]}"
   fi
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review current status" "simai-admin.sh self perf-status"
   ui_kv "Review plan" "simai-admin.sh self perf-plan"
 }
@@ -680,8 +674,7 @@ self_perf_apply_handler() {
 
   progress_done "Server optimization baseline applied"
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Preset|${PERF_PRESET}" \
     "Future FPM defaults|pm=${PERF_FPM_PM}, children=${PERF_FPM_MAX_CHILDREN}, idle=${PERF_FPM_IDLE_TIMEOUT}, max_requests=${PERF_FPM_MAX_REQUESTS}" \
     "OPcache|memory=${PERF_OPCACHE_MEMORY}, strings=${PERF_OPCACHE_STRINGS}, files=${PERF_OPCACHE_MAX_FILES}" \
@@ -689,7 +682,7 @@ self_perf_apply_handler() {
     "MySQL max connections|${PERF_MYSQL_MAX_CONNECTIONS}" \
     "Redis maxmemory|${PERF_REDIS_MAXMEMORY}" \
     "Redis policy|${PERF_REDIS_POLICY}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review current status" "simai-admin.sh self perf-status"
   ui_kv "Check platform" "simai-admin.sh self platform-status"
 }
@@ -754,9 +747,8 @@ self_scheduler_status_handler() {
     rows+=("Job ${job} last message|${last_message}")
   done < <(scheduler_jobs_list)
 
-  ui_section "Result"
-  print_kv_table "${rows[@]}"
-  ui_section "Next steps"
+  ui_result_table "${rows[@]}"
+  ui_next_steps
   ui_kv "Run scheduler now" "simai-admin.sh self scheduler"
   ui_kv "Disable auto optimize" "simai-admin.sh self scheduler-disable --job auto-optimize"
 }
@@ -860,8 +852,7 @@ self_auto_optimize_status_handler() {
   [[ -z "$last_status" ]] && last_status="n/a"
   [[ -z "$last_message" ]] && last_message="n/a"
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Automatic optimization|${enabled}" \
     "Mode|${mode}" \
     "Shared scheduler cron|${cron_state}" \
@@ -873,7 +864,7 @@ self_auto_optimize_status_handler() {
     "Last action|$(scheduler_epoch_human "$last_action")" \
     "Last status|${last_status}" \
     "Last message|${last_message}"
-  ui_section "Next steps"
+  ui_next_steps
   if [[ "$enabled" == "yes" ]]; then
     ui_kv "Turn off" "simai-admin.sh self auto-optimize-disable"
   else
@@ -935,8 +926,7 @@ self_health_review_status_handler() {
   expiring_domains=$(scheduler_job_report_get "health_review" "expiring_domains" 2>/dev/null || true)
   manual_domains=$(scheduler_job_report_get "health_review" "manual_domains" 2>/dev/null || true)
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Health review|${enabled}" \
     "Shared scheduler cron|${cron_state}" \
     "Interval|${interval}m" \
@@ -964,7 +954,7 @@ self_health_review_status_handler() {
     print_kv_table "${highlights[@]}"
   fi
 
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Run review now" "simai-admin.sh self scheduler-run --job health-review"
   ui_kv "Advanced scheduler status" "simai-admin.sh self scheduler-status"
 }
@@ -1001,8 +991,7 @@ self_site_review_status_handler() {
   pause_candidate_domains=$(scheduler_job_report_get "site_review" "pause_candidate_domains" 2>/dev/null || true)
   suspended_domains=$(scheduler_job_report_get "site_review" "suspended_domains" 2>/dev/null || true)
 
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Site review|${enabled}" \
     "Shared scheduler cron|${cron_state}" \
     "Interval|${interval}m" \
@@ -1028,7 +1017,7 @@ self_site_review_status_handler() {
     print_kv_table "${highlights[@]}"
   fi
 
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Run review now" "simai-admin.sh self scheduler-run --job site-review"
   ui_kv "Open health review" "simai-admin.sh self health-review-status"
 }

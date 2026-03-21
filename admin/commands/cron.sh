@@ -39,13 +39,12 @@ cron_add_handler() {
   ui_header "SIMAI ENV · Enable Laravel scheduler"
   cron_site_write "$domain" "$slug" "$profile" "$root" "$php"
   SIMAI_USER="$prev_user"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Scheduler file|/etc/cron.d/${slug}" \
     "PHP|${php}" \
     "User|${user}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Disable scheduler" "simai-admin.sh cron remove --domain ${domain}"
   ui_kv "Review worker status" "simai-admin.sh queue status --domain ${domain}"
 }
@@ -77,12 +76,11 @@ cron_remove_handler() {
   fi
   ui_header "SIMAI ENV · Disable Laravel scheduler"
   remove_cron_file "$slug" "$domain"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Scheduler file|/etc/cron.d/${slug}" \
     "State|removed"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Enable scheduler" "simai-admin.sh cron add --domain ${domain}"
   ui_kv "Review site status" "simai-admin.sh site info --domain ${domain}"
 }

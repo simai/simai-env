@@ -184,8 +184,7 @@ site_perf_status_handler() {
   [[ -n "${optimization_recommendation:-}" ]] || optimization_recommendation=$(site_user_recommendation "$domain" "$fpm_oversub")
 
   ui_header "SIMAI ENV · Site performance"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
     "Activity class|${usage_class}" \
@@ -216,7 +215,7 @@ site_perf_status_handler() {
     "Redis service|${redis_service}" \
     "Cron footprint|${cron_summary}" \
     "Queue footprint|${queue_summary}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Usage standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
   ui_kv "Usage high traffic" "simai-admin.sh site usage-set --domain ${domain} --class high-traffic --confirm yes"
   ui_kv "Usage rarely used" "simai-admin.sh site usage-set --domain ${domain} --class rarely-used --confirm yes"
@@ -280,14 +279,13 @@ site_perf_tune_handler() {
   fi
 
   ui_header "SIMAI ENV · Site performance tune"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Profile|${profile}" \
     "Mode|${mode}" \
     "PHP|${php_version}" \
     "Pool file|/etc/php/${php_version}/fpm/pool.d/${socket_project}.conf"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review site status" "simai-admin.sh site perf-status --domain ${domain}"
 }
 
@@ -308,8 +306,7 @@ site_usage_status_handler() {
   optimization_recommendation=$(site_user_recommendation "$domain")
 
   ui_header "SIMAI ENV · Site activity"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Activity class|${usage_class}" \
     "Optimization|${optimization_mode}" \
@@ -318,7 +315,7 @@ site_usage_status_handler() {
     "Site auto optimize override|${auto_optimize_state}" \
     "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Set standard" "simai-admin.sh site usage-set --domain ${domain} --class standard --confirm yes"
   ui_kv "Set high traffic" "simai-admin.sh site usage-set --domain ${domain} --class high-traffic --confirm yes"
   ui_kv "Set rarely used" "simai-admin.sh site usage-set --domain ${domain} --class rarely-used --confirm yes"
@@ -346,12 +343,11 @@ site_usage_set_handler() {
   site_usage_apply_class "$domain" "$usage_class" "$confirm" || return 1
 
   ui_header "SIMAI ENV · Site activity"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Activity class|${usage_class}" \
     "Mapped perf mode|$(site_usage_class_to_perf_mode "$usage_class")"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Review performance" "simai-admin.sh site perf-status --domain ${domain}"
 }
 
@@ -372,8 +368,7 @@ site_auto_optimize_status_handler() {
   optimization_recommendation=$(site_user_recommendation "$domain")
 
   ui_header "SIMAI ENV · Site automatic optimization"
-  ui_section "Result"
-  print_kv_table \
+  ui_result_table \
     "Domain|${domain}" \
     "Optimization|${optimization_mode}" \
     "Automatic optimization|${auto_optimize_effective}" \
@@ -382,7 +377,7 @@ site_auto_optimize_status_handler() {
     "Mapped perf mode|${perf_mode}" \
     "Recommendation|${optimization_recommendation}" \
     "Runtime state|${runtime_state}"
-  ui_section "Next steps"
+  ui_next_steps
   ui_kv "Enable for site" "simai-admin.sh site auto-optimize-enable --domain ${domain} --confirm yes"
   ui_kv "Disable for site" "simai-admin.sh site auto-optimize-disable --domain ${domain} --confirm yes"
   ui_kv "Reset to inherit" "simai-admin.sh site auto-optimize-reset --domain ${domain} --confirm yes"

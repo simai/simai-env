@@ -53,6 +53,25 @@ ui_section() {
   printf "\n%s\n" "$title"
 }
 
+ui_result_table() {
+  ui_section "Result"
+  print_kv_table "$@"
+}
+
+ui_result_info() {
+  ui_section "Result"
+  ui_info "$@"
+}
+
+ui_result_warn() {
+  ui_section "Result"
+  ui_warn "$@"
+}
+
+ui_next_steps() {
+  ui_section "Next steps"
+}
+
 ui_kv() {
   local key="$1"
   local value="${2:-}"
@@ -63,4 +82,3 @@ ui_header() {
   local title="$1"
   printf "\n%s\n" "$title"
 }
-
