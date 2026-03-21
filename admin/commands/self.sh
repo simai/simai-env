@@ -704,7 +704,10 @@ self_scheduler_persist_config() {
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
     "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}" \
     "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}" \
-    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}"
+    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}" \
+    "${SIMAI_SITE_REVIEW_ENABLED:-yes}" \
+    "${SIMAI_SITE_REVIEW_INTERVAL_MINUTES:-360}" \
+    "${SIMAI_SITE_REVIEW_STALE_DAYS:-3}"
 }
 
 self_scheduler_handler() {
@@ -773,6 +776,9 @@ self_scheduler_enable_handler() {
     health-review)
       SIMAI_HEALTH_REVIEW_ENABLED="yes"
       ;;
+    site-review)
+      SIMAI_SITE_REVIEW_ENABLED="yes"
+      ;;
     *)
       error "Unsupported scheduler job: ${job}"
       return 1
@@ -784,7 +790,8 @@ self_scheduler_enable_handler() {
   print_kv_table \
     "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
     "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")" \
-    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
+    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")" \
+    "Site review enabled|$(scheduler_normalize_bool "${SIMAI_SITE_REVIEW_ENABLED:-yes}")"
 }
 
 self_scheduler_disable_handler() {
@@ -802,6 +809,9 @@ self_scheduler_disable_handler() {
     health-review)
       SIMAI_HEALTH_REVIEW_ENABLED="no"
       ;;
+    site-review)
+      SIMAI_SITE_REVIEW_ENABLED="no"
+      ;;
     *)
       error "Unsupported scheduler job: ${job}"
       return 1
@@ -813,7 +823,8 @@ self_scheduler_disable_handler() {
   print_kv_table \
     "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
     "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")" \
-    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
+    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")" \
+    "Site review enabled|$(scheduler_normalize_bool "${SIMAI_SITE_REVIEW_ENABLED:-yes}")"
 }
 
 self_scheduler_run_handler() {
@@ -958,6 +969,70 @@ self_health_review_status_handler() {
   ui_kv "Advanced scheduler status" "simai-admin.sh self scheduler-status"
 }
 
+self_site_review_status_handler() {
+  ui_header "SIMAI ENV · Site review"
+
+  local enabled interval stale_days cron_state
+  enabled=$(scheduler_job_enabled "site_review")
+  interval=$(scheduler_job_interval_minutes "site_review")
+  stale_days=$(scheduler_site_review_stale_days)
+  cron_state="missing"
+  [[ -f "$(scheduler_cron_file)" ]] && cron_state="installed"
+
+  local last_run last_status last_message generated_at
+  last_run=$(scheduler_job_state_get "site_review" "last_run_epoch" 2>/dev/null || true)
+  last_status=$(scheduler_job_state_get "site_review" "last_status" 2>/dev/null || true)
+  last_message=$(scheduler_job_state_get "site_review" "last_message" 2>/dev/null || true)
+  generated_at=$(scheduler_job_report_get "site_review" "generated_at" 2>/dev/null || true)
+  [[ -z "$last_run" ]] && last_run="never"
+  [[ -z "$last_status" ]] && last_status="n/a"
+  [[ -z "$last_message" ]] && last_message="n/a"
+
+  local sites_total sites_setup_pending sites_setup_stale sites_pause_candidates sites_suspended sites_manual
+  local setup_pending_domains setup_stale_domains pause_candidate_domains suspended_domains
+  sites_total=$(scheduler_job_report_get "site_review" "sites_total" 2>/dev/null || true)
+  sites_setup_pending=$(scheduler_job_report_get "site_review" "sites_setup_pending" 2>/dev/null || true)
+  sites_setup_stale=$(scheduler_job_report_get "site_review" "sites_setup_stale" 2>/dev/null || true)
+  sites_pause_candidates=$(scheduler_job_report_get "site_review" "sites_pause_candidates" 2>/dev/null || true)
+  sites_suspended=$(scheduler_job_report_get "site_review" "sites_suspended" 2>/dev/null || true)
+  sites_manual=$(scheduler_job_report_get "site_review" "sites_manual" 2>/dev/null || true)
+  setup_pending_domains=$(scheduler_job_report_get "site_review" "setup_pending_domains" 2>/dev/null || true)
+  setup_stale_domains=$(scheduler_job_report_get "site_review" "setup_stale_domains" 2>/dev/null || true)
+  pause_candidate_domains=$(scheduler_job_report_get "site_review" "pause_candidate_domains" 2>/dev/null || true)
+  suspended_domains=$(scheduler_job_report_get "site_review" "suspended_domains" 2>/dev/null || true)
+
+  ui_section "Result"
+  print_kv_table \
+    "Site review|${enabled}" \
+    "Shared scheduler cron|${cron_state}" \
+    "Interval|${interval}m" \
+    "Stale setup threshold|${stale_days}d" \
+    "Last run|$(scheduler_epoch_human "$last_run")" \
+    "Last report|$(scheduler_epoch_human "${generated_at:-}")" \
+    "Last status|${last_status}" \
+    "Last summary|${last_message}" \
+    "Sites total|${sites_total:-n/a}" \
+    "Sites needing setup|${sites_setup_pending:-n/a}" \
+    "Sites stale in setup|${sites_setup_stale:-n/a}" \
+    "Pause candidates|${sites_pause_candidates:-n/a}" \
+    "Sites suspended|${sites_suspended:-n/a}" \
+    "Sites in manual optimization|${sites_manual:-n/a}"
+
+  if [[ -n "${setup_pending_domains:-}" || -n "${setup_stale_domains:-}" || -n "${pause_candidate_domains:-}" || -n "${suspended_domains:-}" ]]; then
+    ui_section "Highlights"
+    local highlights=()
+    [[ -n "${setup_pending_domains:-}" ]] && highlights+=("Needs setup|${setup_pending_domains}")
+    [[ -n "${setup_stale_domains:-}" ]] && highlights+=("Stale in setup|${setup_stale_domains}")
+    [[ -n "${pause_candidate_domains:-}" ]] && highlights+=("Good pause candidates|${pause_candidate_domains}")
+    [[ -n "${suspended_domains:-}" ]] && highlights+=("Already paused|${suspended_domains}")
+    print_kv_table "${highlights[@]}"
+  fi
+
+  ui_section "Next steps"
+  ui_kv "Run review now" "simai-admin.sh self scheduler-run --job site-review"
+  ui_kv "Open health review" "simai-admin.sh self health-review-status"
+}
+
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
@@ -967,6 +1042,7 @@ register_cmd "self" "auto-optimize-status" "Show simple automatic optimization s
 register_cmd "self" "auto-optimize-enable" "Enable simple automatic optimization" "self_auto_optimize_enable_handler" "" ""
 register_cmd "self" "auto-optimize-disable" "Disable simple automatic optimization" "self_auto_optimize_disable_handler" "" ""
 register_cmd "self" "health-review-status" "Show platform health review status" "self_health_review_status_handler" "" ""
+register_cmd "self" "site-review-status" "Show site review status" "self_site_review_status_handler" "" ""
 register_cmd "self" "scheduler" "Run the internal simai scheduler tick" "self_scheduler_handler" "" ""
 register_cmd "self" "scheduler-status" "Show internal scheduler status" "self_scheduler_status_handler" "" ""
 register_cmd "self" "scheduler-enable" "Enable scheduler globally or by job" "self_scheduler_enable_handler" "" "job="

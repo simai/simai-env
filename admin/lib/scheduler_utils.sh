@@ -63,7 +63,10 @@ scheduler_install_defaults() {
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
     "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}" \
     "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}" \
-    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}"
+    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}" \
+    "${SIMAI_SITE_REVIEW_ENABLED:-yes}" \
+    "${SIMAI_SITE_REVIEW_INTERVAL_MINUTES:-360}" \
+    "${SIMAI_SITE_REVIEW_STALE_DAYS:-3}"
 }
 
 scheduler_write_config() {
@@ -76,6 +79,9 @@ scheduler_write_config() {
   local auto_rebalance_mode="${7:-auto}"
   local health_enabled="${8:-yes}"
   local health_interval="${9:-30}"
+  local site_review_enabled="${10:-yes}"
+  local site_review_interval="${11:-360}"
+  local site_review_stale_days="${12:-3}"
   local file content
   file=$(scheduler_config_file)
   content=$(cat <<EOF
@@ -88,6 +94,9 @@ SIMAI_AUTO_OPTIMIZE_LIMIT=${auto_limit}
 SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE=${auto_rebalance_mode}
 SIMAI_HEALTH_REVIEW_ENABLED=${health_enabled}
 SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES=${health_interval}
+SIMAI_SITE_REVIEW_ENABLED=${site_review_enabled}
+SIMAI_SITE_REVIEW_INTERVAL_MINUTES=${site_review_interval}
+SIMAI_SITE_REVIEW_STALE_DAYS=${site_review_stale_days}
 EOF
 )
   scheduler_replace_managed_block "$file" "# simai-scheduler-begin" "# simai-scheduler-end" "$content"
@@ -134,12 +143,13 @@ scheduler_job_normalize() {
   case "$job" in
     auto_optimize) echo "auto_optimize" ;;
     health_review) echo "health_review" ;;
+    site_review) echo "site_review" ;;
     *) return 1 ;;
   esac
 }
 
 scheduler_jobs_list() {
-  printf "%s\n" "auto_optimize" "health_review"
+  printf "%s\n" "auto_optimize" "health_review" "site_review"
 }
 
 scheduler_job_enabled() {
@@ -160,6 +170,13 @@ scheduler_job_enabled() {
       }
       echo "$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
       ;;
+    site_review)
+      [[ "$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" == "yes" ]] || {
+        echo "no"
+        return 0
+      }
+      echo "$(scheduler_normalize_bool "${SIMAI_SITE_REVIEW_ENABLED:-yes}")"
+      ;;
   esac
 }
 
@@ -176,6 +193,9 @@ scheduler_job_mode() {
       esac
       ;;
     health_review)
+      echo "report"
+      ;;
+    site_review)
       echo "report"
       ;;
   esac
@@ -197,6 +217,12 @@ scheduler_job_interval_minutes() {
       (( value < 1 )) && value=1
       echo "$value"
       ;;
+    site_review)
+      local value="${SIMAI_SITE_REVIEW_INTERVAL_MINUTES:-360}"
+      [[ "$value" =~ ^[0-9]+$ ]] || value=360
+      (( value < 1 )) && value=1
+      echo "$value"
+      ;;
   esac
 }
 
@@ -213,6 +239,9 @@ scheduler_job_cooldown_minutes() {
     health_review)
       echo "0"
       ;;
+    site_review)
+      echo "0"
+      ;;
   esac
 }
 
@@ -227,6 +256,9 @@ scheduler_job_limit() {
       echo "$value"
       ;;
     health_review)
+      echo "0"
+      ;;
+    site_review)
       echo "0"
       ;;
   esac
@@ -247,7 +279,17 @@ scheduler_job_rebalance_mode() {
     health_review)
       echo "n/a"
       ;;
+    site_review)
+      echo "n/a"
+      ;;
   esac
+}
+
+scheduler_site_review_stale_days() {
+  local value="${SIMAI_SITE_REVIEW_STALE_DAYS:-3}"
+  [[ "$value" =~ ^[0-9]+$ ]] || value=3
+  (( value < 1 )) && value=1
+  echo "$value"
 }
 
 scheduler_job_state_file() {
@@ -562,6 +604,125 @@ scheduler_health_review_run() {
   echo "$summary"
 }
 
+scheduler_site_setup_state() {
+  local domain="$1" profile="$2"
+  local root="" web_state=""
+  case "$profile" in
+    laravel)
+      root="${SITE_META[root]:-$(site_root_path "$domain")}"
+      web_state=$(laravel_web_state_probe "$domain" "$root")
+      if [[ "$web_state" == "app" ]]; then
+        echo "ready"
+      else
+        echo "$web_state"
+      fi
+      ;;
+    wordpress)
+      web_state=$(wordpress_web_state_probe "$domain")
+      if [[ "$web_state" == "installed" ]]; then
+        echo "ready"
+      else
+        echo "$web_state"
+      fi
+      ;;
+    bitrix)
+      web_state=$(bitrix_web_state_probe "$domain")
+      if [[ "$web_state" == "installed" ]]; then
+        echo "ready"
+      else
+        echo "$web_state"
+      fi
+      ;;
+    static|generic|alias)
+      echo "ready"
+      ;;
+    *)
+      echo "unknown"
+      ;;
+  esac
+}
+
+scheduler_site_review_run() {
+  local total=0 setup_pending=0 setup_stale=0 pause_candidates=0 suspended=0 manual_sites=0
+  local stale_days now_ts updated_ts age_days
+  local setup_domains=() stale_domains=() pause_domains=() suspended_domains=()
+  local domain profile runtime_state auto_effective usage_class setup_state updated_at
+  stale_days=$(scheduler_site_review_stale_days)
+  now_ts=$(date +%s)
+
+  while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    total=$((total + 1))
+    if ! read_site_metadata "$domain" >/dev/null 2>&1; then
+      continue
+    fi
+
+    profile="${SITE_META[profile]:-unknown}"
+    runtime_state=$(site_runtime_state "$domain")
+    auto_effective=$(site_auto_optimize_effective_enabled "$domain")
+    usage_class=$(site_usage_class_get "$domain")
+    setup_state=$(scheduler_site_setup_state "$domain" "$profile")
+    updated_at="${SITE_META[updated_at]:-}"
+
+    if [[ "$runtime_state" == "suspended" ]]; then
+      suspended=$((suspended + 1))
+      if (( ${#suspended_domains[@]} < 5 )); then
+        suspended_domains+=("$domain")
+      fi
+    fi
+
+    if [[ "$auto_effective" != yes* ]]; then
+      manual_sites=$((manual_sites + 1))
+    fi
+
+    if [[ "$setup_state" != "ready" ]]; then
+      setup_pending=$((setup_pending + 1))
+      if (( ${#setup_domains[@]} < 5 )); then
+        setup_domains+=("${domain}(${setup_state})")
+      fi
+      if [[ -n "$updated_at" && "$updated_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        updated_ts=$(date -d "$updated_at" +%s 2>/dev/null || echo "")
+        if [[ -n "$updated_ts" && "$updated_ts" =~ ^[0-9]+$ ]]; then
+          age_days=$(( (now_ts - updated_ts) / 86400 ))
+          if (( age_days >= stale_days )); then
+            setup_stale=$((setup_stale + 1))
+            if (( ${#stale_domains[@]} < 5 )); then
+              stale_domains+=("${domain}(${age_days}d)")
+            fi
+          fi
+        fi
+      fi
+      continue
+    fi
+
+    if [[ "$runtime_state" == "active" && "$usage_class" == "rarely-used" ]]; then
+      pause_candidates=$((pause_candidates + 1))
+      if (( ${#pause_domains[@]} < 5 )); then
+        if [[ "$auto_effective" == yes* ]]; then
+          pause_domains+=("${domain}(auto)")
+        else
+          pause_domains+=("${domain}(manual)")
+        fi
+      fi
+    fi
+  done < <(list_sites 2>/dev/null || true)
+
+  scheduler_job_report_write "site_review" \
+    "generated_at|$(date +%s)" \
+    "sites_total|${total}" \
+    "sites_setup_pending|${setup_pending}" \
+    "sites_setup_stale|${setup_stale}" \
+    "sites_pause_candidates|${pause_candidates}" \
+    "sites_suspended|${suspended}" \
+    "sites_manual|${manual_sites}" \
+    "setup_pending_domains|$(IFS=', '; echo "${setup_domains[*]:-}")" \
+    "setup_stale_domains|$(IFS=', '; echo "${stale_domains[*]:-}")" \
+    "pause_candidate_domains|$(IFS=', '; echo "${pause_domains[*]:-}")" \
+    "suspended_domains|$(IFS=', '; echo "${suspended_domains[*]:-}")"
+
+  echo "sites=${total}, setup_pending=${setup_pending}, setup_stale=${setup_stale}, pause_candidates=${pause_candidates}, suspended=${suspended}"
+}
+
 scheduler_run_job() {
   local job started_at ended_at message
   job=$(scheduler_job_normalize "$1") || return 1
@@ -581,6 +742,18 @@ scheduler_run_job() {
       ;;
     health_review)
       if message=$(scheduler_health_review_run); then
+        ended_at=$(date +%s)
+        scheduler_mark_job_run "$job" "ok" "$message" "$started_at" "$ended_at"
+        ui_info "Scheduler job ${job}: ${message}"
+        return 0
+      fi
+      ended_at=$(date +%s)
+      scheduler_mark_job_run "$job" "failed" "$message" "$started_at" "$ended_at"
+      ui_warn "Scheduler job ${job}: ${message}"
+      return 1
+      ;;
+    site_review)
+      if message=$(scheduler_site_review_run); then
         ended_at=$(date +%s)
         scheduler_mark_job_run "$job" "ok" "$message" "$started_at" "$ended_at"
         ui_info "Scheduler job ${job}: ${message}"

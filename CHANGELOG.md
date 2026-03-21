@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.80] - 2026-03-21
+### Added
+- Added a read-only scheduler job `site-review` plus `self site-review-status` to highlight unfinished sites, stale setup candidates, and good pause candidates without changing live sites.
+### Changed
+- Advanced `System` menu and scheduler documentation now expose the new `site-review` job alongside the existing scheduler tools.
+
 ## [1.11.79] - 2026-03-21
 ### Changed
 - Admin overview now reflects the current shared scheduler surface, including both `auto-optimize` and `health-review` job controls.

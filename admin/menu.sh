@@ -849,7 +849,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|System status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization recommendations" "5|Apply optimization recommendations" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "12|Health review" "0|Back")
+        items=("1|System status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization recommendations" "5|Apply optimization recommendations" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "12|Health review" "13|Site review" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
@@ -938,6 +938,13 @@ actsellistbox=black,cyan
         12)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self health-review-status
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        13)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self site-review-status
           else
             menu_invalid_choice
           fi

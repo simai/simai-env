@@ -49,16 +49,17 @@ See `docs/architecture/profiles.md`.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 - `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
-- `self scheduler-enable --job all|auto-optimize|health-review` / `self scheduler-disable --job all|auto-optimize|health-review`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
-- `self scheduler-run --job auto-optimize|health-review`: run one scheduler job immediately for testing/debugging.
+- `self scheduler-enable --job all|auto-optimize|health-review|site-review` / `self scheduler-disable --job all|auto-optimize|health-review|site-review`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
+- `self scheduler-run --job auto-optimize|health-review|site-review`: run one scheduler job immediately for testing/debugging.
 - `self auto-optimize-status`: show the simple user-facing automatic optimization state without exposing low-level scheduler details.
 - `self auto-optimize-enable` / `self auto-optimize-disable`: turn automatic optimization on or off globally while leaving the shared scheduler infrastructure in place.
 - `self health-review-status`: show the latest read-only platform review produced by the shared scheduler.
+- `self site-review-status`: show the latest read-only review of unfinished sites, stale setup candidates, and sites that are good pause candidates.
 - `self perf-status`: show current server optimization status, detected server size, recommended preset, live nginx/mysql/redis/FPM pressure signals, and estimated FPM oversubscription.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
-- The regular System menu uses user-facing labels such as `Optimization status` and `Optimization recommendations`; scheduler internals and `Health review` remain in Advanced mode.
+- The regular System menu uses user-facing labels such as `Optimization status` and `Optimization recommendations`; scheduler internals, `Health review`, and `Site review` remain in Advanced mode.
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
 - `site info`, `site usage-status`, and `site perf-status` now include a simple optimization posture plus a plain-language recommendation so ordinary users can understand the current state without reading raw FPM values first.
 - `site perf-tune --domain <domain> --mode parked|safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
@@ -85,6 +86,8 @@ See `docs/architecture/profiles.md`.
 - Ordinary users can treat this as one switch via `self auto-optimize-enable` / `self auto-optimize-disable`; Advanced mode still exposes scheduler details and manual job control.
 - Current built-in job:
 - `auto_optimize`: policy-driven performance maintenance for oversubscribed PHP-FPM servers.
+- `health_review`: recurring read-only platform health summary.
+- `site_review`: recurring read-only review of unfinished, stale, or pause-candidate sites.
 - `auto_optimize` now uses usage-aware targets by default:
   - `standard` -> `safe`
   - `high-traffic` -> `balanced`

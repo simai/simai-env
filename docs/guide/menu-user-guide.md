@@ -149,6 +149,7 @@ Advanced mode also adds:
 - `Apply optimization recommendations`
 - `Scheduler status`
 - `Health review`
+- `Site review`
 
 ## Most common user scenarios
 

@@ -127,6 +127,21 @@ Typical use:
 sudo /root/simai-env/simai-admin.sh self health-review-status
 ```
 
+## site-review-status
+Show the latest recurring site review summary produced by the shared scheduler.
+
+Output includes:
+- sites that still need setup
+- sites that have stayed in setup longer than the configured threshold
+- active rarely-used sites that are good pause candidates
+- already paused sites
+- sites in manual optimization mode
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self site-review-status
+```
+
 ## scheduler
 Run one shared scheduler tick immediately.
 
@@ -149,6 +164,7 @@ Output includes:
 Current built-in jobs:
 - `auto_optimize`
 - `health_review`
+- `site_review`
 
 Typical use:
 ```bash
@@ -159,23 +175,25 @@ sudo /root/simai-env/simai-admin.sh self scheduler-status
 Enable or disable the whole shared scheduler, or a specific job, without changing the cron entry itself.
 
 Options:
-- `--job all|auto-optimize|health-review`
+- `--job all|auto-optimize|health-review|site-review`
 
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self scheduler-disable --job auto-optimize
 sudo /root/simai-env/simai-admin.sh self scheduler-enable --job health-review
+sudo /root/simai-env/simai-admin.sh self scheduler-enable --job site-review
 ```
 
 ## scheduler-run
 Run one scheduler job immediately for testing or debugging.
 
 Options:
-- `--job auto-optimize|health-review`
+- `--job auto-optimize|health-review|site-review`
 
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self scheduler-run --job health-review
+sudo /root/simai-env/simai-admin.sh self scheduler-run --job site-review
 ```
 
 ## perf-status
