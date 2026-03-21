@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.81] - 2026-03-21
+### Added
+- Added a dedicated production-readiness checklist documenting the platform gate, acceptance matrix, and reporting format for moving `simai-env` toward production rollout.
+### Changed
+- Documentation navigation now links the production-readiness guide from the main docs index and admin overview.
+
 ## [1.11.80] - 2026-03-21
 ### Added
 - Added a read-only scheduler job `site-review` plus `self site-review-status` to highlight unfinished sites, stale setup candidates, and good pause candidates without changing live sites.

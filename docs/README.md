@@ -8,6 +8,7 @@ This directory contains architecture, development, and command reference docs fo
 - Bitrix ops reference: `docs/commands/bitrix.md`.
 - System/self reference: `docs/commands/self.md`.
 - Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`.
+- Production readiness: `docs/operations/production-readiness.md`.
 - Profile ops matrix: `docs/operations/profile-ops-matrix.md`.
 - Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`.
 - WordPress production runbook: `docs/operations/wordpress-production-runbook.md`.

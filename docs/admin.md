@@ -40,6 +40,7 @@ See `docs/architecture/profiles.md`.
 ## System and automation
 - User guide for menu-driven work: `docs/guide/menu-user-guide.md`.
 - Command reference for this section: `docs/commands/self.md`.
+- Production rollout gate: `docs/operations/production-readiness.md`.
 
 ## Self commands
 - `self update`: update scripts in place (reloads menu when invoked from menu).
