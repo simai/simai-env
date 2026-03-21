@@ -786,6 +786,10 @@ bitrix_php_baseline_sync_handler() {
             "short_open_tag|1" \
             "memory_limit|512M" \
             "max_input_vars|10000" \
+            "max_execution_time|300" \
+            "max_input_time|300" \
+            "post_max_size|64M" \
+            "upload_max_filesize|64M" \
             "opcache.validate_timestamps|1" \
             "opcache.revalidate_freq|0"
           if apply_site_php_ini_overrides_to_pool "$d" "$BX_PHP_VERSION" "$socket_project" "yes"; then

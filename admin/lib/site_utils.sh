@@ -910,7 +910,7 @@ php_admin_flag[log_errors] = on
 EOF
   if [[ "$profile_id" == "bitrix" ]]; then
     cat >>"$pool_file" <<'EOF'
-; simai-profile-ini-begin
+; simai-site-ini-begin
 php_admin_flag[short_open_tag] = on
 php_admin_value[memory_limit] = 512M
 php_admin_value[max_input_vars] = 10000
@@ -920,7 +920,7 @@ php_admin_value[post_max_size] = 64M
 php_admin_value[upload_max_filesize] = 64M
 php_admin_value[opcache.validate_timestamps] = 1
 php_admin_value[opcache.revalidate_freq] = 0
-; simai-profile-ini-end
+; simai-site-ini-end
 EOF
   fi
   os_svc_reload_or_restart "php${php_version}-fpm" || true
