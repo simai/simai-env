@@ -125,40 +125,54 @@ select_php_version_for_profile() {
     else
       candidates=("8.1" "8.2" "8.3" "8.4")
     fi
-    local default_sel=""
-    if printf '%s\n' "${candidates[@]}" | grep -qx "8.2" && is_php_version_installed "8.2"; then
-      default_sel="8.2"
-    else
-      local c
-      for c in "${candidates[@]}"; do
-        if is_php_version_installed "$c"; then
-          default_sel="$c"
-          break
-        fi
-      done
-    fi
-    [[ -z "$default_sel" ]] && default_sel="${candidates[0]}"
-    selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
-    [[ -z "$selected" ]] && selected="$default_sel"
-    if ! is_php_version_installed "$selected"; then
-      local choice
-      choice=$(select_from_list "PHP ${selected} is not installed. Install now?" "no" "no" "yes")
-      if [[ "$choice" == "yes" ]]; then
-        if ! run_command "php" "install" --php "$selected"; then
-          error "Failed to install PHP ${selected}"
-          return 1
-        fi
-        if ! is_php_version_installed "$selected"; then
-          error "PHP ${selected} installation did not complete; version still missing."
-          return 1
-        fi
+    while true; do
+      local default_sel=""
+      if printf '%s\n' "${candidates[@]}" | grep -qx "8.2" && is_php_version_installed "8.2"; then
+        default_sel="8.2"
       else
-        error "PHP ${selected} is not installed. Install it first: simai-admin.sh php install --php ${selected}"
+        local c
+        for c in "${candidates[@]}"; do
+          if is_php_version_installed "$c"; then
+            default_sel="$c"
+            break
+          fi
+        done
+      fi
+      [[ -z "$default_sel" ]] && default_sel="${candidates[0]}"
+      selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
+      if [[ -z "$selected" ]]; then
+        warn "Cancelled."
         return 1
       fi
-    fi
-    echo "$selected"
-    return 0
+      if is_php_version_installed "$selected"; then
+        echo "$selected"
+        return 0
+      fi
+
+      local choice
+      choice=$(select_from_list "PHP ${selected} is not installed. Install now?" "no" "no" "yes")
+      case "$choice" in
+        yes)
+          if ! run_command "php" "install" --php "$selected"; then
+            error "Failed to install PHP ${selected}"
+            return 1
+          fi
+          if ! is_php_version_installed "$selected"; then
+            error "PHP ${selected} installation did not complete; version still missing."
+            return 1
+          fi
+          echo "$selected"
+          return 0
+          ;;
+        "")
+          warn "Cancelled."
+          return 1
+          ;;
+        *)
+          info "Select another installed PHP version or choose yes to install PHP ${selected}."
+          ;;
+      esac
+    done
   fi
 
   local versions=()

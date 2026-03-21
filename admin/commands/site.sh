@@ -536,6 +536,15 @@ site_add_handler() {
     return
   fi
 
+  if [[ "${PROFILE_REQUIRES_PHP}" == "no" ]]; then
+    if [[ -n "$php_version" && "$php_version" != "none" ]]; then
+      warn "--php is ignored for profile ${profile} (no PHP runtime)"
+    fi
+    php_version="none"
+  else
+    php_version=$(select_php_version_for_profile "$php_version") || return 1
+  fi
+
   if [[ ! -d "$path" ]]; then
     info "Project path not found, creating: $path"
     mkdir -p "$path"
@@ -578,15 +587,6 @@ site_add_handler() {
       error "Required markers are still missing for profile ${profile} after bootstrap"
       return 1
     fi
-  fi
-
-  if [[ "${PROFILE_REQUIRES_PHP}" == "no" ]]; then
-    if [[ -n "$php_version" && "$php_version" != "none" ]]; then
-      warn "--php is ignored for profile ${profile} (no PHP runtime)"
-    fi
-    php_version="none"
-  else
-    php_version=$(select_php_version_for_profile "$php_version") || return 1
   fi
 
   local template_path

@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.5] - 2026-03-22
+### Fixed
+- `site add` menu flow now selects PHP before creating the project directory, avoiding half-created site roots when the operator changes their mind during PHP selection.
+- If a chosen PHP version is not installed and the operator declines installation, the menu now returns to PHP selection instead of failing the entire `site add` flow immediately.
+
 ## [1.12.4] - 2026-03-22
 ### Changed
 - Fresh-install `site add` now defaults to enabling all bundled profiles inline, so ordinary menu users get Bitrix, WordPress, and Laravel in the profile list without an extra detour. The redundant explicit `cancel` option was also removed; cancellation remains available through the shared `[0] Cancel` path.
