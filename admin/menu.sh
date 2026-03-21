@@ -132,13 +132,19 @@ actsellistbox=black,cyan
     fi
   }
   menu_pause_after_command() {
-    local section="$1" cmd="$2" rc="$3" output_file="$4"
+    local section="$1" cmd="$2" rc="$3" output_file="$4" streamed="${5:-no}"
     local status="SUCCESS"
     [[ "$rc" -ne 0 ]] && status="FAILED (${rc})"
     echo
     echo "Result: ${section} ${cmd}"
     echo "Status: ${status}"
-    if [[ -s "$output_file" ]]; then
+    if [[ "$streamed" == "yes" ]]; then
+      if [[ -s "$output_file" ]]; then
+        echo "(output shown above)"
+      else
+        echo "(no output)"
+      fi
+    elif [[ -s "$output_file" ]]; then
       cat "$output_file"
     else
       echo "(no output)"
@@ -277,6 +283,7 @@ actsellistbox=black,cyan
     local section="$1" cmd="$2"; shift 2
     echo "---- running ${section} ${cmd} ----"
     local rc=0
+    local streamed_output="yes"
     local required
     required="$(get_required_opts "$section" "$cmd")"
     local -a args=("$@")
@@ -297,12 +304,12 @@ actsellistbox=black,cyan
     fi
     local out_file
     out_file="$(mktemp)"
-    if run_command "$section" "$cmd" "${args[@]}" >"$out_file" 2>&1; then
+    if run_command "$section" "$cmd" "${args[@]}" 2>&1 | tee "$out_file"; then
       rc=0
     else
       rc=$?
     fi
-    menu_pause_after_command "$section" "$cmd" "$rc" "$out_file"
+    menu_pause_after_command "$section" "$cmd" "$rc" "$out_file" "$streamed_output"
     rm -f "$out_file"
     if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
       info "Restarting menu after update..."

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.1] - 2026-03-21
+### Fixed
+- Menu command execution now streams live output instead of hiding it in a temporary buffer until completion, so interactive handlers such as `site add` no longer appear to hang after the first prompt when they ask follow-up questions.
+
 ## [1.12.0] - 2026-03-21
 ### Added
 - Completed a clean-server production validation pass across `generic`, `wordpress`, `laravel`, and `bitrix` lifecycle flows, including real browser installs for WordPress and Bitrix.
