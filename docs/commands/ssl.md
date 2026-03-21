@@ -2,6 +2,20 @@
 
 Run with `sudo /root/simai-env/simai-admin.sh ssl <command> [options]` or via menu.
 
+## list
+Show SSL status for all current sites.
+
+Typical output includes:
+- domain
+- certificate type (`LE`, `LE-stg`, `custom`, `none`)
+- expiry date
+- days left
+- staging flag
+- redirect state
+- HSTS state
+
+This is the command used by the normal `SSL -> List SSL` menu item.
+
 ## letsencrypt (Let's Encrypt)
 Request a certificate via webroot.
 - `--domain` (required)
@@ -43,6 +57,19 @@ Examples:
 ## status
 Show cert type/paths/dates for domain.
 - `--domain` (required)
+
+Typical output includes:
+- domain
+- cert type
+- actual nginx cert/key paths when detected
+- fallback cert/key paths
+- not before / not after
+- issuer
+- SAN
+- staging state
+- warning note for staging certs
+
+This is the command used by the normal `SSL -> SSL status` menu item.
 
 Notes
 - Works only for existing sites (aliases are ignored/blocked).

@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.76] - 2026-03-21
+### Changed
+- Command reference coverage now matches more of the everyday menu surface, including `db status`, `db list`, `ssl list`, `ssl status`, and `site info`.
+
 ## [1.11.75] - 2026-03-21
 ### Added
 - Added a menu-first user guide covering the everyday interactive workflow for ordinary users.

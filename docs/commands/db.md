@@ -1,6 +1,37 @@
-# Database commands (per-site)
+# Database commands
 
 Manage MySQL databases and users for individual sites. Credentials are stored at `/etc/simai-env/sites/<domain>/db.env` (mode 0640, root owned); passwords are never logged.
+
+## Global database status
+
+### db status
+`simai-admin.sh db status`
+
+Shows:
+- mysql service state
+- whether mysql is enabled
+- detected version
+- socket presence
+- port
+- datadir
+- free disk near the datadir
+- ping/query reachability
+
+This is the command used by the normal `Database -> MySQL status` menu item.
+
+### db list
+`simai-admin.sh db list`
+
+Lists databases currently visible through MySQL root access.
+
+This is the command used by the normal `Database -> List databases` menu item.
+
+Notes:
+- It is read-only.
+- It does not print users, grants, or passwords.
+- Output is intended as a quick operational overview, not a schema dump.
+
+## Per-site database actions
 
 ## db-status
 `simai-admin.sh site db-status --domain <domain>`

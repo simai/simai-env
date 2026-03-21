@@ -86,6 +86,27 @@ Examples:
 ## list
 List domains from nginx sites-available with profile, PHP version, root/alias target, and brief SSL status (off/LE:YYYY-MM-DD/custom).
 
+## info
+Show the main site card for one domain.
+
+Options:
+- `--domain` (required outside menu)
+
+Output includes:
+- domain, profile, project, slug
+- root/docroot
+- nginx enabled state
+- nginx conf path
+- expected nginx log paths
+- healthcheck endpoint
+- PHP and socket/pool details
+- SSL summary plus redirect/HSTS hints
+- scheduler file state
+- worker unit state
+- activity class and plain-language optimization recommendation
+
+This is the command used by `Sites -> Site info`.
+
 ## set-php
 Switch site to a different PHP version (profile-driven).
 
