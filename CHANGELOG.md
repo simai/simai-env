@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.87] - 2026-03-21
+### Fixed
+- Fresh bootstrap now includes `php${PHP_VERSION}-bcmath` in the default PHP stack so newly provisioned Laravel sites do not fail doctor checks for a missing required extension on clean servers.
+
 ## [1.11.86] - 2026-03-21
 ### Changed
 - Continued consolidating the command presentation layer by introducing shared UI helpers for `Result` tables and result messages and wiring the main daily-ops commands to them (`self`, `site runtime`, `cron`, `site perf`, `ssl`, `wordpress`, `bitrix`).
