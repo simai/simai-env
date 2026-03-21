@@ -1,32 +1,87 @@
-# Profile commands
+# profile commands
 
-Manage profile activation and lint profiles.
+Run with `sudo /root/simai-env/simai-admin.sh profile <command> [options]` or via menu.
 
-## validate
-`simai-admin.sh profile validate [--id <id>] [--all yes]`  
-Lint profile files (read-only). Exits 1 on FAIL findings.
+Use this group to inspect which profiles exist, which ones are enabled, and where they are in use.
 
 ## list
-`simai-admin.sh profile list [--all yes]`  
-Shows profiles and status. By default lists only enabled profiles; `--all yes` shows disabled too. Reports activation mode (legacy vs allowlist at `/etc/simai-env/profiles.enabled`).
+Show available profiles and activation state.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile list
+sudo /root/simai-env/simai-admin.sh profile list --all yes
+```
+
+By default, only enabled profiles are listed. `--all yes` also shows disabled ones.
 
 ## used-by
-`simai-admin.sh profile used-by [--id <id>]`  
-Lists sites using profiles. With `--id`, prints domains using that profile.
+Show which sites use profiles.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile used-by
+sudo /root/simai-env/simai-admin.sh profile used-by --id wordpress
+```
+
+## used-by-one
+Show sites using one specific profile.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile used-by-one --id laravel
+```
+
+## validate
+Lint profile files in read-only mode.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile validate
+sudo /root/simai-env/simai-admin.sh profile validate --all yes
+```
+
+It exits non-zero when validation finds `FAIL` items.
 
 ## enable
-`simai-admin.sh profile enable --id <id>`  
-Adds a profile to the allowlist (creates allowlist if missing).
+Enable one profile in the allowlist.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile enable --id wordpress
+```
 
 ## disable
-`simai-admin.sh profile disable --id <id> [--force yes]`  
-Removes a profile from the allowlist. Core profiles (static, generic, alias) or profiles in use cannot be disabled without `--force yes`.
+Disable one profile in the allowlist.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile disable --id wordpress
+sudo /root/simai-env/simai-admin.sh profile disable --id wordpress --force yes
+```
+
+Notes:
+- core profiles cannot be disabled safely without force
+- profiles in active use are protected unless forced
 
 ## init
-`simai-admin.sh profile init [--mode core|all] [--force yes]`  
-Creates `/etc/simai-env/profiles.enabled`. Default `mode=core` keeps core (`static`, `generic`, `alias`) + profiles used by existing sites. `mode=all` seeds all profiles. Use `--force yes` to overwrite an existing allowlist.
-Install/repair calls `profile init --mode core` on fresh systems (no sites/allowlist).
+Initialize the profile allowlist.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh profile init
+sudo /root/simai-env/simai-admin.sh profile init --mode all --force yes
+```
+
+Options:
+- `--mode core|all`
+- `--force yes|no`
+
+Behavior:
+- creates `/etc/simai-env/profiles.enabled`
+- `core` keeps core profiles plus profiles already used by existing sites
+- `all` seeds all current profiles
 
 ## Notes
-- If `/etc/simai-env/profiles.enabled` is missing, activation runs in legacy mode (all profiles enabled). Managing profiles creates the allowlist.
-- `site add` only lists enabled profiles; enable a profile first if you want it selectable.
+- If `/etc/simai-env/profiles.enabled` is missing, simai-env works in legacy mode where all profiles are treated as enabled.
+- `site add` only offers enabled profiles in normal selection flows.

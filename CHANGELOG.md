@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.77] - 2026-03-21
+### Changed
+- Reworked the remaining everyday command docs (`php`, `logs`, `backup`, `profile`) into the same simple, command-first format as the newer documentation.
+- Daily ops quickstart now points menu-first users to the dedicated menu guide.
+
 ## [1.11.76] - 2026-03-21
 ### Changed
 - Command reference coverage now matches more of the everyday menu surface, including `db status`, `db list`, `ssl list`, `ssl status`, and `site info`.

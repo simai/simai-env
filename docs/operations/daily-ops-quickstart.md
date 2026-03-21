@@ -2,6 +2,7 @@
 
 Use this page as the fastest operator checklist for routine work.
 For profile-specific command selection, see `docs/operations/profile-ops-matrix.md`.
+For menu-driven everyday work, start with `docs/guide/menu-user-guide.md`.
 
 ## 1) Daily read-only check
 

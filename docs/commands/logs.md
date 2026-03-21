@@ -1,26 +1,72 @@
 # logs commands
 
-`logs` commands help inspect recent output from installer/admin/audit and nginx/Let’s Encrypt logs. Default tail length: 200 lines (override with `--lines`).
+Run with `sudo /root/simai-env/simai-admin.sh logs <command> [options]` or via menu.
 
-## logs admin
-- Tails `/var/log/simai-admin.log`.
-- Options: `--lines` (default 200).
+These commands provide quick access to the most useful platform logs without remembering full file paths.
 
-## logs env
-- Tails installer log `/var/log/simai-env.log`.
-- Options: `--lines` (default 200).
+Default tail length: `200` lines. Override with `--lines <n>`.
 
-## logs audit
-- Tails audit log `/var/log/simai-audit.log` (command start/finish with correlation IDs).
-- Options: `--lines` (default 200).
+## admin
+Tail the main admin log.
 
-## logs nginx
-- Select a domain from existing sites (aliases allowed, catch-all hidden) and tail nginx access/error log.
-- Options:
-  - `--domain` domain name (optional when using menu).
-  - `--kind` `access` (default) or `error`.
-  - `--lines` tail length (default 200).
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh logs admin
+sudo /root/simai-env/simai-admin.sh logs admin --lines 500
+```
 
-## logs letsencrypt
-- Tails `/var/log/letsencrypt/letsencrypt.log`.
-- Options: `--lines` (default 200).
+File:
+- `/var/log/simai-admin.log`
+
+## env
+Tail the environment/bootstrap log.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh logs env
+```
+
+File:
+- `/var/log/simai-env.log`
+
+## audit
+Tail the audit log.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh logs audit
+```
+
+File:
+- `/var/log/simai-audit.log`
+
+This log records command start/finish with correlation IDs and redacted arguments.
+
+## nginx
+Tail one site's nginx access or error log.
+
+Options:
+- `--domain <domain>` (required outside menu)
+- `--kind access|error` (default `access`)
+- `--lines <n>`
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh logs nginx --domain example.com --kind access
+sudo /root/simai-env/simai-admin.sh logs nginx --domain example.com --kind error --lines 300
+```
+
+Menu mapping:
+- `Logs -> Nginx access log`
+- `Logs -> Nginx error log`
+
+## letsencrypt
+Tail the Let's Encrypt log.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh logs letsencrypt
+```
+
+File:
+- `/var/log/letsencrypt/letsencrypt.log`
