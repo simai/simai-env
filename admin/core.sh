@@ -288,7 +288,7 @@ run_command() {
   ensure_audit_log
   local corr_id
   corr_id=$(uuidgen 2>/dev/null || date +"%Y%m%d%H%M%S%N")
-  local caller="${SUDO_USER:-$USER}"
+  local caller="${SUDO_USER:-${USER:-root}}"
   local args_redacted
   args_redacted=$(redact_args "$@")
   audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id"

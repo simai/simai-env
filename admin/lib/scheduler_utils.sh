@@ -61,7 +61,9 @@ scheduler_install_defaults() {
     "${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}" \
     "${SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES:-60}" \
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
-    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}"
+    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}" \
+    "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}" \
+    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}"
 }
 
 scheduler_write_config() {
@@ -72,6 +74,8 @@ scheduler_write_config() {
   local auto_cooldown="${5:-60}"
   local auto_limit="${6:-3}"
   local auto_rebalance_mode="${7:-auto}"
+  local health_enabled="${8:-yes}"
+  local health_interval="${9:-30}"
   local file content
   file=$(scheduler_config_file)
   content=$(cat <<EOF
@@ -82,6 +86,8 @@ SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES=${auto_interval}
 SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES=${auto_cooldown}
 SIMAI_AUTO_OPTIMIZE_LIMIT=${auto_limit}
 SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE=${auto_rebalance_mode}
+SIMAI_HEALTH_REVIEW_ENABLED=${health_enabled}
+SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES=${health_interval}
 EOF
 )
   scheduler_replace_managed_block "$file" "# simai-scheduler-begin" "# simai-scheduler-end" "$content"
@@ -127,12 +133,13 @@ scheduler_job_normalize() {
   job=$(printf '%s' "$job" | tr '[:upper:]' '[:lower:]' | tr '-' '_')
   case "$job" in
     auto_optimize) echo "auto_optimize" ;;
+    health_review) echo "health_review" ;;
     *) return 1 ;;
   esac
 }
 
 scheduler_jobs_list() {
-  printf "%s\n" "auto_optimize"
+  printf "%s\n" "auto_optimize" "health_review"
 }
 
 scheduler_job_enabled() {
@@ -145,6 +152,13 @@ scheduler_job_enabled() {
         return 0
       }
       echo "$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+      ;;
+    health_review)
+      [[ "$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" == "yes" ]] || {
+        echo "no"
+        return 0
+      }
+      echo "$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
       ;;
   esac
 }
@@ -161,6 +175,9 @@ scheduler_job_mode() {
         *) echo "assist" ;;
       esac
       ;;
+    health_review)
+      echo "report"
+      ;;
   esac
 }
 
@@ -171,6 +188,12 @@ scheduler_job_interval_minutes() {
     auto_optimize)
       local value="${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}"
       [[ "$value" =~ ^[0-9]+$ ]] || value=5
+      (( value < 1 )) && value=1
+      echo "$value"
+      ;;
+    health_review)
+      local value="${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}"
+      [[ "$value" =~ ^[0-9]+$ ]] || value=30
       (( value < 1 )) && value=1
       echo "$value"
       ;;
@@ -187,6 +210,9 @@ scheduler_job_cooldown_minutes() {
       (( value < 1 )) && value=1
       echo "$value"
       ;;
+    health_review)
+      echo "0"
+      ;;
   esac
 }
 
@@ -199,6 +225,9 @@ scheduler_job_limit() {
       [[ "$value" =~ ^[0-9]+$ ]] || value=3
       (( value < 1 )) && value=1
       echo "$value"
+      ;;
+    health_review)
+      echo "0"
       ;;
   esac
 }
@@ -215,6 +244,9 @@ scheduler_job_rebalance_mode() {
         *) echo "auto" ;;
       esac
       ;;
+    health_review)
+      echo "n/a"
+      ;;
   esac
 }
 
@@ -222,6 +254,12 @@ scheduler_job_state_file() {
   local job
   job=$(scheduler_job_normalize "$1") || return 1
   echo "$(scheduler_jobs_state_dir)/${job}.state"
+}
+
+scheduler_job_report_file() {
+  local job
+  job=$(scheduler_job_normalize "$1") || return 1
+  echo "$(scheduler_jobs_state_dir)/${job}.report"
 }
 
 scheduler_job_state_get() {
@@ -336,6 +374,43 @@ scheduler_mark_job_action() {
     "last_action_message|${message}"
 }
 
+scheduler_job_report_write() {
+  local job
+  job=$(scheduler_job_normalize "$1") || return 1
+  shift
+  install -d "$(scheduler_jobs_state_dir)"
+  local file tmp entry
+  file=$(scheduler_job_report_file "$job")
+  tmp=$(mktemp)
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    printf "%s=%s\n" "${entry%%|*}" "${entry#*|}" >>"$tmp"
+  done
+  mv "$tmp" "$file"
+  chmod 0644 "$file"
+  chown root:root "$file" 2>/dev/null || true
+}
+
+scheduler_job_report_get() {
+  local job key
+  job=$(scheduler_job_normalize "$1") || return 1
+  key="$2"
+  local file
+  file=$(scheduler_job_report_file "$job")
+  [[ -f "$file" ]] || return 1
+  awk -F= -v target="$key" '
+    $1 == target {
+      val=substr($0, index($0, "=")+1)
+      sub(/^[[:space:]]+/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      print val
+      found=1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$file"
+}
+
 scheduler_auto_optimize_run() {
   local mode limit rebalance_mode total budget excess risk
   mode=$(scheduler_job_mode "auto_optimize")
@@ -383,6 +458,110 @@ scheduler_auto_optimize_run() {
   return 1
 }
 
+scheduler_health_review_run() {
+  local total=0 active=0 suspended=0 auto_disabled=0 setup_pending=0 ssl_expiring_soon=0 ssl_disabled=0
+  local setup_domains=() expiring_domains=() manual_domains=()
+  local domain ssl_info ssl_type ssl_expires exp_ts now_ts days_left
+  local profile runtime_state auto_effective web_state root project
+  now_ts=$(date +%s)
+
+  while IFS= read -r domain; do
+    [[ -z "$domain" ]] && continue
+    total=$((total + 1))
+    if ! read_site_metadata "$domain" >/dev/null 2>&1; then
+      continue
+    fi
+    profile="${SITE_META[profile]:-unknown}"
+    runtime_state=$(site_runtime_state "$domain")
+    if [[ "$runtime_state" == "suspended" ]]; then
+      suspended=$((suspended + 1))
+    else
+      active=$((active + 1))
+    fi
+
+    auto_effective=$(site_auto_optimize_effective_enabled "$domain")
+    if [[ "$auto_effective" != yes* ]]; then
+      auto_disabled=$((auto_disabled + 1))
+      if (( ${#manual_domains[@]} < 5 )); then
+        manual_domains+=("$domain")
+      fi
+    fi
+
+    ssl_info=$(site_ssl_brief "$domain")
+    ssl_type="${ssl_info%%:*}"
+    ssl_expires="${ssl_info#*:}"
+    if [[ "$ssl_type" == "none" ]]; then
+      ssl_disabled=$((ssl_disabled + 1))
+    elif [[ "$ssl_expires" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+      exp_ts=$(date -d "$ssl_expires" +%s 2>/dev/null || echo "")
+      if [[ -n "$exp_ts" && "$exp_ts" =~ ^[0-9]+$ ]]; then
+        days_left=$(( (exp_ts - now_ts) / 86400 ))
+        if (( days_left <= 14 )); then
+          ssl_expiring_soon=$((ssl_expiring_soon + 1))
+          if (( ${#expiring_domains[@]} < 5 )); then
+            expiring_domains+=("${domain}(${days_left}d)")
+          fi
+        fi
+      fi
+    fi
+
+    case "$profile" in
+      laravel)
+        root="${SITE_META[root]:-$(site_root_path "$domain")}"
+        web_state=$(laravel_web_state_probe "$domain" "$root")
+        if [[ "$web_state" != "app" ]]; then
+          setup_pending=$((setup_pending + 1))
+          if (( ${#setup_domains[@]} < 5 )); then
+            setup_domains+=("${domain}(${web_state})")
+          fi
+        fi
+        ;;
+      wordpress)
+        web_state=$(wordpress_web_state_probe "$domain")
+        if [[ "$web_state" != "installed" ]]; then
+          setup_pending=$((setup_pending + 1))
+          if (( ${#setup_domains[@]} < 5 )); then
+            setup_domains+=("${domain}(${web_state})")
+          fi
+        fi
+        ;;
+      bitrix)
+        web_state=$(bitrix_web_state_probe "$domain")
+        if [[ "$web_state" != "installed" ]]; then
+          setup_pending=$((setup_pending + 1))
+          if (( ${#setup_domains[@]} < 5 )); then
+            setup_domains+=("${domain}(${web_state})")
+          fi
+        fi
+        ;;
+    esac
+  done < <(list_sites 2>/dev/null || true)
+
+  local total_children budget oversub summary
+  total_children=$(perf_fpm_total_max_children)
+  budget=$(perf_fpm_recommended_total_children)
+  oversub=$(perf_fpm_oversubscription_risk "$total_children" "$budget")
+
+  scheduler_job_report_write "health_review" \
+    "generated_at|$(date +%s)" \
+    "sites_total|${total}" \
+    "sites_active|${active}" \
+    "sites_suspended|${suspended}" \
+    "sites_auto_disabled|${auto_disabled}" \
+    "sites_setup_pending|${setup_pending}" \
+    "sites_ssl_expiring_soon|${ssl_expiring_soon}" \
+    "sites_ssl_disabled|${ssl_disabled}" \
+    "fpm_children|${total_children}" \
+    "fpm_budget|${budget}" \
+    "fpm_oversubscription|${oversub}" \
+    "setup_domains|$(IFS=', '; echo "${setup_domains[*]:-}")" \
+    "expiring_domains|$(IFS=', '; echo "${expiring_domains[*]:-}")" \
+    "manual_domains|$(IFS=', '; echo "${manual_domains[*]:-}")"
+
+  summary="sites=${total}, active=${active}, suspended=${suspended}, setup=${setup_pending}, ssl_soon=${ssl_expiring_soon}, oversub=${oversub}"
+  echo "$summary"
+}
+
 scheduler_run_job() {
   local job started_at ended_at message
   job=$(scheduler_job_normalize "$1") || return 1
@@ -390,6 +569,18 @@ scheduler_run_job() {
   case "$job" in
     auto_optimize)
       if message=$(scheduler_auto_optimize_run); then
+        ended_at=$(date +%s)
+        scheduler_mark_job_run "$job" "ok" "$message" "$started_at" "$ended_at"
+        ui_info "Scheduler job ${job}: ${message}"
+        return 0
+      fi
+      ended_at=$(date +%s)
+      scheduler_mark_job_run "$job" "failed" "$message" "$started_at" "$ended_at"
+      ui_warn "Scheduler job ${job}: ${message}"
+      return 1
+      ;;
+    health_review)
+      if message=$(scheduler_health_review_run); then
         ended_at=$(date +%s)
         scheduler_mark_job_run "$job" "ok" "$message" "$started_at" "$ended_at"
         ui_info "Scheduler job ${job}: ${message}"

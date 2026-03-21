@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.11.74] - 2026-03-21
+### Added
+- Added a read-only scheduler job `health-review` plus `self health-review-status` so the shared automation layer can produce recurring platform/site review summaries without changing live sites.
+### Fixed
+- Scheduler-driven commands no longer fail on missing `USER` in non-interactive cron runs.
+### Changed
+- Advanced `System` menu now exposes `Health review` alongside the existing scheduler status screen.
+
 ## [1.11.73] - 2026-03-21
 ### Fixed
 - Laravel app bootstrap now runs Composer from an accessible working directory for the site user instead of inheriting the root-only admin cwd.

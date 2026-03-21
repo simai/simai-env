@@ -702,7 +702,9 @@ self_scheduler_persist_config() {
     "${SIMAI_AUTO_OPTIMIZE_INTERVAL_MINUTES:-5}" \
     "${SIMAI_AUTO_OPTIMIZE_COOLDOWN_MINUTES:-60}" \
     "${SIMAI_AUTO_OPTIMIZE_LIMIT:-3}" \
-    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}"
+    "${SIMAI_AUTO_OPTIMIZE_REBALANCE_MODE:-auto}" \
+    "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}" \
+    "${SIMAI_HEALTH_REVIEW_INTERVAL_MINUTES:-30}"
 }
 
 self_scheduler_handler() {
@@ -768,6 +770,9 @@ self_scheduler_enable_handler() {
     auto-optimize)
       SIMAI_AUTO_OPTIMIZE_ENABLED="yes"
       ;;
+    health-review)
+      SIMAI_HEALTH_REVIEW_ENABLED="yes"
+      ;;
     *)
       error "Unsupported scheduler job: ${job}"
       return 1
@@ -778,7 +783,8 @@ self_scheduler_enable_handler() {
   ui_success "Scheduler config updated"
   print_kv_table \
     "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
-    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")" \
+    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
 }
 
 self_scheduler_disable_handler() {
@@ -793,6 +799,9 @@ self_scheduler_disable_handler() {
     auto-optimize)
       SIMAI_AUTO_OPTIMIZE_ENABLED="no"
       ;;
+    health-review)
+      SIMAI_HEALTH_REVIEW_ENABLED="no"
+      ;;
     *)
       error "Unsupported scheduler job: ${job}"
       return 1
@@ -803,7 +812,8 @@ self_scheduler_disable_handler() {
   ui_success "Scheduler config updated"
   print_kv_table \
     "Scheduler enabled|$(scheduler_normalize_bool "${SIMAI_SCHEDULER_ENABLED:-yes}")" \
-    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")"
+    "Auto optimize enabled|$(scheduler_normalize_bool "${SIMAI_AUTO_OPTIMIZE_ENABLED:-yes}")" \
+    "Health review enabled|$(scheduler_normalize_bool "${SIMAI_HEALTH_REVIEW_ENABLED:-yes}")"
 }
 
 self_scheduler_run_handler() {
@@ -881,6 +891,73 @@ self_auto_optimize_disable_handler() {
     "Rebalance policy|$(scheduler_job_rebalance_mode "auto_optimize")"
 }
 
+self_health_review_status_handler() {
+  ui_header "SIMAI ENV · Platform health review"
+
+  local enabled interval cron_state
+  enabled=$(scheduler_job_enabled "health_review")
+  interval=$(scheduler_job_interval_minutes "health_review")
+  cron_state="missing"
+  [[ -f "$(scheduler_cron_file)" ]] && cron_state="installed"
+
+  local last_run last_status last_message generated_at
+  last_run=$(scheduler_job_state_get "health_review" "last_run_epoch" 2>/dev/null || true)
+  last_status=$(scheduler_job_state_get "health_review" "last_status" 2>/dev/null || true)
+  last_message=$(scheduler_job_state_get "health_review" "last_message" 2>/dev/null || true)
+  generated_at=$(scheduler_job_report_get "health_review" "generated_at" 2>/dev/null || true)
+  [[ -z "$last_run" ]] && last_run="never"
+  [[ -z "$last_status" ]] && last_status="n/a"
+  [[ -z "$last_message" ]] && last_message="n/a"
+
+  local sites_total sites_active sites_suspended sites_auto_disabled sites_setup_pending sites_ssl_expiring_soon sites_ssl_disabled fpm_children fpm_budget fpm_oversub setup_domains expiring_domains manual_domains
+  sites_total=$(scheduler_job_report_get "health_review" "sites_total" 2>/dev/null || true)
+  sites_active=$(scheduler_job_report_get "health_review" "sites_active" 2>/dev/null || true)
+  sites_suspended=$(scheduler_job_report_get "health_review" "sites_suspended" 2>/dev/null || true)
+  sites_auto_disabled=$(scheduler_job_report_get "health_review" "sites_auto_disabled" 2>/dev/null || true)
+  sites_setup_pending=$(scheduler_job_report_get "health_review" "sites_setup_pending" 2>/dev/null || true)
+  sites_ssl_expiring_soon=$(scheduler_job_report_get "health_review" "sites_ssl_expiring_soon" 2>/dev/null || true)
+  sites_ssl_disabled=$(scheduler_job_report_get "health_review" "sites_ssl_disabled" 2>/dev/null || true)
+  fpm_children=$(scheduler_job_report_get "health_review" "fpm_children" 2>/dev/null || true)
+  fpm_budget=$(scheduler_job_report_get "health_review" "fpm_budget" 2>/dev/null || true)
+  fpm_oversub=$(scheduler_job_report_get "health_review" "fpm_oversubscription" 2>/dev/null || true)
+  setup_domains=$(scheduler_job_report_get "health_review" "setup_domains" 2>/dev/null || true)
+  expiring_domains=$(scheduler_job_report_get "health_review" "expiring_domains" 2>/dev/null || true)
+  manual_domains=$(scheduler_job_report_get "health_review" "manual_domains" 2>/dev/null || true)
+
+  ui_section "Result"
+  print_kv_table \
+    "Health review|${enabled}" \
+    "Shared scheduler cron|${cron_state}" \
+    "Interval|${interval}m" \
+    "Last run|$(scheduler_epoch_human "$last_run")" \
+    "Last report|$(scheduler_epoch_human "${generated_at:-}")" \
+    "Last status|${last_status}" \
+    "Last summary|${last_message}" \
+    "Sites total|${sites_total:-n/a}" \
+    "Sites active|${sites_active:-n/a}" \
+    "Sites suspended|${sites_suspended:-n/a}" \
+    "Sites auto optimize off|${sites_auto_disabled:-n/a}" \
+    "Sites needing setup|${sites_setup_pending:-n/a}" \
+    "Sites with SSL expiring soon|${sites_ssl_expiring_soon:-n/a}" \
+    "Sites without SSL|${sites_ssl_disabled:-n/a}" \
+    "FPM configured children|${fpm_children:-n/a}" \
+    "FPM budget|${fpm_budget:-n/a}" \
+    "FPM oversubscription|${fpm_oversub:-n/a}"
+
+  if [[ -n "${setup_domains:-}" || -n "${expiring_domains:-}" || -n "${manual_domains:-}" ]]; then
+    ui_section "Highlights"
+    local highlights=()
+    [[ -n "${setup_domains:-}" ]] && highlights+=("Needs setup|${setup_domains}")
+    [[ -n "${expiring_domains:-}" ]] && highlights+=("SSL expiring soon|${expiring_domains}")
+    [[ -n "${manual_domains:-}" ]] && highlights+=("Auto optimization off|${manual_domains}")
+    print_kv_table "${highlights[@]}"
+  fi
+
+  ui_section "Next steps"
+  ui_kv "Run review now" "simai-admin.sh self scheduler-run --job health-review"
+  ui_kv "Advanced scheduler status" "simai-admin.sh self scheduler-status"
+}
+
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
@@ -889,6 +966,7 @@ register_cmd "self" "platform-status" "Show platform diagnostic status" "self_pl
 register_cmd "self" "auto-optimize-status" "Show simple automatic optimization status" "self_auto_optimize_status_handler" "" ""
 register_cmd "self" "auto-optimize-enable" "Enable simple automatic optimization" "self_auto_optimize_enable_handler" "" ""
 register_cmd "self" "auto-optimize-disable" "Disable simple automatic optimization" "self_auto_optimize_disable_handler" "" ""
+register_cmd "self" "health-review-status" "Show platform health review status" "self_health_review_status_handler" "" ""
 register_cmd "self" "scheduler" "Run the internal simai scheduler tick" "self_scheduler_handler" "" ""
 register_cmd "self" "scheduler-status" "Show internal scheduler status" "self_scheduler_status_handler" "" ""
 register_cmd "self" "scheduler-enable" "Enable scheduler globally or by job" "self_scheduler_enable_handler" "" "job="
