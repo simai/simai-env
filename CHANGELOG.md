@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.3] - 2026-03-21
+### Changed
+- `site add` in menu mode can now enable all bundled profiles inline before profile selection, so operators do not need to leave the flow and run `profile init --mode all --force yes` separately just to create a Bitrix, WordPress, or Laravel site.
+
 ## [1.12.2] - 2026-03-21
 ### Fixed
 - Text-mode selection lists now support an explicit cancel path (`0`, `cancel`, `back`, `q`) instead of trapping users inside menu prompts with no visible way out.

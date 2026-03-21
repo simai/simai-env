@@ -357,7 +357,29 @@ site_add_handler() {
     if [[ ${#profiles_available[@]} -gt 0 && ${#all_profiles[@]} -gt ${#profiles_available[@]} ]]; then
       info "Only enabled profiles are shown in this list."
       info "Fresh install starts with core profiles: static, generic, alias."
-      info "Enable more profiles first if you need Bitrix, WordPress, or Laravel: simai-admin.sh profile init --mode all --force yes"
+      local profile_scope_choice=""
+      profile_scope_choice=$(select_from_list \
+        "More bundled profiles are available. What do you want to do?" \
+        "continue" \
+        "continue" \
+        "enable-all" \
+        "cancel")
+      case "$profile_scope_choice" in
+        enable-all)
+          if ! run_command profile init --mode all --force yes; then
+            error "Failed to enable all bundled profiles"
+            return 1
+          fi
+          mapfile -t profiles_available < <(list_enabled_profile_ids 2>/dev/null || true)
+          mapfile -t all_profiles < <(list_profile_ids 2>/dev/null || true)
+          ;;
+        cancel|"")
+          warn "Cancelled."
+          return 0
+          ;;
+        *)
+          ;;
+      esac
     fi
     local ordered=()
     for p in "${fallback_profiles[@]}"; do
