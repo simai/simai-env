@@ -134,7 +134,11 @@ actsellistbox=black,cyan
   menu_pause_after_command() {
     local section="$1" cmd="$2" rc="$3" output_file="$4" streamed="${5:-no}"
     local status="SUCCESS"
-    [[ "$rc" -ne 0 ]] && status="FAILED (${rc})"
+    if [[ "$rc" -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
+      status="SUCCESS (menu reload)"
+    elif [[ "$rc" -ne 0 ]]; then
+      status="FAILED (${rc})"
+    fi
     echo
     echo "Result: ${section} ${cmd}"
     echo "Status: ${status}"
@@ -312,13 +316,8 @@ actsellistbox=black,cyan
     menu_pause_after_command "$section" "$cmd" "$rc" "$out_file" "$streamed_output"
     rm -f "$out_file"
     if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
-      info "Restarting menu after update..."
-      if menu_spawn_restart; then
-        exit 0
-      fi
-      warn "Menu restart failed; continuing current session."
       reload_requested=1
-      echo "---- done (${section} ${cmd}), exit=${rc} ----"
+      echo "---- done (${section} ${cmd}), exit=0 ----"
       return 0
     fi
     echo "---- done (${section} ${cmd}), exit=${rc} ----"

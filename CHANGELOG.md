@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.6] - 2026-03-22
+### Fixed
+- Menu-mode `self update` now treats the post-update reload code as a successful internal reload instead of a failed command, and refreshes the current menu session in-place without triggering the old nested restart/depth-limit path.
+
 ## [1.12.5] - 2026-03-22
 ### Fixed
 - `site add` menu flow now selects PHP before creating the project directory, avoiding half-created site roots when the operator changes their mind during PHP selection.
