@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.0] - 2026-03-21
+### Added
+- Completed a clean-server production validation pass across `generic`, `wordpress`, `laravel`, and `bitrix` lifecycle flows, including real browser installs for WordPress and Bitrix.
+### Fixed
+- Fresh bootstrap now includes `php${PHP_VERSION}-bcmath` in the default PHP stack so newly provisioned Laravel sites do not fail doctor checks for a missing required extension on clean servers.
+- Bitrix required PHP pool baseline now lives in the site-managed INI block, and `bitrix php-baseline-sync` re-applies the full required runtime set (`max_execution_time`, `max_input_time`, `post_max_size`, `upload_max_filesize`) instead of only a partial subset.
+### Changed
+- First-run guidance now makes the default profile allowlist (`static`, `generic`, `alias`) and default PHP bootstrap version (`8.2`) explicit in both CLI hints and operator documentation.
+
 ## [1.11.87] - 2026-03-21
 ### Fixed
 - Fresh bootstrap now includes `php${PHP_VERSION}-bcmath` in the default PHP stack so newly provisioned Laravel sites do not fail doctor checks for a missing required extension on clean servers.

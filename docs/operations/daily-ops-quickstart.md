@@ -4,6 +4,11 @@ Use this page as the fastest operator checklist for routine work.
 For profile-specific command selection, see `docs/operations/profile-ops-matrix.md`.
 For menu-driven everyday work, start with `docs/guide/menu-user-guide.md`.
 
+Fresh install defaults:
+- only the core profiles are enabled at first: `static`, `generic`, `alias`
+- bootstrap installs PHP `8.2` by default
+- before creating `WordPress`, `Laravel`, or `Bitrix` sites, enable the profile and install another PHP version if you need one
+
 ## 1) Daily read-only check
 
 ```bash

@@ -8,6 +8,11 @@ sudo /root/simai-env/simai-admin.sh menu
 
 It focuses on the everyday menu flow, not on internal implementation details.
 
+Fresh install defaults:
+- new installs enable only the core profiles at first: `static`, `generic`, and `alias`
+- additional profiles such as `wordpress`, `laravel`, and `bitrix` can be enabled later from `Advanced -> Profiles`
+- bootstrap installs PHP `8.2` by default; install another version from the `PHP` section when needed
+
 ## How the menu behaves
 - The menu stays open after commands finish.
 - Failed commands return you to the menu instead of dropping you to the shell.

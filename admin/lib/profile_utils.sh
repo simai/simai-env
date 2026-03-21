@@ -84,7 +84,7 @@ maybe_init_profiles_allowlist_core_defaults() {
     return 0
   fi
 
-  info "Initializing profile activation allowlist (core profiles enabled by default)."
+  info "Initializing profile activation allowlist (core profiles enabled by default: static, generic, alias)."
   local ids=()
   local id
   while IFS= read -r id; do
@@ -103,6 +103,7 @@ maybe_init_profiles_allowlist_core_defaults() {
   printf "%s\n" "${ids[@]}" | write_profiles_allowlist
   info "Enabled profiles: ${ids[*]}"
   info "You can enable more profiles later: simai-admin.sh profile enable --id <profile>"
+  info "Or initialize all bundled profiles at once: simai-admin.sh profile init --mode all --force yes"
   return 0
 }
 

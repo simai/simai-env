@@ -393,7 +393,7 @@ site_add_handler() {
       return 1
     fi
     if ! is_profile_enabled "$profile"; then
-      error "Profile '${profile}' is disabled. Enable it: simai-admin.sh profile enable --id ${profile}"
+      error "Profile '${profile}' is disabled. Enable it: simai-admin.sh profile enable --id ${profile} (or initialize all bundled profiles with: simai-admin.sh profile init --mode all --force yes)"
       return 1
     fi
   fi
