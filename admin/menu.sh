@@ -438,12 +438,12 @@ actsellistbox=black,cyan
   ssl_menu() {
     while true; do
       local -a items=(
-        "1|List SSL"
-        "2|SSL status"
+        "1|List certificates"
+        "2|Certificate status"
         "3|Issue Let's Encrypt"
         "4|Install custom certificate"
         "5|Renew certificate"
-        "6|Remove SSL"
+        "6|Disable HTTPS"
         "0|Back"
       )
       local ch=""
@@ -892,11 +892,11 @@ actsellistbox=black,cyan
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
       local -a items=(
-        "1|System status"
+        "1|Platform status"
         "2|Optimization status"
         "3|${auto_opt_label}"
-        "4|Optimization recommendations"
-        "5|Repair environment"
+        "4|Optimization plan"
+        "5|Repair platform"
         "6|Update simai-env"
         "7|Version"
         "8|${adv_label}"
@@ -904,7 +904,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|System status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization recommendations" "5|Apply optimization recommendations" "6|Repair environment" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Scheduler status" "12|Health review" "13|Site review" "0|Back")
+        items=("1|Platform status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization plan" "5|Apply optimization plan" "6|Repair platform" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Automation scheduler status" "12|Health review" "13|Site review" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")

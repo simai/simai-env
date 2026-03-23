@@ -14,7 +14,7 @@ Typical output includes:
 - redirect state
 - HSTS state
 
-This is the command used by the normal `SSL -> List SSL` menu item.
+This is the command used by the normal `SSL -> List certificates` menu item.
 
 ## letsencrypt (Let's Encrypt)
 Request a certificate via webroot.
@@ -69,7 +69,7 @@ Typical output includes:
 - staging state
 - warning note for staging certs
 
-This is the command used by the normal `SSL -> SSL status` menu item.
+This is the command used by the normal `SSL -> Certificate status` menu item.
 
 Notes
 - Works only for existing sites (aliases are ignored/blocked).

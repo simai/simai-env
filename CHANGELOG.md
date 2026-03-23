@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.14] - 2026-03-23
+### Changed
+- `SSL` menu labels are now more user-facing: `List certificates`, `Certificate status`, and `Disable HTTPS`.
+- `System` menu labels are now more user-facing: `Platform status`, `Optimization plan`, `Repair platform`, and `Automation scheduler status`.
+- SSL/System docs were updated to match the new menu wording.
+
 ## [1.12.13] - 2026-03-23
 ### Changed
 - `Applications` now opens into separate `Laravel`, `WordPress`, and `Bitrix` submenus instead of showing one long mixed action list.

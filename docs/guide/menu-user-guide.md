@@ -47,12 +47,12 @@ Typical flow:
 Use this section to view certificate state and enable HTTPS.
 
 Common actions:
-- `List SSL`
-- `SSL status`
+- `List certificates`
+- `Certificate status`
 - `Issue Let's Encrypt`
 - `Install custom certificate`
 - `Renew certificate`
-- `Remove SSL`
+- `Disable HTTPS`
 
 ### PHP
 Use this section when you need to inspect installed PHP versions, install a new version, or reload PHP-FPM.
@@ -141,18 +141,18 @@ Common actions:
 Use this section for the platform itself.
 
 Regular mode:
-- `System status`
+- `Platform status`
 - `Optimization status`
 - `Automatic optimization`
-- `Optimization recommendations`
-- `Repair environment`
+- `Optimization plan`
+- `Repair platform`
 - `Update simai-env`
 - `Version`
 - `Advanced mode`
 
 Advanced mode also adds:
-- `Apply optimization recommendations`
-- `Scheduler status`
+- `Apply optimization plan`
+- `Automation scheduler status`
 - `Health review`
 - `Site review`
 

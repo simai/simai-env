@@ -267,6 +267,6 @@ sudo /root/simai-env/simai-admin.sh self perf-apply --preset small --confirm yes
 ```
 
 ## Notes
-- The regular `System` menu intentionally shows simple labels such as `Optimization status` and `Automatic optimization`.
+- The regular `System` menu intentionally shows simple labels such as `Platform status`, `Optimization status`, `Optimization plan`, and `Automatic optimization`.
 - Scheduler internals and `Health review` remain in Advanced mode.
 - Shared scheduler config lives in `/etc/simai-env.conf`, but ordinary users usually do not need to edit it manually.
