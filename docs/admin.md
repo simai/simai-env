@@ -68,6 +68,7 @@ See `docs/architecture/profiles.md`.
 - `site auto-optimize-status --domain <domain>` / `site auto-optimize-enable|disable|reset --domain <domain> --confirm yes`: per-site override for automatic optimization; useful when one site should be excluded from scheduler-driven automatic changes.
 - `site runtime-status --domain <domain>`: show whether the site runtime is active or suspended and whether its pool/cron/queue are currently enabled.
 - `site add --domain <domain> --host-mode wildcard`: create one site that serves both the main domain and all first-level subdomains (`*.domain`) on the same nginx vhost.
+- `ssl letsencrypt --domain <domain> --wildcard yes --dns-provider cloudflare --dns-credentials <file>`: request one Let's Encrypt cert for both the main domain and all first-level subdomains of a wildcard-host site.
 - In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Automatic optimization for this site`, `Site availability`, `Pause site`, `Resume site`, `Optimization plan`, `Database server status`, and `Configuration check`.
 - `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.

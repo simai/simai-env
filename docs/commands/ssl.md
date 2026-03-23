@@ -17,18 +17,36 @@ Typical output includes:
 This is the command used by the normal `SSL -> List certificates` menu item.
 
 ## letsencrypt (Let's Encrypt)
-Request a certificate via webroot.
+Request a certificate via webroot or DNS challenge.
 - `--domain` (required)
 - `--email` (required)
 - `--redirect yes|no` (default no) — add HTTP→HTTPS redirect.
 - `--hsts yes|no` (default no) — add HSTS header.
 - `--staging yes|no` (default no) — use LE staging.
+- `--wildcard yes|no` (default `no`) — request one certificate for both the main domain and all first-level subdomains.
+- `--wildcard-domain` (optional) — override wildcard hostname, default `*.domain`.
+- `--dns-provider cloudflare` — required for wildcard mode in the current implementation.
+- `--dns-credentials /path/to/file.ini` — required for wildcard mode; Cloudflare plugin credentials file.
 
-Uses site docroot (based on profile `PROFILE_PUBLIC_DIR`, recorded as `simai-public-dir` in nginx metadata), updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
+Behavior:
+- Standard mode uses site docroot (based on profile `PROFILE_PUBLIC_DIR`, recorded as `simai-public-dir` in nginx metadata), updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
+- Wildcard mode currently works only for sites created with `site add --host-mode wildcard`.
+- Wildcard mode currently uses DNS challenge through the Certbot Cloudflare plugin and requests a cert for both `<domain>` and `*.domain`.
+- Wildcard renewal reuses stored per-site DNS settings from `/etc/simai-env/sites/<domain>/ssl.env`.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain example.com --email ops@example.com
+sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain obr.site --email ops@example.com --wildcard yes --dns-provider cloudflare --dns-credentials /root/.secrets/certbot/cloudflare.ini
+```
 
 ## renew
 Force renew LE cert for domain, reload nginx.
 - `--domain` (required)
+
+Notes:
+- Standard certs renew through webroot as before.
+- Wildcard certs renew through the stored DNS challenge settings.
 
 ## install (custom cert)
 Install your own certificate and key.
@@ -75,3 +93,4 @@ Notes
 - Works only for existing sites (aliases are ignored/blocked).
 - Catch-all is never listed.
 - Private keys are not logged; cert/keys live under `/etc/letsencrypt/live/<domain>/` (LE) or `/etc/nginx/ssl/<domain>/` (custom).
+- Wildcard HTTPS is separate from wildcard host mode: wildcard host mode controls nginx routing, while wildcard HTTPS controls certificate coverage for subdomains.

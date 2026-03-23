@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.19] - 2026-03-23
+### Changed
+- `ssl letsencrypt` now supports wildcard certificates for wildcard-host sites through DNS challenge with the Certbot Cloudflare plugin.
+- Wildcard certificate settings are stored per site in `/etc/simai-env/sites/<domain>/ssl.env` and reused by `ssl renew`.
+- Menu/docs now explain wildcard HTTPS separately from wildcard host mode.
+
 ## [1.12.18] - 2026-03-23
 ### Changed
 - `site add` now supports `--host-mode standard|wildcard`, and menu mode can create one site that serves the main domain plus all first-level subdomains.

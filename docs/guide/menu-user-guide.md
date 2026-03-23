@@ -54,6 +54,10 @@ Common actions:
 - `Renew certificate`
 - `Disable HTTPS`
 
+Notes:
+- If a site was created with `Serve all first-level subdomains too? = yes`, the SSL screen can now request a wildcard certificate for the main domain plus `*.domain`.
+- Current wildcard HTTPS support uses Cloudflare DNS challenge and needs a credentials file on the server.
+
 ### PHP
 Use this section when you need to inspect installed PHP versions, install a new version, or reload PHP-FPM.
 

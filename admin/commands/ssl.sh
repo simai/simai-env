@@ -1,6 +1,117 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ssl_site_env_file() {
+  local domain="$1"
+  echo "/etc/simai-env/sites/${domain}/ssl.env"
+}
+
+ssl_site_write_state() {
+  local domain="$1"
+  shift
+  local file dir tmp
+  file=$(ssl_site_env_file "$domain")
+  dir=$(dirname "$file")
+  mkdir -p "$dir"
+  tmp=$(mktemp)
+  local entry
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    printf "%s=%s\n" "${entry%%|*}" "${entry#*|}" >>"$tmp"
+  done
+  if [[ -s "$tmp" ]]; then
+    mv "$tmp" "$file"
+    chmod 0600 "$file"
+    chown root:root "$file" 2>/dev/null || true
+  else
+    rm -f "$tmp"
+  fi
+}
+
+ssl_site_read_var() {
+  local domain="$1" key="$2"
+  local file
+  file=$(ssl_site_env_file "$domain")
+  [[ -f "$file" ]] || return 1
+  awk -F= -v target="$key" '
+    $1 == target {
+      val=substr($0, index($0, "=")+1)
+      sub(/^[[:space:]]+/, "", val)
+      sub(/[[:space:]]+$/, "", val)
+      print val
+      found=1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$file"
+}
+
+ssl_dns_provider_normalize() {
+  local provider="${1:-}"
+  provider=$(echo "$provider" | tr '[:upper:]' '[:lower:]')
+  case "$provider" in
+    cloudflare) echo "cloudflare" ;;
+    *) return 1 ;;
+  esac
+}
+
+ssl_dns_provider_package() {
+  local provider="$1"
+  case "$provider" in
+    cloudflare) echo "python3-certbot-dns-cloudflare" ;;
+    *) return 1 ;;
+  esac
+}
+
+ssl_dns_provider_flag() {
+  local provider="$1"
+  case "$provider" in
+    cloudflare) echo "--dns-cloudflare" ;;
+    *) return 1 ;;
+  esac
+}
+
+ssl_dns_provider_credentials_flag() {
+  local provider="$1"
+  case "$provider" in
+    cloudflare) echo "--dns-cloudflare-credentials" ;;
+    *) return 1 ;;
+  esac
+}
+
+ssl_ensure_dns_credentials_file() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    error "DNS credentials file not found: ${file}"
+    return 1
+  fi
+  chmod 0600 "$file" 2>/dev/null || true
+  return 0
+}
+
+ssl_menu_prepare_dns_wildcard() {
+  local domain="$1"
+  local email_default="$2"
+  local wildcard_domain="${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}"
+  info "Wildcard HTTPS needs DNS challenge. Current supported provider: Cloudflare."
+  local provider=""
+  provider=$(select_from_list "DNS provider for wildcard certificate" "cloudflare" "cloudflare")
+  [[ -z "$provider" ]] && return 1
+  local credentials=""
+  credentials=$(prompt "Cloudflare credentials file" "/root/.secrets/certbot/cloudflare.ini")
+  [[ -z "$credentials" ]] && return 1
+  local email=""
+  email=$(prompt "Let's Encrypt email" "$email_default")
+  [[ -z "$email" ]] && return 1
+  PARSED_ARGS[dns-provider]="$provider"
+  PARSED_ARGS[dns-credentials]="$credentials"
+  PARSED_ARGS[wildcard]="yes"
+  PARSED_ARGS[email]="$email"
+  PARSED_ARGS[domain]="$domain"
+  PARSED_ARGS[wildcard-domain]="$wildcard_domain"
+  return 0
+}
+
 ssl_select_domain() {
   local policy="${1:-block}"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -133,6 +244,10 @@ ssl_issue_handler() {
   local redirect="${PARSED_ARGS[redirect]:-}"
   local hsts="${PARSED_ARGS[hsts]:-}"
   local staging="${PARSED_ARGS[staging]:-}"
+  local wildcard="${PARSED_ARGS[wildcard]:-no}"
+  local dns_provider="${PARSED_ARGS[dns-provider]:-}"
+  local dns_credentials="${PARSED_ARGS[dns-credentials]:-}"
+  local wildcard_domain="${PARSED_ARGS[wildcard-domain]:-}"
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     if [[ -z "$domain" ]]; then
@@ -144,6 +259,19 @@ ssl_issue_handler() {
     if [[ -z "$email" ]]; then
       email=$(prompt "email")
       PARSED_ARGS[email]="$email"
+    fi
+    if [[ "${SITE_META[host_mode]:-standard}" == "wildcard" && -z "${PARSED_ARGS[wildcard]:-}" ]]; then
+      local cert_scope=""
+      cert_scope=$(select_from_list "Certificate scope" "standard" "standard" "wildcard")
+      [[ -z "$cert_scope" ]] && return 0
+      if [[ "$cert_scope" == "wildcard" ]]; then
+        ssl_menu_prepare_dns_wildcard "$domain" "$email" || return 0
+        wildcard="yes"
+        dns_provider="${PARSED_ARGS[dns-provider]:-}"
+        dns_credentials="${PARSED_ARGS[dns-credentials]:-}"
+        wildcard_domain="${PARSED_ARGS[wildcard-domain]:-}"
+        email="${PARSED_ARGS[email]:-$email}"
+      fi
     fi
     [[ -z "$redirect" ]] && redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
     if [[ -z "$staging" ]]; then
@@ -165,6 +293,7 @@ ssl_issue_handler() {
   fi
   [[ -z "$redirect" ]] && redirect="no"
   [[ -z "$staging" ]] && staging="no"
+  [[ -z "$wildcard" ]] && wildcard="no"
   if [[ "$staging" == "yes" && $staging_warned -eq 0 ]]; then
     warn "Let's Encrypt STAGING issues certificates that are NOT trusted by browsers. Use only for testing/diagnostics."
     warn "HSTS will be forced to NO in staging mode."
@@ -174,9 +303,27 @@ ssl_issue_handler() {
 
   PARSED_ARGS[domain]="$domain"
   PARSED_ARGS[email]="$email"
+  PARSED_ARGS[wildcard]="$wildcard"
   require_args "domain email" || return 1
   domain="${PARSED_ARGS[domain]:-}"
   email="${PARSED_ARGS[email]:-}"
+  wildcard="${PARSED_ARGS[wildcard]:-no}"
+  wildcard=$(echo "$wildcard" | tr '[:upper:]' '[:lower:]')
+  if [[ "$wildcard" == "yes" ]]; then
+    wildcard_domain="${PARSED_ARGS[wildcard-domain]:-${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}}"
+    dns_provider=$(ssl_dns_provider_normalize "${PARSED_ARGS[dns-provider]:-$dns_provider}") || {
+      error "Wildcard certificate currently requires --dns-provider cloudflare"
+      return 1
+    }
+    dns_credentials="${PARSED_ARGS[dns-credentials]:-$dns_credentials}"
+    if [[ -z "$dns_credentials" ]]; then
+      error "Wildcard certificate requires --dns-credentials <file>"
+      return 1
+    fi
+    if ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
+      return 1
+    fi
+  fi
   progress_step "Validating domain and loading site metadata"
   if ! validate_domain "$domain"; then
     return 1
@@ -193,6 +340,10 @@ ssl_issue_handler() {
     error "Failed to read site context for ${domain}. Check nginx config metadata headers (simai-*)."
     return 1
   fi
+  if [[ "$wildcard" == "yes" && "${SITE_META[host_mode]:-standard}" != "wildcard" ]]; then
+    error "Wildcard certificate requires a site created with host mode wildcard"
+    return 1
+  fi
   local webroot=""
   local pd="${SITE_SSL_PUBLIC_DIR}"
   webroot=$(site_compute_doc_root "$SITE_SSL_ROOT" "$pd") || return 1
@@ -202,10 +353,23 @@ ssl_issue_handler() {
   mkdir -p "$webroot"
   progress_step "Preparing ACME webroot at ${webroot}"
 
-  local cmd=(certbot certonly --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+  local -a cmd=()
+  if [[ "$wildcard" == "yes" ]]; then
+    local plugin_flag credentials_flag pkg
+    plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
+    credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
+    pkg=$(ssl_dns_provider_package "$dns_provider")
+    if ! certbot plugins 2>/dev/null | grep -qi "dns-${dns_provider}"; then
+      error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
+      return 1
+    fi
+    cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+  else
+    cmd=(certbot certonly --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+  fi
   [[ "$staging" == "yes" ]] && cmd+=(--staging)
-  progress_step "Requesting certificate from Let's Encrypt (staging=${staging})"
-  if ! run_long "Requesting certificate from Let's Encrypt (staging=${staging})" "${cmd[@]}"; then
+  progress_step "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})"
+  if ! run_long "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})" "${cmd[@]}"; then
     error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
     return 1
   fi
@@ -218,6 +382,13 @@ ssl_issue_handler() {
     return 1
   fi
   ensure_certbot_cron
+  ssl_site_write_state "$domain" \
+    "SITE_SSL_LE_MODE|$([[ "$wildcard" == "yes" ]] && echo dns || echo webroot)" \
+    "SITE_SSL_LE_WILDCARD|${wildcard}" \
+    "SITE_SSL_LE_WILDCARD_DOMAIN|${wildcard_domain}" \
+    "SITE_SSL_LE_DNS_PROVIDER|${dns_provider}" \
+    "SITE_SSL_LE_DNS_CREDENTIALS|${dns_credentials}" \
+    "SITE_SSL_LE_EMAIL|${email}"
   progress_step "Reloading nginx"
   local hsts_display="${hsts}"
   if [[ "$staging" == "yes" ]]; then
@@ -226,6 +397,7 @@ ssl_issue_handler() {
   ui_result_table \
     "Domain|${domain}" \
     "Type|Let's Encrypt" \
+    "Scope|$([[ "$wildcard" == "yes" ]] && echo "${domain}, ${wildcard_domain}" || echo "${domain}")" \
     "Cert|${cert}" \
     "Key|${key}" \
     "Chain|${chain}" \
@@ -378,6 +550,14 @@ ssl_renew_handler() {
     return 1
   fi
   ssl_site_context "$domain" || return 1
+  local le_mode wildcard dns_provider dns_credentials wildcard_domain le_email
+  le_mode=$(ssl_site_read_var "$domain" "SITE_SSL_LE_MODE" 2>/dev/null || true)
+  wildcard=$(ssl_site_read_var "$domain" "SITE_SSL_LE_WILDCARD" 2>/dev/null || true)
+  dns_provider=$(ssl_site_read_var "$domain" "SITE_SSL_LE_DNS_PROVIDER" 2>/dev/null || true)
+  dns_credentials=$(ssl_site_read_var "$domain" "SITE_SSL_LE_DNS_CREDENTIALS" 2>/dev/null || true)
+  wildcard_domain=$(ssl_site_read_var "$domain" "SITE_SSL_LE_WILDCARD_DOMAIN" 2>/dev/null || true)
+  le_email=$(ssl_site_read_var "$domain" "SITE_SSL_LE_EMAIL" 2>/dev/null || true)
+  [[ -z "$le_mode" ]] && le_mode="webroot"
   progress_step "Preparing ACME webroot"
   local pd="${SITE_SSL_PUBLIC_DIR}"
   local webroot=""
@@ -386,7 +566,23 @@ ssl_renew_handler() {
     return 1
   fi
   progress_step "Requesting renewal from Let's Encrypt"
-  if ! run_long "Renewing certificate for ${domain}" certbot certonly --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain"; then
+  local -a renew_cmd=()
+  if [[ "$le_mode" == "dns" || "$wildcard" == "yes" ]]; then
+    dns_provider=$(ssl_dns_provider_normalize "$dns_provider") || {
+      error "Stored wildcard renewal provider is unsupported"
+      return 1
+    }
+    if ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
+      return 1
+    fi
+    local plugin_flag credentials_flag
+    plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
+    credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
+    renew_cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" -d "$domain" -d "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}")
+  else
+    renew_cmd=(certbot certonly --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
+  fi
+  if ! run_long "Renewing certificate for ${domain}" "${renew_cmd[@]}"; then
     error "Renew failed for ${domain}; see ${LOG_FILE}"
     return 1
   fi
@@ -644,7 +840,7 @@ ssl_list_handler() {
   ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain <domain> --email <email>"
 }
 
-register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging="
+register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging= wildcard= dns-provider= dns-credentials= wildcard-domain="
 register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect= hsts="
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
 register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert= confirm="
