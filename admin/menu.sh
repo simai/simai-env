@@ -613,181 +613,241 @@ actsellistbox=black,cyan
     done
   }
 
-  laravel_menu() {
+  laravel_app_menu() {
     while true; do
       local -a items=(
-        "1|Laravel cache clear"
-        "2|Laravel scheduler enable"
-        "3|Laravel scheduler disable"
-        "4|Laravel worker status"
-        "5|Laravel worker restart"
-        "6|Laravel worker logs"
-        "7|Laravel status"
-        "8|Laravel prepare app"
-        "9|Laravel complete setup"
-        "10|WordPress status"
-        "11|WordPress optimization"
-        "12|WordPress complete setup"
-        "13|Bitrix status"
-        "14|Bitrix optimization"
-        "15|Bitrix complete setup"
+        "1|Laravel status"
+        "2|Laravel prepare app"
+        "3|Laravel complete setup"
+        "4|Laravel cache clear"
+        "5|Laravel scheduler enable"
+        "6|Laravel scheduler disable"
+        "7|Laravel worker status"
+        "8|Laravel worker restart"
+        "9|Laravel worker logs"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Laravel cache clear" "2|Laravel scheduler enable" "3|Laravel scheduler disable" "4|Laravel worker status" "5|Laravel worker restart" "6|Laravel worker logs" "7|Laravel status" "8|Laravel prepare app" "9|Laravel complete setup" "10|Laravel optimization" "11|WordPress status" "12|WordPress optimization" "13|WordPress complete setup" "14|WordPress installer ready" "15|WordPress scheduler status" "16|WordPress scheduler sync" "17|WordPress cache clear" "18|Bitrix status" "19|Bitrix optimization" "20|Bitrix complete setup" "21|Bitrix scheduler status" "22|Bitrix scheduler sync" "23|Bitrix cache clear" "24|Bitrix agents status" "25|Bitrix agents readiness" "26|Bitrix DB preseed" "27|Bitrix installer ready" "28|Bitrix PHP baseline sync (all)" "29|Bitrix agents sync (apply)" "0|Back")
+        items=("1|Laravel status" "2|Laravel prepare app" "3|Laravel complete setup" "4|Laravel optimization" "5|Laravel cache clear" "6|Laravel scheduler enable" "7|Laravel scheduler disable" "8|Laravel worker status" "9|Laravel worker restart" "10|Laravel worker logs" "0|Back")
       fi
       local ch=""
-      ch=$(menu_choose_key "Applications" "Enter choice" "" "${items[@]}")
+      ch=$(menu_choose_key "Applications · Laravel" "Enter choice" "" "${items[@]}")
       case "$ch" in
-        1) run_menu_command cache clear ;;
-        2) run_menu_command cron add ;;
-        3) run_menu_command cron remove ;;
-        4) run_menu_command queue status ;;
-        5) run_menu_command queue restart ;;
-        6) run_menu_command queue logs ;;
-        7) run_menu_command laravel status ;;
-        8) run_menu_command laravel app-ready ;;
-        9) run_menu_command laravel finalize ;;
-        10)
+        1) run_menu_command laravel status ;;
+        2) run_menu_command laravel app-ready ;;
+        3) run_menu_command laravel finalize ;;
+        4)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command laravel perf-status
           else
-            run_menu_command wp status
+            run_menu_command cache clear
           fi
           ;;
-        11)
+        5)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp status
+            run_menu_command cache clear
           else
-            run_menu_command wp perf-status
+            run_menu_command cron add
           fi
           ;;
-        12)
+        6)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp perf-status
+            run_menu_command cron add
           else
-            run_menu_command wp finalize
+            run_menu_command cron remove
           fi
           ;;
-        13)
+        7)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command wp finalize
+            run_menu_command cron remove
           else
-            run_menu_command bitrix status
+            run_menu_command queue status
           fi
           ;;
-        14)
+        8)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command queue status
+          else
+            run_menu_command queue restart
+          fi
+          ;;
+        9)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command queue restart
+          else
+            run_menu_command queue logs
+          fi
+          ;;
+        10)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command queue logs
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        0) break ;;
+        "") continue ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
+  wordpress_app_menu() {
+    while true; do
+      local -a items=(
+        "1|WordPress status"
+        "2|WordPress optimization"
+        "3|WordPress complete setup"
+        "0|Back"
+      )
+      if [[ $show_advanced -eq 1 ]]; then
+        items=("1|WordPress status" "2|WordPress optimization" "3|WordPress complete setup" "4|WordPress installer ready" "5|WordPress scheduler status" "6|WordPress scheduler sync" "7|WordPress cache clear" "0|Back")
+      fi
+      local ch=""
+      ch=$(menu_choose_key "Applications · WordPress" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command wp status ;;
+        2) run_menu_command wp perf-status ;;
+        3) run_menu_command wp finalize ;;
+        4)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp installer-ready
           else
-            run_menu_command bitrix perf-status
+            menu_invalid_choice
           fi
           ;;
-        15)
+        5)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cron-status
           else
-            run_menu_command bitrix finalize
+            menu_invalid_choice
           fi
           ;;
-        16)
+        6)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cron-sync
           else
             menu_invalid_choice
           fi
           ;;
-        17)
+        7)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cache-clear
           else
             menu_invalid_choice
           fi
           ;;
-        18)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        19)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix perf-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        20)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix finalize
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        21)
+        0) break ;;
+        "") continue ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
+  bitrix_app_menu() {
+    while true; do
+      local -a items=(
+        "1|Bitrix status"
+        "2|Bitrix optimization"
+        "3|Bitrix complete setup"
+        "0|Back"
+      )
+      if [[ $show_advanced -eq 1 ]]; then
+        items=("1|Bitrix status" "2|Bitrix optimization" "3|Bitrix complete setup" "4|Bitrix scheduler status" "5|Bitrix scheduler sync" "6|Bitrix cache clear" "7|Bitrix agents status" "8|Bitrix agents readiness" "9|Bitrix DB preseed" "10|Bitrix installer ready" "11|Bitrix PHP baseline sync (all)" "12|Bitrix agents sync (apply)" "0|Back")
+      fi
+      local ch=""
+      ch=$(menu_choose_key "Applications · Bitrix" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command bitrix status ;;
+        2) run_menu_command bitrix perf-status ;;
+        3) run_menu_command bitrix finalize ;;
+        4)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix cron-status
           else
             menu_invalid_choice
           fi
           ;;
-        22)
+        5)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix cron-sync
           else
             menu_invalid_choice
           fi
           ;;
-        23)
+        6)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix cache-clear
           else
             menu_invalid_choice
           fi
           ;;
-        24)
+        7)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix agents-status
           else
             menu_invalid_choice
           fi
           ;;
-        25)
+        8)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix agents-sync
           else
             menu_invalid_choice
           fi
           ;;
-        26)
+        9)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix db-preseed
           else
             menu_invalid_choice
           fi
           ;;
-        27)
+        10)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix installer-ready
           else
             menu_invalid_choice
           fi
           ;;
-        28)
+        11)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix php-baseline-sync --all yes
           else
             menu_invalid_choice
           fi
           ;;
-        29)
+        12)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command bitrix agents-sync --apply yes
           else
             menu_invalid_choice
           fi
           ;;
+        0) break ;;
+        "") continue ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
+  applications_menu() {
+    while true; do
+      local -a items=(
+        "1|Laravel"
+        "2|WordPress"
+        "3|Bitrix"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Applications" "Choose application" "" "${items[@]}")
+      case "$ch" in
+        1) laravel_app_menu ;;
+        2) wordpress_app_menu ;;
+        3) bitrix_app_menu ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -985,7 +1045,7 @@ actsellistbox=black,cyan
       5) diagnostics_menu ;;
       6) logs_menu ;;
       7) backup_menu ;;
-      8) laravel_menu ;;
+      8) applications_menu ;;
       9) profiles_menu ;;
       10) system_menu ;;
       0) exit 0 ;;

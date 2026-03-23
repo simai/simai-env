@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.13] - 2026-03-23
+### Changed
+- `Applications` now opens into separate `Laravel`, `WordPress`, and `Bitrix` submenus instead of showing one long mixed action list.
+- Laravel, WordPress, and Bitrix menu/docs references were updated to match the new submenu structure.
+
 ## [1.12.12] - 2026-03-23
 ### Changed
 - `Sites -> Create site` no longer asks a separate technical `.env` export question in menu mode for required-DB profiles; DB credentials are exported by default and summarized clearly.

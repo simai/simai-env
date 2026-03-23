@@ -1,7 +1,7 @@
 # Laravel Commands
 
 Laravel profile-aware lifecycle and optimization commands are available under the `laravel` section.
-In the interactive menu, Laravel daily actions are shown inside the shared `Applications` section.
+In the interactive menu, Laravel daily actions are shown inside `Applications -> Laravel`.
 
 All commands require a site with `laravel` profile.
 

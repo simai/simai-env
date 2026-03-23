@@ -100,14 +100,14 @@ Common actions:
 - `Import archive (plan)`
 
 ### Applications
-This section is the shared application/CMS daily-ops area for:
-- Laravel
-- WordPress
-- Bitrix
+This section is the shared application/CMS area. It now opens into three submenus:
+- `Laravel`
+- `WordPress`
+- `Bitrix`
 
-Regular mode keeps only the most common actions. Advanced mode shows installer/scheduler/cache maintenance commands.
+Regular mode keeps only the most common actions in each submenu. Advanced mode shows installer, scheduler, cache, and maintenance commands.
 
-Common Laravel actions:
+Common Laravel actions inside `Applications -> Laravel`:
 - `Laravel status`
 - `Laravel prepare app`
 - `Laravel complete setup`
@@ -117,12 +117,12 @@ Common Laravel actions:
 - `Laravel scheduler enable`
 - `Laravel scheduler disable`
 
-Common WordPress actions:
+Common WordPress actions inside `Applications -> WordPress`:
 - `WordPress status`
 - `WordPress optimization`
 - `WordPress complete setup`
 
-Common Bitrix actions:
+Common Bitrix actions inside `Applications -> Bitrix`:
 - `Bitrix status`
 - `Bitrix optimization`
 - `Bitrix complete setup`

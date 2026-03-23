@@ -1,7 +1,7 @@
 # WordPress Commands
 
 WordPress operational commands are available under the `wp` section.
-In the interactive menu, the daily WordPress actions currently appear inside the shared `Applications` section.
+In the interactive menu, the daily WordPress actions appear inside `Applications -> WordPress`.
 
 All commands require a site with `wordpress` profile.
 
