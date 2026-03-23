@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.15] - 2026-03-23
+### Changed
+- `Database` menu labels are now more user-facing: `Database server status`, `Create database for site`, `Write site database settings`, `Rotate database password`, and `Remove database for site`.
+- `Diagnostics` menu labels are now more user-facing: `Site health check`, `Configuration check`, and `Repair configuration`.
+- Database/Diagnostics guide and admin docs were updated to match the new menu wording.
+
 ## [1.12.14] - 2026-03-23
 ### Changed
 - `SSL` menu labels are now more user-facing: `List certificates`, `Certificate status`, and `Disable HTTPS`.

@@ -489,14 +489,14 @@ actsellistbox=black,cyan
     while true; do
       local -a items=(
         "1|List databases"
-        "2|MySQL status"
-        "3|Create DB + user (for site)"
-        "4|Write DB credentials to project"
-        "5|Rotate DB user password"
+        "2|Database server status"
+        "3|Create database for site"
+        "4|Write site database settings"
+        "5|Rotate database password"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|List databases" "2|MySQL status" "3|Create DB + user (for site)" "4|Write DB credentials to project" "5|Rotate DB user password" "6|Drop DB + user" "0|Back")
+        items=("1|List databases" "2|Database server status" "3|Create database for site" "4|Write site database settings" "5|Rotate database password" "6|Remove database for site" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
@@ -524,11 +524,11 @@ actsellistbox=black,cyan
   diagnostics_menu() {
     while true; do
       local -a items=(
-        "1|Site doctor"
-        "2|Drift plan"
+        "1|Site health check"
+        "2|Configuration check"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items+=("3|Drift apply")
+        items+=("3|Repair configuration")
       fi
       items+=("4|Platform status")
       items+=("0|Back")

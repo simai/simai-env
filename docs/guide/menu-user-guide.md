@@ -67,17 +67,17 @@ Use this section for database overview and site-level DB operations.
 
 Common actions:
 - `List databases`
-- `MySQL status`
-- `Create DB + user`
-- `Write DB credentials to project`
-- `Rotate DB password`
+- `Database server status`
+- `Create database for site`
+- `Write site database settings`
+- `Rotate database password`
 
 ### Diagnostics
 Use this section for read-only checks.
 
 Common actions:
-- `Site doctor`
-- `Drift plan`
+- `Site health check`
+- `Configuration check`
 - `Platform status`
 
 ### Logs
