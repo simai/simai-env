@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.16] - 2026-03-23
+### Changed
+- `Profiles` menu labels are now more user-facing: `Profile usage summary`, `Sites using one profile`, `Check profiles`, `Turn profile on`, `Turn profile off`, and `Initialize profile list`.
+- Advanced `Sites` menu labels for per-site automatic optimization are now more explicit and easier to understand.
+
 ## [1.12.15] - 2026-03-23
 ### Changed
 - `Database` menu labels are now more user-facing: `Database server status`, `Create database for site`, `Write site database settings`, `Rotate database password`, and `Remove database for site`.

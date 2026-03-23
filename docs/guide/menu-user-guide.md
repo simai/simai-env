@@ -132,10 +132,10 @@ Use this section to inspect and manage profile availability.
 
 Common actions:
 - `List profiles`
-- `Used by`
-- `Validate profiles`
-- `Enable profile`
-- `Disable profile`
+- `Profile usage summary`
+- `Check profiles`
+- `Turn profile on`
+- `Turn profile off`
 
 ### System
 Use this section for the platform itself.

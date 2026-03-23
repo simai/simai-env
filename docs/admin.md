@@ -67,7 +67,7 @@ See `docs/architecture/profiles.md`.
 - `site usage-status --domain <domain>` / `site usage-set --domain <domain> --class standard|high-traffic|rarely-used --confirm yes`: simple user-facing site activity class mapped to the internal performance engine.
 - `site auto-optimize-status --domain <domain>` / `site auto-optimize-enable|disable|reset --domain <domain> --confirm yes`: per-site override for automatic optimization; useful when one site should be excluded from scheduler-driven automatic changes.
 - `site runtime-status --domain <domain>`: show whether the site runtime is active or suspended and whether its pool/cron/queue are currently enabled.
-- In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Site availability`, `Pause site`, `Resume site`, `Optimization plan`, `Database server status`, and `Configuration check`.
+- In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Automatic optimization for this site`, `Site availability`, `Pause site`, `Resume site`, `Optimization plan`, `Database server status`, and `Configuration check`.
 - `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
 - `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
 - `laravel status --domain <domain>`: show Laravel lifecycle state (`placeholder`, `app-ready`, `post-install`) and the next practical action.
