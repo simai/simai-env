@@ -295,6 +295,36 @@ site_issue_default_ssl_after_create() {
   fi
 }
 
+site_menu_prepare_ssl_choice() {
+  local default_mode="$1"
+  local email_default="$2"
+
+  local default_choice="no"
+  case "$(site_ssl_mode_normalize "$default_mode")" in
+    yes) default_choice="yes" ;;
+    *) default_choice="no" ;;
+  esac
+
+  local choice=""
+  choice=$(select_from_list "Issue Let's Encrypt certificate after site creation?" "$default_choice" "no" "yes")
+  if [[ -z "$choice" ]]; then
+    warn "Cancelled."
+    return 1
+  fi
+
+  PARSED_ARGS[ssl]="$choice"
+  if [[ "$choice" == "yes" ]]; then
+    local email=""
+    email=$(prompt "Let's Encrypt email" "$email_default")
+    if [[ -z "$email" ]]; then
+      warn "Cancelled."
+      return 1
+    fi
+    PARSED_ARGS[ssl-email]="$email"
+  fi
+  return 0
+}
+
 site_add_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -442,6 +472,14 @@ site_add_handler() {
       error "Unsupported site usage class: ${PARSED_ARGS[usage]:-}"
       return 1
     }
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[ssl]:-}" ]]; then
+    if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+      site_menu_prepare_ssl_choice "$ssl_mode" "$ssl_email" || return 0
+      ssl_mode="${PARSED_ARGS[ssl]:-$ssl_mode}"
+      ssl_email="${PARSED_ARGS[ssl-email]:-$ssl_email}"
+    fi
   fi
 
   if [[ "${PROFILE_IS_ALIAS:-no}" == "yes" ]]; then

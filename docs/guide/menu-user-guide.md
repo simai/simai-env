@@ -163,8 +163,9 @@ Advanced mode also adds:
 2. Enter the domain.
 3. Choose the profile.
 4. Choose activity class if asked.
-5. If the profile needs a database, confirm DB creation.
+5. If the profile supports PHP, choose one of the installed compatible PHP versions.
 6. If you want HTTPS right away, choose SSL issuance when prompted.
+7. If the profile needs a database, confirm DB creation.
 
 ## Finish a Laravel site
 1. Create the site with profile `laravel`.

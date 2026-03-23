@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.10] - 2026-03-23
+### Changed
+- `site add` in menu mode now asks explicitly whether to issue Let's Encrypt after site creation and prompts for an email when needed, instead of silently relying on a hidden SSL default.
+- The regular shared CMS/application menu no longer shows duplicated WordPress items before the Laravel actions.
+- Menu and command docs were updated to match the new `site add` behavior: installed-compatible PHP only, then explicit SSL choice, then DB prompts.
+
 ## [1.12.9] - 2026-03-23
 ### Fixed
 - After `self update` from the interactive menu, the menu now restarts as a fresh process (`exec`) so newly updated command code is actually loaded immediately instead of continuing inside the old Bash process with stale functions.

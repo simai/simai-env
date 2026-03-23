@@ -13,7 +13,7 @@ Options:
 - `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
 - `--usage` selects a user-facing activity class: `standard` (default), `high-traffic`, or `rarely-used`. simai-env maps this to the internal performance mode automatically.
 - `--target-domain` (alias only) set target non-interactively; required in CLI for alias when not in menu.
-- `--php` (optional; choose from installed if omitted; in menu you can pick supported versions 8.1–8.4 and optionally install if missing)
+- `--php` (optional; choose from installed if omitted; in menu the selector shows only installed versions that are compatible with the chosen profile)
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
 - DB (optional): `--create-db=yes|no` (alias: `--db=yes|no`), `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated), `--db-export=yes|no` (export to project `.env`; default yes for required DB profiles, no otherwise), `--skip-db-required=yes|no` (default `no`; allow required-DB profiles to be created without DB — for migration only, emits warning)
 
@@ -21,7 +21,7 @@ Behavior:
 - Generic uses placeholder and profile-driven docroot (`PROFILE_PUBLIC_DIR`, default `public`); Laravel requires `artisan`. Static is nginx-only (no PHP/DB) with `index.html` placeholder under docroot and nginx-served `/healthcheck` (local-only). Alias points the domain to an existing site (reuses its root, no DB/pool creation).
 - Creates PHP-FPM pool and nginx vhost for non-static profiles; installs `healthcheck.php` into the profile docroot when the profile healthcheck mode is `php`.
 - If `create-db=yes` (or `db=yes`), creates DB/user and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, export is controlled by `--db-export` (menu prompts). Required-DB profiles can be created without DB only when `--skip-db-required yes` is supplied (intended for migration); create DB later via `site db-create`.
-- If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, `--ssl=ask` can prompt after creation; in non-menu CLI, `ask` behaves as `no`.
+- If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
   - `standard` -> `balanced`
   - `high-traffic` -> `aggressive`
