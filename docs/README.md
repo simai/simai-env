@@ -9,6 +9,7 @@ This directory contains architecture, development, and command reference docs fo
 - System/self reference: `docs/commands/self.md`.
 - Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`.
 - Production readiness: `docs/operations/production-readiness.md`.
+- Wildcard site regression: `docs/operations/wildcard-site-regression.md`.
 - Menu UX audit and scoring: `docs/development/menu-ux-audit.md`.
 - Profile ops matrix: `docs/operations/profile-ops-matrix.md`.
 - Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`.
