@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.8] - 2026-03-23
+### Fixed
+- PHP version discovery now filters `/etc/php/*` through the real installation check instead of assuming every config directory is an installed runtime, so menu flows no longer advertise phantom PHP versions left behind by stray config directories.
+
 ## [1.12.7] - 2026-03-23
 ### Fixed
 - Menu-mode PHP selection during `site add` now shows only installed PHP versions compatible with the selected profile instead of advertising not-yet-installed versions as ordinary choices.

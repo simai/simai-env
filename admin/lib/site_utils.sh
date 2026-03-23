@@ -645,7 +645,13 @@ installed_php_versions() {
   local versions=()
   shopt -s nullglob
   for d in /etc/php/*; do
-    [[ -d "$d" ]] && versions+=("$(basename "$d")")
+    if [[ -d "$d" ]]; then
+      local ver
+      ver="$(basename "$d")"
+      if is_php_version_installed "$ver"; then
+        versions+=("$ver")
+      fi
+    fi
   done
   shopt -u nullglob
   printf "%s\n" "${versions[@]}"
