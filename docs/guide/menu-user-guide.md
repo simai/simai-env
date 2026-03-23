@@ -41,7 +41,7 @@ Typical flow:
 1. Create the site.
 2. Open `Site info`.
 3. If needed, issue SSL in the `SSL` section.
-4. For CMS profiles, complete setup from the `Laravel` section.
+4. For CMS profiles, complete setup from the `Applications` section.
 
 ### SSL
 Use this section to view certificate state and enable HTTPS.
@@ -99,8 +99,8 @@ Common actions:
 - `Inspect archive`
 - `Import archive (plan)`
 
-### Laravel
-The menu label is currently `Laravel`, but this section is actually the shared application/CMS daily-ops area for:
+### Applications
+This section is the shared application/CMS daily-ops area for:
 - Laravel
 - WordPress
 - Bitrix
@@ -169,21 +169,21 @@ Advanced mode also adds:
 
 ## Finish a Laravel site
 1. Create the site with profile `laravel`.
-2. Open `Laravel -> Laravel prepare app`.
-3. Open `Laravel -> Laravel complete setup`.
-4. Open `Laravel -> Laravel status`.
+2. Open `Applications -> Laravel prepare app`.
+3. Open `Applications -> Laravel complete setup`.
+4. Open `Applications -> Laravel status`.
 
 ## Finish a WordPress site
 1. Create the site with profile `wordpress`.
-2. Open `Laravel -> WordPress complete setup` only after the browser installer is finished.
-3. Open `Laravel -> WordPress status`.
+2. Open `Applications -> WordPress complete setup` only after the browser installer is finished.
+3. Open `Applications -> WordPress status`.
 
 ## Finish a Bitrix site
 1. Create the site with profile `bitrix`.
 2. Prepare the installer if needed from Advanced mode.
 3. Complete the web install in the browser.
-4. Open `Laravel -> Bitrix complete setup`.
-5. Open `Laravel -> Bitrix status`.
+4. Open `Applications -> Bitrix complete setup`.
+5. Open `Applications -> Bitrix status`.
 
 ## Pause a rarely used site
 1. Open `Sites -> Pause site`.
@@ -203,7 +203,7 @@ Ordinary users normally do not need `Scheduler status`; it is kept in Advanced m
 - Start with `Sites -> Site info`
 - Then `Diagnostics -> Site doctor`
 - Then `SSL -> SSL status`
-- Then the profile-specific status in the `Laravel` section
+- Then the profile-specific status in the `Applications` section
 
 ## Where to read more
 - Command reference: `/Users/rim/Documents/GitHub/simai-env/docs/commands/`

@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.11] - 2026-03-23
+### Changed
+- The shared daily application/CMS menu section is now labeled `Applications` instead of `Laravel`, matching its real purpose for Laravel, WordPress, and Bitrix operations.
+- Menu guide and command docs were updated to reference the new `Applications` label consistently.
+
 ## [1.12.10] - 2026-03-23
 ### Changed
 - `site add` in menu mode now asks explicitly whether to issue Let's Encrypt after site creation and prompts for an email when needed, instead of silently relying on a hidden SSL default.

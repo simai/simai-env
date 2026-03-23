@@ -637,7 +637,7 @@ actsellistbox=black,cyan
         items=("1|Clear cache" "2|Enable scheduler (schedule:run)" "3|Disable scheduler (schedule:run)" "4|Worker status" "5|Worker restart" "6|Worker logs" "7|Laravel status" "8|Laravel prepare app" "9|Laravel complete setup" "10|Laravel optimization" "11|WordPress status" "12|WordPress optimization" "13|WordPress complete setup" "14|WordPress installer ready" "15|WordPress scheduler status" "16|WordPress scheduler sync" "17|WordPress cache clear" "18|Bitrix status" "19|Bitrix optimization" "20|Bitrix complete setup" "21|Bitrix scheduler status" "22|Bitrix scheduler sync" "23|Bitrix cache clear" "24|Bitrix agents status" "25|Bitrix agents readiness" "26|Bitrix DB preseed" "27|Bitrix installer ready" "28|Bitrix PHP baseline sync (all)" "29|Bitrix agents sync (apply)" "0|Back")
       fi
       local ch=""
-      ch=$(menu_choose_key "Laravel" "Enter choice" "" "${items[@]}")
+      ch=$(menu_choose_key "Applications" "Enter choice" "" "${items[@]}")
       case "$ch" in
         1) run_menu_command cache clear ;;
         2) run_menu_command cron add ;;
@@ -970,7 +970,7 @@ actsellistbox=black,cyan
       "5|Diagnostics"
       "6|Logs"
       "7|Backup / Migrate"
-      "8|Laravel"
+      "8|Applications"
       "9|Profiles"
       "10|System"
       "0|Exit"
