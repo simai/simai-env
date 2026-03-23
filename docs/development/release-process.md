@@ -6,6 +6,7 @@
 4. Run executable release gate (mandatory before release):
    - `bash testing/release-gate.sh`
    - Gate includes shell syntax checks + `testing/run-regression.sh full` on the configured test server.
-5. Verify no secrets in logs; ANSI output remains TTY-only.
-6. If profiles change, update registry files and profile docs; ensure menu selection still works.
-7. Tag/release when ready; install/update scripts reference VERSION for display.
+5. For interactive menu changes, review `docs/development/menu-ux-audit.md` and record the affected scenario(s) before/after the change.
+6. Verify no secrets in logs; ANSI output remains TTY-only.
+7. If profiles change, update registry files and profile docs; ensure menu selection still works.
+8. Tag/release when ready; install/update scripts reference VERSION for display.
