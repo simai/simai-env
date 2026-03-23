@@ -57,11 +57,11 @@ sudo /root/simai-env/simai-admin.sh logs nginx --domain example.com --kind error
 ```
 
 Menu mapping:
-- `Logs -> Nginx access log`
-- `Logs -> Nginx error log`
+- `Logs -> Website access log`
+- `Logs -> Website error log`
 
 ## letsencrypt
-Tail the Let's Encrypt log.
+Tail the Let's Encrypt / certificate log.
 
 Typical use:
 ```bash

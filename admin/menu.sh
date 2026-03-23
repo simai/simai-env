@@ -556,12 +556,12 @@ actsellistbox=black,cyan
   logs_menu() {
     while true; do
       local -a items=(
-        "1|Admin log"
-        "2|Environment log"
-        "3|Audit log"
-        "4|Nginx access log (by domain)"
-        "5|Nginx error log (by domain)"
-        "6|Let's Encrypt log"
+        "1|Platform log"
+        "2|Setup log"
+        "3|Command audit log"
+        "4|Website access log"
+        "5|Website error log"
+        "6|Certificate log"
         "0|Back"
       )
       local ch=""
@@ -584,12 +584,12 @@ actsellistbox=black,cyan
   backup_menu() {
     while true; do
       local -a items=(
-        "1|Export site config"
-        "2|Inspect archive"
-        "3|Import plan (dry-run)"
+        "1|Export site settings"
+        "2|Review archive"
+        "3|Preview import"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items+=("4|Import apply")
+        items+=("4|Import archive now")
       fi
       items+=("0|Back")
       local ch=""

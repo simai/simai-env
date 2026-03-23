@@ -84,20 +84,20 @@ Common actions:
 Use this section to inspect logs without searching paths manually.
 
 Common actions:
-- `Admin log`
-- `Environment log`
-- `Audit log`
-- `Nginx access log`
-- `Nginx error log`
-- `Let's Encrypt log`
+- `Platform log`
+- `Setup log`
+- `Command audit log`
+- `Website access log`
+- `Website error log`
+- `Certificate log`
 
 ### Backup / Migrate
 Use this section when you need a safe export/import workflow for site config archives.
 
 Common actions:
-- `Export site config`
-- `Inspect archive`
-- `Import archive (plan)`
+- `Export site settings`
+- `Review archive`
+- `Preview import`
 
 ### Applications
 This section is the shared application/CMS area. It now opens into three submenus:

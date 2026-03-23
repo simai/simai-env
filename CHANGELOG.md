@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.17] - 2026-03-23
+### Changed
+- `Logs` menu labels are now more user-facing: `Platform log`, `Setup log`, `Command audit log`, `Website access log`, `Website error log`, and `Certificate log`.
+- `Backup / Migrate` menu labels are now more user-facing: `Export site settings`, `Review archive`, `Preview import`, and `Import archive now`.
+- Logs/backup/admin docs were updated to match the final menu wording.
+
 ## [1.12.16] - 2026-03-23
 ### Changed
 - `Profiles` menu labels are now more user-facing: `Profile usage summary`, `Sites using one profile`, `Check profiles`, `Turn profile on`, `Turn profile off`, and `Initialize profile list`.

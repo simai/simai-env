@@ -33,9 +33,9 @@ See `docs/architecture/profiles.md`.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
 - Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
 - Logging:
-  - Admin log: `/var/log/simai-admin.log`.
-  - Audit log: `/var/log/simai-audit.log` records command start/finish with user, section/command, redacted args, exit code, and correlation ID.
-  - Installer log: `/var/log/simai-env.log`.
+  - Platform log: `/var/log/simai-admin.log`.
+  - Command audit log: `/var/log/simai-audit.log` records command start/finish with user, section/command, redacted args, exit code, and correlation ID.
+  - Setup log: `/var/log/simai-env.log`.
 
 ## System and automation
 - User guide for menu-driven work: `docs/guide/menu-user-guide.md`.
