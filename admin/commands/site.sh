@@ -347,6 +347,9 @@ site_print_add_next_steps() {
   local profile="$1"
   local domain="$2"
   local ssl_issue_summary="$3"
+  local host_mode="${4:-standard}"
+  local wildcard_domain="${5:-}"
+  local primary_ip="${6:-}"
 
   echo
   echo "===== Next steps ====="
@@ -378,6 +381,22 @@ site_print_add_next_steps() {
       echo "Site info   : simai-admin.sh site info --domain ${domain}"
       ;;
   esac
+  if [[ "$host_mode" == "wildcard" ]]; then
+    [[ -z "$wildcard_domain" ]] && wildcard_domain="$(site_default_wildcard_domain "$domain")"
+    echo
+    echo "DNS records :"
+    if [[ -n "$primary_ip" ]]; then
+      echo "  ${domain} -> A -> ${primary_ip}"
+      echo "  ${wildcard_domain} -> A -> ${primary_ip}"
+    else
+      echo "  ${domain} -> A -> <server-ip>"
+      echo "  ${wildcard_domain} -> A -> <server-ip>"
+    fi
+    echo "Wildcard TLS: use DNS challenge after DNS is live"
+    echo "  Install    : apt-get install -y python3-certbot-dns-cloudflare"
+    echo "  Credentials: /root/.secrets/certbot/cloudflare.ini"
+    echo "  Issue      : simai-admin.sh ssl letsencrypt --domain ${domain} --email <your-email> --wildcard yes --dns-provider cloudflare --dns-credentials /root/.secrets/certbot/cloudflare.ini"
+  fi
 }
 
 site_add_handler() {
@@ -835,6 +854,10 @@ site_add_handler() {
   fi
 
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
+  local primary_ip=""
+  if [[ "$host_mode" == "wildcard" ]]; then
+    primary_ip="$(site_best_effort_primary_ip)"
+  fi
 
   echo "===== Site summary ====="
   echo "Domain      : ${domain}"
@@ -843,6 +866,13 @@ site_add_handler() {
   echo "Host mode   : ${host_mode}"
   if [[ "$host_mode" == "wildcard" ]]; then
     echo "Hostnames   : ${domain}, ${wildcard_domain}"
+    if [[ -n "$primary_ip" ]]; then
+      echo "DNS A       : ${domain} -> ${primary_ip}"
+      echo "DNS A       : ${wildcard_domain} -> ${primary_ip}"
+    else
+      echo "DNS A       : ${domain} -> <server-ip>"
+      echo "DNS A       : ${wildcard_domain} -> <server-ip>"
+    fi
   fi
   echo "Usage class : ${usage_class}"
   echo "Usage apply : ${usage_apply_summary}"
@@ -873,7 +903,7 @@ site_add_handler() {
   echo "SSL issue   : ${ssl_issue_summary}"
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"
-  site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary"
+  site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary" "$host_mode" "$wildcard_domain" "$primary_ip"
 }
 
 site_remove_handler() {
@@ -1655,6 +1685,10 @@ site_info_handler() {
   [[ -z "$updated_at" ]] && updated_at="n/a"
   local runtime_state
   runtime_state=$(site_runtime_state "$domain")
+  local primary_ip=""
+  if [[ "$host_mode" == "wildcard" ]]; then
+    primary_ip="$(site_best_effort_primary_ip)"
+  fi
   local usage_class
   usage_class=$(site_usage_class_get "$domain")
   local optimization_mode
@@ -1697,6 +1731,20 @@ site_info_handler() {
   ui_kv "SSL status" "simai-admin.sh ssl status --domain ${domain}"
   ui_kv "Optimization status" "simai-admin.sh site perf-status --domain ${domain}"
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
+  if [[ "$host_mode" == "wildcard" ]]; then
+    ui_section "Wildcard DNS"
+    if [[ -n "$primary_ip" ]]; then
+      ui_kv "${domain}" "A -> ${primary_ip}"
+      ui_kv "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}" "A -> ${primary_ip}"
+    else
+      ui_kv "${domain}" "A -> <server-ip>"
+      ui_kv "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}" "A -> <server-ip>"
+    fi
+    ui_section "Wildcard HTTPS"
+    ui_kv "Install plugin" "apt-get install -y python3-certbot-dns-cloudflare"
+    ui_kv "Credentials file" "/root/.secrets/certbot/cloudflare.ini"
+    ui_kv "Issue command" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <your-email> --wildcard yes --dns-provider cloudflare --dns-credentials /root/.secrets/certbot/cloudflare.ini"
+  fi
 }
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="

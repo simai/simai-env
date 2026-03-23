@@ -174,7 +174,9 @@ Advanced mode also adds:
 
 Notes:
 - `Serve all first-level subdomains too?` creates one site for both the main domain and `*.domain`.
-- This host mode changes nginx routing only. Wildcard HTTPS for subdomains is a separate later step.
+- After creation, the summary prints the DNS records you need to add for the main domain and wildcard host.
+- `Site info` repeats these DNS records later, so you do not need to remember them.
+- Wildcard HTTPS for subdomains is a separate next step. The summary and `Site info` both show the Cloudflare DNS challenge command to use after DNS is ready.
 
 ## Finish a Laravel site
 1. Create the site with profile `laravel`.

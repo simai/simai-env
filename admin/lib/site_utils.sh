@@ -137,6 +137,21 @@ site_default_wildcard_domain() {
   echo "*.${domain}"
 }
 
+site_best_effort_primary_ip() {
+  local ip=""
+  if command -v ip >/dev/null 2>&1; then
+    ip=$(ip route get 1.1.1.1 2>/dev/null | awk '/src / {for (i=1; i<=NF; i++) if ($i=="src") {print $(i+1); exit}}')
+  fi
+  if [[ -z "$ip" ]] && command -v hostname >/dev/null 2>&1; then
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  fi
+  if [[ -n "$ip" && "$ip" != "127.0.0.1" ]]; then
+    echo "$ip"
+  else
+    echo ""
+  fi
+}
+
 site_server_name_value() {
   local domain="$1" host_mode="${2:-standard}" wildcard_domain="${3:-}"
   host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || echo "standard")

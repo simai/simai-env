@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.20] - 2026-03-23
+### Changed
+- Wildcard-host site creation summary now prints the DNS `A` records the user needs to create for the main domain and wildcard hostname.
+- `site info` for wildcard-host sites now repeats the DNS records and shows the next wildcard HTTPS command to run with Cloudflare DNS challenge.
+- Site/menu docs were updated so the wildcard flow explains both DNS preparation and the later wildcard certificate step.
+
 ## [1.12.19] - 2026-03-23
 ### Changed
 - `ssl letsencrypt` now supports wildcard certificates for wildcard-host sites through DNS challenge with the Certbot Cloudflare plugin.
