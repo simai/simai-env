@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.7] - 2026-03-23
+### Fixed
+- Menu-mode PHP selection during `site add` now shows only installed PHP versions compatible with the selected profile instead of advertising not-yet-installed versions as ordinary choices.
+
 ## [1.12.6] - 2026-03-22
 ### Fixed
 - Menu-mode `self update` now treats the post-update reload code as a successful internal reload instead of a failed command, and refreshes the current menu session in-place without triggering the old nested restart/depth-limit path.

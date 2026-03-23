@@ -119,60 +119,40 @@ select_php_version_for_profile() {
   fi
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local installed=()
     local candidates=()
-    if [[ ${#allowed[@]} -gt 0 ]]; then
-      candidates=("${allowed[@]}")
-    else
-      candidates=("8.1" "8.2" "8.3" "8.4")
+    mapfile -t installed < <(installed_php_versions)
+    if [[ ${#installed[@]} -eq 0 ]]; then
+      error "No PHP versions are installed. Install one first: simai-admin.sh php install --php 8.2"
+      return 1
     fi
-    while true; do
-      local default_sel=""
-      if printf '%s\n' "${candidates[@]}" | grep -qx "8.2" && is_php_version_installed "8.2"; then
-        default_sel="8.2"
-      else
-        local c
-        for c in "${candidates[@]}"; do
-          if is_php_version_installed "$c"; then
-            default_sel="$c"
-            break
-          fi
-        done
-      fi
-      [[ -z "$default_sel" ]] && default_sel="${candidates[0]}"
-      selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
-      if [[ -z "$selected" ]]; then
-        warn "Cancelled."
-        return 1
-      fi
-      if is_php_version_installed "$selected"; then
-        echo "$selected"
-        return 0
-      fi
-
-      local choice
-      choice=$(select_from_list "PHP ${selected} is not installed. Install now?" "no" "no" "yes")
-      case "$choice" in
-        yes)
-          if ! run_command "php" "install" --php "$selected"; then
-            error "Failed to install PHP ${selected}"
-            return 1
-          fi
-          if ! is_php_version_installed "$selected"; then
-            error "PHP ${selected} installation did not complete; version still missing."
-            return 1
-          fi
-          echo "$selected"
-          return 0
-          ;;
-        "")
-          warn "Cancelled."
-          return 1
-          ;;
-        *)
-          info "Select another installed PHP version or choose yes to install PHP ${selected}."
-          ;;
-      esac
-    done
+    if [[ ${#allowed[@]} -gt 0 ]]; then
+      local c
+      for c in "${installed[@]}"; do
+        if printf '%s\n' "${allowed[@]}" | grep -qx "$c"; then
+          candidates+=("$c")
+        fi
+      done
+    else
+      candidates=("${installed[@]}")
+    fi
+    if [[ ${#candidates[@]} -eq 0 ]]; then
+      error "No installed PHP versions match profile ${PROFILE_ID:-unknown}. Allowed: ${allowed[*]}. Install one first: simai-admin.sh php install --php ${allowed[0]:-8.2}"
+      return 1
+    fi
+    local default_sel=""
+    if printf '%s\n' "${candidates[@]}" | grep -qx "8.2"; then
+      default_sel="8.2"
+    else
+      default_sel="${candidates[0]}"
+    fi
+    selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
+    if [[ -z "$selected" ]]; then
+      warn "Cancelled."
+      return 1
+    fi
+    echo "$selected"
+    return 0
   fi
 
   local versions=()
