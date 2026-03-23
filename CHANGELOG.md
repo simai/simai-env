@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.12] - 2026-03-23
+### Changed
+- `Sites -> Create site` no longer asks a separate technical `.env` export question in menu mode for required-DB profiles; DB credentials are exported by default and summarized clearly.
+- Site creation summary now prints profile-aware `Next steps`, making the expected follow-up flow visible for generic, Laravel, WordPress, Bitrix, and static sites.
+- The shared `Applications` menu now labels Laravel-specific daily actions explicitly (`Laravel cache clear`, `Laravel scheduler ...`, `Laravel worker ...`) instead of generic wording.
+
 ## [1.12.11] - 2026-03-23
 ### Changed
 - The shared daily application/CMS menu section is now labeled `Applications` instead of `Laravel`, matching its real purpose for Laravel, WordPress, and Bitrix operations.

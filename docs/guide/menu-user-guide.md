@@ -111,11 +111,11 @@ Common Laravel actions:
 - `Laravel status`
 - `Laravel prepare app`
 - `Laravel complete setup`
-- `Worker status`
-- `Worker restart`
-- `Worker logs`
-- `Enable scheduler`
-- `Disable scheduler`
+- `Laravel worker status`
+- `Laravel worker restart`
+- `Laravel worker logs`
+- `Laravel scheduler enable`
+- `Laravel scheduler disable`
 
 Common WordPress actions:
 - `WordPress status`

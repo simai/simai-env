@@ -325,6 +325,43 @@ site_menu_prepare_ssl_choice() {
   return 0
 }
 
+site_print_add_next_steps() {
+  local profile="$1"
+  local domain="$2"
+  local ssl_issue_summary="$3"
+
+  echo
+  echo "===== Next steps ====="
+  case "$profile" in
+    generic)
+      echo "Open site   : https://${domain}/"
+      if [[ "$ssl_issue_summary" != "issued" ]]; then
+        echo "Enable SSL  : simai-admin.sh ssl letsencrypt --domain ${domain} --email <your-email>"
+      fi
+      echo "Site info   : simai-admin.sh site info --domain ${domain}"
+      ;;
+    laravel)
+      echo "Prepare app : Applications -> Laravel prepare app"
+      echo "Complete    : Applications -> Laravel complete setup"
+      echo "Status      : Applications -> Laravel status"
+      ;;
+    wordpress)
+      echo "Open site   : https://${domain}/wp-admin/install.php"
+      echo "Complete    : Applications -> WordPress complete setup"
+      echo "Status      : Applications -> WordPress status"
+      ;;
+    bitrix)
+      echo "Open site   : https://${domain}/"
+      echo "Complete    : Applications -> Bitrix complete setup"
+      echo "Status      : Applications -> Bitrix status"
+      ;;
+    static)
+      echo "Open site   : https://${domain}/"
+      echo "Site info   : simai-admin.sh site info --domain ${domain}"
+      ;;
+  esac
+}
+
 site_add_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -666,7 +703,8 @@ site_add_handler() {
     queue_summary="${QUEUE_UNIT_RESULT:-unknown}"
   fi
   local bitrix_preseed_summary="n/a"
-  local bitrix_setup_summary="n/a"
+  local bitrix_installer_summary="n/a"
+  local db_export_summary="not exported"
 
   local db_summary="not requested"
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
@@ -698,15 +736,20 @@ site_add_handler() {
       if [[ -n "$db_export_opt" ]]; then
         [[ "${db_export_opt,,}" == "yes" ]] && do_export="yes" || do_export="no"
       elif [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        local choice
-        choice=$(select_from_list "Export DB creds to .env now?" "yes" "yes" "no")
-        [[ "$choice" == "yes" ]] && do_export="yes" || do_export="no"
+        do_export="yes"
       else
         do_export="yes"
       fi
     fi
     if [[ "$do_export" == "yes" ]]; then
-      site_db_export_to_env "$domain" "$path" ".env" || warn "Failed to export DB creds to ${path}/.env"
+      if site_db_export_to_env "$domain" "$path" ".env"; then
+        db_export_summary="saved to .env"
+      else
+        db_export_summary="failed to save to .env"
+        warn "Failed to export DB creds to ${path}/.env"
+      fi
+    else
+      db_export_summary="stored in site db.env only"
     fi
   fi
 
@@ -727,12 +770,12 @@ site_add_handler() {
     if bitrix_download_setup_script "$doc_root" "no"; then
       bitrix_setup_kind=$(bitrix_setup_script_kind "$(bitrix_setup_script_path "$doc_root")")
       case "$bitrix_setup_kind" in
-        site-management) bitrix_setup_summary="ready" ;;
-        bitrix24-loader) bitrix_setup_summary="generic-loader" ;;
-        *) bitrix_setup_summary="downloaded" ;;
+        site-management) bitrix_installer_summary="ready" ;;
+        bitrix24-loader) bitrix_installer_summary="downloaded" ;;
+        *) bitrix_installer_summary="downloaded" ;;
       esac
     else
-      bitrix_setup_summary="failed"
+      bitrix_installer_summary="failed"
       warn "Failed to download bitrixsetup.php"
     fi
   fi
@@ -775,19 +818,18 @@ site_add_handler() {
     echo "DB name     : ${DB_CREDS_NAME}"
     echo "DB user     : ${DB_CREDS_USER}"
     echo "DB password : hidden"
+    echo "DB creds    : ${db_export_summary}"
   else
     echo "Database    : ${db_summary}"
   fi
   if [[ "$profile" == "bitrix" ]]; then
     echo "Bitrix DB preseed: ${bitrix_preseed_summary}"
-    echo "Bitrix setup.php : ${bitrix_setup_summary}"
-    if [[ -n "${bitrix_setup_kind:-}" && "$bitrix_setup_kind" != "missing" ]]; then
-      echo "Bitrix setup kind: ${bitrix_setup_kind}"
-    fi
+    echo "Bitrix installer : ${bitrix_installer_summary}"
   fi
   echo "SSL issue   : ${ssl_issue_summary}"
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"
+  site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary"
 }
 
 site_remove_handler() {
