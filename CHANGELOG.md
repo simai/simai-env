@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.18] - 2026-03-23
+### Changed
+- `site add` now supports `--host-mode standard|wildcard`, and menu mode can create one site that serves the main domain plus all first-level subdomains.
+- Nginx metadata, site info, and site list now store and show the site host mode and wildcard hostname.
+- SSL config regeneration preserves wildcard host mode metadata instead of reverting such sites back to a single-host nginx config.
+
 ## [1.12.17] - 2026-03-23
 ### Changed
 - `Logs` menu labels are now more user-facing: `Platform log`, `Setup log`, `Command audit log`, `Website access log`, `Website error log`, and `Certificate log`.

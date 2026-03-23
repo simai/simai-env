@@ -162,10 +162,15 @@ Advanced mode also adds:
 1. Open `Sites -> Create site`.
 2. Enter the domain.
 3. Choose the profile.
-4. Choose activity class if asked.
-5. If the profile supports PHP, choose one of the installed compatible PHP versions.
-6. If you want HTTPS right away, choose SSL issuance when prompted.
-7. If the profile needs a database, confirm DB creation.
+4. Choose whether the site should also serve all first-level subdomains.
+5. Choose activity class if asked.
+6. If the profile supports PHP, choose one of the installed compatible PHP versions.
+7. If you want HTTPS right away, choose SSL issuance when prompted.
+8. If the profile needs a database, confirm DB creation.
+
+Notes:
+- `Serve all first-level subdomains too?` creates one site for both the main domain and `*.domain`.
+- This host mode changes nginx routing only. Wildcard HTTPS for subdomains is a separate later step.
 
 ## Finish a Laravel site
 1. Create the site with profile `laravel`.

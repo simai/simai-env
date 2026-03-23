@@ -11,6 +11,8 @@ Options:
 - `--path` (optional; default uses path style under `/home/simai/www/`)
 - `--path-style` (`slug`|`domain`) controls default path when `--path` is not set. Default is `domain` (e.g., `/home/simai/www/your-domain.tld`). Use `--path-style slug` to restore legacy slug paths or set `/etc/simai-env.conf` with `SIMAI_DEFAULT_PATH_STYLE=domain|slug`. Menu does not prompt for path style; domain-based default is used unless overridden via CLI/config.
 - `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
+- `--host-mode standard|wildcard` controls whether the site serves only the main domain or the main domain plus all first-level subdomains. Default is `standard`.
+- `--wildcard-domain` (optional) overrides the wildcard hostname stored in metadata for `--host-mode wildcard`. Default is `*.your-domain.tld`.
 - `--usage` selects a user-facing activity class: `standard` (default), `high-traffic`, or `rarely-used`. simai-env maps this to the internal performance mode automatically.
 - `--target-domain` (alias only) set target non-interactively; required in CLI for alias when not in menu.
 - `--php` (optional; choose from installed if omitted; in menu the selector shows only installed versions that are compatible with the chosen profile)
@@ -20,6 +22,7 @@ Options:
 Behavior:
 - Generic uses placeholder and profile-driven docroot (`PROFILE_PUBLIC_DIR`, default `public`); Laravel requires `artisan`. Static is nginx-only (no PHP/DB) with `index.html` placeholder under docroot and nginx-served `/healthcheck` (local-only). Alias points the domain to an existing site (reuses its root, no DB/pool creation).
 - Creates PHP-FPM pool and nginx vhost for non-static profiles; installs `healthcheck.php` into the profile docroot when the profile healthcheck mode is `php`.
+- `--host-mode wildcard` makes nginx serve both the main domain and all first-level subdomains by writing `server_name <domain> *.domain` and storing the host mode in metadata. This does not issue a wildcard certificate yet; HTTPS for subdomains is a separate later step.
 - If `create-db=yes` (or `db=yes`), creates DB/user and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, `.env` export stays enabled by default and menu no longer asks a separate technical question about it. Required-DB profiles can be created without DB only when `--skip-db-required yes` is supplied (intended for migration); create DB later via `site db-create`.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
@@ -42,7 +45,8 @@ Behavior:
   SIMAI_SSL_STAGING_DEFAULT=no
   ```
  - For static profile, `--php` and DB flags are ignored (with warnings); no PHP-FPM pool or cron is created.
- - Project ID (slug) is still used for pools/cron/queue/sockets/logs even if the path style uses the domain.
+- Project ID (slug) is still used for pools/cron/queue/sockets/logs even if the path style uses the domain.
+- `site info` and `site list` show the site host mode and wildcard hostname when enabled.
  - If an existing slug/domain directory is found, the tool reuses it to avoid duplicates and warns accordingly.
 - Required markers: if the directory is newly created or empty, missing markers do not block immediately; bootstrap files are applied first, then markers are rechecked. On non-empty directories without markers, CLI errors (menu can still fallback to generic).
 - `/healthcheck.php` is localhost-only by default for php-mode profiles; test with `curl -i -H "Host: <domain>" http://127.0.0.1/healthcheck.php`. Static uses nginx-mode healthcheck at `/healthcheck` (local-only).
@@ -51,6 +55,7 @@ Behavior:
 Examples:
 - Create without TLS: `simai-admin.sh site add --domain example.com --profile generic --php 8.3`
 - Create and issue TLS immediately: `simai-admin.sh site add --domain example.com --profile generic --php 8.3 --ssl yes --ssl-email ops@example.com`
+- Create one site for domain plus subdomains: `simai-admin.sh site add --domain obr.site --profile generic --host-mode wildcard`
 
 ## remove
 Remove site resources (profile-driven; no fixes on target data unless confirmed).
@@ -95,6 +100,7 @@ Options:
 
 Output includes:
 - domain, profile, project, slug
+- host mode and hostnames
 - root/docroot
 - nginx enabled state
 - nginx conf path

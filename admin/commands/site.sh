@@ -325,6 +325,24 @@ site_menu_prepare_ssl_choice() {
   return 0
 }
 
+site_menu_prepare_host_mode() {
+  local domain="$1"
+  local choice=""
+  choice=$(select_from_list "Serve all first-level subdomains too?" "no" "no" "yes")
+  if [[ -z "$choice" ]]; then
+    warn "Cancelled."
+    return 1
+  fi
+  if [[ "$choice" == "yes" ]]; then
+    PARSED_ARGS[host-mode]="wildcard"
+    PARSED_ARGS[wildcard-domain]="$(site_default_wildcard_domain "$domain")"
+  else
+    PARSED_ARGS[host-mode]="standard"
+    PARSED_ARGS[wildcard-domain]=""
+  fi
+  return 0
+}
+
 site_print_add_next_steps() {
   local profile="$1"
   local domain="$2"
@@ -385,6 +403,8 @@ site_add_handler() {
   local profile="${PARSED_ARGS[profile]:-}"
   local php_version="${PARSED_ARGS[php]:-}"
   local usage_class="${PARSED_ARGS[usage]:-${SIMAI_SITE_USAGE_DEFAULT:-}}"
+  local host_mode="${PARSED_ARGS[host-mode]:-standard}"
+  local wildcard_domain="${PARSED_ARGS[wildcard-domain]:-}"
   local ssl_mode="${PARSED_ARGS[ssl]:-${SIMAI_SSL_AUTO_ISSUE_ON_CREATE:-no}}"
   local ssl_email="${PARSED_ARGS[ssl-email]:-${SIMAI_SSL_LE_EMAIL_DEFAULT:-}}"
   local ssl_redirect="${PARSED_ARGS[ssl-redirect]:-${SIMAI_SSL_REDIRECT_DEFAULT:-no}}"
@@ -412,6 +432,14 @@ site_add_handler() {
   fi
   if ! validate_path "$path"; then
     return 1
+  fi
+  host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || true)
+  if [[ -z "$host_mode" ]]; then
+    error "Unsupported host mode: ${PARSED_ARGS[host-mode]:-}"
+    return 1
+  fi
+  if [[ "$host_mode" == "wildcard" && -z "$wildcard_domain" ]]; then
+    wildcard_domain="$(site_default_wildcard_domain "$domain")"
   fi
 
   ensure_user
@@ -497,6 +525,18 @@ site_add_handler() {
   fi
 
   load_profile "$profile" || return 1
+
+  if [[ "${PROFILE_IS_ALIAS:-no}" == "yes" && "$host_mode" != "standard" ]]; then
+    warn "Host mode is ignored for alias profile; using standard host mode."
+    host_mode="standard"
+    wildcard_domain=""
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[host-mode]:-}" && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+    site_menu_prepare_host_mode "$domain" || return 0
+    host_mode="${PARSED_ARGS[host-mode]:-$host_mode}"
+    wildcard_domain="${PARSED_ARGS[wildcard-domain]:-$wildcard_domain}"
+  fi
 
   if [[ -z "$usage_class" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -676,7 +716,7 @@ site_add_handler() {
   local ssl_redirect="no" ssl_hsts="no"
   local doc_root
   doc_root=$(site_compute_doc_root "$path" "$public_dir") || return 1
-  if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir"; then
+  if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir" "$host_mode" "$wildcard_domain"; then
     error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
     return 1
   fi
@@ -800,6 +840,10 @@ site_add_handler() {
   echo "Domain      : ${domain}"
   echo "Project     : ${project}"
   echo "Profile     : ${profile}"
+  echo "Host mode   : ${host_mode}"
+  if [[ "$host_mode" == "wildcard" ]]; then
+    echo "Hostnames   : ${domain}, ${wildcard_domain}"
+  fi
   echo "Usage class : ${usage_class}"
   echo "Usage apply : ${usage_apply_summary}"
   echo "PHP version : ${php_version}"
@@ -1480,6 +1524,8 @@ site_list_handler() {
         local php="${SITE_META[php]:-}"
         local root="${SITE_META[root]:-}"
         local target="${SITE_META[target]:-}"
+        local host_mode="${SITE_META[host_mode]:-standard}"
+        local wildcard_domain="${SITE_META[wildcard_domain]:-}"
         local runtime
         runtime=$(site_runtime_state "$s")
         local ssl_info
@@ -1487,6 +1533,8 @@ site_list_handler() {
         local summary="$root"
         if [[ "$profile" == "alias" && -n "$target" ]]; then
           summary="alias -> ${target}"
+        elif [[ "$host_mode" == "wildcard" ]]; then
+          summary="${root} (+ ${wildcard_domain:-$(site_default_wildcard_domain "$s")})"
         fi
         printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
           "$compact_domain" "$(truncate_cell "$compact_domain" "$s")" \
@@ -1523,6 +1571,8 @@ site_list_handler() {
     local php="${SITE_META[php]:-}"
     local root="${SITE_META[root]:-}"
     local target="${SITE_META[target]:-}"
+    local host_mode="${SITE_META[host_mode]:-standard}"
+    local wildcard_domain="${SITE_META[wildcard_domain]:-}"
     local runtime
     runtime=$(site_runtime_state "$s")
     local ssl_info
@@ -1530,6 +1580,8 @@ site_list_handler() {
     local summary="$root"
     if [[ "$profile" == "alias" && -n "$target" ]]; then
       summary="alias -> ${target}"
+    elif [[ "$host_mode" == "wildcard" ]]; then
+      summary="${root} (+ ${wildcard_domain:-$(site_default_wildcard_domain "$s")})"
     fi
     printf "| %-*s | %-*s | %-*s | %-*s | %-*s | %-*s | %-*s |\n" \
       "$domain_w" "$(truncate_cell "$domain_w" "$s")" \
@@ -1559,6 +1611,8 @@ site_info_handler() {
   local slug="${SITE_META[slug]:-$project}"
   local root="${SITE_META[root]:-${WWW_ROOT}/${domain}}"
   local public_dir="${SITE_META[public_dir]:-public}"
+  local host_mode="${SITE_META[host_mode]:-standard}"
+  local wildcard_domain="${SITE_META[wildcard_domain]:-}"
   local nginx_conf="/etc/nginx/sites-available/${domain}.conf"
   local nginx_enabled
   nginx_enabled=$(site_nginx_is_enabled "$domain")
@@ -1610,6 +1664,7 @@ site_info_handler() {
 
   local -a rows=(
     "Domain|${domain}"
+    "Host mode|${host_mode}"
     "Slug|${slug}"
     "Profile|${profile}"
     "Activity class|${usage_class}"
@@ -1618,6 +1673,7 @@ site_info_handler() {
     "Project|${project}"
     "Root|${root}"
     "Public dir|${public_dir}"
+    "Hostnames|$(site_server_name_value "$domain" "$host_mode" "$wildcard_domain")"
     "Nginx conf|${nginx_conf}"
     "Nginx enabled|${nginx_enabled}"
     "Healthcheck|${healthcheck}"
@@ -1643,7 +1699,7 @@ site_info_handler() {
   ui_kv "Drift plan" "simai-admin.sh site drift --domain ${domain}"
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
