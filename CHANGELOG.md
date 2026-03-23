@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.9] - 2026-03-23
+### Fixed
+- After `self update` from the interactive menu, the menu now restarts as a fresh process (`exec`) so newly updated command code is actually loaded immediately instead of continuing inside the old Bash process with stale functions.
+
 ## [1.12.8] - 2026-03-23
 ### Fixed
 - PHP version discovery now filters `/etc/php/*` through the real installation check instead of assuming every config directory is an installed runtime, so menu flows no longer advertise phantom PHP versions left behind by stray config directories.
