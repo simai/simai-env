@@ -5,6 +5,7 @@ Run with `sudo /root/simai-env/simai-admin.sh self <command> [options]` or via t
 This group covers:
 - platform status
 - updates and bootstrap/repair
+- automatic update checks
 - automatic optimization
 - shared scheduler jobs
 - server-wide optimization baselines
@@ -60,9 +61,54 @@ sudo /root/simai-env/simai-admin.sh self update
 ## version
 Show local version, remote version, and update status.
 
+Behavior:
+- runs a live remote version check
+- refreshes the cached automatic update state used by the menu banner
+
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self version
+```
+
+## auto-update-status
+Show the current automatic update mode and cached remote version state.
+
+Output includes:
+- mode (`off`, `check`, `apply-safe`)
+- check interval
+- configured update ref
+- local version
+- cached remote version
+- cached status
+- last check time
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self auto-update-status
+```
+
+## auto-update-enable-check / auto-update-enable-apply / auto-update-disable
+Control automatic update behavior.
+
+Behavior:
+- `auto-update-enable-check` turns on periodic update checks only
+- `auto-update-enable-apply` prepares the later safe-apply mode and still keeps the current batch limited to checking/badging
+- `auto-update-disable` turns off automatic checks
+- settings are stored in `/etc/simai-env.conf`
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self auto-update-enable-check
+sudo /root/simai-env/simai-admin.sh self auto-update-enable-apply
+sudo /root/simai-env/simai-admin.sh self auto-update-disable
+```
+
+## auto-update-run-check
+Run one update check immediately and refresh the cached state used by the menu.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self auto-update-run-check
 ```
 
 ## bootstrap

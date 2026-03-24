@@ -1,6 +1,214 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+self_auto_update_config_file() {
+  echo "/etc/simai-env.conf"
+}
+
+self_auto_update_state_dir() {
+  echo "/var/lib/simai-env/update"
+}
+
+self_auto_update_state_file() {
+  echo "$(self_auto_update_state_dir)/state.env"
+}
+
+self_auto_update_mode_normalize() {
+  local mode="${1:-check}"
+  mode=$(printf '%s' "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$mode" in
+    off|check|apply-safe) echo "$mode" ;;
+    *) echo "check" ;;
+  esac
+}
+
+self_auto_update_mode() {
+  self_auto_update_mode_normalize "${SIMAI_AUTO_UPDATE_MODE:-check}"
+}
+
+self_auto_update_interval_minutes() {
+  local value="${SIMAI_AUTO_UPDATE_CHECK_INTERVAL_MINUTES:-360}"
+  [[ "$value" =~ ^[0-9]+$ ]] || value=360
+  (( value < 5 )) && value=5
+  echo "$value"
+}
+
+self_auto_update_state_get() {
+  local key="$1"
+  local file
+  file=$(self_auto_update_state_file)
+  [[ -f "$file" ]] || return 1
+  awk -F= -v target="$key" '
+    $1 == target {
+      val=substr($0, index($0, "=")+1)
+      print val
+      found=1
+      exit
+    }
+    END { if (!found) exit 1 }
+  ' "$file"
+}
+
+self_auto_update_state_write() {
+  local file dir tmp
+  file=$(self_auto_update_state_file)
+  dir=$(dirname "$file")
+  install -d "$dir"
+  tmp=$(mktemp)
+  local entry
+  for entry in "$@"; do
+    [[ -z "$entry" ]] && continue
+    printf "%s=%s\n" "${entry%%|*}" "${entry#*|}" >>"$tmp"
+  done
+  mv "$tmp" "$file"
+  chmod 0644 "$file"
+  chown root:root "$file" 2>/dev/null || true
+}
+
+self_local_version() {
+  local version_file="${SCRIPT_DIR}/VERSION"
+  if [[ -f "$version_file" ]]; then
+    cat "$version_file"
+  else
+    echo "(unknown)"
+  fi
+}
+
+self_auto_update_status_from_versions() {
+  local local_version="$1" remote_version="$2"
+  if [[ "$remote_version" == "(unavailable)" || -z "$remote_version" ]]; then
+    echo "n/a"
+  elif [[ "$local_version" == "$remote_version" ]]; then
+    echo "up to date"
+  else
+    echo "update available"
+  fi
+}
+
+self_auto_update_write_config() {
+  local mode="${1:-check}"
+  local interval="${2:-360}"
+  mode=$(self_auto_update_mode_normalize "$mode")
+  [[ "$interval" =~ ^[0-9]+$ ]] || interval=360
+  (( interval < 5 )) && interval=5
+  scheduler_replace_managed_block \
+    "$(self_auto_update_config_file)" \
+    "# simai-auto-update-begin" \
+    "# simai-auto-update-end" \
+    "SIMAI_AUTO_UPDATE_MODE=${mode}
+SIMAI_AUTO_UPDATE_CHECK_INTERVAL_MINUTES=${interval}"
+}
+
+self_auto_update_check_now() {
+  local quiet="${1:-no}"
+  local local_version update_ref remote_version_url remote_version status now
+  local_version="$(self_local_version)"
+  update_ref="$(self_update_ref)"
+  remote_version_url="$(self_remote_version_url)"
+  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
+  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  status=$(self_auto_update_status_from_versions "$local_version" "$remote_version")
+  now=$(date +%s)
+  self_auto_update_state_write \
+    "checked_at_epoch|${now}" \
+    "checked_at_human|$(date -d "@${now}" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date '+%Y-%m-%d %H:%M:%S %Z')" \
+    "local_version|${local_version}" \
+    "remote_version|${remote_version}" \
+    "status|${status}" \
+    "update_ref|${update_ref}" \
+    "remote_version_url|${remote_version_url}"
+  if [[ "$quiet" != "yes" ]]; then
+    info "Update check completed: ${status} (${local_version} -> ${remote_version})"
+  fi
+}
+
+self_auto_update_check_if_due() {
+  local mode interval now last_checked due=0
+  mode=$(self_auto_update_mode)
+  [[ "$mode" == "off" ]] && return 0
+  interval=$(self_auto_update_interval_minutes)
+  now=$(date +%s)
+  last_checked=$(self_auto_update_state_get "checked_at_epoch" 2>/dev/null || true)
+  if [[ -z "$last_checked" || ! "$last_checked" =~ ^[0-9]+$ ]]; then
+    due=1
+  elif (( now - last_checked >= interval * 60 )); then
+    due=1
+  fi
+  if (( due == 1 )); then
+    self_auto_update_check_now "yes" || true
+  fi
+}
+
+self_auto_update_status_handler() {
+  self_auto_update_check_if_due
+  local mode interval checked_at local_version remote_version status update_ref
+  mode=$(self_auto_update_mode)
+  interval=$(self_auto_update_interval_minutes)
+  checked_at=$(self_auto_update_state_get "checked_at_human" 2>/dev/null || true)
+  local_version=$(self_auto_update_state_get "local_version" 2>/dev/null || true)
+  remote_version=$(self_auto_update_state_get "remote_version" 2>/dev/null || true)
+  status=$(self_auto_update_state_get "status" 2>/dev/null || true)
+  update_ref=$(self_auto_update_state_get "update_ref" 2>/dev/null || true)
+  [[ -z "$checked_at" ]] && checked_at="never"
+  [[ -z "$local_version" ]] && local_version="$(self_local_version)"
+  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  [[ -z "$status" ]] && status="n/a"
+  [[ -z "$update_ref" ]] && update_ref="$(self_update_ref)"
+
+  ui_header "SIMAI ENV · Automatic updates"
+  ui_result_table \
+    "Mode|${mode}" \
+    "Apply behavior|$([[ "$mode" == "apply-safe" ]] && echo "planned; current release checks only" || echo "n/a")" \
+    "Check interval|${interval}m" \
+    "Update ref|${update_ref}" \
+    "Local version|${local_version}" \
+    "Remote version|${remote_version}" \
+    "Status|${status}" \
+    "Last checked|${checked_at}"
+  ui_next_steps
+  ui_kv "Check now" "simai-admin.sh self auto-update-run-check"
+  ui_kv "Enable checks" "simai-admin.sh self auto-update-enable-check"
+  ui_kv "Enable safe apply" "simai-admin.sh self auto-update-enable-apply"
+  ui_kv "Turn off" "simai-admin.sh self auto-update-disable"
+}
+
+self_auto_update_enable_check_handler() {
+  SIMAI_AUTO_UPDATE_MODE="check"
+  self_auto_update_write_config "check" "$(self_auto_update_interval_minutes)"
+  self_auto_update_check_now "yes"
+  ui_success "Automatic update checks enabled"
+  print_kv_table \
+    "Mode|check" \
+    "Check interval|$(self_auto_update_interval_minutes)m" \
+    "Status|$(self_auto_update_state_get "status" 2>/dev/null || echo n/a)"
+}
+
+self_auto_update_enable_apply_handler() {
+  SIMAI_AUTO_UPDATE_MODE="apply-safe"
+  self_auto_update_write_config "apply-safe" "$(self_auto_update_interval_minutes)"
+  self_auto_update_check_now "yes"
+  ui_success "Safe automatic updates enabled"
+  print_kv_table \
+    "Mode|apply-safe" \
+    "Check interval|$(self_auto_update_interval_minutes)m" \
+    "Status|$(self_auto_update_state_get "status" 2>/dev/null || echo n/a)" \
+    "Apply behavior|planned; current release checks only"
+}
+
+self_auto_update_disable_handler() {
+  SIMAI_AUTO_UPDATE_MODE="off"
+  self_auto_update_write_config "off" "$(self_auto_update_interval_minutes)"
+  ui_success "Automatic updates disabled"
+  print_kv_table \
+    "Mode|off" \
+    "Check interval|$(self_auto_update_interval_minutes)m"
+}
+
+self_auto_update_run_check_handler() {
+  self_auto_update_check_now "no"
+  self_auto_update_status_handler
+}
+
 self_update_ref() {
   update_ref_default
 }
@@ -64,6 +272,7 @@ self_update_handler() {
     progress_done "Update completed with smoke failures"
     return 1
   fi
+  self_auto_update_check_now "yes" || true
   progress_done "Update completed"
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     progress_step "Reloading admin menu"
@@ -97,24 +306,12 @@ self_bootstrap_handler() {
 }
 
 self_version_handler() {
-  local local_version="(unknown)"
-  local version_file="${SCRIPT_DIR}/VERSION"
-  [[ -f "$version_file" ]] && local_version="$(cat "$version_file")"
-
-  local update_ref remote_version_url remote_version
-  update_ref="$(self_update_ref)"
-  remote_version_url="$(self_remote_version_url)"
-  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
-  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
-
-  local status="n/a"
-  if [[ "$remote_version" != "(unavailable)" ]]; then
-    if [[ "$local_version" == "$remote_version" ]]; then
-      status="up to date"
-    else
-      status="update available"
-    fi
-  fi
+  self_auto_update_check_now "yes"
+  local local_version remote_version status update_ref
+  local_version=$(self_auto_update_state_get "local_version" 2>/dev/null || self_local_version)
+  remote_version=$(self_auto_update_state_get "remote_version" 2>/dev/null || echo "(unavailable)")
+  status=$(self_auto_update_state_get "status" 2>/dev/null || echo "n/a")
+  update_ref=$(self_auto_update_state_get "update_ref" 2>/dev/null || self_update_ref)
 
   local GREEN=$'\e[32m' RED=$'\e[31m' RESET=$'\e[0m'
   local status_padded
@@ -1024,6 +1221,11 @@ self_site_review_status_handler() {
 
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
+register_cmd "self" "auto-update-status" "Show automatic update status" "self_auto_update_status_handler" "" ""
+register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" ""
+register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" ""
+register_cmd "self" "auto-update-disable" "Disable automatic updates" "self_auto_update_disable_handler" "" ""
+register_cmd "self" "auto-update-run-check" "Check for simai-env updates now" "self_auto_update_run_check_handler" "" ""
 register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""

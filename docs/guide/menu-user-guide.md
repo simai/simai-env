@@ -152,9 +152,14 @@ Regular mode:
 - `Repair platform`
 - `Update simai-env`
 - `Version`
+- `Automatic updates`
+- `Check for updates now`
 - `Advanced mode`
 
 Advanced mode also adds:
+- `Turn update checks on`
+- `Turn safe auto-update on`
+- `Turn automatic updates off`
 - `Apply optimization plan`
 - `Automation scheduler status`
 - `Health review`
@@ -209,6 +214,15 @@ To bring it back:
 2. Use `Automatic optimization`.
 
 Ordinary users normally do not need `Scheduler status`; it is kept in Advanced mode.
+
+## Automatic update checks
+1. Open `System`.
+2. Use `Automatic updates` to see whether the platform is in `off`, `check`, or `apply-safe` mode.
+3. Use `Check for updates now` when you want to refresh the cached update status immediately.
+
+Notes:
+- The menu banner uses cached update state instead of doing a live network check every screen redraw.
+- In this first batch, automatic updates mean automatic checking and menu badging. Safe background self-apply is not yet active during interactive work.
 
 ## If you are not sure what to do next
 - Start with `Sites -> Site info`

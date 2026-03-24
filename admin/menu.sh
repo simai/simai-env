@@ -23,22 +23,22 @@ prompt() {
 }
 
 print_version_banner() {
+  if declare -F self_auto_update_check_if_due >/dev/null 2>&1; then
+    self_auto_update_check_if_due
+  fi
   local update_ref="${SIMAI_UPDATE_REF:-refs/heads/${SIMAI_UPDATE_BRANCH:-main}}"
-  local remote_version_url
-  remote_version_url="$(update_remote_version_url "$update_ref" "${REPO_URL:-https://github.com/simai/simai-env}")"
   local local_version="(unknown)"
   local remote_version="(unavailable)"
-  [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"
-  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
-  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
   local status="n/a"
-  if [[ "$remote_version" != "(unavailable)" ]]; then
-    if [[ "$local_version" == "$remote_version" ]]; then
-      status="up to date"
-    else
-      status="update available"
-    fi
+  if declare -F self_auto_update_state_get >/dev/null 2>&1; then
+    update_ref="$(self_auto_update_state_get "update_ref" 2>/dev/null || echo "$update_ref")"
+    local_version="$(self_auto_update_state_get "local_version" 2>/dev/null || true)"
+    remote_version="$(self_auto_update_state_get "remote_version" 2>/dev/null || true)"
+    status="$(self_auto_update_state_get "status" 2>/dev/null || true)"
   fi
+  [[ -z "$local_version" || "$local_version" == "(unknown)" ]] && [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"
+  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  [[ -z "$status" ]] && status="n/a"
   local GREEN=$'\e[32m' RED=$'\e[31m' RESET=$'\e[0m'
   local status_padded
   status_padded=$(printf "%-20s" "$status")
@@ -891,6 +891,11 @@ actsellistbox=black,cyan
       local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
+      local auto_update_mode="check"
+      if declare -F self_auto_update_mode >/dev/null 2>&1; then
+        auto_update_mode="$(self_auto_update_mode 2>/dev/null || echo check)"
+      fi
+      local auto_update_label="Automatic updates (currently: ${auto_update_mode})"
       local -a items=(
         "1|Platform status"
         "2|Optimization status"
@@ -899,12 +904,14 @@ actsellistbox=black,cyan
         "5|Repair platform"
         "6|Update simai-env"
         "7|Version"
-        "8|${adv_label}"
-        "9|${backend_label}"
+        "8|${auto_update_label}"
+        "9|Check for updates now"
+        "10|${adv_label}"
+        "11|${backend_label}"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Platform status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization plan" "5|Apply optimization plan" "6|Repair platform" "7|Update simai-env" "8|Version" "9|${adv_label}" "10|${backend_label}" "11|Automation scheduler status" "12|Health review" "13|Site review" "0|Back")
+        items=("1|Platform status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization plan" "5|Apply optimization plan" "6|Repair platform" "7|Update simai-env" "8|Version" "9|${auto_update_label}" "10|Check for updates now" "11|Turn update checks on" "12|Turn safe auto-update on" "13|Turn automatic updates off" "14|${adv_label}" "15|${backend_label}" "16|Automation scheduler status" "17|Health review" "18|Site review" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
@@ -950,14 +957,27 @@ actsellistbox=black,cyan
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self version
           else
-            show_advanced=1
-            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+            run_menu_command self auto-update-status
           fi
           ;;
         9)
           if [[ $show_advanced -eq 1 ]]; then
-            show_advanced=0
+            run_menu_command self auto-update-run-check
+          else
+            run_menu_command self auto-update-run-check
+          fi
+          ;;
+        10)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self auto-update-enable-check
+          else
+            show_advanced=1
             export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+          fi
+          ;;
+        11)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self auto-update-enable-apply
           else
             if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
               export SIMAI_MENU_BACKEND="text"
@@ -971,33 +991,68 @@ actsellistbox=black,cyan
             fi
           fi
           ;;
-        10)
-          if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
-            export SIMAI_MENU_BACKEND="text"
+        12)
+          if [[ $show_advanced -eq 1 ]]; then
+            run_menu_command self auto-update-disable
           else
-            if command -v whiptail >/dev/null 2>&1; then
-              export SIMAI_MENU_BACKEND="whiptail"
-              menu_init_whiptail_theme
-            else
-              warn "whiptail is not installed; backend stays text."
-            fi
+            menu_invalid_choice
           fi
           ;;
-        11)
+        13)
+          if [[ $show_advanced -eq 1 ]]; then
+            show_advanced=0
+            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        14)
+          if [[ $show_advanced -eq 1 ]]; then
+            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+              export SIMAI_MENU_BACKEND="text"
+            else
+              if command -v whiptail >/dev/null 2>&1; then
+                export SIMAI_MENU_BACKEND="whiptail"
+                menu_init_whiptail_theme
+              else
+                warn "whiptail is not installed; backend stays text."
+              fi
+            fi
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        15)
+          if [[ $show_advanced -eq 1 ]]; then
+            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+              export SIMAI_MENU_BACKEND="text"
+            else
+              if command -v whiptail >/dev/null 2>&1; then
+                export SIMAI_MENU_BACKEND="whiptail"
+                menu_init_whiptail_theme
+              else
+                warn "whiptail is not installed; backend stays text."
+              fi
+            fi
+          else
+            menu_invalid_choice
+          fi
+          ;;
+        16)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self scheduler-status
           else
             menu_invalid_choice
           fi
           ;;
-        12)
+        17)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self health-review-status
           else
             menu_invalid_choice
           fi
           ;;
-        13)
+        18)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command self site-review-status
           else
@@ -1019,6 +1074,9 @@ actsellistbox=black,cyan
       print_version_banner
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       printf "Menu backend: %s\n" "${SIMAI_MENU_BACKEND:-text}"
+      if declare -F self_auto_update_mode >/dev/null 2>&1; then
+        printf "Automatic updates: %s\n" "$(self_auto_update_mode 2>/dev/null || echo check)"
+      fi
       printf "Keys: type menu number and press Enter.\n"
       preflight_bootstrap
     fi

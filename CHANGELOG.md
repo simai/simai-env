@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.21] - 2026-03-24
+### Changed
+- Added automatic update check state with cached local/remote version info stored under `/var/lib/simai-env/update/`.
+- The menu banner now uses cached update state and refreshes it only when the configured interval is due, instead of doing a live network check on every redraw.
+- Added `self auto-update-status`, `self auto-update-run-check`, `self auto-update-enable-check`, `self auto-update-enable-apply`, and `self auto-update-disable`.
+- The `System` menu now exposes automatic update status and a manual `Check for updates now` action; Advanced mode adds explicit controls for update-check modes.
+
 ## [1.12.20] - 2026-03-23
 ### Changed
 - Wildcard-host site creation summary now prints the DNS `A` records the user needs to create for the main domain and wildcard hostname.

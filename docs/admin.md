@@ -48,6 +48,9 @@ See `docs/architecture/profiles.md`.
   - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
   - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
+- `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
+- `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
+- `self auto-update-run-check`: refresh update availability now without applying the update.
 - `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
 - `self scheduler-enable --job all|auto-optimize|health-review|site-review` / `self scheduler-disable --job all|auto-optimize|health-review|site-review`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
@@ -60,7 +63,7 @@ See `docs/architecture/profiles.md`.
 - `self perf-plan --limit <n>`: show the heaviest PHP-FPM pools on the server, plus usage-aware suggested target modes (`safe`, `balanced`, `parked`) for the full server footprint.
 - `self perf-rebalance --limit <n> --mode auto|safe|parked --confirm yes`: apply `site perf-tune` to the heaviest eligible pools, reducing global FPM oversubscription in controlled batches. `auto` respects the site usage class.
 - `self perf-apply --preset small|medium|large --confirm yes`: apply a managed server baseline for future PHP-FPM pools, PHP OPcache, nginx, MySQL, and Redis (when installed).
-- The regular System menu uses user-facing labels such as `Platform status`, `Optimization status`, and `Optimization plan`; scheduler internals, `Health review`, and `Site review` remain in Advanced mode.
+- The regular System menu uses user-facing labels such as `Platform status`, `Optimization status`, `Automatic updates`, and `Check for updates now`; scheduler internals, `Health review`, and `Site review` remain in Advanced mode.
 - `site perf-status --domain <domain>`: inspect current per-site PHP-FPM governance, socket/service state, pool share, estimated global FPM oversubscription, memory risk, and cron/queue footprint.
 - `site info`, `site usage-status`, and `site perf-status` now include a simple optimization posture plus a plain-language recommendation so ordinary users can understand the current state without reading raw FPM values first.
 - `site perf-tune --domain <domain> --mode parked|safe|balanced|aggressive --confirm yes`: apply site-level FPM governance without touching nginx/MySQL/Redis.
