@@ -222,7 +222,9 @@ Ordinary users normally do not need `Scheduler status`; it is kept in Advanced m
 
 Notes:
 - The menu banner uses cached update state instead of doing a live network check every screen redraw.
-- In this first batch, automatic updates mean automatic checking and menu badging. Safe background self-apply is not yet active during interactive work.
+- In `apply-safe` mode, the menu can apply an update only at safe points such as entering or returning to a section.
+- The menu does not auto-update during prompt chains or while a command is already running.
+- After a safe auto-update, the menu returns you to the same section.
 
 ## If you are not sure what to do next
 - Start with `Sites -> Site info`

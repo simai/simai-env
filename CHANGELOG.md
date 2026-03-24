@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.22] - 2026-03-24
+### Changed
+- `apply-safe` automatic updates are now active in the interactive menu: updates are applied only at safe menu points and never inside prompt chains or running commands.
+- The menu now tracks its current section and restores the same section after a safe auto-update restart.
+- Manual `System -> Update simai-env` also restores the current section after the menu reloads.
+
 ## [1.12.21] - 2026-03-24
 ### Changed
 - Added automatic update check state with cached local/remote version info stored under `/var/lib/simai-env/update/`.

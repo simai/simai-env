@@ -158,7 +158,7 @@ self_auto_update_status_handler() {
   ui_header "SIMAI ENV · Automatic updates"
   ui_result_table \
     "Mode|${mode}" \
-    "Apply behavior|$([[ "$mode" == "apply-safe" ]] && echo "planned; current release checks only" || echo "n/a")" \
+    "Apply behavior|$([[ "$mode" == "apply-safe" ]] && echo "automatic at safe menu points" || echo "n/a")" \
     "Check interval|${interval}m" \
     "Update ref|${update_ref}" \
     "Local version|${local_version}" \
@@ -192,7 +192,7 @@ self_auto_update_enable_apply_handler() {
     "Mode|apply-safe" \
     "Check interval|$(self_auto_update_interval_minutes)m" \
     "Status|$(self_auto_update_state_get "status" 2>/dev/null || echo n/a)" \
-    "Apply behavior|planned; current release checks only"
+    "Apply behavior|automatic at safe menu points"
 }
 
 self_auto_update_disable_handler() {

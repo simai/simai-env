@@ -92,9 +92,14 @@ Control automatic update behavior.
 
 Behavior:
 - `auto-update-enable-check` turns on periodic update checks only
-- `auto-update-enable-apply` prepares the later safe-apply mode and still keeps the current batch limited to checking/badging
+- `auto-update-enable-apply` enables menu-driven safe auto-apply
 - `auto-update-disable` turns off automatic checks
 - settings are stored in `/etc/simai-env.conf`
+
+Safe auto-apply behavior:
+- updates are applied only at safe menu points
+- never during prompt chains or while a command is running
+- after update, the menu reopens the same section
 
 Typical use:
 ```bash

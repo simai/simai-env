@@ -105,6 +105,8 @@ run_menu() {
     fi
   fi
   local reload_requested=1
+  export SIMAI_MENU_PATH="${SIMAI_MENU_PATH:-main}"
+  export SIMAI_MENU_RESTORE_PATH="${SIMAI_MENU_RESTORE_PATH:-}"
   local requested_backend="${SIMAI_MENU_BACKEND:-text}"
   menu_init_whiptail_theme() {
     if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" && -z "${NEWT_COLORS:-}" ]]; then
@@ -148,6 +150,75 @@ actsellistbox=black,cyan
     fi
     echo
     read -r -p "Press Enter to continue..." _menu_continue || true
+  }
+  menu_set_path() {
+    local path="${1:-main}"
+    export SIMAI_MENU_PATH="$path"
+  }
+  menu_set_restore_path() {
+    local path="${1:-main}"
+    export SIMAI_MENU_RESTORE_PATH="$path"
+  }
+  menu_clear_restore_path() {
+    export SIMAI_MENU_RESTORE_PATH=""
+  }
+  menu_run_auto_update() {
+    local path="${1:-main}"
+    local out_file rc=0
+    menu_set_restore_path "$path"
+    echo
+    echo "---- automatic update available; applying at safe point ----"
+    out_file="$(mktemp)"
+    if run_command self update 2>&1 | tee "$out_file"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    rm -f "$out_file"
+    if [[ $rc -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
+      menu_spawn_restart
+    fi
+    warn "Automatic update failed or did not request reload; staying in current menu."
+    return 0
+  }
+  menu_auto_update_apply_if_safe() {
+    local path="${1:-main}"
+    menu_set_path "$path"
+    if ! declare -F self_auto_update_mode >/dev/null 2>&1; then
+      return 0
+    fi
+    if [[ "$(self_auto_update_mode 2>/dev/null || echo check)" != "apply-safe" ]]; then
+      return 0
+    fi
+    self_auto_update_check_if_due || true
+    local status=""
+    status="$(self_auto_update_state_get "status" 2>/dev/null || true)"
+    if [[ "$status" == "update available" ]]; then
+      menu_run_auto_update "$path"
+    fi
+    return 0
+  }
+  menu_open_restore_path() {
+    local path="${SIMAI_MENU_RESTORE_PATH:-}"
+    [[ -z "$path" ]] && return 1
+    menu_clear_restore_path
+    case "$path" in
+      main) return 0 ;;
+      sites) sites_menu; return 0 ;;
+      ssl) ssl_menu; return 0 ;;
+      php) php_menu; return 0 ;;
+      db) db_menu; return 0 ;;
+      diagnostics) diagnostics_menu; return 0 ;;
+      logs) logs_menu; return 0 ;;
+      backup) backup_menu; return 0 ;;
+      applications) applications_menu; return 0 ;;
+      applications:laravel) laravel_app_menu; return 0 ;;
+      applications:wordpress) wordpress_app_menu; return 0 ;;
+      applications:bitrix) bitrix_app_menu; return 0 ;;
+      profiles) profiles_menu; return 0 ;;
+      system) system_menu; return 0 ;;
+      *) return 1 ;;
+    esac
   }
   case "${requested_backend,,}" in
     whiptail)
@@ -301,6 +372,9 @@ actsellistbox=black,cyan
     fi
     local out_file
     out_file="$(mktemp)"
+    if [[ "$section" == "self" && "$cmd" == "update" ]]; then
+      menu_set_restore_path "${SIMAI_MENU_PATH:-main}"
+    fi
     if run_command "$section" "$cmd" "${args[@]}" 2>&1 | tee "$out_file"; then
       rc=0
     else
@@ -324,6 +398,7 @@ actsellistbox=black,cyan
 
   sites_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "sites"
       local -a items=(
         "1|List sites"
         "2|Create site"
@@ -437,6 +512,7 @@ actsellistbox=black,cyan
 
   ssl_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "ssl"
       local -a items=(
         "1|List certificates"
         "2|Certificate status"
@@ -465,6 +541,7 @@ actsellistbox=black,cyan
 
   php_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "php"
       local -a items=(
         "1|List PHP versions"
         "2|Install PHP version"
@@ -487,6 +564,7 @@ actsellistbox=black,cyan
 
   db_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "db"
       local -a items=(
         "1|List databases"
         "2|Database server status"
@@ -523,6 +601,7 @@ actsellistbox=black,cyan
 
   diagnostics_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "diagnostics"
       local -a items=(
         "1|Site health check"
         "2|Configuration check"
@@ -555,6 +634,7 @@ actsellistbox=black,cyan
 
   logs_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "logs"
       local -a items=(
         "1|Platform log"
         "2|Setup log"
@@ -583,6 +663,7 @@ actsellistbox=black,cyan
 
   backup_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "backup"
       local -a items=(
         "1|Export site settings"
         "2|Review archive"
@@ -615,6 +696,7 @@ actsellistbox=black,cyan
 
   laravel_app_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "applications:laravel"
       local -a items=(
         "1|Laravel status"
         "2|Laravel prepare app"
@@ -695,6 +777,7 @@ actsellistbox=black,cyan
 
   wordpress_app_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "applications:wordpress"
       local -a items=(
         "1|WordPress status"
         "2|WordPress optimization"
@@ -748,6 +831,7 @@ actsellistbox=black,cyan
 
   bitrix_app_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "applications:bitrix"
       local -a items=(
         "1|Bitrix status"
         "2|Bitrix optimization"
@@ -836,6 +920,7 @@ actsellistbox=black,cyan
 
   applications_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "applications"
       local -a items=(
         "1|Laravel"
         "2|WordPress"
@@ -858,6 +943,7 @@ actsellistbox=black,cyan
 
   profiles_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "profiles"
       local -a items=(
         "1|List profiles"
         "2|Profile usage summary"
@@ -888,6 +974,7 @@ actsellistbox=black,cyan
 
   system_menu() {
     while true; do
+      menu_auto_update_apply_if_safe "system"
       local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
@@ -1071,6 +1158,7 @@ actsellistbox=black,cyan
     if [[ $reload_requested -eq 1 ]]; then
       reload_requested=0
       SIMAI_PREFLIGHT_DONE=0
+      menu_auto_update_apply_if_safe "main"
       print_version_banner
       printf "Advanced: %s\n" "$([[ $show_advanced -eq 1 ]] && echo ON || echo OFF)"
       printf "Menu backend: %s\n" "${SIMAI_MENU_BACKEND:-text}"
@@ -1079,7 +1167,11 @@ actsellistbox=black,cyan
       fi
       printf "Keys: type menu number and press Enter.\n"
       preflight_bootstrap
+      if menu_open_restore_path; then
+        continue
+      fi
     fi
+    menu_set_path "main"
     local -a root_items=(
       "1|Sites"
       "2|SSL"

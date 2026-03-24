@@ -51,6 +51,7 @@ See `docs/architecture/profiles.md`.
 - `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
 - `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
 - `self auto-update-run-check`: refresh update availability now without applying the update.
+- In `apply-safe` mode, the interactive menu applies updates only at safe points (section boundaries / post-command return) and restores the same menu section after restart.
 - `self scheduler`: run one internal scheduler tick (the command used by the managed system cron entry).
 - `self scheduler-status`: show whether the shared scheduler cron is installed, plus job state/last run/next due.
 - `self scheduler-enable --job all|auto-optimize|health-review|site-review` / `self scheduler-disable --job all|auto-optimize|health-review|site-review`: enable or disable the shared scheduler globally or per job without touching the cron entry itself.
