@@ -35,8 +35,8 @@ site_pick_existing_domain() {
     fi
   fi
   if [[ -z "$domain" ]]; then
-    warn "Cancelled."
-    return 0
+    command_cancelled
+    return $?
   fi
   if ! validate_domain "$domain" "allow"; then
     return 1
@@ -308,8 +308,8 @@ site_menu_prepare_ssl_choice() {
   local choice=""
   choice=$(select_from_list "Issue Let's Encrypt certificate after site creation?" "$default_choice" "no" "yes")
   if [[ -z "$choice" ]]; then
-    warn "Cancelled."
-    return 1
+    command_cancelled
+    return $?
   fi
 
   PARSED_ARGS[ssl]="$choice"
@@ -317,8 +317,8 @@ site_menu_prepare_ssl_choice() {
     local email=""
     email=$(prompt "Let's Encrypt email" "$email_default")
     if [[ -z "$email" ]]; then
-      warn "Cancelled."
-      return 1
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[ssl-email]="$email"
   fi
@@ -330,8 +330,8 @@ site_menu_prepare_host_mode() {
   local choice=""
   choice=$(select_from_list "Serve all first-level subdomains too?" "no" "no" "yes")
   if [[ -z "$choice" ]]; then
-    warn "Cancelled."
-    return 1
+    command_cancelled
+    return $?
   fi
   if [[ "$choice" == "yes" ]]; then
     PARSED_ARGS[host-mode]="wildcard"
@@ -433,8 +433,11 @@ site_add_handler() {
   local db_export_opt="${PARSED_ARGS[db-export]:-}"
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
+  local db_pass="${PARSED_ARGS[db-pass]:-}"
   local target_domain="${PARSED_ARGS[target-domain]:-}" target_path="" target_project="" target_php=""
   local path_created=0 path_empty=0 need_post_bootstrap_marker_check=0
+  local path_explicit="no"
+  [[ -n "${PARSED_ARGS[path]:-}" ]] && path_explicit="yes"
   if [[ -z "$project" ]]; then
     project=$(project_slug_from_domain "$domain")
     info "project-name not provided; using ${project}"
@@ -450,6 +453,11 @@ site_add_handler() {
     fi
   fi
   if ! validate_path "$path"; then
+    return 1
+  fi
+  local existing_cfg="/etc/nginx/sites-available/${domain}.conf"
+  if [[ -f "$existing_cfg" ]]; then
+    error "Site ${domain} already exists. Use site info/update actions for the existing site instead of site add."
     return 1
   fi
   host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || true)
@@ -487,8 +495,8 @@ site_add_handler() {
           mapfile -t all_profiles < <(list_profile_ids 2>/dev/null || true)
           ;;
         "")
-          warn "Cancelled."
-          return 0
+          command_cancelled
+          return $?
           ;;
         *)
           ;;
@@ -520,8 +528,8 @@ site_add_handler() {
     fi
     profile=$(select_from_list "Select profile" "$default_profile" "${ordered[@]}")
     if [[ -z "$profile" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   [[ -z "$profile" ]] && profile="generic"
@@ -552,14 +560,14 @@ site_add_handler() {
   fi
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[host-mode]:-}" && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
-    site_menu_prepare_host_mode "$domain" || return 0
+    site_menu_prepare_host_mode "$domain" || return $?
     host_mode="${PARSED_ARGS[host-mode]:-$host_mode}"
     wildcard_domain="${PARSED_ARGS[wildcard-domain]:-$wildcard_domain}"
   fi
 
   if [[ -z "$usage_class" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      usage_class=$(site_usage_select_class "") || return 0
+      usage_class=$(site_usage_select_class "") || return $?
     else
       usage_class="standard"
     fi
@@ -572,7 +580,7 @@ site_add_handler() {
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[ssl]:-}" ]]; then
     if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
-      site_menu_prepare_ssl_choice "$ssl_mode" "$ssl_email" || return 0
+      site_menu_prepare_ssl_choice "$ssl_mode" "$ssl_email" || return $?
       ssl_mode="${PARSED_ARGS[ssl]:-$ssl_mode}"
       ssl_email="${PARSED_ARGS[ssl-email]:-$ssl_email}"
     fi
@@ -687,6 +695,12 @@ site_add_handler() {
   else
     if [[ -z "$(ls -A "$path" 2>/dev/null)" ]]; then
       path_empty=1
+    else
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" || "$path_explicit" != "yes" ]]; then
+        error "Target path ${path} already contains files. Menu-based site creation only supports a new empty directory."
+        echo "Use a new domain/path, or run the command directly with an explicit --path if you intentionally want to attach an existing project."
+        return 1
+      fi
     fi
   fi
   if ! validate_path "$path"; then
@@ -697,18 +711,9 @@ site_add_handler() {
     if [[ $path_created -eq 1 || $path_empty -eq 1 ]]; then
       need_post_bootstrap_marker_check=1
     elif ! ensure_profile_required_markers "$path"; then
-      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        local choice
-        choice=$(select_from_list "Required files not found for profile ${profile}. Fallback to generic?" "yes" "yes" "no")
-        if [[ "$choice" == "yes" ]]; then
-          profile="generic"
-          load_profile "$profile" || return 1
-        else
-          return 1
-        fi
-      else
-        return 1
-      fi
+      error "Required files for profile ${profile} are missing in ${path}. Refusing to attach this non-empty path to a new ${profile} site."
+      echo "Use a clean directory for a new site, or prepare the project files first and rerun with an explicit --path."
+      return 1
     fi
   fi
 
@@ -768,6 +773,13 @@ site_add_handler() {
   local db_summary="not requested"
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
     create_db=$(decide_create_db_for_profile) || return 1
+    if [[ "$create_db" != "yes" ]]; then
+      if [[ "${PROFILE_REQUIRES_DB}" == "required" ]]; then
+        db_summary="not configured yet (required later)"
+      else
+        db_summary="skipped by choice"
+      fi
+    fi
   else
     [[ -n "$create_db" && "${create_db,,}" == "yes" ]] && warn "Database creation ignored for profile ${profile}"
     create_db="no"
@@ -777,6 +789,21 @@ site_add_handler() {
     local charset="${PROFILE_DB_CHARSET:-utf8mb4}"
     local coll="${PROFILE_DB_COLLATION:-utf8mb4_unicode_ci}"
     site_db_load_or_generate_creds "$domain" "$project" "$charset" "$coll" || return 1
+    if [[ -n "$db_name" ]]; then
+      if ! db_validate_db_name "$db_name"; then
+        return 1
+      fi
+      DB_CREDS_NAME="$db_name"
+    fi
+    if [[ -n "$db_user" ]]; then
+      if ! db_validate_db_user "$db_user"; then
+        return 1
+      fi
+      DB_CREDS_USER="$db_user"
+    fi
+    if [[ -n "$db_pass" ]]; then
+      DB_CREDS_PASS="$db_pass"
+    fi
     local privs=()
     if [[ -n "${PROFILE_DB_REQUIRED_PRIVILEGES+x}" && ${#PROFILE_DB_REQUIRED_PRIVILEGES[@]} -gt 0 ]]; then
       privs=("${PROFILE_DB_REQUIRED_PRIVILEGES[@]}")
@@ -927,8 +954,8 @@ site_remove_handler() {
     local mode_choice
     mode_choice=$(select_from_list "Select remove mode" "plan" "plan" "apply")
     if [[ -z "$mode_choice" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     case "$mode_choice" in
       plan) is_dry_run=1 ;;
@@ -945,8 +972,8 @@ site_remove_handler() {
     fi
     domain=$(select_from_list "Select domain to remove" "" "${sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -z "$domain" ]]; then
@@ -1193,7 +1220,8 @@ site_remove_handler() {
     local proceed
     proceed=$(select_from_list "Proceed with removal now?" "no" "no" "yes")
     if [[ "$proceed" != "yes" ]]; then
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
 
@@ -1319,6 +1347,10 @@ site_set_php_handler() {
       filtered+=("$s")
     done
     domain=$(select_from_list "Select site" "" "${filtered[@]}")
+    if [[ -z "$domain" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   if [[ -z "$domain" ]]; then
     require_args "domain" || return 1
@@ -1372,6 +1404,10 @@ site_set_php_handler() {
   php_version=$(select_php_version_for_profile "$php_version") || return 1
   if [[ -z "$keep_old_pool" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     keep_old_pool=$(select_from_list "Keep old PHP-FPM pool?" "no" "no" "yes")
+    if [[ -z "$keep_old_pool" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   [[ "$keep_old_pool" == "yes" ]] && keep_old_pool="yes" || keep_old_pool="no"
 

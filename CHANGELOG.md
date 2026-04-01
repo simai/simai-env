@@ -1,6 +1,84 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.38] - 2026-03-31
+### Fixed
+- The menu version banner now always shows the current local `VERSION` file instead of reusing a stale cached `local_version` from auto-update state.
+
+## [1.12.37] - 2026-03-31
+### Fixed
+- Pre-command cancellations in menu-required prompts no longer render a duplicate second `Result/Status` block; they now show a single `CANCELLED` summary and return cleanly to the menu.
+
+## [1.12.36] - 2026-03-31
+### Fixed
+- Text prompts in menu mode now treat `0`, `cancel`, `back`, and `q` as a real cancellation instead of submitting those strings as field values.
+- Backup archive pickers now hide manual platform sync archives (`simai-env-manualsync-*`) in addition to pre-update archives, so inspect/import menus only show site-settings backups.
+
+## [1.12.35] - 2026-03-31
+### Fixed
+- Cancelling a menu-required argument before the command starts now stays inside the menu flow and shows `CANCELLED` instead of bubbling exit code `89` out of the whole menu session.
+
+## [1.12.34] - 2026-03-31
+### Fixed
+- `Profiles -> Sites using one profile` now uses the profile picker in menu-required prompts instead of falling back to a raw `id:` prompt.
+- `SSL` menu handlers now preserve `CANCELLED` from domain selection more robustly by capturing helper exit codes without relying on negation-sensitive return patterns.
+
+## [1.12.33] - 2026-03-31
+### Fixed
+- Preserved non-zero helper return codes such as `CANCELLED` in several `SSL` and Bitrix handlers by removing `if ! helper; then return $?; fi` patterns that collapsed the original status.
+
+## [1.12.32] - 2026-03-31
+### Changed
+- `SSL` menu wizards now propagate cancellation correctly for intermediate prompts such as email, redirect/HSTS toggles, and required custom-certificate file paths, instead of silently defaulting or failing later on empty required values.
+
+## [1.12.31] - 2026-03-31
+### Changed
+- `Profiles` menu actions now use a real profile picker in menu mode instead of relying on raw `id` input for enable/disable and profile-specific usage lookups.
+
+## [1.12.30] - 2026-03-31
+### Changed
+- `site php-ini set` and `site php-ini unset` now treat `No` in the menu `Apply and reload php-fpm now?` prompt as `CANCELLED`, matching the stricter semantics already used in other apply-only flows.
+
+## [1.12.29] - 2026-03-31
+### Changed
+- Added a concise live-server regression checklist under `source/` so the cross-profile validation stage can be executed as a pass/fail runbook instead of an informal plan.
+
+## [1.12.28] - 2026-03-31
+### Changed
+- `Disable HTTPS` in the menu now asks for an explicit final confirmation and returns `CANCELLED` when the operator declines, instead of applying the removal immediately after site selection.
+
+## [1.12.27] - 2026-03-31
+### Changed
+- Added a structured cross-profile regression and fix plan under `source/` to guide the next validation stage after the tester feedback.
+- Advanced destructive/apply-only menu flows now treat an explicit `No` as `CANCELLED` where the action itself is the whole purpose of the command: site DB drop, site PHP INI apply, and site removal after plan preview.
+
+## [1.12.26] - 2026-03-31
+### Changed
+- `SSL` menu flows now treat cancellation consistently: domain selection, wildcard DNS prompts, and certificate scope prompts stop with `CANCELLED` instead of falling through as a silent success.
+- `site drift` and Bitrix PHP baseline sync now propagate menu cancellation correctly instead of continuing as if the user had completed the selection.
+
+## [1.12.25] - 2026-03-31
+### Changed
+- `Backup / Migrate` archive pickers in the menu now exclude incompatible platform pre-update archives, and `backup inspect/import` explain more clearly when a file is not a site settings bundle.
+- `Select site activity` now includes short human-readable guidance for `standard`, `high-traffic`, and `rarely-used`.
+- `Profiles -> List profiles` now uses a wider title column so long profile names are cut less aggressively.
+- `Diagnostics` numbering is now consistent in regular mode: `Platform status` is shown as the third item instead of skipping from `2` to `4`.
+
+## [1.12.24] - 2026-03-31
+### Changed
+- `site add` is now stricter and safer: it refuses to create a new site over an already configured domain and the regular menu wizard no longer attaches new profiles to non-empty project directories.
+- Profile-aware database setup in `site add` now uses clearer menu branches (`create managed DB now` vs `continue without DB setup`) instead of a misleading bare yes/no question.
+- `Database` menu wording is now more explicit about managed site DB actions, including writing DB credentials to the project `.env`.
+- `site db-create` now shows whether the database, user, and grants already existed before applying the managed setup, so reuse vs create is visible.
+- `site db-rotate` can now update the project `.env` immediately after rotating the password in menu mode.
+
+## [1.12.23] - 2026-03-30
+### Changed
+- Menu-driven command cancellation now uses a dedicated `CANCELLED` outcome instead of leaking warning text into selected values or showing false `SUCCESS` results.
+- Command logs now print to `stderr`, which prevents `select`/`prompt` helpers from capturing log lines as fake domains, paths, or other argument values.
+- `site add` now always prompts for a new domain in menu mode instead of forcing a choice from existing sites, and menu-driven site/domain selectors propagate cancellation correctly.
+- `php install` and `php reload` menu flows now handle cancellation correctly and no longer prompt with a raw free-form `php:` field before showing the PHP version selector.
+
 ## [1.12.22] - 2026-03-24
 ### Changed
 - `apply-safe` automatic updates are now active in the interactive menu: updates are applied only at safe menu points and never inside prompt chains or running commands.

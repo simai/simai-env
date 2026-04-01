@@ -38,6 +38,7 @@ What it does:
 - prints manifest details
 - verifies file checksums inside the archive
 - does not change system state
+- rejects platform pre-update archives such as `simai-env-preupdate-*.tar.gz`, because they are not site settings bundles and do not contain `manifest.json`
 
 ## import
 Import a config archive.
@@ -70,3 +71,4 @@ Import rules:
 ## Notes
 - Use `backup inspect` before `backup import --apply yes`.
 - This flow is designed for safe config migration, not for full-content site restoration.
+- In the menu, `Review archive` and `Preview import` now show only compatible site settings archives by default; platform pre-update backups are excluded from the chooser.

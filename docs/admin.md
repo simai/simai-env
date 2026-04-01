@@ -113,7 +113,7 @@ Use this section when running commands from automation (CI, cron, deploy scripts
 
 - Prefer direct CLI mode (`simai-admin.sh <section> <command> ...`), not `menu`.
 - Treat exit code `0` as success and non-zero as failure.
-- In menu mode, cancel actions are intentionally non-fatal (`exit 0`) to keep the session alive.
+- In menu mode, cancel actions are intentionally non-fatal to the menu session, but they are now reported distinctly as `CANCELLED` instead of `SUCCESS`.
 
 ### Output channels
 - Command output is primarily printed to stdout.

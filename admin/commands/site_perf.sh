@@ -8,10 +8,15 @@ site_usage_select_class() {
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
-    choice=$(select_from_list "Select site activity" "standard" "standard" "high-traffic" "rarely-used")
+    choice=$(select_from_list \
+      $'Select site activity\nstandard = balanced everyday use\nhigh-traffic = more resources for busy sites\nrarely-used = lower footprint for idle sites' \
+      "standard" \
+      "standard" \
+      "high-traffic" \
+      "rarely-used")
     [[ -z "$choice" ]] && {
-      warn "Cancelled."
-      return 1
+      command_cancelled
+      return $?
     }
     site_usage_class_normalize "$choice"
     return $?
@@ -30,8 +35,8 @@ site_perf_select_domain() {
     fi
     domain=$(select_from_list "Select site" "" "${sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -329,7 +334,7 @@ site_usage_set_handler() {
   usage_class="${PARSED_ARGS[class]:-${PARSED_ARGS[usage]:-}}"
   confirm="${PARSED_ARGS[confirm]:-no}"
   if [[ -z "$usage_class" ]]; then
-    usage_class=$(site_usage_select_class "") || return 0
+    usage_class=$(site_usage_select_class "") || return $?
   else
     usage_class=$(site_usage_class_normalize "$usage_class") || {
       error "Unsupported site usage class: ${PARSED_ARGS[class]:-${PARSED_ARGS[usage]:-}}"

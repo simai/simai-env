@@ -72,8 +72,8 @@ Use this section for database overview and site-level DB operations.
 Common actions:
 - `List databases`
 - `Database server status`
-- `Create database for site`
-- `Write site database settings`
+- `Prepare site database`
+- `Write DB credentials to project .env`
 - `Rotate database password`
 
 ### Diagnostics
@@ -102,6 +102,10 @@ Common actions:
 - `Export site settings`
 - `Review archive`
 - `Preview import`
+
+Notes:
+- The menu shows only compatible site settings archives for `Review archive` and `Preview import`.
+- Platform pre-update backups are intentionally excluded from that picker.
 
 ### Applications
 This section is the shared application/CMS area. It now opens into three submenus:
@@ -175,10 +179,11 @@ Advanced mode also adds:
 5. Choose activity class if asked.
 6. If the profile supports PHP, choose one of the installed compatible PHP versions.
 7. If you want HTTPS right away, choose SSL issuance when prompted.
-8. If the profile needs a database, confirm DB creation.
+8. If the profile needs a database, choose whether to prepare a managed site database now or continue without DB setup.
 
 Notes:
 - `Serve all first-level subdomains too?` creates one site for both the main domain and `*.domain`.
+- Menu-based site creation expects a new empty project directory. It will refuse to attach a new site profile to a non-empty path.
 - After creation, the summary prints the DNS records you need to add for the main domain and wildcard host.
 - `Site info` repeats these DNS records later, so you do not need to remember them.
 - Wildcard HTTPS for subdomains is a separate next step. The summary and `Site info` both show the Cloudflare DNS challenge command to use after DNS is ready.

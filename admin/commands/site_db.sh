@@ -11,8 +11,8 @@ site_db_status_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -81,8 +81,8 @@ site_db_create_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -102,6 +102,18 @@ site_db_create_handler() {
   local charset="${PROFILE_DB_CHARSET:-utf8mb4}"
   local coll="${PROFILE_DB_COLLATION:-utf8mb4_unicode_ci}"
   site_db_load_or_generate_creds "$domain" "$project" "$charset" "$coll" || return 1
+  local db_exists_before="no"
+  local user_exists_before="no"
+  local grants_before="no"
+  if db_exists "$DB_CREDS_NAME"; then
+    db_exists_before="yes"
+  fi
+  if db_user_exists "$DB_CREDS_USER"; then
+    user_exists_before="yes"
+  fi
+  if [[ "$db_exists_before" == "yes" && "$user_exists_before" == "yes" ]] && db_user_has_grant_on "$DB_CREDS_USER" "$DB_CREDS_NAME"; then
+    grants_before="yes"
+  fi
 
   local privs=()
   if [[ -n "${PROFILE_DB_REQUIRED_PRIVILEGES+x}" && ${#PROFILE_DB_REQUIRED_PRIVILEGES[@]} -gt 0 ]]; then
@@ -119,6 +131,9 @@ site_db_create_handler() {
   echo "- Charset : ${DB_CREDS_CHARSET}"
   echo "- Collation: ${DB_CREDS_COLLATION}"
   echo "- Privileges: ${priv_str}"
+  echo "- Existing DB: ${db_exists_before}"
+  echo "- Existing user: ${user_exists_before}"
+  echo "- Existing grants: ${grants_before}"
   if [[ "$dry_run" == "yes" ]]; then
     echo "Dry-run only; no changes made."
     return 0
@@ -131,18 +146,24 @@ site_db_create_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
     choice=$(select_from_list "Proceed with DB/user creation?" "no" "no" "yes")
-    [[ "$choice" == "yes" ]] || return 0
+    [[ "$choice" == "yes" ]] || {
+      command_cancelled
+      return $?
+    }
   fi
 
   if ! site_db_apply_create "$domain" "$DB_CREDS_NAME" "$DB_CREDS_USER" "$DB_CREDS_PASS" "$DB_CREDS_CHARSET" "$DB_CREDS_COLLATION" "${privs[@]}"; then
     return 1
   fi
 
-  echo "Database created for ${domain}"
+  echo "Database prepared for ${domain}"
   echo "DB_NAME=${DB_CREDS_NAME}"
   echo "DB_USER=${DB_CREDS_USER}"
   echo "DB_HOST=localhost"
   echo "DB_PASS=created (hidden)"
+  echo "DB already existed : ${db_exists_before}"
+  echo "User already existed: ${user_exists_before}"
+  echo "Grants existed     : ${grants_before}"
   return 0
 }
 
@@ -164,8 +185,8 @@ site_db_drop_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -218,7 +239,10 @@ site_db_drop_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
     choice=$(select_from_list "Proceed with drop?" "no" "no" "yes")
-    [[ "$choice" == "yes" ]] || return 0
+    [[ "$choice" == "yes" ]] || {
+      command_cancelled
+      return $?
+    }
   fi
 
   if ! site_db_apply_drop "$domain" "$db_name" "$db_user" "$remove_files"; then
@@ -243,8 +267,8 @@ site_db_rotate_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -292,7 +316,10 @@ site_db_rotate_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
     choice=$(select_from_list "Proceed with password rotation?" "no" "no" "yes")
-    [[ "$choice" == "yes" ]] || return 0
+    [[ "$choice" == "yes" ]] || {
+      command_cancelled
+      return $?
+    }
   fi
 
   local new_pass
@@ -305,6 +332,19 @@ site_db_rotate_handler() {
   echo "DB_USER=${db_user}"
   echo "DB_HOST=localhost"
   echo "DB_PASS=updated (hidden)"
+  read_site_metadata "$domain" || return 1
+  local project_root="${SITE_META[root]:-}"
+  if [[ -n "$project_root" && -d "$project_root" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local export_choice
+    export_choice=$(select_from_list "Update project .env with the new password?" "yes" "yes" "no")
+    if [[ "$export_choice" == "yes" ]]; then
+      if site_db_export_to_env "$domain" "$project_root" ".env"; then
+        echo "Project .env updated: ${project_root}/.env"
+      else
+        warn "Password rotated, but failed to update ${project_root}/.env"
+      fi
+    fi
+  fi
 }
 
 register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced"

@@ -643,9 +643,9 @@ bitrix_installer_ready_handler() {
     return 1
   }
 
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
-  fi
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
   if ! read_site_db_env "$BX_DOMAIN" >/dev/null 2>&1; then
     error "db.env not found or incomplete for ${BX_DOMAIN}"
     return 1
@@ -761,14 +761,14 @@ bitrix_php_baseline_sync_handler() {
       fi
       domain=$(select_from_list "Select Bitrix site" "" "${candidates[@]}")
       if [[ -z "$domain" ]]; then
-        warn "Cancelled."
-        return 0
+        command_cancelled
+        return $?
       fi
     fi
     require_args "domain" || return 1
-    if ! bitrix_prepare_site "$domain"; then
-      return $?
-    fi
+    bitrix_prepare_site "$domain"
+    local rc=$?
+    (( rc == 0 )) || return $rc
     targets=("$domain")
   fi
 
@@ -831,9 +831,9 @@ bitrix_perf_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
-  fi
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
 
   local managed_mode="none"
   managed_mode=$(bitrix_perf_read_mode "$domain")
@@ -972,9 +972,9 @@ bitrix_perf_apply_handler() {
     error "Use --confirm yes to apply Bitrix optimization changes"
     return 1
   fi
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
-  fi
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
 
   local site_mode=""
   site_mode=$(bitrix_perf_site_mode_for_apply "$mode") || return 1
@@ -1066,9 +1066,9 @@ bitrix_finalize_handler() {
     error "Use --confirm yes to finalize Bitrix setup in CLI mode."
     return 1
   fi
-  if ! bitrix_prepare_site "$domain"; then
-    return $?
-  fi
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
 
   local web_state="unknown"
   local db_state="unknown"

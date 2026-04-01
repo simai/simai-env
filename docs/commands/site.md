@@ -27,7 +27,7 @@ Behavior:
   - `<domain> -> A -> <server-ip>`
   - `*.domain -> A -> <server-ip>`
 - The same summary and `site info` also print the next wildcard HTTPS step for the currently supported DNS provider flow (Cloudflare DNS challenge).
-- If `create-db=yes` (or `db=yes`), creates DB/user and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, `.env` export stays enabled by default and menu no longer asks a separate technical question about it. Required-DB profiles can be created without DB only when `--skip-db-required yes` is supplied (intended for migration); create DB later via `site db-create`.
+- If `create-db=yes` (or `db=yes`), creates or reuses the managed DB/user for the site and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, `.env` export stays enabled by default and menu no longer asks a separate technical question about it. In menu mode, DB setup now offers a clearer branch between creating a managed DB now and continuing without DB setup. Required-DB profiles can still be created without DB only when `--skip-db-required yes` is supplied in CLI (intended for migration); create DB later via `site db-create`.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
 - After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
@@ -54,8 +54,9 @@ Behavior:
 - `site info` for wildcard-host sites also shows:
   - the DNS records to create
   - the wildcard HTTPS command to run after DNS is ready
- - If an existing slug/domain directory is found, the tool reuses it to avoid duplicates and warns accordingly.
-- Required markers: if the directory is newly created or empty, missing markers do not block immediately; bootstrap files are applied first, then markers are rechecked. On non-empty directories without markers, CLI errors (menu can still fallback to generic).
+- If the target domain already exists as a configured site, `site add` now refuses to continue instead of silently reattaching or downgrading the site profile.
+- Menu-based `site add` now expects a new empty project directory. Reusing a non-empty path requires an explicit CLI `--path` flow and is refused in the regular menu wizard.
+- Required markers: if the directory is newly created or empty, missing markers do not block immediately; bootstrap files are applied first, then markers are rechecked. On non-empty directories without markers, the command now errors instead of falling back to `generic`.
 - `/healthcheck.php` is localhost-only by default for php-mode profiles; test with `curl -i -H "Host: <domain>" http://127.0.0.1/healthcheck.php`. Static uses nginx-mode healthcheck at `/healthcheck` (local-only).
 - Web root is profile-driven (`PROFILE_PUBLIC_DIR`, empty/"." means project root).
 

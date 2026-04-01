@@ -148,8 +148,8 @@ select_php_version_for_profile() {
     fi
     selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
     if [[ -z "$selected" ]]; then
-      warn "Cancelled."
-      return 1
+      command_cancelled
+      return $?
     fi
     echo "$selected"
     return 0
@@ -201,7 +201,20 @@ decide_create_db_for_profile() {
       ;;
     required)
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$create_db" ]]; then
-        create_db=$(select_from_list "Create MySQL database and user?" "yes" "yes" "no")
+        local choice
+        choice=$(select_from_list \
+          "Database setup for this site" \
+          "create-managed-db" \
+          "create-managed-db" \
+          "continue-without-db")
+        if [[ -z "$choice" ]]; then
+          command_cancelled
+          return $?
+        fi
+        case "$choice" in
+          create-managed-db) create_db="yes" ;;
+          continue-without-db) create_db="no" ;;
+        esac
       fi
       [[ -z "$create_db" ]] && create_db="yes"
       if [[ "${create_db,,}" != "yes" ]]; then
@@ -217,7 +230,20 @@ decide_create_db_for_profile() {
       ;;
     optional)
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$create_db" ]]; then
-        create_db=$(select_from_list "Create MySQL database and user?" "no" "no" "yes")
+        local choice
+        choice=$(select_from_list \
+          "Database setup for this site" \
+          "continue-without-db" \
+          "continue-without-db" \
+          "create-managed-db")
+        if [[ -z "$choice" ]]; then
+          command_cancelled
+          return $?
+        fi
+        case "$choice" in
+          create-managed-db) create_db="yes" ;;
+          continue-without-db) create_db="no" ;;
+        esac
       fi
       [[ -z "$create_db" ]] && create_db="no"
       ;;

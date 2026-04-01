@@ -96,13 +96,22 @@ ssl_menu_prepare_dns_wildcard() {
   info "Wildcard HTTPS needs DNS challenge. Current supported provider: Cloudflare."
   local provider=""
   provider=$(select_from_list "DNS provider for wildcard certificate" "cloudflare" "cloudflare")
-  [[ -z "$provider" ]] && return 1
+  if [[ -z "$provider" ]]; then
+    command_cancelled
+    return $?
+  fi
   local credentials=""
   credentials=$(prompt "Cloudflare credentials file" "/root/.secrets/certbot/cloudflare.ini")
-  [[ -z "$credentials" ]] && return 1
+  if [[ -z "$credentials" ]]; then
+    command_cancelled
+    return $?
+  fi
   local email=""
   email=$(prompt "Let's Encrypt email" "$email_default")
-  [[ -z "$email" ]] && return 1
+  if [[ -z "$email" ]]; then
+    command_cancelled
+    return $?
+  fi
   PARSED_ARGS[dns-provider]="$provider"
   PARSED_ARGS[dns-credentials]="$credentials"
   PARSED_ARGS[wildcard]="yes"
@@ -125,8 +134,8 @@ ssl_select_domain() {
     filtered=("${sites[@]}")
     domain=$(select_from_list "Select domain" "" "${filtered[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 1
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -z "$domain" ]]; then
@@ -230,12 +239,9 @@ ssl_issue_handler() {
   local staging_warned=0
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! ssl_select_domain; then
-      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        return 0
-      fi
-      return 1
-    fi
+    local rc=0
+    ssl_select_domain || rc=$?
+    (( rc == 0 )) || return $rc
     domain="${PARSED_ARGS[domain]:-}"
   fi
   progress_init 6
@@ -258,14 +264,21 @@ ssl_issue_handler() {
     fi
     if [[ -z "$email" ]]; then
       email=$(prompt "email")
+      if [[ -z "$email" ]]; then
+        command_cancelled
+        return $?
+      fi
       PARSED_ARGS[email]="$email"
     fi
     if [[ "${SITE_META[host_mode]:-standard}" == "wildcard" && -z "${PARSED_ARGS[wildcard]:-}" ]]; then
       local cert_scope=""
       cert_scope=$(select_from_list "Certificate scope" "standard" "standard" "wildcard")
-      [[ -z "$cert_scope" ]] && return 0
+      if [[ -z "$cert_scope" ]]; then
+        command_cancelled
+        return $?
+      fi
       if [[ "$cert_scope" == "wildcard" ]]; then
-        ssl_menu_prepare_dns_wildcard "$domain" "$email" || return 0
+        ssl_menu_prepare_dns_wildcard "$domain" "$email" || return $?
         wildcard="yes"
         dns_provider="${PARSED_ARGS[dns-provider]:-}"
         dns_credentials="${PARSED_ARGS[dns-credentials]:-}"
@@ -273,10 +286,20 @@ ssl_issue_handler() {
         email="${PARSED_ARGS[email]:-$email}"
       fi
     fi
-    [[ -z "$redirect" ]] && redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
+    if [[ -z "$redirect" ]]; then
+      redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
+      if [[ -z "$redirect" ]]; then
+        command_cancelled
+        return $?
+      fi
+    fi
     if [[ -z "$staging" ]]; then
       if [[ $is_advanced -eq 1 ]]; then
         staging=$(select_from_list "Use Let's Encrypt staging? (testing/diagnostics; avoids rate limits)" "no" "no" "yes")
+        if [[ -z "$staging" ]]; then
+          command_cancelled
+          return $?
+        fi
       else
         info "Staging mode is hidden in Advanced; defaulting to production Let's Encrypt."
         staging="no"
@@ -288,7 +311,13 @@ ssl_issue_handler() {
       hsts="no"
       staging_warned=1
     else
-      [[ -z "$hsts" ]] && hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
+      if [[ -z "$hsts" ]]; then
+        hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
+        if [[ -z "$hsts" ]]; then
+          command_cancelled
+          return $?
+        fi
+      fi
     fi
   fi
   [[ -z "$redirect" ]] && redirect="no"
@@ -415,12 +444,9 @@ ssl_install_custom_handler() {
   ui_header "SIMAI ENV · Install custom certificate"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! ssl_select_domain; then
-      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        return 0
-      fi
-      return 1
-    fi
+    local rc=0
+    ssl_select_domain || rc=$?
+    (( rc == 0 )) || return $rc
     domain="${PARSED_ARGS[domain]:-}"
   fi
   progress_init 6
@@ -465,10 +491,26 @@ ssl_install_custom_handler() {
     chain_src=${chain_src:-$raw_chain_dst}
     key_src=${key_src:-${dest_dir}/private.key}
     cert_src=$(prompt "Path to certificate (certificate.crt)" "$cert_src")
+    if [[ -z "$cert_src" ]]; then
+      command_cancelled
+      return $?
+    fi
     chain_src=$(prompt "Path to CA bundle (certificate_ca.crt, optional)" "$chain_src")
     key_src=$(prompt "Path to private key (private.key)" "$key_src")
+    if [[ -z "$key_src" ]]; then
+      command_cancelled
+      return $?
+    fi
     redirect=$(select_from_list "Redirect HTTP to HTTPS?" "no" "no" "yes")
+    if [[ -z "$redirect" ]]; then
+      command_cancelled
+      return $?
+    fi
     hsts=$(select_from_list "Enable HSTS?" "no" "no" "yes")
+    if [[ -z "$hsts" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
 
   if [[ -z "$cert_src" || -z "$key_src" ]]; then
@@ -597,17 +639,10 @@ ssl_remove_handler() {
   ui_header "SIMAI ENV · Remove SSL"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! ssl_select_domain "allow"; then
-      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        return 0
-      fi
-      return 1
-    fi
+    local rc=0
+    ssl_select_domain "allow" || rc=$?
+    (( rc == 0 )) || return $rc
     domain="${PARSED_ARGS[domain]:-}"
-  fi
-  if [[ -z "$domain" ]]; then
-    warn "Cancelled."
-    return 0
   fi
   if [[ -z "${PARSED_ARGS[domain]:-}" ]]; then
     PARSED_ARGS[domain]="$domain"
@@ -625,6 +660,14 @@ ssl_remove_handler() {
       yes|true|1) ;;
       *) error "Deleting certificate requires --confirm yes"; return 1 ;;
     esac
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local proceed
+    proceed=$(select_from_list "Disable HTTPS for this site now?" "no" "no" "yes")
+    if [[ "$proceed" != "yes" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   ssl_site_context "$domain" || return 1
   local template="$NGINX_TEMPLATE"
@@ -656,17 +699,10 @@ ssl_status_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   if [[ -z "$domain" ]]; then
-    if ! ssl_select_domain "allow"; then
-      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-        return 0
-      fi
-      return 1
-    fi
+    local rc=0
+    ssl_select_domain "allow" || rc=$?
+    (( rc == 0 )) || return $rc
     domain="${PARSED_ARGS[domain]:-}"
-  fi
-  if [[ -z "$domain" ]]; then
-    warn "Cancelled."
-    return 0
   fi
   PARSED_ARGS[domain]="$domain"
   require_args "domain" || return 1

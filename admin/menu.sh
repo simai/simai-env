@@ -19,6 +19,14 @@ prompt() {
   else
     read -r -p "$label: " value || true
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    case "${value,,}" in
+      0|cancel|back|q|quit|exit)
+        echo ""
+        return 1
+        ;;
+    esac
+  fi
   echo "$value"
 }
 
@@ -36,7 +44,9 @@ print_version_banner() {
     remote_version="$(self_auto_update_state_get "remote_version" 2>/dev/null || true)"
     status="$(self_auto_update_state_get "status" 2>/dev/null || true)"
   fi
-  [[ -z "$local_version" || "$local_version" == "(unknown)" ]] && [[ -f "${SCRIPT_DIR}/VERSION" ]] && local_version="$(cat "${SCRIPT_DIR}/VERSION")"
+  if [[ -f "${SCRIPT_DIR}/VERSION" ]]; then
+    local_version="$(cat "${SCRIPT_DIR}/VERSION")"
+  fi
   [[ -z "$remote_version" ]] && remote_version="(unavailable)"
   [[ -z "$status" ]] && status="n/a"
   local GREEN=$'\e[32m' RED=$'\e[31m' RESET=$'\e[0m'
@@ -131,6 +141,8 @@ actsellistbox=black,cyan
     local status="SUCCESS"
     if [[ "$rc" -eq ${SIMAI_RC_MENU_RELOAD:-88} ]]; then
       status="SUCCESS (menu reload)"
+    elif [[ "$rc" -eq ${SIMAI_RC_CANCELLED:-89} ]]; then
+      status="CANCELLED"
     elif [[ "$rc" -ne 0 ]]; then
       status="FAILED (${rc})"
     fi
@@ -317,10 +329,34 @@ actsellistbox=black,cyan
     local val=""
     case "$key" in
       domain)
-        local sites=()
-        mapfile -t sites < <(list_sites)
-        if [[ ${#sites[@]} -gt 0 ]]; then
-          val=$(select_from_list "Select domain" "" "${sites[@]}")
+        if [[ "$section" == "site" && "$cmd" == "add" ]]; then
+          val=$(prompt "domain")
+        else
+          local sites=()
+          mapfile -t sites < <(list_sites)
+          if [[ ${#sites[@]} -gt 0 ]]; then
+            val=$(select_from_list "Select domain" "" "${sites[@]}")
+          else
+            val=$(prompt "$key")
+          fi
+        fi
+        ;;
+      id)
+        if [[ "$section" == "profile" ]]; then
+          local profile_ids=()
+          case "$cmd" in
+            disable)
+              mapfile -t profile_ids < <(list_enabled_profile_ids 2>/dev/null || true)
+              ;;
+            used-by-one|enable|used-by)
+              mapfile -t profile_ids < <(list_profile_ids 2>/dev/null || true)
+              ;;
+          esac
+          if [[ ${#profile_ids[@]} -gt 0 ]]; then
+            val=$(select_from_list "Select profile" "" "${profile_ids[@]}")
+          else
+            val=$(prompt "$key")
+          fi
         else
           val=$(prompt "$key")
         fi
@@ -329,7 +365,15 @@ actsellistbox=black,cyan
         if [[ "$section" == "backup" && ( "$cmd" == "inspect" || "$cmd" == "import" ) ]]; then
           local archives=()
           shopt -s nullglob
-          mapfile -t archives < <(ls -1t /root/simai-backups/*.tar.gz 2>/dev/null || true)
+          mapfile -t archives < <(
+            ls -1t /root/simai-backups/*.tar.gz 2>/dev/null | while IFS= read -r archive; do
+              if declare -F backup_archive_is_menu_compatible >/dev/null 2>&1; then
+                backup_archive_is_menu_compatible "$archive" && printf '%s\n' "$archive"
+              else
+                printf '%s\n' "$archive"
+              fi
+            done
+          )
           shopt -u nullglob
           if [[ ${#archives[@]} -gt 0 ]]; then
             val=$(select_from_list "Select archive" "${archives[0]}" "${archives[@]}")
@@ -363,8 +407,18 @@ actsellistbox=black,cyan
         fi
         val=$(menu_prompt_required_arg "$section" "$cmd" "$key")
         if [[ -z "$val" ]]; then
-          warn "Cancelled."
-          echo "---- done (${section} ${cmd}), exit=0 ----"
+          local cancel_rc="${SIMAI_RC_CANCELLED:-89}"
+          echo
+          echo "Result: ${section} ${cmd}"
+          echo "Status: CANCELLED"
+          echo "(cancelled before command start)"
+          if menu_can_use_whiptail; then
+            whiptail --title "SIMAI ENV" --msgbox "Result: ${section} ${cmd}\nStatus: CANCELLED\n(cancelled before command start)" 12 70
+          else
+            echo
+            read -r -p "Press Enter to continue..." _ || true
+          fi
+          echo "---- done (${section} ${cmd}), exit=${cancel_rc} ----"
           return 0
         fi
         args+=("--$key" "$val")
@@ -387,7 +441,7 @@ actsellistbox=black,cyan
       menu_spawn_restart
     fi
     echo "---- done (${section} ${cmd}), exit=${rc} ----"
-    if [[ $rc -ne 0 ]]; then
+    if [[ $rc -ne 0 && $rc -ne ${SIMAI_RC_CANCELLED:-89} ]]; then
       warn "Command failed with exit code ${rc}"
     fi
     return 0
@@ -568,13 +622,13 @@ actsellistbox=black,cyan
       local -a items=(
         "1|List databases"
         "2|Database server status"
-        "3|Create database for site"
-        "4|Write site database settings"
+        "3|Prepare site database"
+        "4|Write DB credentials to project .env"
         "5|Rotate database password"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|List databases" "2|Database server status" "3|Create database for site" "4|Write site database settings" "5|Rotate database password" "6|Remove database for site" "0|Back")
+        items=("1|List databases" "2|Database server status" "3|Prepare site database" "4|Write DB credentials to project .env" "5|Rotate database password" "6|Remove database for site" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
@@ -605,11 +659,11 @@ actsellistbox=black,cyan
       local -a items=(
         "1|Site health check"
         "2|Configuration check"
+        "3|Platform status"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items+=("3|Repair configuration")
+        items=("1|Site health check" "2|Configuration check" "3|Repair configuration" "4|Platform status")
       fi
-      items+=("4|Platform status")
       items+=("0|Back")
       local ch=""
       ch=$(menu_choose_key "Diagnostics" "Enter choice" "" "${items[@]}")
@@ -620,7 +674,7 @@ actsellistbox=black,cyan
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site drift --fix yes
           else
-            menu_invalid_choice
+            run_menu_command self platform-status
           fi
           ;;
         4) run_menu_command self platform-status ;;

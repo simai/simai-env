@@ -17,7 +17,7 @@ Shows:
 - free disk near the datadir
 - ping/query reachability
 
-This is the command used by the normal `Database -> MySQL status` menu item.
+This is the command used by the normal `Database -> Database server status` menu item.
 
 ### db list
 `simai-admin.sh db list`
@@ -41,7 +41,7 @@ Notes:
 `simai-admin.sh site db-create --domain <domain> [--dry_run yes] [--confirm yes]`
 - Profile-aware defaults for charset/collation/privileges; refuses when profile declares no DB.
 - Dry-run prints the plan only. Real execution requires `--confirm yes` in CLI (menu asks interactively).
-- Creates DB + user and grants privileges, then writes db.env (DB_PASS shown once to stdout, not logged).
+- Creates or reuses the managed DB + user for the site, repairs grants when needed, then writes db.env.
 
 ## db-drop
 `simai-admin.sh site db-drop --domain <domain> [--dry_run yes] [--confirm yes] [--remove_files yes]`
@@ -51,6 +51,7 @@ Notes:
 ## db-rotate
 `simai-admin.sh site db-rotate --domain <domain> [--dry_run yes] [--confirm yes]`
 - Rotates the DB user password, updates db.env, and prints the new password once.
+- In menu mode, it can also update the project `.env` immediately after rotation.
 
 ## db-export
 `simai-admin.sh site db-export --domain <domain> [--target .env] [--confirm yes]`

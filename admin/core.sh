@@ -6,6 +6,7 @@ AUDIT_LOG_FILE=${AUDIT_LOG_FILE:-/var/log/simai-audit.log}
 ADMIN_USER=${ADMIN_USER:-simai}
 # shellcheck disable=SC2034 # used by sourced command handlers
 SIMAI_RC_MENU_RELOAD=88
+SIMAI_RC_CANCELLED=89
 SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
@@ -115,12 +116,16 @@ log() {
   ts=$(date +"%Y-%m-%dT%H:%M:%S")
   mkdir -p "$(dirname "$LOG_FILE")"
   echo "${ts} [${level}] ${msg}" >>"$LOG_FILE"
-  echo "${ts} [${level}] ${msg}"
+  echo "${ts} [${level}] ${msg}" >&2
 }
 
 info() { log "INFO" "$@"; }
 warn() { log "WARN" "$@"; }
 error() { log "ERROR" "$@"; }
+command_cancelled() {
+  warn "${1:-Cancelled.}"
+  return "${SIMAI_RC_CANCELLED:-89}"
+}
 
 print_kv_table() {
   local -a rows=("$@")

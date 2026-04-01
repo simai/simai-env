@@ -18,8 +18,8 @@ site_php_ini_set_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -n "$domain" ]]; then
@@ -58,7 +58,10 @@ site_php_ini_set_handler() {
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
       local choice
       choice=$(select_from_list "Apply and reload php-fpm now?" "no" "no" "yes")
-      [[ "$choice" == "yes" ]] || return 0
+      [[ "$choice" == "yes" ]] || {
+        command_cancelled
+        return $?
+      }
     fi
     read_site_metadata "$domain"
     if ! load_profile "${SITE_META[profile]:-}"; then
@@ -95,8 +98,8 @@ site_php_ini_unset_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -n "$domain" ]]; then
@@ -136,7 +139,10 @@ site_php_ini_unset_handler() {
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
       local choice
       choice=$(select_from_list "Apply and reload php-fpm now?" "no" "no" "yes")
-      [[ "$choice" == "yes" ]] || return 0
+      [[ "$choice" == "yes" ]] || {
+        command_cancelled
+        return $?
+      }
     fi
     read_site_metadata "$domain"
     if ! load_profile "${SITE_META[profile]:-}"; then
@@ -167,8 +173,8 @@ site_php_ini_list_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -n "$domain" ]]; then
@@ -210,8 +216,8 @@ site_php_ini_apply_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
   fi
   if [[ -n "$domain" ]]; then
@@ -229,7 +235,10 @@ site_php_ini_apply_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
     choice=$(select_from_list "Apply overrides and reload php-fpm now?" "no" "no" "yes")
-    [[ "$choice" == "yes" ]] || return 0
+    [[ "$choice" == "yes" ]] || {
+      command_cancelled
+      return $?
+    }
   fi
 
   read_site_metadata "$domain"

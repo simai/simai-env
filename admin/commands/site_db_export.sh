@@ -15,8 +15,8 @@ site_db_export_handler() {
     fi
     domain=$(select_from_list "Select site" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
@@ -30,8 +30,11 @@ site_db_export_handler() {
   fi
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
-    choice=$(select_from_list "Write DB_* to ${target}?" "no" "no" "yes")
-    [[ "$choice" == "yes" ]] || return 0
+    choice=$(select_from_list "Write DB_* credentials to ${target}?" "yes" "yes" "no")
+    [[ "$choice" == "yes" ]] || {
+      command_cancelled
+      return $?
+    }
   fi
 
   local project_dir="${WWW_ROOT}/${domain}"

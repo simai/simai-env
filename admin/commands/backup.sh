@@ -4,6 +4,32 @@ set -euo pipefail
 # shellcheck source=admin/lib/backup_utils.sh
 source "${SCRIPT_DIR}/admin/lib/backup_utils.sh"
 
+backup_archive_is_menu_compatible() {
+  local file="$1"
+  local base
+  base=$(basename "$file")
+  [[ "$base" == simai-env-preupdate-* ]] && return 1
+  [[ "$base" == simai-env-manualsync-* ]] && return 1
+  return 0
+}
+
+backup_archive_compat_error() {
+  local file="$1"
+  local base
+  base=$(basename "$file")
+  if [[ "$base" == simai-env-preupdate-* ]]; then
+    error "This archive is a platform pre-update backup, not a site settings archive: ${file}"
+    echo "Use one created by: simai-admin.sh backup export --domain <domain>"
+    return 0
+  fi
+  if [[ "$base" == simai-env-manualsync-* ]]; then
+    error "This archive is a manual platform sync backup, not a site settings archive: ${file}"
+    echo "Use one created by: simai-admin.sh backup export --domain <domain>"
+    return 0
+  fi
+  return 1
+}
+
 backup_export_handler() {
   parse_kv_args "$@"
   ui_header "SIMAI ENV · Backup export"
@@ -143,6 +169,9 @@ backup_inspect_handler() {
     echo "Use: simai-admin.sh backup export --domain <domain>"
     return 1
   fi
+  if backup_archive_compat_error "$file"; then
+    return 1
+  fi
   local tmpdir
   tmpdir=$(mktemp -d)
   if ! backup_safe_extract_archive "$file" "$tmpdir"; then
@@ -153,6 +182,7 @@ backup_inspect_handler() {
   local manifest="${tmpdir}/manifest.json"
   if [[ ! -f "$manifest" ]]; then
     error "manifest.json missing in archive"
+    echo "This command expects a site settings archive created by: simai-admin.sh backup export --domain <domain>"
     rm -rf "$tmpdir"
     return 1
   fi
@@ -188,6 +218,9 @@ backup_import_handler() {
     echo "Use: simai-admin.sh backup export --domain <domain>"
     return 1
   fi
+  if backup_archive_compat_error "$file"; then
+    return 1
+  fi
 
   local tmpdir
   tmpdir=$(mktemp -d)
@@ -199,6 +232,7 @@ backup_import_handler() {
   local manifest="${tmpdir}/manifest.json"
   if [[ ! -f "$manifest" ]]; then
     error "manifest.json missing in archive"
+    echo "This command expects a site settings archive created by: simai-admin.sh backup export --domain <domain>"
     rm -rf "$tmpdir"
     return 1
   fi

@@ -37,7 +37,15 @@ php_reload_handler() {
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local versions=()
     mapfile -t versions < <(installed_php_versions)
+    if [[ ${#versions[@]} -eq 0 ]]; then
+      error "No installed PHP versions available for reload"
+      return 1
+    fi
     php_version=$(select_from_list "Select PHP version to reload" "" "${versions[@]}")
+    if [[ -z "$php_version" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   if [[ -z "$php_version" ]]; then
     require_args "php"
@@ -56,6 +64,10 @@ php_install_handler() {
 
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     php_version=$(select_from_list "Select PHP version to install" "8.2" "8.1" "8.2" "8.3" "8.4")
+    if [[ -z "$php_version" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   if [[ -z "$php_version" ]]; then
     require_args "php"
@@ -66,12 +78,16 @@ php_install_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     local choice
     choice=$(select_from_list "Install common extensions?" "yes" "yes" "no")
+    if [[ -z "$choice" ]]; then
+      command_cancelled
+      return $?
+    fi
     include_common="$choice"
     local proceed
-    proceed=$(select_from_list "Proceed with installation?" "no" "no" "yes")
+    proceed=$(select_from_list "Proceed with installation?" "yes" "no" "yes")
     if [[ "$proceed" != "yes" ]]; then
-      info "Installation cancelled"
-      return 0
+      command_cancelled "Installation cancelled"
+      return $?
     fi
   fi
 
@@ -155,5 +171,5 @@ php_install_handler() {
 }
 
 register_cmd "php" "list" "List installed PHP versions and FPM status" "php_list_handler" "" ""
-register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "php" ""
+register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "" "php="
 register_cmd "php" "install" "Install a PHP version (FPM/CLI + base extensions)" "php_install_handler" "" "php= include-common= confirm="

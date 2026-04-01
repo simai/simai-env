@@ -1,5 +1,36 @@
 #!/usr/bin/env bash
 
+profile_pick_id() {
+  local mode="${1:-all}"
+  local id="${2:-}"
+  if [[ -n "$id" ]]; then
+    printf '%s\n' "$id"
+    return 0
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" ]]; then
+    return 1
+  fi
+  local ids=()
+  case "$mode" in
+    enabled)
+      mapfile -t ids < <(list_enabled_profile_ids 2>/dev/null || true)
+      ;;
+    all|*)
+      mapfile -t ids < <(list_profile_ids 2>/dev/null || true)
+      ;;
+  esac
+  if [[ ${#ids[@]} -eq 0 ]]; then
+    warn "No profiles found"
+    return 1
+  fi
+  id=$(select_from_list "Select profile" "" "${ids[@]}")
+  if [[ -z "$id" ]]; then
+    command_cancelled
+    return $?
+  fi
+  printf '%s\n' "$id"
+}
+
 profile_validate_results_status=()
 profile_validate_results_profile=()
 profile_validate_results_msg=()
@@ -288,9 +319,9 @@ profile_list_handler() {
     info "No profiles found"
     return 0
   fi
-  local border="+------------+----------+--------------------------+-------------+-------------+-------+"
+  local border="+------------+----------+--------------------------------------+-------------+-------------+-------+"
   printf "%s\n" "$border"
-  printf "| %-10s | %-8s | %-24s | %-11s | %-11s | %-5s |\n" "ID" "Status" "Title" "RequiresPHP" "RequiresDB" "Alias"
+  printf "| %-10s | %-8s | %-36s | %-11s | %-11s | %-5s |\n" "ID" "Status" "Title" "RequiresPHP" "RequiresDB" "Alias"
   printf "%s\n" "$border"
   local id
   for id in "${ids[@]}"; do
@@ -318,7 +349,7 @@ printf "%s\n" "${PROFILE_IS_ALIAS-}"
         alias=$(echo "$meta" | sed -n '4p')
       fi
     fi
-    printf "| %-10s | %-8s | %-24s | %-11s | %-11s | %-5s |\n" "$id" "$status" "${title:0:24}" "${req_php:-?}" "${req_db:-?}" "${alias:-no}"
+    printf "| %-10s | %-8s | %-36s | %-11s | %-11s | %-5s |\n" "$id" "$status" "${title:0:36}" "${req_php:-?}" "${req_db:-?}" "${alias:-no}"
   done
   printf "%s\n" "$border"
   if profiles_allowlist_exists; then
@@ -331,6 +362,10 @@ printf "%s\n" "${PROFILE_IS_ALIAS-}"
 profile_used_by_handler() {
   parse_kv_args "$@"
   local id="${PARSED_ARGS[id]:-}"
+  if [[ -z "$id" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    id=$(profile_pick_id "all") || return $?
+    PARSED_ARGS[id]="$id"
+  fi
   local domains=()
   mapfile -t domains < <(list_sites)
   declare -A profile_to_domains=()
@@ -374,7 +409,12 @@ profile_enable_handler() {
   parse_kv_args "$@"
   local id="${PARSED_ARGS[id]:-}"
   if [[ -z "$id" ]]; then
-    require_args "id"
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      id=$(profile_pick_id "all") || return $?
+      PARSED_ARGS[id]="$id"
+    else
+      require_args "id"
+    fi
   fi
   if ! is_profile_known "$id"; then
     error "Unknown profile: ${id}"
@@ -398,7 +438,12 @@ profile_disable_handler() {
   local force="${PARSED_ARGS[force]:-no}"
   [[ "${force,,}" == "yes" ]] && force="yes" || force="no"
   if [[ -z "$id" ]]; then
-    require_args "id"
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      id=$(profile_pick_id "enabled") || return $?
+      PARSED_ARGS[id]="$id"
+    else
+      require_args "id"
+    fi
   fi
   if ! is_profile_known "$id"; then
     error "Unknown profile: ${id}"

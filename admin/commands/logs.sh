@@ -55,8 +55,8 @@ logs_nginx_handler() {
     fi
     domain=$(select_from_list "Select domain" "" "${_sites[@]}")
     if [[ -z "$domain" ]]; then
-      warn "Cancelled."
-      return 0
+      command_cancelled
+      return $?
     fi
     PARSED_ARGS[domain]="$domain"
   fi
