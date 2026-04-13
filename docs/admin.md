@@ -5,6 +5,7 @@
 - Interactive menu: `sudo /root/simai-env/simai-admin.sh menu` (numeric choices, stays in section; self-update reloads menu)
   - Text backend is the default for stable console UX.
   - After each command, menu shows status/output and waits for Enter before returning.
+- Managed file access now lives under `Access`; this batch covers global access to all projects under `WWW_ROOT` and project-scoped access with chroot isolation.
 
 Supported OS: Ubuntu 22.04/24.04. Run as root.
 

@@ -224,6 +224,7 @@ actsellistbox=black,cyan
       logs) logs_menu; return 0 ;;
       backup) backup_menu; return 0 ;;
       applications) applications_menu; return 0 ;;
+      access) access_menu; return 0 ;;
       applications:laravel) laravel_app_menu; return 0 ;;
       applications:wordpress) wordpress_app_menu; return 0 ;;
       applications:bitrix) bitrix_app_menu; return 0 ;;
@@ -361,6 +362,21 @@ actsellistbox=black,cyan
           val=$(prompt "$key")
         fi
         ;;
+      login)
+        if [[ "$section" == "access" && "$cmd" != "create-global" ]]; then
+          local access_logins=()
+          if declare -F access_list_logins >/dev/null 2>&1; then
+            mapfile -t access_logins < <(access_list_logins 2>/dev/null || true)
+          fi
+          if [[ ${#access_logins[@]} -gt 0 ]]; then
+            val=$(select_from_list "Select access login" "" "${access_logins[@]}")
+          else
+            val=$(prompt "$key")
+          fi
+        else
+          val=$(prompt "$key")
+        fi
+        ;;
       file)
         if [[ "$section" == "backup" && ( "$cmd" == "inspect" || "$cmd" == "import" ) ]]; then
           local archives=()
@@ -457,13 +473,15 @@ actsellistbox=black,cyan
         "1|List sites"
         "2|Create site"
         "3|Site info"
-        "4|Activity & optimization"
-        "5|Change activity class"
-        "6|Site availability"
-        "7|Pause site"
-        "8|Resume site"
-        "9|Change site PHP"
-        "10|Remove site"
+        "4|Create file access"
+        "5|List file accesses"
+        "6|Activity & optimization"
+        "7|Change activity class"
+        "8|Site availability"
+        "9|Pause site"
+        "10|Resume site"
+        "11|Change site PHP"
+        "12|Remove site"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
@@ -471,17 +489,19 @@ actsellistbox=black,cyan
           "1|List sites"
           "2|Create site"
           "3|Site info"
-          "4|Activity & optimization"
-          "5|Change activity class"
-          "6|Automatic optimization for this site"
-          "7|Exclude site from automatic optimization"
-          "8|Include site in automatic optimization"
-          "9|Use automatic optimization defaults"
-          "10|Site availability"
-          "11|Pause site"
-          "12|Resume site"
-          "13|Change site PHP"
-          "14|Remove site"
+          "4|Create file access"
+          "5|List file accesses"
+          "6|Activity & optimization"
+          "7|Change activity class"
+          "8|Automatic optimization for this site"
+          "9|Exclude site from automatic optimization"
+          "10|Include site in automatic optimization"
+          "11|Use automatic optimization defaults"
+          "12|Site availability"
+          "13|Pause site"
+          "14|Resume site"
+          "15|Change site PHP"
+          "16|Remove site"
           "0|Back"
         )
       fi
@@ -491,65 +511,77 @@ actsellistbox=black,cyan
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
         3) run_menu_command site info ;;
-        4) run_menu_command site usage-status ;;
-        5) run_menu_command site usage-set ;;
-        6)
+        4) run_menu_command access create-project ;;
+        5)
+          local sites=() domain=""
+          mapfile -t sites < <(list_sites 2>/dev/null || true)
+          if [[ ${#sites[@]} -eq 0 ]]; then
+            warn "No sites found"
+            continue
+          fi
+          domain=$(select_from_list "Select site" "" "${sites[@]}")
+          [[ -z "$domain" ]] && continue
+          run_menu_command access list --domain "$domain"
+          ;;
+        6) run_menu_command site usage-status ;;
+        7) run_menu_command site usage-set ;;
+        8)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-status
           else
             run_menu_command site runtime-status
           fi
           ;;
-        7)
+        9)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-disable
           else
             run_menu_command site runtime-suspend
           fi
           ;;
-        8)
+        10)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-enable
           else
             run_menu_command site runtime-resume
           fi
           ;;
-        9)
+        11)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-reset
           else
             run_menu_command site set-php
           fi
           ;;
-        10)
+        12)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-status
           else
             run_menu_command site remove
           fi
           ;;
-        11)
+        13)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-suspend
           else
             menu_invalid_choice
           fi
           ;;
-        12)
+        14)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-resume
           else
             menu_invalid_choice
           fi
           ;;
-        13)
+        15)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site set-php
           else
             menu_invalid_choice
           fi
           ;;
-        14)
+        16)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site remove
           else
@@ -995,6 +1027,39 @@ actsellistbox=black,cyan
     done
   }
 
+  access_menu() {
+    while true; do
+      menu_auto_update_apply_if_safe "access"
+      local -a items=(
+        "1|List accesses"
+        "2|Show access details"
+        "3|Create project access"
+        "4|Create global access"
+        "5|Add SSH key"
+        "6|Disable access"
+        "7|Enable access"
+        "8|Reset access password"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Access" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command access list ;;
+        2) run_menu_command access show ;;
+        3) run_menu_command access create-project ;;
+        4) run_menu_command access create-global ;;
+        5) run_menu_command access add-key ;;
+        6) run_menu_command access disable ;;
+        7) run_menu_command access enable ;;
+        8) run_menu_command access reset-password ;;
+        0) break ;;
+        "") continue ;;
+        "__invalid__") menu_invalid_choice ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
   profiles_menu() {
     while true; do
       menu_auto_update_apply_if_safe "profiles"
@@ -1235,8 +1300,9 @@ actsellistbox=black,cyan
       "6|Logs"
       "7|Backup / Migrate"
       "8|Applications"
-      "9|Profiles"
-      "10|System"
+      "9|Access"
+      "10|Profiles"
+      "11|System"
       "0|Exit"
     )
     local choice=""
@@ -1250,8 +1316,9 @@ actsellistbox=black,cyan
       6) logs_menu ;;
       7) backup_menu ;;
       8) applications_menu ;;
-      9) profiles_menu ;;
-      10) system_menu ;;
+      9) access_menu ;;
+      10) profiles_menu ;;
+      11) system_menu ;;
       0) exit 0 ;;
       "") continue ;;
       "__invalid__") menu_invalid_choice ;;

@@ -434,6 +434,9 @@ site_add_handler() {
   local db_name="${PARSED_ARGS[db-name]:-}"
   local db_user="${PARSED_ARGS[db-user]:-}"
   local db_pass="${PARSED_ARGS[db-pass]:-}"
+  local access_create="${PARSED_ARGS[access-create]:-}"
+  local access_login="${PARSED_ARGS[access-login]:-}"
+  local access_password="${PARSED_ARGS[access-password]:-}"
   local target_domain="${PARSED_ARGS[target-domain]:-}" target_path="" target_project="" target_php=""
   local path_created=0 path_empty=0 need_post_bootstrap_marker_check=0
   local path_explicit="no"
@@ -863,6 +866,26 @@ site_add_handler() {
     else
       bitrix_installer_summary="failed"
       warn "Failed to download bitrixsetup.php"
+    fi
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    if [[ -z "$access_create" ]]; then
+      local access_choice
+      access_choice=$(select_from_list "Create file access for this site?" "no" "no" "yes")
+      [[ "$access_choice" == "yes" ]] && access_create="yes" || access_create="no"
+    fi
+  fi
+  if [[ "$access_create" == "yes" ]]; then
+    if [[ -z "$access_login" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      access_login=$(prompt "access login")
+      [[ -z "$access_login" ]] && command_cancelled && return $?
+    fi
+    if [[ -n "$access_login" ]]; then
+      run_command access create-project --domain "$domain" --login "$access_login" ${access_password:+--password "$access_password"} || return $?
+    else
+      error "access-login is required for access-create"
+      return 1
     fi
   fi
 
@@ -1783,7 +1806,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

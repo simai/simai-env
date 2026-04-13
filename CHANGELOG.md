@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.41] - 2026-04-13
+### Added
+- Added the `Access` menu section for managed SFTP-only access: list, show, create project/global access, add SSH key, enable/disable, and reset password.
+- Added optional project access creation during `site add`, so a site can be created together with delegated file access.
+- Wired access documentation into the main admin docs and menu guide.
+
 ## [1.12.40] - 2026-04-13
 ### Fixed
 - `SSL -> Issue Let's Encrypt` in menu mode now shows a wildcard preflight screen before Certbot runs: required `A` records, a plain-language note that TXT verification is automatic through Cloudflare API, and `PASS/WARN/FAIL` checks for wildcard host mode, DNS resolution, plugin availability, and credentials file presence.
