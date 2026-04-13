@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.39] - 2026-04-13
+### Fixed
+- `SSL -> Issue Let's Encrypt` in menu mode now loads site metadata immediately after domain selection, preventing the wildcard certificate scope prompt from crashing with `host_mode: unbound variable`.
+
 ## [1.12.38] - 2026-03-31
 ### Fixed
 - The menu version banner now always shows the current local `VERSION` file instead of reusing a stale cached `local_version` from auto-update state.

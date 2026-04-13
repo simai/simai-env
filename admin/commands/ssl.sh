@@ -262,6 +262,9 @@ ssl_issue_handler() {
       domain=$(select_from_list "Select domain" "" "${sites[@]}")
       PARSED_ARGS[domain]="$domain"
     fi
+    if [[ -n "$domain" ]]; then
+      read_site_metadata "$domain" >/dev/null 2>&1 || true
+    fi
     if [[ -z "$email" ]]; then
       email=$(prompt "email")
       if [[ -z "$email" ]]; then
