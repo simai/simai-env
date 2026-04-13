@@ -500,7 +500,7 @@ apt_update_once() {
 install_packages() {
   apt_update_once
   os_cmd_pkg_install \
-    software-properties-common ca-certificates curl gnupg lsb-release sudo cron \
+    software-properties-common ca-certificates curl gnupg lsb-release sudo cron acl \
     git unzip htop rsyslog logrotate certbot
   run_long "Installing base utilities" "${OS_CMD[@]}" || fail "Failed to install base utilities"
   os_svc_enable_now cron || true
