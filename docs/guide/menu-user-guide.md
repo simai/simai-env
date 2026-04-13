@@ -29,6 +29,8 @@ Common actions:
 - `List sites`
 - `Create site`
 - `Site info`
+- `Create file access`
+- `List file accesses`
 - `Site activity`
 - `Set activity`
 - `Optimization override status`
@@ -57,6 +59,10 @@ Common actions:
 Notes:
 - If a site was created with `Serve all first-level subdomains too? = yes`, the SSL screen can now request a wildcard certificate for the main domain plus `*.domain`.
 - Current wildcard HTTPS support uses Cloudflare DNS challenge and needs a credentials file on the server.
+- Before requesting a wildcard certificate, the menu now shows a preflight screen with:
+  - the `A` records the user should create
+  - a simple explanation that TXT verification is automatic through Cloudflare API
+  - `PASS/WARN/FAIL` checks for DNS, plugin, and credentials readiness
 
 ### PHP
 Use this section when you need to inspect installed PHP versions, install a new version, or reload PHP-FPM.
@@ -134,6 +140,25 @@ Common Bitrix actions inside `Applications -> Bitrix`:
 - `Bitrix status`
 - `Bitrix optimization`
 - `Bitrix complete setup`
+
+### Access
+Use this section to manage delegated file access without giving out `root` or the main `simai` account.
+
+Common actions:
+- `List accesses`
+- `Show access details`
+- `Create project access`
+- `Create global access`
+- `Add SSH key`
+- `Disable access`
+- `Enable access`
+- `Reset access password`
+
+Notes:
+- Access users are `SFTP`-only and do not receive shell access.
+- Project access is isolated with `ChrootDirectory` and a bind mount.
+- Project root must live under `WWW_ROOT`.
+- On systemd hosts, a `.mount` unit is created to persist the bind mount across reboots.
 
 ### Profiles
 Use this section to inspect and manage profile availability.
