@@ -1039,6 +1039,7 @@ actsellistbox=black,cyan
         "6|Disable access"
         "7|Enable access"
         "8|Reset access password"
+        "9|Remove access"
         "0|Back"
       )
       local ch=""
@@ -1052,6 +1053,7 @@ actsellistbox=black,cyan
         6) run_menu_command access disable ;;
         7) run_menu_command access enable ;;
         8) run_menu_command access reset-password ;;
+        9) run_menu_command access remove ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

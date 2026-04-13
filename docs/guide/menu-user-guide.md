@@ -153,6 +153,7 @@ Common actions:
 - `Disable access`
 - `Enable access`
 - `Reset access password`
+- `Remove access`
 
 Notes:
 - Access users are `SFTP`-only and do not receive shell access.

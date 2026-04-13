@@ -332,6 +332,40 @@ access_reset_password_handler() {
     "Password|${password}"
 }
 
+access_remove_handler() {
+  parse_kv_args "$@"
+  local login="${PARSED_ARGS[login]:-}"
+  login=$(access_pick_login "$login") || return $?
+  access_load_metadata "$login" || { error "Access login ${login} not found"; return 1; }
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Remove access ${login} and delete its user?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
+  if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
+    access_disable_mount_unit "$login" || true
+    access_unmount_project_root "$login" || true
+  fi
+  if id -u "$login" >/dev/null 2>&1; then
+    userdel "$login" 2>/dev/null || userdel -r "$login" 2>/dev/null || true
+  fi
+  if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
+    local jail_root
+    jail_root="${ACCESS_META[JAIL_PATH]:-$(access_project_jail_root "$login")}"
+    access_safe_remove_dir "$SIMAI_ACCESS_JAIL_BASE" "$jail_root" || true
+  fi
+  if [[ "${ACCESS_META[TYPE]:-}" == "global" ]]; then
+    local home
+    home="${ACCESS_META[HOME_PATH]:-}"
+    if [[ -z "$home" ]]; then
+      home=$(access_global_home "$login")
+    fi
+    access_safe_remove_dir "$SIMAI_ACCESS_HOME_BASE" "$home" || true
+  fi
+  rm -f "$(access_metadata_file "$login")"
+  ui_result_table "Login|${login}" "Status|removed"
+}
+
 access_add_key_handler() {
   parse_kv_args "$@"
   local login="${PARSED_ARGS[login]:-}"
@@ -388,4 +422,5 @@ register_cmd "access" "create-project" "Create project SFTP access" "access_crea
 register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" ""
 register_cmd "access" "enable" "Enable access" "access_enable_handler" "login" "" ""
 register_cmd "access" "reset-password" "Reset access password" "access_reset_password_handler" "login" "password=" ""
+register_cmd "access" "remove" "Remove access" "access_remove_handler" "login" "" ""
 register_cmd "access" "add-key" "Add SSH public key for access" "access_add_key_handler" "login pubkey-file" ""

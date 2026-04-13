@@ -289,6 +289,27 @@ access_mount_is_active() {
   grep -qs " ${target} " /proc/mounts
 }
 
+access_unmount_project_root() {
+  local login="$1"
+  local site_dir
+  site_dir=$(access_project_site_dir "$login")
+  if access_mount_is_active "$site_dir"; then
+    umount "$site_dir" 2>/dev/null || true
+  fi
+}
+
+access_safe_remove_dir() {
+  local base="$1" path="$2"
+  [[ -z "$base" || -z "$path" ]] && return 1
+  if [[ "$path" != "$base/"* ]]; then
+    return 1
+  fi
+  if [[ "$path" == "$base" ]]; then
+    return 1
+  fi
+  rm -rf "$path"
+}
+
 access_prepare_project_jail() {
   local login="$1"
   local jail_root site_dir
