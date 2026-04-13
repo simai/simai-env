@@ -35,7 +35,12 @@ laravel_perf_prepare_site() {
   if ! validate_path "$root"; then
     return 1
   fi
-  local public_dir="${SITE_META[public_dir]:-public}"
+  local public_dir
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    public_dir="public"
+  else
+    public_dir="${SITE_META[public_dir]}"
+  fi
   local doc_root
   doc_root=$(site_compute_doc_root "$root" "$public_dir") || return 1
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"

@@ -37,7 +37,12 @@ bitrix_prepare_site() {
   if ! validate_path "$root"; then
     return 1
   fi
-  local public_dir="${SITE_META[public_dir]:-public}"
+  local public_dir
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    public_dir="public"
+  else
+    public_dir="${SITE_META[public_dir]}"
+  fi
   local doc_root
   doc_root=$(site_compute_doc_root "$root" "$public_dir") || return 1
   local slug="${SITE_META[slug]:-${SITE_META[project]:-$(project_slug_from_domain "$domain")}}"
@@ -110,7 +115,7 @@ bitrix_dbconn_drop_const() {
 }
 
 bitrix_agents_ready_state() {
-  local cron_managed="$1" cron_domain_match="$2" cron_slug_match="$3" cron_entry="$4" crontab="$5" crontab_support="$6"
+  local cron_managed="$1" cron_domain_match="$2" cron_slug_match="$3" cron_entry="$4" _crontab="$5" crontab_support="$6"
   if [[ "$cron_managed" == "yes" && "$cron_domain_match" == "yes" && "$cron_slug_match" == "yes" && "$cron_entry" == "yes" && "$crontab_support" == "true" ]]; then
     echo "yes"
     return 0

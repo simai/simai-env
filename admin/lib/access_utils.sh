@@ -114,6 +114,7 @@ access_load_metadata() {
     [[ -z "$key" ]] && continue
     value="${value%\"}"
     value="${value#\"}"
+    # shellcheck disable=SC2034 # ACCESS_META is a shared global associative array read by access commands.
     ACCESS_META["$key"]="$value"
   done <"$file"
 }

@@ -8,6 +8,7 @@ if ! declare -F platform_detect_os >/dev/null 2>&1; then
 fi
 
 OS_ADAPTER_ID="${OS_ADAPTER_ID:-}"
+# shellcheck disable=SC2034 # OS_CMD is a shared global command buffer consumed by callers.
 declare -ag OS_CMD=()
 
 _os_run() {
@@ -53,7 +54,8 @@ os_cmd_pkg_install_deb() {
 
 os_cmd_pkg_add_ppa() {
   local ppa="$1"
-  OS_CMD=(DEBIAN_FRONTEND=noninteractive add-apt-repository -y "$ppa")
+  # shellcheck disable=SC2034 # OS_CMD is a shared global command buffer consumed by callers.
+  OS_CMD=(env DEBIAN_FRONTEND=noninteractive add-apt-repository -y "$ppa")
 }
 
 os_svc_enable_now() {

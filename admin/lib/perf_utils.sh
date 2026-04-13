@@ -408,7 +408,7 @@ perf_fpm_service_summary() {
     if systemctl is-active --quiet "$unit"; then
       active=$((active + 1))
     fi
-  done < <(systemctl list-unit-files --type=service 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}')
+  done < <(systemctl list-units --type=service --no-legend 'php*-fpm.service' 2>/dev/null | awk '{print $1}')
   if (( total == 0 )); then
     echo "missing"
     return 0

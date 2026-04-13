@@ -677,7 +677,8 @@ create_queue_unit() {
     fi
   else
     warn "Created queue unit ${unit_name}, but bootstrap placeholders were detected; leaving it disabled"
-    QUEUE_UNIT_RESULT="created/disabled"
+      # shellcheck disable=SC2034 # QUEUE_UNIT_RESULT is a shared global read by site command handlers.
+      QUEUE_UNIT_RESULT="created/disabled"
   fi
 }
 
@@ -2257,10 +2258,10 @@ wordpress_config_table_prefix() {
   local file="$1"
   local prefix="wp_"
   if [[ -f "$file" ]]; then
-    local parsed=""
-    parsed=$(perl -ne 'if (/\$table_prefix\s*=\s*["'\'']([^"'\'']+)["'\'']\s*;/) { print $1; exit }' "$file" 2>/dev/null || true)
-    if [[ -n "$parsed" && "$parsed" =~ ^[A-Za-z0-9_]+$ ]]; then
-      prefix="$parsed"
+    local table_prefix_candidate=""
+    table_prefix_candidate=$(perl -ne 'if (/\$table_prefix\s*=\s*["'\'']([^"'\'']+)["'\'']\s*;/) { print $1; exit }' "$file" 2>/dev/null || true)
+    if [[ -n "$table_prefix_candidate" && "$table_prefix_candidate" =~ ^[A-Za-z0-9_]+$ ]]; then
+      prefix="$table_prefix_candidate"
     fi
   fi
   printf '%s\n' "$prefix"
@@ -2382,8 +2383,14 @@ wordpress_db_state_probe() {
     return 0
   fi
 
+  local public_dir
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    public_dir="public"
+  else
+    public_dir="${SITE_META[public_dir]}"
+  fi
   local config_file
-  config_file="$(site_compute_doc_root "${SITE_META[root]:-${WWW_ROOT}/${domain}}" "${SITE_META[public_dir]:-public}" 2>/dev/null || true)/wp-config.php"
+  config_file="$(site_compute_doc_root "${SITE_META[root]:-${WWW_ROOT}/${domain}}" "$public_dir" 2>/dev/null || true)/wp-config.php"
   local prefix
   prefix=$(wordpress_config_table_prefix "$config_file")
   [[ "$prefix" =~ ^[A-Za-z0-9_]+$ ]] || prefix="wp_"

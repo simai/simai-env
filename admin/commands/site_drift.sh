@@ -84,9 +84,9 @@ site_drift_handler() {
     cron_file=$(cron_site_file_path "$(project_slug_from_domain "$domain")")
     [[ -f "$cron_file" ]] && cron_status="OK (guessed)"
   fi
-  local legacy_info legacy_state legacy_user legacy_fmt
+  local legacy_info legacy_state legacy_user _legacy_fmt
   legacy_info=$(cron_legacy_detect_any "$domain")
-  IFS="|" read -r legacy_state legacy_user legacy_fmt _ <<<"$legacy_info"
+  IFS="|" read -r legacy_state legacy_user _legacy_fmt _ <<<"$legacy_info"
   if [[ "$legacy_state" == "marked" ]]; then
     cron_notes+=("legacy cron (marked) in ${legacy_user}")
     [[ "$cron_status" == "OK" ]] && cron_status="DRIFT" || cron_status="DRIFT"

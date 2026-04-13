@@ -262,6 +262,7 @@ ssl_menu_prepare_dns_wildcard() {
       ;;
   esac
 
+  # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
   PARSED_ARGS[dns-provider]="$provider"
   PARSED_ARGS[dns-credentials]="$credentials"
   PARSED_ARGS[wildcard]="yes"

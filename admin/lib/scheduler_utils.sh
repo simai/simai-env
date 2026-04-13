@@ -504,7 +504,7 @@ scheduler_health_review_run() {
   local total=0 active=0 suspended=0 auto_disabled=0 setup_pending=0 ssl_expiring_soon=0 ssl_disabled=0
   local setup_domains=() expiring_domains=() manual_domains=()
   local domain ssl_info ssl_type ssl_expires exp_ts now_ts days_left
-  local profile runtime_state auto_effective web_state root project
+  local profile runtime_state auto_effective web_state root
   now_ts=$(date +%s)
 
   while IFS= read -r domain; do

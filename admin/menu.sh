@@ -1094,9 +1094,11 @@ actsellistbox=black,cyan
   system_menu() {
     while true; do
       menu_auto_update_apply_if_safe "system"
-      local adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
+      local adv_label
+      adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
-      local auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
+      local auto_opt_label
+      auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
       local auto_update_mode="check"
       if declare -F self_auto_update_mode >/dev/null 2>&1; then
         auto_update_mode="$(self_auto_update_mode 2>/dev/null || echo check)"

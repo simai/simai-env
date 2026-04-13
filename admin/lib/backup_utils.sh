@@ -182,6 +182,7 @@ backup_print_plan() {
 
 backup_apply_files() {
   local root="$1" domain="$2" slug="$3" php="$4" enable_flag="$5" ts="$6" cron_allowed="$7" queue_allowed="$8"
+  # shellcheck disable=SC2034 # rollback_ref is a nameref sink populated by backup helpers.
   local -n rollback_ref="$9"
   local ok=0
 
@@ -195,7 +196,6 @@ backup_apply_files() {
   backup_backup_if_exists "$nginx_dst" "$ts" rollback_ref
   cp "$nginx_src" "$nginx_dst"
 
-  local nginx_enabled_src="${root}/nginx/sites-enabled/${domain}.conf.symlink"
   if [[ "$enable_flag" == "yes" ]]; then
     local symlink="/etc/nginx/sites-enabled/${domain}.conf"
     backup_backup_if_exists "$symlink" "$ts" rollback_ref
@@ -233,7 +233,8 @@ backup_apply_files() {
     else
       for unit in "$systemd_dir"/*.service; do
         [[ -f "$unit" ]] || continue
-        local dst="/etc/systemd/system/$(basename "$unit")"
+        local dst
+        dst="/etc/systemd/system/$(basename "$unit")"
         backup_backup_if_exists "$dst" "$ts" rollback_ref
         cp "$unit" "$dst"
       done
@@ -257,6 +258,7 @@ backup_backup_if_exists() {
 }
 
 backup_rollback() {
+  # shellcheck disable=SC2178 # ref is a nameref to an array passed by the caller.
   local -n ref="$1"
   for entry in "${ref[@]}"; do
     local path="${entry%%|*}"
@@ -331,21 +333,28 @@ backup_profile_contract() {
     BACKUP_PROFILE_NOTE="profile '${profile}' is not present in local registry"
     return 1
   fi
+  # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
   BACKUP_PROFILE_KNOWN="yes"
 
   if command -v is_profile_enabled >/dev/null 2>&1; then
     if is_profile_enabled "$profile"; then
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_ENABLED="yes"
     else
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_ENABLED="no"
     fi
   fi
 
   if command -v source_profile_file_raw >/dev/null 2>&1; then
     if source_profile_file_raw "$profile"; then
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_REQUIRES_PHP="${PROFILE_REQUIRES_PHP:-yes}"
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_SUPPORTS_CRON="${PROFILE_SUPPORTS_CRON:-no}"
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_SUPPORTS_QUEUE="${PROFILE_SUPPORTS_QUEUE:-no}"
+      # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
       BACKUP_PROFILE_NOTE="ok"
       return 0
     fi
@@ -353,6 +362,7 @@ backup_profile_contract() {
     return 1
   fi
 
+  # shellcheck disable=SC2034 # BACKUP_PROFILE_* globals are exported through this helper for callers to read.
   BACKUP_PROFILE_NOTE="profile loader helper unavailable"
   return 1
 }

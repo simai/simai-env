@@ -312,6 +312,7 @@ site_menu_prepare_ssl_choice() {
     return $?
   fi
 
+  # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
   PARSED_ARGS[ssl]="$choice"
   if [[ "$choice" == "yes" ]]; then
     local email=""
@@ -334,10 +335,14 @@ site_menu_prepare_host_mode() {
     return $?
   fi
   if [[ "$choice" == "yes" ]]; then
+    # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
     PARSED_ARGS[host-mode]="wildcard"
+    # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
     PARSED_ARGS[wildcard-domain]="$(site_default_wildcard_domain "$domain")"
   else
+    # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
     PARSED_ARGS[host-mode]="standard"
+    # shellcheck disable=SC2154 # PARSED_ARGS is a shared global associative array.
     PARSED_ARGS[wildcard-domain]=""
   fi
   return 0
@@ -1699,7 +1704,12 @@ site_info_handler() {
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
   local slug="${SITE_META[slug]:-$project}"
   local root="${SITE_META[root]:-${WWW_ROOT}/${domain}}"
-  local public_dir="${SITE_META[public_dir]:-public}"
+  local public_dir
+  if [[ -z "${SITE_META[public_dir]+x}" ]]; then
+    public_dir="public"
+  else
+    public_dir="${SITE_META[public_dir]}"
+  fi
   local host_mode="${SITE_META[host_mode]:-standard}"
   local wildcard_domain="${SITE_META[wildcard_domain]:-}"
   local nginx_conf="/etc/nginx/sites-available/${domain}.conf"

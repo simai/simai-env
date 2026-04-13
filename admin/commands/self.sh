@@ -342,7 +342,6 @@ self_status_handler() {
   fi
   local install_dir="${SIMAI_ENV_ROOT:-${SCRIPT_DIR:-unknown}}"
 
-  local svc_state
   svc_state() {
     local svc="$1"
     if ! os_svc_has_unit "$svc"; then
@@ -457,7 +456,6 @@ self_status_handler() {
 
 self_platform_status_handler() {
   ui_header "SIMAI ENV · Platform diagnostics"
-  local svc_state
   svc_state() {
     local svc="$1"
     if ! os_svc_has_unit "$svc"; then
@@ -721,10 +719,10 @@ self_perf_plan_handler() {
   local rows=()
   local commands=()
   local idx=0
-  local entry current domain profile mode usage_class auto_optimize_state suggested_mode target_children reduction php_version pool_file
+  local entry current domain profile mode usage_class auto_optimize_state suggested_mode target_children reduction php_version
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
-    IFS='|' read -r current domain profile mode usage_class auto_optimize_state suggested_mode target_children reduction php_version pool_file <<<"$entry"
+    IFS='|' read -r current domain profile mode usage_class auto_optimize_state suggested_mode target_children reduction php_version _pool_file <<<"$entry"
     idx=$((idx + 1))
     rows+=("${idx}. ${domain}|children=${current}, usage=${usage_class}, auto=${auto_optimize_state}, suggest=${suggested_mode}, target=${target_children}, reduce=${reduction}, mode=${mode}, profile=${profile}, php=${php_version}")
     if [[ "$domain" == *.* && "$reduction" =~ ^[0-9]+$ && "$reduction" -gt 0 ]]; then
@@ -781,10 +779,10 @@ self_perf_rebalance_handler() {
   local changed=()
   local skipped=()
   local applied=0
-  local entry current domain profile current_mode usage_class auto_optimize_state suggested_mode target_children reduction php_version pool_file apply_mode
+  local entry current domain profile usage_class auto_optimize_state suggested_mode target_children reduction php_version apply_mode
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
-    IFS='|' read -r current domain profile current_mode usage_class auto_optimize_state suggested_mode _target _reduction php_version pool_file <<<"$entry"
+    IFS='|' read -r current domain profile _current_mode usage_class auto_optimize_state suggested_mode _target _reduction php_version _pool_file <<<"$entry"
     [[ "$domain" == *.* ]] || continue
     apply_mode="$mode"
     if [[ "$apply_mode" == "auto" ]]; then

@@ -329,6 +329,7 @@ backup_import_handler() {
 
   local timestamp
   timestamp=$(date +%Y%m%d%H%M%S)
+  # shellcheck disable=SC2034 # rollback_paths is passed by name into backup helpers.
   local rollback_paths=()
   if ! backup_apply_files "$tmpdir" "$domain" "$slug" "$php" "$enable" "$timestamp" "$profile_supports_cron" "$profile_supports_queue" rollback_paths; then
     backup_rollback rollback_paths
