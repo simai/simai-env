@@ -32,6 +32,10 @@ Behavior:
 - Standard mode uses site docroot (based on profile `PROFILE_PUBLIC_DIR`, recorded as `simai-public-dir` in nginx metadata), updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
 - Wildcard mode currently works only for sites created with `site add --host-mode wildcard`.
 - Wildcard mode currently uses DNS challenge through the Certbot Cloudflare plugin and requests a cert for both `<domain>` and `*.domain`.
+- In menu mode, wildcard issuance now shows a preflight screen before running Certbot:
+  - the required `A` records for the main domain and wildcard host
+  - a note that `_acme-challenge` TXT records are created automatically through Cloudflare API
+  - readiness checks for site host mode, DNS resolution, DNS plugin availability, and credentials file presence
 - Wildcard renewal reuses stored per-site DNS settings from `/etc/simai-env/sites/<domain>/ssl.env`.
 
 Typical use:

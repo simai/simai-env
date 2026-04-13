@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.40] - 2026-04-13
+### Fixed
+- `SSL -> Issue Let's Encrypt` in menu mode now shows a wildcard preflight screen before Certbot runs: required `A` records, a plain-language note that TXT verification is automatic through Cloudflare API, and `PASS/WARN/FAIL` checks for wildcard host mode, DNS resolution, plugin availability, and credentials file presence.
+
 ## [1.12.39] - 2026-04-13
 ### Fixed
 - `SSL -> Issue Let's Encrypt` in menu mode now loads site metadata immediately after domain selection, preventing the wildcard certificate scope prompt from crashing with `host_mode: unbound variable`.

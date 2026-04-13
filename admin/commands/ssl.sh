@@ -89,6 +89,134 @@ ssl_ensure_dns_credentials_file() {
   return 0
 }
 
+ssl_dns_resolve_ipv4() {
+  local host="$1"
+  local ip=""
+  if command -v getent >/dev/null 2>&1; then
+    ip=$(getent ahostsv4 "$host" 2>/dev/null | awk 'NR==1 {print $1}')
+  fi
+  if [[ -z "$ip" && "$(command -v dig 2>/dev/null || true)" != "" ]]; then
+    ip=$(dig +short A "$host" 2>/dev/null | awk 'NF {print; exit}')
+  fi
+  echo "$ip"
+}
+
+ssl_wildcard_probe_host() {
+  local domain="$1"
+  echo "wildcard-check.${domain}"
+}
+
+ssl_wildcard_preflight_show() {
+  local domain="$1"
+  local wildcard_domain="$2"
+  local dns_provider="$3"
+  local dns_credentials="$4"
+  local provider_pkg plugin_flag probe_host primary_ip main_ip wildcard_ip
+  local host_mode_ok="PASS"
+  local main_status="PASS"
+  local wildcard_status="PASS"
+  local plugin_status="PASS"
+  local credentials_status="PASS"
+  local hard_fail=0 dns_warn=0
+
+  probe_host=$(ssl_wildcard_probe_host "$domain")
+  primary_ip=$(site_best_effort_primary_ip)
+  main_ip=$(ssl_dns_resolve_ipv4 "$domain")
+  wildcard_ip=$(ssl_dns_resolve_ipv4 "$probe_host")
+
+  if [[ "${SITE_META[host_mode]:-standard}" != "wildcard" ]]; then
+    host_mode_ok="FAIL (site is not in wildcard host mode)"
+    hard_fail=1
+  fi
+
+  if [[ -z "$main_ip" ]]; then
+    main_status="WARN (DNS A record not found)"
+    dns_warn=1
+  elif [[ -n "$primary_ip" && "$main_ip" != "$primary_ip" ]]; then
+    main_status="WARN (${main_ip}; expected ${primary_ip})"
+    dns_warn=1
+  else
+    main_status="PASS (${main_ip})"
+  fi
+
+  if [[ -z "$wildcard_ip" ]]; then
+    wildcard_status="WARN (${probe_host} does not resolve yet)"
+    dns_warn=1
+  elif [[ -n "$primary_ip" && "$wildcard_ip" != "$primary_ip" ]]; then
+    wildcard_status="WARN (${wildcard_ip}; expected ${primary_ip})"
+    dns_warn=1
+  else
+    wildcard_status="PASS (${wildcard_ip})"
+  fi
+
+  if ! plugin_flag=$(ssl_dns_provider_flag "$dns_provider" 2>/dev/null); then
+    plugin_status="FAIL (unsupported provider: ${dns_provider})"
+    hard_fail=1
+  else
+    provider_pkg=$(ssl_dns_provider_package "$dns_provider")
+    if ! certbot plugins 2>/dev/null | grep -qi "${plugin_flag#--}"; then
+      plugin_status="FAIL (install ${provider_pkg})"
+      hard_fail=1
+    fi
+  fi
+
+  if [[ -z "$dns_credentials" || ! -f "$dns_credentials" ]]; then
+    credentials_status="FAIL (${dns_credentials:-missing})"
+    hard_fail=1
+  else
+    credentials_status="PASS (${dns_credentials})"
+  fi
+
+  ui_section "Wildcard HTTPS"
+  echo "One certificate will cover:"
+  echo "- ${domain}"
+  echo "- ${wildcard_domain}"
+  echo
+  echo "Required DNS records:"
+  if [[ -n "$primary_ip" ]]; then
+    echo "- ${domain} -> A -> ${primary_ip}"
+    echo "- ${wildcard_domain} -> A -> ${primary_ip}"
+  else
+    echo "- ${domain} -> A -> <server-ip>"
+    echo "- ${wildcard_domain} -> A -> <server-ip>"
+  fi
+  echo
+  echo "TXT verification:"
+  echo "- You do NOT add TXT records manually when using Cloudflare API."
+  echo "- SIMAI ENV / Certbot will create temporary _acme-challenge TXT records automatically."
+
+  ui_section "Wildcard SSL preflight"
+  print_kv_table \
+    "Site host mode|${host_mode_ok}" \
+    "Main domain DNS (${domain})|${main_status}" \
+    "Wildcard DNS (${probe_host})|${wildcard_status}" \
+    "Cloudflare plugin|${plugin_status}" \
+    "Credentials file|${credentials_status}"
+
+  if (( hard_fail != 0 )); then
+    ui_next_steps
+    if [[ "${SITE_META[host_mode]:-standard}" != "wildcard" ]]; then
+      ui_kv "Site mode" "Recreate the site with wildcard host mode first."
+    fi
+    if [[ "$plugin_status" == FAIL* ]]; then
+      ui_kv "Install plugin" "apt-get install -y ${provider_pkg:-python3-certbot-dns-cloudflare}"
+    fi
+    if [[ "$credentials_status" == FAIL* ]]; then
+      ui_kv "Credentials file" "/root/.secrets/certbot/cloudflare.ini"
+    fi
+    return 1
+  fi
+
+  if (( dns_warn != 0 )); then
+    ui_next_steps
+    ui_kv "DNS records" "Create/update the A records shown above before requesting the certificate."
+    ui_kv "Re-run later" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email> --wildcard yes --dns-provider ${dns_provider} --dns-credentials ${dns_credentials}"
+    return 2
+  fi
+
+  return 0
+}
+
 ssl_menu_prepare_dns_wildcard() {
   local domain="$1"
   local email_default="$2"
@@ -112,6 +240,28 @@ ssl_menu_prepare_dns_wildcard() {
     command_cancelled
     return $?
   fi
+
+  local preflight_rc=0
+  ssl_wildcard_preflight_show "$domain" "$wildcard_domain" "$provider" "$credentials" || preflight_rc=$?
+  case "$preflight_rc" in
+    0) ;;
+    1)
+      error "Wildcard SSL preflight failed. Fix the items above and run the command again."
+      return 1
+      ;;
+    2)
+      local proceed=""
+      proceed=$(select_from_list "DNS is not ready yet. Continue with certificate request anyway?" "no" "no" "yes")
+      if [[ -z "$proceed" || "$proceed" == "no" ]]; then
+        command_cancelled "Wildcard certificate request cancelled until DNS is ready."
+        return $?
+      fi
+      ;;
+    *)
+      return "$preflight_rc"
+      ;;
+  esac
+
   PARSED_ARGS[dns-provider]="$provider"
   PARSED_ARGS[dns-credentials]="$credentials"
   PARSED_ARGS[wildcard]="yes"
