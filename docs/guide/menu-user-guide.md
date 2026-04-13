@@ -29,8 +29,6 @@ Common actions:
 - `List sites`
 - `Create site`
 - `Site info`
-- `Create file access`
-- `List file accesses`
 - `Site activity`
 - `Set activity`
 - `Optimization override status`

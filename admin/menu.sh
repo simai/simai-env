@@ -473,15 +473,13 @@ actsellistbox=black,cyan
         "1|List sites"
         "2|Create site"
         "3|Site info"
-        "4|Create file access"
-        "5|List file accesses"
-        "6|Activity & optimization"
-        "7|Change activity class"
-        "8|Site availability"
-        "9|Pause site"
-        "10|Resume site"
-        "11|Change site PHP"
-        "12|Remove site"
+        "4|Activity & optimization"
+        "5|Change activity class"
+        "6|Site availability"
+        "7|Pause site"
+        "8|Resume site"
+        "9|Change site PHP"
+        "10|Remove site"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
@@ -489,19 +487,17 @@ actsellistbox=black,cyan
           "1|List sites"
           "2|Create site"
           "3|Site info"
-          "4|Create file access"
-          "5|List file accesses"
-          "6|Activity & optimization"
-          "7|Change activity class"
-          "8|Automatic optimization for this site"
-          "9|Exclude site from automatic optimization"
-          "10|Include site in automatic optimization"
-          "11|Use automatic optimization defaults"
-          "12|Site availability"
-          "13|Pause site"
-          "14|Resume site"
-          "15|Change site PHP"
-          "16|Remove site"
+          "4|Activity & optimization"
+          "5|Change activity class"
+          "6|Automatic optimization for this site"
+          "7|Exclude site from automatic optimization"
+          "8|Include site in automatic optimization"
+          "9|Use automatic optimization defaults"
+          "10|Site availability"
+          "11|Pause site"
+          "12|Resume site"
+          "13|Change site PHP"
+          "14|Remove site"
           "0|Back"
         )
       fi
@@ -511,77 +507,65 @@ actsellistbox=black,cyan
         1) run_menu_command site list ;;
         2) run_menu_command site add ;;
         3) run_menu_command site info ;;
-        4) run_menu_command access create-project ;;
-        5)
-          local sites=() domain=""
-          mapfile -t sites < <(list_sites 2>/dev/null || true)
-          if [[ ${#sites[@]} -eq 0 ]]; then
-            warn "No sites found"
-            continue
-          fi
-          domain=$(select_from_list "Select site" "" "${sites[@]}")
-          [[ -z "$domain" ]] && continue
-          run_menu_command access list --domain "$domain"
-          ;;
-        6) run_menu_command site usage-status ;;
-        7) run_menu_command site usage-set ;;
-        8)
+        4) run_menu_command site usage-status ;;
+        5) run_menu_command site usage-set ;;
+        6)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-status
           else
             run_menu_command site runtime-status
           fi
           ;;
-        9)
+        7)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-disable
           else
             run_menu_command site runtime-suspend
           fi
           ;;
-        10)
+        8)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-enable
           else
             run_menu_command site runtime-resume
           fi
           ;;
-        11)
+        9)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site auto-optimize-reset
           else
             run_menu_command site set-php
           fi
           ;;
-        12)
+        10)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-status
           else
             run_menu_command site remove
           fi
           ;;
-        13)
+        11)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-suspend
           else
             menu_invalid_choice
           fi
           ;;
-        14)
+        12)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site runtime-resume
           else
             menu_invalid_choice
           fi
           ;;
-        15)
+        13)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site set-php
           else
             menu_invalid_choice
           fi
           ;;
-        16)
+        14)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site remove
           else
