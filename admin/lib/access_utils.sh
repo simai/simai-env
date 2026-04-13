@@ -189,8 +189,8 @@ access_grant_traverse_acl() {
 access_grant_global_acl() {
   local login="$1"
   access_grant_traverse_acl "$login" "$WWW_ROOT"
-  setfacl -R -m "u:${login}:rwX" "$WWW_ROOT"
-  find "$WWW_ROOT" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX"
+  setfacl -R -m "u:${login}:rwX" -m "u:${SIMAI_USER}:rwX" "$WWW_ROOT"
+  find "$WWW_ROOT" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX" -m "d:u:${SIMAI_USER}:rwX"
 }
 
 access_global_home() {
@@ -320,8 +320,8 @@ access_mount_project_root() {
 access_grant_project_acl() {
   local login="$1" project_path="$2"
   access_grant_traverse_acl "$login" "$project_path"
-  setfacl -R -m "u:${login}:rwX" "$project_path"
-  find "$project_path" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX"
+  setfacl -R -m "u:${login}:rwX" -m "u:${SIMAI_USER}:rwX" "$project_path"
+  find "$project_path" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX" -m "d:u:${SIMAI_USER}:rwX"
 }
 
 access_create_system_user() {
