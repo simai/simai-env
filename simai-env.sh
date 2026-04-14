@@ -76,7 +76,7 @@ Install options:
   --db-pass <pass>           Database password (generated if empty)
   --db-host <host>           Database host (default: 127.0.0.1)
   --db-port <port>           Database port (default: 3306)
-  --php <8.1|8.2|8.3>        PHP version (default: 8.2)
+  --php <version>            PHP version (default: 8.2; installable versions depend on apt repositories)
   --mysql <mysql|percona>    MySQL implementation (default: mysql)
   --node-version <N>         Node.js major version (default: 20)
   --run-migrations           Run php artisan migrate --force

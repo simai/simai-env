@@ -80,6 +80,26 @@ Common actions:
 - `Write DB credentials to project .env`
 - `Rotate database password`
 
+### Access
+Use this section to manage delegated file access without giving out `root` or the main `simai` account.
+
+Common actions:
+- `List accesses`
+- `Show access details`
+- `Create project access`
+- `Create global access`
+- `Add SSH key`
+- `Disable access`
+- `Enable access`
+- `Reset access password`
+- `Remove access`
+
+Notes:
+- Access users are `SFTP`-only and do not receive shell access.
+- Project access is isolated with `ChrootDirectory` and a bind mount.
+- Project root must live under `WWW_ROOT`.
+- On systemd hosts, a `.mount` unit is created to persist the bind mount across reboots.
+
 ### Diagnostics
 Use this section for read-only checks.
 
@@ -138,26 +158,6 @@ Common Bitrix actions inside `Applications -> Bitrix`:
 - `Bitrix status`
 - `Bitrix optimization`
 - `Bitrix complete setup`
-
-### Access
-Use this section to manage delegated file access without giving out `root` or the main `simai` account.
-
-Common actions:
-- `List accesses`
-- `Show access details`
-- `Create project access`
-- `Create global access`
-- `Add SSH key`
-- `Disable access`
-- `Enable access`
-- `Reset access password`
-- `Remove access`
-
-Notes:
-- Access users are `SFTP`-only and do not receive shell access.
-- Project access is isolated with `ChrootDirectory` and a bind mount.
-- Project root must live under `WWW_ROOT`.
-- On systemd hosts, a `.mount` unit is created to persist the bind mount across reboots.
 
 ### Profiles
 Use this section to inspect and manage profile availability.

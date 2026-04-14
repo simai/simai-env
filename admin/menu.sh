@@ -1284,11 +1284,11 @@ actsellistbox=black,cyan
       "2|SSL"
       "3|PHP"
       "4|Database"
-      "5|Diagnostics"
-      "6|Logs"
-      "7|Backup / Migrate"
-      "8|Applications"
-      "9|Access"
+      "5|Access"
+      "6|Diagnostics"
+      "7|Logs"
+      "8|Backup / Migrate"
+      "9|Applications"
       "10|Profiles"
       "11|System"
       "0|Exit"
@@ -1300,11 +1300,11 @@ actsellistbox=black,cyan
       2) ssl_menu ;;
       3) php_menu ;;
       4) db_menu ;;
-      5) diagnostics_menu ;;
-      6) logs_menu ;;
-      7) backup_menu ;;
-      8) applications_menu ;;
-      9) access_menu ;;
+      5) access_menu ;;
+      6) diagnostics_menu ;;
+      7) logs_menu ;;
+      8) backup_menu ;;
+      9) applications_menu ;;
       10) profiles_menu ;;
       11) system_menu ;;
       0) exit 0 ;;

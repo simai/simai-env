@@ -78,19 +78,19 @@ ensure_profile_required_markers() {
 select_php_version_for_profile() {
   local desired="$1"
   local allowed=("${PROFILE_ALLOWED_PHP_VERSIONS[@]}")
+  local allowed_csv="${allowed[*]}"
+  local min_allowed="${PROFILE_ALLOWED_PHP_MIN_VERSION:-}"
+  local max_allowed="${PROFILE_ALLOWED_PHP_MAX_VERSION:-}"
+  local allowed_desc=""
   local selected=""
+  allowed_desc=$(php_describe_constraints "$allowed_csv" "$min_allowed" "$max_allowed")
 
   if [[ -n "$desired" ]]; then
-    if [[ ${#allowed[@]} -gt 0 ]]; then
-      local ok=1
-      local v
-      for v in "${allowed[@]}"; do
-        if [[ "$v" == "$desired" ]]; then ok=0; fi
-      done
-      if [[ $ok -ne 0 ]]; then
-        error "PHP ${desired} is not allowed for profile ${PROFILE_ID:-unknown}. Allowed: ${allowed[*]}"
-        return 1
-      fi
+    local desired_allowed=()
+    mapfile -t desired_allowed < <(php_filter_versions "$allowed_csv" "$min_allowed" "$max_allowed" "$desired")
+    if [[ ${#desired_allowed[@]} -eq 0 ]]; then
+      error "PHP ${desired} is not allowed for profile ${PROFILE_ID:-unknown}. Allowed: ${allowed_desc}"
+      return 1
     fi
     if ! is_php_version_installed "$desired"; then
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -123,29 +123,16 @@ select_php_version_for_profile() {
     local candidates=()
     mapfile -t installed < <(installed_php_versions)
     if [[ ${#installed[@]} -eq 0 ]]; then
-      error "No PHP versions are installed. Install one first: simai-admin.sh php install --php 8.2"
+      error "No PHP versions are installed. Install one first: simai-admin.sh php install --php $(php_default_version)"
       return 1
     fi
-    if [[ ${#allowed[@]} -gt 0 ]]; then
-      local c
-      for c in "${installed[@]}"; do
-        if printf '%s\n' "${allowed[@]}" | grep -qx "$c"; then
-          candidates+=("$c")
-        fi
-      done
-    else
-      candidates=("${installed[@]}")
-    fi
+    mapfile -t candidates < <(php_filter_versions "$allowed_csv" "$min_allowed" "$max_allowed" "${installed[@]}")
     if [[ ${#candidates[@]} -eq 0 ]]; then
-      error "No installed PHP versions match profile ${PROFILE_ID:-unknown}. Allowed: ${allowed[*]}. Install one first: simai-admin.sh php install --php ${allowed[0]:-8.2}"
+      error "No installed PHP versions match profile ${PROFILE_ID:-unknown}. Allowed: ${allowed_desc}. Install one first: simai-admin.sh php install --php $(php_default_version)"
       return 1
     fi
     local default_sel=""
-    if printf '%s\n' "${candidates[@]}" | grep -qx "8.2"; then
-      default_sel="8.2"
-    else
-      default_sel="${candidates[0]}"
-    fi
+    default_sel=$(php_pick_preferred_version "${candidates[@]}")
     selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
     if [[ -z "$selected" ]]; then
       command_cancelled
@@ -163,29 +150,14 @@ select_php_version_for_profile() {
   fi
 
   local choices=()
-  if [[ ${#allowed[@]} -gt 0 ]]; then
-    local v
-    for v in "${versions[@]}"; do
-      for a in "${allowed[@]}"; do
-        if [[ "$v" == "$a" ]]; then
-          choices+=("$v")
-        fi
-      done
-    done
-  else
-    choices=("${versions[@]}")
-  fi
+  mapfile -t choices < <(php_filter_versions "$allowed_csv" "$min_allowed" "$max_allowed" "${versions[@]}")
 
   if [[ ${#choices[@]} -eq 0 ]]; then
-    error "No installed PHP versions match allowed list: ${allowed[*]}"
+    error "No installed PHP versions match allowed rule: ${allowed_desc}"
     return 1
   fi
 
-  if printf '%s\n' "${choices[@]}" | grep -qx "8.2"; then
-    selected="8.2"
-  else
-    selected="${choices[0]}"
-  fi
+  selected=$(php_pick_preferred_version "${choices[@]}")
 
   echo "$selected"
 }

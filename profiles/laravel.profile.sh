@@ -14,7 +14,8 @@ PROFILE_HEALTHCHECK_MODE="php"
 
 # PHP runtime
 PROFILE_REQUIRES_PHP="yes"
-PROFILE_ALLOWED_PHP_VERSIONS=("8.1" "8.2" "8.3")
+PROFILE_ALLOWED_PHP_VERSIONS=()
+PROFILE_ALLOWED_PHP_MIN_VERSION="8.1"
 PROFILE_PHP_EXTENSIONS_REQUIRED=("bcmath" "ctype" "curl" "dom" "fileinfo" "mbstring" "openssl" "pdo" "pdo_mysql" "tokenizer" "xml")
 PROFILE_PHP_EXTENSIONS_RECOMMENDED=("intl" "gd" "zip" "opcache" "redis")
 PROFILE_PHP_EXTENSIONS_OPTIONAL=()

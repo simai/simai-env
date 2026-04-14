@@ -33,7 +33,7 @@ sudo /root/simai-env/simai-admin.sh php reload --php 8.3
 Install a PHP version and the base runtime packages.
 
 Options:
-- `--php <version>` (required outside menu; menu offers supported versions)
+- `--php <version>` (required outside menu; menu offers installable versions discovered from current apt metadata)
 - `--include-common yes|no` (default `yes`)
 - `--confirm yes` (required outside menu when installation is needed)
 
@@ -49,5 +49,6 @@ sudo /root/simai-env/simai-admin.sh php install --php 8.3 --confirm yes
 ```
 
 Notes:
-- `site add` and `site set-php` can offer to install a missing supported version from the menu flow.
+- `site add` and `site set-php` can offer to install a missing version from the menu flow.
+- The install picker is dynamic: it reads installable PHP versions from current apt metadata instead of a hardcoded version list.
 - This section is intentionally small; per-site PHP behavior is handled by `site set-php`, `site fix`, and `site php-ini-*`.

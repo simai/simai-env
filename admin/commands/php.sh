@@ -63,7 +63,15 @@ php_install_handler() {
   local confirm="${PARSED_ARGS[confirm]:-no}"
 
   if [[ -z "$php_version" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    php_version=$(select_from_list "Select PHP version to install" "8.2" "8.1" "8.2" "8.3" "8.4")
+    local versions=()
+    mapfile -t versions < <(php_list_available_install_versions)
+    if [[ ${#versions[@]} -eq 0 ]]; then
+      error "No installable PHP versions found in apt metadata. Run apt update or check configured repositories."
+      return 1
+    fi
+    local default_sel=""
+    default_sel=$(php_pick_preferred_version "${versions[@]}" || true)
+    php_version=$(select_from_list "Select PHP version to install" "$default_sel" "${versions[@]}")
     if [[ -z "$php_version" ]]; then
       command_cancelled
       return $?

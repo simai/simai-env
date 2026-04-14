@@ -128,12 +128,12 @@ Switch site to a different PHP version (profile-driven).
 
 Options:
 - `--domain` (required; aliases are not allowed)
-- `--php` (target version; menu lets you pick supported versions 8.1–8.4 and optionally install if missing; CLI still requires it installed)
+- `--php` (target version; menu lets you pick installed versions allowed by the profile and can offer installation of apt-available versions when missing; CLI still requires it installed)
 - `--keep-old-pool` (`yes|no`, default `no`; if `no`, removes old PHP-FPM pool)
 
 Behavior:
 - Loads the profile from nginx metadata; refuses when `PROFILE_REQUIRES_PHP=no`, `PROFILE_IS_ALIAS=yes`, or `PROFILE_ALLOW_PHP_SWITCH=no`.
-- Enforces `PROFILE_ALLOWED_PHP_VERSIONS` when set (only installed+allowed versions are accepted).
+- Enforces profile PHP constraints when set: explicit `PROFILE_ALLOWED_PHP_VERSIONS` or dynamic `PROFILE_ALLOWED_PHP_MIN_VERSION` / `PROFILE_ALLOWED_PHP_MAX_VERSION`.
 - Recreates PHP-FPM pool for the target version, patches nginx upstream sockets in-place, validates with `nginx -t`, then reloads nginx/php-fpm. Socket/pool naming uses a safe fallback slug when metadata is invalid.
 - Laravel/queue profiles keep their cron/unit wiring; `--keep-old-pool=yes` preserves the previous pool, otherwise it is removed.
 
