@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.42] - 2026-04-14
+### Changed
+- Moved `Access` to position 5 in the root menu, directly after `Database`.
+- PHP install selection now discovers installable versions dynamically from current apt metadata instead of using a hardcoded list.
+- Profile PHP compatibility can now be defined with dynamic min/max version bounds, reducing manual updates when new PHP versions appear.
+
 ## [1.12.41] - 2026-04-13
 ### Added
 - Added the `Access` menu section for managed SFTP-only access: list, show, create project/global access, add SSH key, enable/disable, and reset password.
