@@ -1,22 +1,24 @@
 # simai-env Documentation
 
-This directory contains architecture, development, and command reference docs for simai-env.
+This documentation should be read through two primary sections only.
 
-- Menu-first user guide: `docs/guide/menu-user-guide.md`.
-- Admin usage map: see `docs/admin.md` and `docs/commands/`.
-- File access management: `docs/commands/access.md`.
-- WordPress ops reference: `docs/commands/wp.md`.
-- Bitrix ops reference: `docs/commands/bitrix.md`.
-- System/self reference: `docs/commands/self.md`.
-- Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`.
-- Production readiness: `docs/operations/production-readiness.md`.
-- Wildcard site regression: `docs/operations/wildcard-site-regression.md`.
-- Menu UX audit and scoring: `docs/development/menu-ux-audit.md`.
-- Profile ops matrix: `docs/operations/profile-ops-matrix.md`.
-- Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`.
-- WordPress production runbook: `docs/operations/wordpress-production-runbook.md`.
-- Laravel production runbook: `docs/operations/laravel-production-runbook.md`.
-- Operations runbook: see `docs/operations/runbook.md`.
-- Architecture: see `docs/architecture/overview.md` and related files.
-- Glossary: see `docs/architecture/glossary.md` for domain/project-root/project-slug placeholders.
-- Development guides: see `docs/development/`.
+## User Documentation
+
+For operators who work through the interactive menu and need to understand what to click, why, and what to expect:
+
+- User manual: `docs/user/README.md`
+- Start here: `docs/user/start-here.md`
+- Section map: `docs/user/README.md`
+
+## Developer Documentation
+
+For engineers who develop `simai-env`, change architecture, or integrate with the CLI from external systems:
+
+- Developer guide: `docs/developer/README.md`
+- Admin CLI overview: `docs/developer/admin.md`
+- Architecture: `docs/developer/architecture/README.md`
+- Command reference: `docs/developer/commands/README.md`
+- Development notes: `docs/developer/development/README.md`
+- Operations runbooks: `docs/developer/operations/README.md`
+- Testing notes: `docs/developer/development/testing.md`
+- Advanced installer notes: `docs/developer/development/advanced-installer.md`

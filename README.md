@@ -35,13 +35,17 @@ ShellCheck runs with warnings treated as errors to prevent regressions.
 You can point `SHELLCHECK_BIN` to a custom binary if not in PATH.
 
 ## More docs
+- User manual: `docs/user/README.md`
+- Start here: `docs/user/start-here.md`
+- Section map: `docs/user/README.md`
+- Developer guide: `docs/developer/README.md`
 - Docs entrypoint: `docs/README.md`
-- Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`
-- Profile ops matrix: `docs/operations/profile-ops-matrix.md`
-- Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`
-- WordPress production runbook: `docs/operations/wordpress-production-runbook.md`
-- Operator runbook: `docs/operations/runbook.md`
-- Architecture overview: `docs/architecture/overview.md`
-- Admin commands: `docs/commands/`
-- Advanced/legacy installer flags: `docs/advanced-installer.md`
+- Daily ops quickstart: `docs/developer/operations/daily-ops-quickstart.md`
+- Profile ops matrix: `docs/developer/operations/profile-ops-matrix.md`
+- Bitrix production runbook: `docs/developer/operations/bitrix-production-runbook.md`
+- WordPress production runbook: `docs/developer/operations/wordpress-production-runbook.md`
+- Operator runbook: `docs/developer/operations/runbook.md`
+- Architecture overview: `docs/developer/architecture/overview.md`
+- Admin commands: `docs/developer/commands/`
+- Advanced/legacy installer flags: `docs/developer/development/advanced-installer.md`
 - Contribution and license: see `CONTRIBUTING.md` and `LICENSE`.
