@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.44] - 2026-04-22
+### Added
+- Wildcard Let's Encrypt now supports `--dns-provider manual` in addition to Cloudflare, using an interactive Certbot DNS challenge that prints the TXT records to add manually.
+
+### Changed
+- Wildcard SSL preflight now explains whether TXT verification is automatic (Cloudflare API) or manual.
+- Renewal now blocks with a clear instruction when a wildcard certificate was issued through manual DNS challenge, because it cannot auto-renew.
+
 ## [1.12.43] - 2026-04-22
 ### Fixed
 - Bitrix nginx template now explicitly forwards `SERVER_NAME`, `HTTP_HOST`, `REQUEST_SCHEME`, `SERVER_PORT`, and `HTTPS` to PHP-FPM so legacy Bitrix code relying on Apache-like `$_SERVER` keys can build URLs consistently under nginx.

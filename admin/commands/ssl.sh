@@ -50,7 +50,7 @@ ssl_dns_provider_normalize() {
   local provider="${1:-}"
   provider=$(echo "$provider" | tr '[:upper:]' '[:lower:]')
   case "$provider" in
-    cloudflare) echo "cloudflare" ;;
+    cloudflare|manual) echo "$provider" ;;
     *) return 1 ;;
   esac
 }
@@ -59,6 +59,7 @@ ssl_dns_provider_package() {
   local provider="$1"
   case "$provider" in
     cloudflare) echo "python3-certbot-dns-cloudflare" ;;
+    manual) echo "" ;;
     *) return 1 ;;
   esac
 }
@@ -67,6 +68,7 @@ ssl_dns_provider_flag() {
   local provider="$1"
   case "$provider" in
     cloudflare) echo "--dns-cloudflare" ;;
+    manual) echo "--manual" ;;
     *) return 1 ;;
   esac
 }
@@ -75,6 +77,7 @@ ssl_dns_provider_credentials_flag() {
   local provider="$1"
   case "$provider" in
     cloudflare) echo "--dns-cloudflare-credentials" ;;
+    manual) echo "" ;;
     *) return 1 ;;
   esac
 }
@@ -152,6 +155,9 @@ ssl_wildcard_preflight_show() {
   if ! plugin_flag=$(ssl_dns_provider_flag "$dns_provider" 2>/dev/null); then
     plugin_status="FAIL (unsupported provider: ${dns_provider})"
     hard_fail=1
+  elif [[ "$dns_provider" == "manual" ]]; then
+    plugin_status="N/A (manual DNS challenge)"
+    credentials_status="N/A (you will add TXT records yourself)"
   else
     provider_pkg=$(ssl_dns_provider_package "$dns_provider")
     if ! certbot plugins 2>/dev/null | grep -qi "${plugin_flag#--}"; then
@@ -160,11 +166,13 @@ ssl_wildcard_preflight_show() {
     fi
   fi
 
-  if [[ -z "$dns_credentials" || ! -f "$dns_credentials" ]]; then
-    credentials_status="FAIL (${dns_credentials:-missing})"
-    hard_fail=1
-  else
-    credentials_status="PASS (${dns_credentials})"
+  if [[ "$dns_provider" != "manual" ]]; then
+    if [[ -z "$dns_credentials" || ! -f "$dns_credentials" ]]; then
+      credentials_status="FAIL (${dns_credentials:-missing})"
+      hard_fail=1
+    else
+      credentials_status="PASS (${dns_credentials})"
+    fi
   fi
 
   ui_section "Wildcard HTTPS"
@@ -182,15 +190,20 @@ ssl_wildcard_preflight_show() {
   fi
   echo
   echo "TXT verification:"
-  echo "- You do NOT add TXT records manually when using Cloudflare API."
-  echo "- SIMAI ENV / Certbot will create temporary _acme-challenge TXT records automatically."
+  if [[ "$dns_provider" == "manual" ]]; then
+    echo "- You WILL add temporary _acme-challenge TXT records manually."
+    echo "- Certbot will show the exact TXT name and value during the next step."
+  else
+    echo "- You do NOT add TXT records manually when using Cloudflare API."
+    echo "- SIMAI ENV / Certbot will create temporary _acme-challenge TXT records automatically."
+  fi
 
   ui_section "Wildcard SSL preflight"
   print_kv_table \
     "Site host mode|${host_mode_ok}" \
     "Main domain DNS (${domain})|${main_status}" \
     "Wildcard DNS (${probe_host})|${wildcard_status}" \
-    "Cloudflare plugin|${plugin_status}" \
+    "$([[ "$dns_provider" == "manual" ]] && echo "Manual challenge" || echo "Cloudflare plugin")|${plugin_status}" \
     "Credentials file|${credentials_status}"
 
   if (( hard_fail != 0 )); then
@@ -210,7 +223,11 @@ ssl_wildcard_preflight_show() {
   if (( dns_warn != 0 )); then
     ui_next_steps
     ui_kv "DNS records" "Create/update the A records shown above before requesting the certificate."
-    ui_kv "Re-run later" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email> --wildcard yes --dns-provider ${dns_provider} --dns-credentials ${dns_credentials}"
+    if [[ "$dns_provider" == "manual" ]]; then
+      ui_kv "Re-run later" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email> --wildcard yes --dns-provider manual"
+    else
+      ui_kv "Re-run later" "simai-admin.sh ssl letsencrypt --domain ${domain} --email <email> --wildcard yes --dns-provider ${dns_provider} --dns-credentials ${dns_credentials}"
+    fi
     return 2
   fi
 
@@ -221,18 +238,20 @@ ssl_menu_prepare_dns_wildcard() {
   local domain="$1"
   local email_default="$2"
   local wildcard_domain="${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}"
-  info "Wildcard HTTPS needs DNS challenge. Current supported provider: Cloudflare."
+  info "Wildcard HTTPS needs DNS challenge. Supported providers: Cloudflare API or manual DNS challenge."
   local provider=""
-  provider=$(select_from_list "DNS provider for wildcard certificate" "cloudflare" "cloudflare")
+  provider=$(select_from_list "DNS provider for wildcard certificate" "cloudflare" "cloudflare" "manual")
   if [[ -z "$provider" ]]; then
     command_cancelled
     return $?
   fi
   local credentials=""
-  credentials=$(prompt "Cloudflare credentials file" "/root/.secrets/certbot/cloudflare.ini")
-  if [[ -z "$credentials" ]]; then
-    command_cancelled
-    return $?
+  if [[ "$provider" == "cloudflare" ]]; then
+    credentials=$(prompt "Cloudflare credentials file" "/root/.secrets/certbot/cloudflare.ini")
+    if [[ -z "$credentials" ]]; then
+      command_cancelled
+      return $?
+    fi
   fi
   local email=""
   email=$(prompt "Let's Encrypt email" "$email_default")
@@ -270,6 +289,18 @@ ssl_menu_prepare_dns_wildcard() {
   PARSED_ARGS[domain]="$domain"
   PARSED_ARGS[wildcard-domain]="$wildcard_domain"
   return 0
+}
+
+ssl_issue_mode_value() {
+  local wildcard="$1"
+  local dns_provider="$2"
+  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
+    echo "manual-dns"
+  elif [[ "$wildcard" == "yes" ]]; then
+    echo "dns"
+  else
+    echo "webroot"
+  fi
 }
 
 ssl_select_domain() {
@@ -495,15 +526,15 @@ ssl_issue_handler() {
   if [[ "$wildcard" == "yes" ]]; then
     wildcard_domain="${PARSED_ARGS[wildcard-domain]:-${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}}"
     dns_provider=$(ssl_dns_provider_normalize "${PARSED_ARGS[dns-provider]:-$dns_provider}") || {
-      error "Wildcard certificate currently requires --dns-provider cloudflare"
+      error "Wildcard certificate requires --dns-provider cloudflare or --dns-provider manual"
       return 1
     }
     dns_credentials="${PARSED_ARGS[dns-credentials]:-$dns_credentials}"
-    if [[ -z "$dns_credentials" ]]; then
+    if [[ "$dns_provider" != "manual" && -z "$dns_credentials" ]]; then
       error "Wildcard certificate requires --dns-credentials <file>"
       return 1
     fi
-    if ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
+    if [[ "$dns_provider" != "manual" ]] && ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
       return 1
     fi
   fi
@@ -538,23 +569,37 @@ ssl_issue_handler() {
 
   local -a cmd=()
   if [[ "$wildcard" == "yes" ]]; then
-    local plugin_flag credentials_flag pkg
-    plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
-    credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
-    pkg=$(ssl_dns_provider_package "$dns_provider")
-    if ! certbot plugins 2>/dev/null | grep -qi "dns-${dns_provider}"; then
-      error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
-      return 1
+    if [[ "$dns_provider" == "manual" ]]; then
+      cmd=(certbot certonly --manual --preferred-challenges dns --manual-public-ip-logging-ok -d "$domain" -d "$wildcard_domain" --agree-tos -m "$email" --keep-until-expiring)
+    else
+      local plugin_flag credentials_flag pkg
+      plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
+      credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
+      pkg=$(ssl_dns_provider_package "$dns_provider")
+      if ! certbot plugins 2>/dev/null | grep -qi "dns-${dns_provider}"; then
+        error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
+        return 1
+      fi
+      cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
     fi
-    cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
   else
     cmd=(certbot certonly --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
   fi
   [[ "$staging" == "yes" ]] && cmd+=(--staging)
   progress_step "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})"
-  if ! run_long "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})" "${cmd[@]}"; then
-    error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
-    return 1
+  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
+    ui_section "Manual DNS challenge"
+    echo "Certbot will now show one or more _acme-challenge TXT records."
+    echo "Add them at your DNS provider, wait until they resolve, then continue in the same terminal."
+    if ! "${cmd[@]}"; then
+      error "Manual DNS challenge failed or was cancelled."
+      return 1
+    fi
+  else
+    if ! run_long "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})" "${cmd[@]}"; then
+      error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
+      return 1
+    fi
   fi
   local cert="/etc/letsencrypt/live/${domain}/fullchain.pem"
   local key="/etc/letsencrypt/live/${domain}/privkey.pem"
@@ -565,8 +610,10 @@ ssl_issue_handler() {
     return 1
   fi
   ensure_certbot_cron
+  local le_mode
+  le_mode=$(ssl_issue_mode_value "$wildcard" "$dns_provider")
   ssl_site_write_state "$domain" \
-    "SITE_SSL_LE_MODE|$([[ "$wildcard" == "yes" ]] && echo dns || echo webroot)" \
+    "SITE_SSL_LE_MODE|${le_mode}" \
     "SITE_SSL_LE_WILDCARD|${wildcard}" \
     "SITE_SSL_LE_WILDCARD_DOMAIN|${wildcard_domain}" \
     "SITE_SSL_LE_DNS_PROVIDER|${dns_provider}" \
@@ -589,7 +636,11 @@ ssl_issue_handler() {
     "HSTS|${hsts_display}"
   ui_next_steps
   ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
-  ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
+  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
+    ui_kv "Renew cert" "Run the same manual wildcard command again when renewal is needed."
+  else
+    ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
+  fi
   progress_done "Done"
 }
 
@@ -763,7 +814,12 @@ ssl_renew_handler() {
   fi
   progress_step "Requesting renewal from Let's Encrypt"
   local -a renew_cmd=()
-  if [[ "$le_mode" == "dns" || "$wildcard" == "yes" ]]; then
+  if [[ "$le_mode" == "manual-dns" || "$dns_provider" == "manual" ]]; then
+    error "This certificate was issued with manual DNS challenge. Automatic renewal is not available."
+    echo "Re-run manually:"
+    echo "  simai-admin.sh ssl letsencrypt --domain ${domain} --email ${le_email:-<email>} --wildcard yes --dns-provider manual"
+    return 1
+  elif [[ "$le_mode" == "dns" || "$wildcard" == "yes" ]]; then
     dns_provider=$(ssl_dns_provider_normalize "$dns_provider") || {
       error "Stored wildcard renewal provider is unsupported"
       return 1

@@ -25,23 +25,27 @@ Request a certificate via webroot or DNS challenge.
 - `--staging yes|no` (default no) — use LE staging.
 - `--wildcard yes|no` (default `no`) — request one certificate for both the main domain and all first-level subdomains.
 - `--wildcard-domain` (optional) — override wildcard hostname, default `*.domain`.
-- `--dns-provider cloudflare` — required for wildcard mode in the current implementation.
-- `--dns-credentials /path/to/file.ini` — required for wildcard mode; Cloudflare plugin credentials file.
+- `--dns-provider cloudflare|manual` — required for wildcard mode.
+- `--dns-credentials /path/to/file.ini` — required only for `--dns-provider cloudflare`; Cloudflare plugin credentials file.
 
 Behavior:
 - Standard mode uses site docroot (based on profile `PROFILE_PUBLIC_DIR`, recorded as `simai-public-dir` in nginx metadata), updates nginx with cert paths from `/etc/letsencrypt/live/<domain>/`, reloads nginx, ensures cron for renewals at `/etc/cron.d/simai-certbot`.
 - Wildcard mode currently works only for sites created with `site add --host-mode wildcard`.
-- Wildcard mode currently uses DNS challenge through the Certbot Cloudflare plugin and requests a cert for both `<domain>` and `*.domain`.
+- Wildcard mode can use either:
+  - `cloudflare` — automatic DNS challenge through the Certbot Cloudflare plugin
+  - `manual` — interactive DNS challenge where Certbot prints the TXT records and the operator adds them by hand
 - In menu mode, wildcard issuance now shows a preflight screen before running Certbot:
   - the required `A` records for the main domain and wildcard host
-  - a note that `_acme-challenge` TXT records are created automatically through Cloudflare API
-  - readiness checks for site host mode, DNS resolution, DNS plugin availability, and credentials file presence
-- Wildcard renewal reuses stored per-site DNS settings from `/etc/simai-env/sites/<domain>/ssl.env`.
+  - a note that `_acme-challenge` TXT records are either created automatically through Cloudflare API or shown interactively for manual entry
+  - readiness checks for site host mode, DNS resolution, provider/plugin availability, and credentials file presence where applicable
+- Wildcard renewal reuses stored per-site DNS settings from `/etc/simai-env/sites/<domain>/ssl.env` for automatic providers.
+- Wildcard certificates issued with `--dns-provider manual` do not auto-renew; run the same manual wildcard command again when renewal is needed.
 
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain example.com --email ops@example.com
 sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain obr.site --email ops@example.com --wildcard yes --dns-provider cloudflare --dns-credentials /root/.secrets/certbot/cloudflare.ini
+sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain obr.site --email ops@example.com --wildcard yes --dns-provider manual
 ```
 
 ## renew
@@ -50,7 +54,8 @@ Force renew LE cert for domain, reload nginx.
 
 Notes:
 - Standard certs renew through webroot as before.
-- Wildcard certs renew through the stored DNS challenge settings.
+- Wildcard certs issued through automatic DNS providers renew through the stored DNS challenge settings.
+- Wildcard certs issued through `manual` DNS challenge must be re-issued manually.
 
 ## install (custom cert)
 Install your own certificate and key.

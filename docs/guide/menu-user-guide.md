@@ -56,11 +56,13 @@ Common actions:
 
 Notes:
 - If a site was created with `Serve all first-level subdomains too? = yes`, the SSL screen can now request a wildcard certificate for the main domain plus `*.domain`.
-- Current wildcard HTTPS support uses Cloudflare DNS challenge and needs a credentials file on the server.
+- Wildcard HTTPS can now use either:
+  - `cloudflare` with a credentials file on the server
+  - `manual`, where Certbot shows TXT records and the operator adds them by hand
 - Before requesting a wildcard certificate, the menu now shows a preflight screen with:
   - the `A` records the user should create
-  - a simple explanation that TXT verification is automatic through Cloudflare API
-  - `PASS/WARN/FAIL` checks for DNS, plugin, and credentials readiness
+  - a simple explanation of whether TXT verification is automatic or manual
+  - `PASS/WARN/FAIL` checks for DNS, provider/plugin, and credentials readiness
 
 ### PHP
 Use this section when you need to inspect installed PHP versions, install a new version, or reload PHP-FPM.
