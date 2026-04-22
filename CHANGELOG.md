@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.43] - 2026-04-22
+### Fixed
+- Bitrix nginx template now explicitly forwards `SERVER_NAME`, `HTTP_HOST`, `REQUEST_SCHEME`, `SERVER_PORT`, and `HTTPS` to PHP-FPM so legacy Bitrix code relying on Apache-like `$_SERVER` keys can build URLs consistently under nginx.
+
 ## [1.12.42] - 2026-04-14
 ### Changed
 - Moved `Access` to position 5 in the root menu, directly after `Database`.
