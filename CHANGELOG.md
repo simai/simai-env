@@ -1518,6 +1518,10 @@ All notable changes to this project will be documented in this file.
 - More reliable insertion of `# simai-php` metadata during nginx socket patching.
 - `php list` table widened for longer FPM statuses.
 
+## [1.12.47] - 2026-04-24
+### Added
+- Added `bitrix restore-ready` and `Applications -> Bitrix -> Bitrix restore from backup` to prepare Bitrix restore flows with `restore.php`, DB preseed, and restore-friendly writable directories.
+
 ## [1.12.46] - 2026-04-24
 ### Fixed
 - Bitrix DB preseed now normalizes ownership and permissions for `public/bitrix/php_interface`, so `restore.php` can create `dbconn.restore.php` during backup restore flows.

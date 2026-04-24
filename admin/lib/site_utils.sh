@@ -2514,6 +2514,20 @@ bitrix_setup_script_path() {
   echo "${doc_root}/bitrixsetup.php"
 }
 
+bitrix_restore_script_path() {
+  local doc_root="$1"
+  echo "${doc_root}/restore.php"
+}
+
+bitrix_restore_script_urls() {
+  if [[ -n "${SIMAI_BITRIX_RESTORE_URL:-}" ]]; then
+    echo "$SIMAI_BITRIX_RESTORE_URL"
+    return
+  fi
+  echo "https://www.1c-bitrix.ru/download/files/scripts/restore.php"
+  echo "https://www.1c-bitrix.ru/download/scripts/restore.php"
+}
+
 bitrix_setup_script_kind() {
   local script_path="$1"
   if [[ ! -s "$script_path" ]]; then
@@ -2819,6 +2833,61 @@ bitrix_download_setup_script() {
   chmod 0644 "$target"
   chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
   return 0
+}
+
+bitrix_download_restore_script() {
+  local doc_root="$1" overwrite="${2:-no}"
+  local target
+  target=$(bitrix_restore_script_path "$doc_root")
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  if [[ "$overwrite" != "yes" && -s "$target" ]]; then
+    return 0
+  fi
+
+  local url tmp
+  tmp=$(mktemp)
+  while IFS= read -r url; do
+    [[ -z "$url" ]] && continue
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$url" -o "$tmp" || true
+    elif command -v wget >/dev/null 2>&1; then
+      wget -qO "$tmp" "$url" || true
+    else
+      rm -f "$tmp"
+      return 1
+    fi
+    if [[ -s "$tmp" ]] && grep -q "<\\?php" "$tmp"; then
+      mv "$tmp" "$target"
+      chmod 0644 "$target"
+      chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+      return 0
+    fi
+    : >"$tmp"
+  done < <(bitrix_restore_script_urls)
+
+  rm -f "$tmp"
+  return 1
+}
+
+bitrix_prepare_restore_writable_paths() {
+  local doc_root="$1"
+  local dir
+  local dirs=(
+    "$doc_root"
+    "${doc_root}/upload"
+    "${doc_root}/bitrix"
+    "${doc_root}/bitrix/backup"
+    "${doc_root}/bitrix/cache"
+    "${doc_root}/bitrix/managed_cache"
+    "${doc_root}/bitrix/stack_cache"
+    "${doc_root}/bitrix/tmp"
+    "${doc_root}/bitrix/php_interface"
+  )
+  for dir in "${dirs[@]}"; do
+    mkdir -p "$dir"
+    chown "${SIMAI_USER}:www-data" "$dir" 2>/dev/null || true
+    chmod 0775 "$dir" 2>/dev/null || true
+  done
 }
 
 bitrix_write_db_preseed_files() {

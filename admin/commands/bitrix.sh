@@ -735,6 +735,82 @@ bitrix_installer_ready_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+bitrix_restore_ready_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  local preseed="${PARSED_ARGS[preseed]:-auto}"
+  local short_install="${PARSED_ARGS[short-install]:-no}"
+  [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
+  case "${preseed,,}" in
+    yes|no|auto) preseed="${preseed,,}" ;;
+    *)
+      error "Unsupported preseed value '${preseed}'. Use: auto, yes, no"
+      return 1
+      ;;
+  esac
+  [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
+
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
+
+  ui_header "SIMAI ENV · Bitrix restore ready"
+
+  local writable_state="ready"
+  if ! bitrix_prepare_restore_writable_paths "$BX_DOC_ROOT"; then
+    writable_state="failed"
+  fi
+
+  local preseed_state="skipped"
+  if [[ "$preseed" == "yes" || "$preseed" == "auto" ]]; then
+    if read_site_db_env "$BX_DOMAIN" >/dev/null 2>&1; then
+      if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite" "$short_install"; then
+        preseed_state="ready"
+      else
+        preseed_state="failed"
+      fi
+    elif [[ "$preseed" == "yes" ]]; then
+      error "db.env not found or incomplete for ${BX_DOMAIN}; use site db-create first or run with --preseed no"
+      return 1
+    else
+      preseed_state="skipped (no db.env)"
+    fi
+  fi
+
+  local restore_state="failed"
+  local restore_script
+  restore_script=$(bitrix_restore_script_path "$BX_DOC_ROOT")
+  if bitrix_download_restore_script "$BX_DOC_ROOT" "$overwrite"; then
+    restore_state="ready"
+  fi
+
+  local status="ready"
+  if [[ "$writable_state" != "ready" || "$restore_state" != "ready" || "$preseed_state" == "failed" ]]; then
+    status="partial"
+  fi
+
+  ui_result_table \
+    "Domain|${BX_DOMAIN}" \
+    "Docroot|${BX_DOC_ROOT}" \
+    "Writable paths|${writable_state}" \
+    "DB preseed|${preseed_state}" \
+    "SHORT_INSTALL|${short_install}" \
+    "restore.php|${restore_script} (${restore_state})" \
+    "Status|${status}"
+
+  if [[ "$status" != "ready" ]]; then
+    warn "Restore ready is partial. Check network access, restore.php download, db.env, and writable path permissions."
+    return 1
+  fi
+
+  ui_next_steps
+  ui_kv "Open restore wizard" "$(site_primary_url "$BX_DOMAIN")/restore.php"
+  ui_kv "After restore" "simai-admin.sh bitrix finalize --domain ${BX_DOMAIN} --confirm yes"
+  ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
+}
+
 bitrix_php_baseline_sync_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -1148,6 +1224,7 @@ register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" ""
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install="
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack="
+register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""
 register_cmd "bitrix" "perf-apply" "Apply Bitrix optimization baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="

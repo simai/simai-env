@@ -121,6 +121,24 @@ Notes:
 - `bitrix status` now probes the real web state and distinguishes `installer`, `installed`, `placeholder`, and `unknown`.
 - When unpacked distro files are present, the recommended installer URL is the site root `/`, not `bitrixsetup.php`.
 
+## Restore Ready
+
+```bash
+simai-admin.sh bitrix restore-ready --domain <domain> [--overwrite yes] [--preseed auto|yes|no] [--short-install yes|no]
+```
+
+Prepares a Bitrix site for restore from an existing backup archive:
+- downloads `public/restore.php` from the official Bitrix script URL
+- normalizes ownership and write permissions for restore-sensitive directories
+- optionally writes DB preseed files from site `db.env`
+- prints the browser restore URL and the post-restore finalize command
+
+Notes:
+- This flow is for backup restore/migration. Use `installer-ready` for a fresh Bitrix install.
+- `--preseed auto` writes DB files only when site DB credentials are available.
+- `--overwrite yes` refreshes an existing `restore.php`.
+- After the browser restore wizard finishes, run `bitrix finalize --domain <domain> --confirm yes`.
+
 ## Finalize
 
 ```bash

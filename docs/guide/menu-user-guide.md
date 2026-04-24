@@ -160,6 +160,7 @@ Common Bitrix actions inside `Applications -> Bitrix`:
 - `Bitrix status`
 - `Bitrix optimization`
 - `Bitrix complete setup`
+- `Bitrix restore from backup`
 
 ### Profiles
 Use this section to inspect and manage profile availability.
@@ -231,6 +232,14 @@ Notes:
 3. Complete the web install in the browser.
 4. Open `Applications -> Bitrix complete setup`.
 5. Open `Applications -> Bitrix status`.
+
+## Restore a Bitrix site from backup
+1. Create the site with profile `bitrix`.
+2. Open `Applications -> Bitrix restore from backup`.
+3. Open the shown `restore.php` URL in the browser.
+4. Complete the Bitrix restore wizard.
+5. Open `Applications -> Bitrix complete setup`.
+6. Open `Applications -> Bitrix status`.
 
 ## Pause a rarely used site
 1. Open `Sites -> Pause site`.
