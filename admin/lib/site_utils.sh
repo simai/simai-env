@@ -2862,6 +2862,8 @@ bitrix_write_db_preseed_files() {
   [[ "$short_install" == "yes" ]] && short_install_php="true"
 
   mkdir -p "${bx_dir}/php_interface"
+  chmod 0775 "${bx_dir}/php_interface" 2>/dev/null || true
+  chown "${SIMAI_USER}:www-data" "${bx_dir}/php_interface" 2>/dev/null || true
 
   local tmp_settings tmp_dbconn
   local tmp_after_connect

@@ -1518,6 +1518,10 @@ All notable changes to this project will be documented in this file.
 - More reliable insertion of `# simai-php` metadata during nginx socket patching.
 - `php list` table widened for longer FPM statuses.
 
+## [1.12.46] - 2026-04-24
+### Fixed
+- Bitrix DB preseed now normalizes ownership and permissions for `public/bitrix/php_interface`, so `restore.php` can create `dbconn.restore.php` during backup restore flows.
+
 ## [1.12.45] - 2026-04-22
 ### Fixed
 - Bitrix nginx template now builds FastCGI params explicitly instead of inheriting `SERVER_NAME $server_name` from system `fastcgi.conf`, so wildcard and subdomain requests reach PHP with the actual host in `$_SERVER['SERVER_NAME']`.
