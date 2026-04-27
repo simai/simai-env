@@ -71,6 +71,25 @@ Clears Bitrix cache directories:
 - `bitrix/managed_cache`
 - `bitrix/stack_cache`
 
+## Ownership
+
+```bash
+simai-admin.sh bitrix ownership --domain <domain>
+simai-admin.sh bitrix ownership --domain <domain> --apply yes --confirm yes
+```
+
+Checks and repairs root-owned files that can block Bitrix module install,
+uninstall, cache cleanup, and web-based file operations.
+
+The command scans:
+- the Bitrix docroot
+- symlinked module targets under the managed SIMAI web/git paths
+
+Repair mode changes web files to `simai:www-data` and git checkout targets to
+`simai:simai`. Use this after restoring archives, running module installers
+from a root shell, or repairing a deployment that left module files owned by
+`root`.
+
 ## DB Preseed
 
 ```bash

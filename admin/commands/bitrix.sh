@@ -908,6 +908,108 @@ bitrix_php_baseline_sync_handler() {
   return 0
 }
 
+bitrix_ownership_scan_roots() {
+  local doc_root="$1"
+  local target real
+  printf '%s|%s\n' "$doc_root" "web"
+
+  for target in "${doc_root}/local/modules"/* "${doc_root}/bitrix/modules"/*; do
+    [[ -L "$target" ]] || continue
+    real=$(readlink -f "$target" 2>/dev/null || true)
+    [[ -n "$real" && -e "$real" ]] || continue
+    case "$real" in
+      "$doc_root"/*|/home/"${SIMAI_USER:-simai}"/git/*|/home/"${SIMAI_USER:-simai}"/www/*)
+        printf '%s|%s\n' "$real" "linked"
+        ;;
+    esac
+  done | awk -F'|' '!seen[$1]++'
+}
+
+bitrix_ownership_count_root_owned() {
+  local path="$1"
+  [[ -e "$path" ]] || {
+    echo 0
+    return 0
+  }
+  find "$path" -xdev \( -user root -o -group root \) -printf . 2>/dev/null | wc -c | tr -d ' '
+}
+
+bitrix_ownership_fix_path() {
+  local path="$1" group="$2"
+  [[ -e "$path" ]] || return 0
+  find "$path" -xdev \( -user root -o -group root \) -exec chown -h "${SIMAI_USER:-simai}:${group}" {} + 2>/dev/null || return 1
+  find "$path" -xdev -type d -exec chmod u+rwx,g+rwx {} + 2>/dev/null || true
+}
+
+bitrix_ownership_handler() {
+  parse_kv_args "$@"
+  require_args "domain" || return 1
+  local domain="${PARSED_ARGS[domain]:-}"
+  local apply="${PARSED_ARGS[apply]:-no}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  [[ "${apply,,}" == "yes" ]] && apply="yes" || apply="no"
+
+  if [[ "$apply" == "yes" && "${SIMAI_ADMIN_MENU:-0}" != "1" && "${confirm,,}" != "yes" ]]; then
+    error "Ownership repair requires --confirm yes in CLI mode."
+    return 1
+  fi
+
+  bitrix_prepare_site "$domain"
+  local rc=$?
+  (( rc == 0 )) || return $rc
+
+  ui_header "SIMAI ENV · Bitrix ownership"
+
+  local rows=()
+  local total_before=0 total_after=0 fixed=0 failed=0
+  local root kind count_before count_after group status
+  while IFS='|' read -r root kind; do
+    [[ -n "$root" ]] || continue
+    count_before=$(bitrix_ownership_count_root_owned "$root")
+    total_before=$((total_before + count_before))
+    status="ok"
+    count_after="$count_before"
+    if [[ "$apply" == "yes" && "$count_before" -gt 0 ]]; then
+      group="www-data"
+      [[ "$root" == /home/"${SIMAI_USER:-simai}"/git/* ]] && group="${SIMAI_USER:-simai}"
+      if bitrix_ownership_fix_path "$root" "$group"; then
+        count_after=$(bitrix_ownership_count_root_owned "$root")
+        fixed=$((fixed + count_before - count_after))
+        [[ "$count_after" -eq 0 ]] || status="partial"
+      else
+        failed=$((failed + 1))
+        status="failed"
+      fi
+    fi
+    total_after=$((total_after + count_after))
+    rows+=("${kind}: ${root}|${count_before} -> ${count_after} (${status})")
+  done < <(bitrix_ownership_scan_roots "$BX_DOC_ROOT")
+
+  echo "Ownership scan:"
+  local row
+  for row in "${rows[@]}"; do
+    printf "  %-80s %s\n" "${row%%|*}" "${row#*|}"
+  done
+  ui_result_table \
+    "Domain|${BX_DOMAIN}" \
+    "Docroot|${BX_DOC_ROOT}" \
+    "Apply|${apply}" \
+    "Root-owned before|${total_before}" \
+    "Root-owned after|${total_after}" \
+    "Fixed|${fixed}" \
+    "Failures|${failed}"
+
+  if [[ "$apply" != "yes" && "$total_before" -gt 0 ]]; then
+    ui_next_steps
+    ui_kv "Repair" "simai-admin.sh bitrix ownership --domain ${BX_DOMAIN} --apply yes --confirm yes"
+  fi
+  if [[ "$apply" == "yes" ]]; then
+    [[ "$failed" -eq 0 && "$total_after" -eq 0 ]]
+    return $?
+  fi
+  return 0
+}
+
 bitrix_perf_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -1226,6 +1328,7 @@ register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env"
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack="
 register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install="
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended="
+register_cmd "bitrix" "ownership" "Check/repair Bitrix file ownership drift" "bitrix_ownership_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""
 register_cmd "bitrix" "perf-apply" "Apply Bitrix optimization baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="
 register_cmd "bitrix" "finalize" "Finalize Bitrix post-install baseline" "bitrix_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging="

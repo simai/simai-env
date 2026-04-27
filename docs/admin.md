@@ -29,7 +29,7 @@ See `docs/architecture/profiles.md`.
 - Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP, cron, SSL, DB) with PASS/WARN/FAIL summary; does not apply changes.
 - Laravel daily ops (`laravel status`, `laravel app-ready`, `laravel finalize`, `laravel perf-status`, `laravel perf-apply`) provide low-risk application bootstrap, post-bootstrap baseline, and optimization checks for laravel profile sites.
 - WordPress daily ops (`wp status`, `wp installer-ready`, `wp finalize`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and install/scheduler/cache maintenance for wordpress profile sites.
-- Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache maintenance for bitrix profile sites.
+- Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix ownership`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache/ownership maintenance for bitrix profile sites.
 - In the interactive menu, these daily application/CMS actions live under `Applications`, which opens separate submenus for Laravel, WordPress, and Bitrix.
 - PHP commands: list/reload installed versions, and `php install` to add a new PHP version (uses ondrej/php, installs FPM/CLI/common extensions, with post-install tests).
 - Site list shows domain, profile, PHP version, root/alias target, and brief SSL status.
@@ -86,6 +86,7 @@ See `docs/architecture/profiles.md`.
 - `wp finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: complete a finished WordPress web install in one step (optimization baseline + scheduler baseline + optional Let's Encrypt).
 - `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix optimization status and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).
 - `bitrix finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: finalize a completed Bitrix web install in one step (PHP baseline + agents sync + optional Let's Encrypt).
+- `bitrix ownership --domain <domain> [--apply yes --confirm yes]`: detect and repair root-owned Bitrix web files and managed symlinked module checkouts after root-run installs, restores, or deployments.
 
 ## Internal scheduler
 - Bootstrap now installs one shared cron entry: `/etc/cron.d/simai-scheduler`.
