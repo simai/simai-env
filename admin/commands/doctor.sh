@@ -214,6 +214,15 @@ site_doctor_handler() {
         doctor_add_result "WARN" "fs" ".env permissions" "Mode ${mode}" "Set chmod 640 ${root}/.env"
       fi
     fi
+    if [[ "$profile" == "bitrix" && -d "$doc_root" ]]; then
+      local root_owned_count
+      root_owned_count=$(find "$doc_root" -xdev \( -user root -o -group root \) -printf . 2>/dev/null | wc -c | tr -d ' ')
+      if [[ "${root_owned_count:-0}" -gt 0 ]]; then
+        doctor_add_result "WARN" "fs" "Root-owned files" "${root_owned_count} item(s) under ${doc_root}" "Run: simai-admin.sh bitrix ownership --domain ${domain} --apply yes --confirm yes"
+      else
+        doctor_add_result "PASS" "fs" "Root-owned files" "None under ${doc_root}" ""
+      fi
+    fi
   fi
 
   progress_step "Application checks"
