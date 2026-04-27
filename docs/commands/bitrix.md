@@ -19,6 +19,7 @@ Shows:
 - `BX_CRONTAB_SUPPORT` mode (best effort from `dbconn.php`)
 - `cron_events.php` entrypoint presence
 - cron file/entry state with managed/domain/slug marker checks
+- nginx upload body limit for Bitrix FileInput uploads (`client_max_body_size 64m`)
 - nginx SEF fallback state for Bitrix URLs (`/bitrix/urlrewrite.php`)
 - nginx static asset compression/cache hints for first page load performance
 

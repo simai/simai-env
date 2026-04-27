@@ -334,6 +334,11 @@ site_doctor_handler() {
       doctor_add_result "SKIP" "nginx" "Healthcheck" "Profile disables healthcheck" ""
     fi
     if [[ "$profile" == "bitrix" ]]; then
+      if grep -qE 'client_max_body_size[[:space:]]+64m;' "$avail" 2>/dev/null; then
+        doctor_add_result "PASS" "nginx" "Bitrix upload body limit" "client_max_body_size 64m" ""
+      else
+        doctor_add_result "FAIL" "nginx" "Bitrix upload body limit" "client_max_body_size 64m is missing" "Regenerate nginx config from nginx-bitrix.conf or add client_max_body_size 64m to the server block"
+      fi
       if grep -qE 'try_files[[:space:]]+\$uri[[:space:]]+\$uri/[[:space:]]+/bitrix/urlrewrite\.php' "$avail" 2>/dev/null; then
         doctor_add_result "PASS" "nginx" "Bitrix SEF fallback" "/bitrix/urlrewrite.php" ""
       else
