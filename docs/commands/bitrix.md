@@ -20,6 +20,7 @@ Shows:
 - `cron_events.php` entrypoint presence
 - cron file/entry state with managed/domain/slug marker checks
 - nginx SEF fallback state for Bitrix URLs (`/bitrix/urlrewrite.php`)
+- nginx static asset compression/cache hints for first page load performance
 
 ## Cron Status
 

@@ -339,6 +339,16 @@ site_doctor_handler() {
       else
         doctor_add_result "FAIL" "nginx" "Bitrix SEF fallback" "Nginx fallback is not /bitrix/urlrewrite.php" "Regenerate nginx config from nginx-bitrix.conf; SSL commands must preserve template=bitrix"
       fi
+      if grep -qE 'gzip_types.*text/css.*application/javascript' "$avail" 2>/dev/null; then
+        doctor_add_result "PASS" "nginx" "Bitrix static gzip types" "css/js enabled" ""
+      else
+        doctor_add_result "WARN" "nginx" "Bitrix static gzip types" "CSS/JS may be served uncompressed" "Regenerate nginx config from nginx-bitrix.conf"
+      fi
+      if grep -qE 'location[[:space:]]+~\*.*css.*js' "$avail" 2>/dev/null && grep -qE 'expires[[:space:]]+[0-9]+d' "$avail" 2>/dev/null; then
+        doctor_add_result "PASS" "nginx" "Bitrix static cache" "expires configured" ""
+      else
+        doctor_add_result "WARN" "nginx" "Bitrix static cache" "Static asset cache headers are missing" "Regenerate nginx config from nginx-bitrix.conf"
+      fi
     fi
   fi
   local ngout
