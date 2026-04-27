@@ -366,7 +366,7 @@ ssl_apply_nginx() {
   local domain="$1" cert="$2" key="$3" chain="$4" redirect="$5" hsts="$6"
   ssl_site_context "$domain" || return 1
   local template_id="${SITE_META[nginx_template]:-${SITE_SSL_PROFILE}}"
-  local template="$NGINX_TEMPLATE"
+  local template=""
   if [[ "$SITE_SSL_PROFILE" == "alias" ]]; then
     if [[ -z "$template_id" || "$template_id" == "unknown" ]]; then
       error "Alias nginx template is unknown; refusing to regenerate nginx config safely."
@@ -374,22 +374,12 @@ ssl_apply_nginx() {
       return 1
     fi
   fi
-  case "$template_id" in
-    static) template="$NGINX_TEMPLATE_STATIC" ;;
-    generic) template="$NGINX_TEMPLATE_GENERIC" ;;
-    laravel) template="$NGINX_TEMPLATE" ;;
-    alias)
-      error "Alias nginx template id is insufficient to regenerate config; template for target site is required."
-      echo "Fix target metadata first: simai-admin.sh site drift --domain ${SITE_META[target]:-<target>} --fix yes (or restore # simai-* header manually)"
-      return 1
-      ;;
-    *)
-      if [[ "$SITE_SSL_PROFILE" == "alias" ]]; then
-        error "Unsupported alias nginx template ${template_id}"
-        return 1
-      fi
-      ;;
-  esac
+  if [[ "$template_id" == "alias" ]]; then
+    error "Alias nginx template id is insufficient to regenerate config; template for target site is required."
+    echo "Fix target metadata first: simai-admin.sh site drift --domain ${SITE_META[target]:-<target>} --fix yes (or restore # simai-* header manually)"
+    return 1
+  fi
+  template=$(site_nginx_template_path_for_id "$template_id") || return 1
 
   local pd_val
   if [[ -z "${SITE_META[public_dir]+x}" ]]; then
@@ -880,14 +870,11 @@ ssl_remove_handler() {
     fi
   fi
   ssl_site_context "$domain" || return 1
-  local template="$NGINX_TEMPLATE"
-  if [[ "$SITE_SSL_PROFILE" == "static" ]]; then
-    template="$NGINX_TEMPLATE_STATIC"
-  elif [[ "$SITE_SSL_PROFILE" == "generic" ]]; then
-    template="$NGINX_TEMPLATE_GENERIC"
-  fi
+  local template_id="${SITE_META[nginx_template]:-${SITE_SSL_PROFILE}}"
+  local template
+  template=$(site_nginx_template_path_for_id "$template_id") || return 1
   info "Removing SSL config for ${domain}"
-  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}"
+  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "$template_id" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}"
   site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "${SITE_META[project]}" "${SITE_META[profile]}" "${SITE_META[root]}" "${SITE_META[project]}" "${SITE_META[php]}" "none" "" "${SITE_META[target]:-}" "${SITE_META[php_socket_project]:-${SITE_META[project]}}" "${SITE_META[nginx_template]:-${SITE_META[profile]}}" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}" >/dev/null 2>&1 || true
   local ssl_kind="${SITE_META[ssl]:-none}"
   if [[ "$delete_cert" == "yes" ]]; then

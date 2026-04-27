@@ -1712,6 +1712,22 @@ site_nginx_metadata_upsert() {
   nginx_safe_write_config "$cfg" "$new_content"
 }
 
+site_nginx_template_path_for_id() {
+  local template_id="${1:-}"
+  case "$template_id" in
+    laravel) echo "$NGINX_TEMPLATE" ;;
+    generic) echo "$NGINX_TEMPLATE_GENERIC" ;;
+    static) echo "$NGINX_TEMPLATE_STATIC" ;;
+    alias) echo "${SCRIPT_DIR}/templates/nginx-alias.conf" ;;
+    wordpress) echo "${SCRIPT_DIR}/templates/nginx-wordpress.conf" ;;
+    bitrix) echo "${SCRIPT_DIR}/templates/nginx-bitrix.conf" ;;
+    *)
+      error "Unsupported nginx template id: ${template_id:-<empty>}"
+      return 1
+      ;;
+  esac
+}
+
 ensure_ssl_dir() {
   local domain="$1"
   local dir="/etc/nginx/ssl/${domain}"

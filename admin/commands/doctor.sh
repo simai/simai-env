@@ -333,6 +333,13 @@ site_doctor_handler() {
     else
       doctor_add_result "SKIP" "nginx" "Healthcheck" "Profile disables healthcheck" ""
     fi
+    if [[ "$profile" == "bitrix" ]]; then
+      if grep -qE 'try_files[[:space:]]+\$uri[[:space:]]+\$uri/[[:space:]]+/bitrix/urlrewrite\.php' "$avail" 2>/dev/null; then
+        doctor_add_result "PASS" "nginx" "Bitrix SEF fallback" "/bitrix/urlrewrite.php" ""
+      else
+        doctor_add_result "FAIL" "nginx" "Bitrix SEF fallback" "Nginx fallback is not /bitrix/urlrewrite.php" "Regenerate nginx config from nginx-bitrix.conf; SSL commands must preserve template=bitrix"
+      fi
+    fi
   fi
   local ngout
   ngout=$(nginx -t 2>&1 || true)

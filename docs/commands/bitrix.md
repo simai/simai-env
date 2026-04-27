@@ -19,6 +19,7 @@ Shows:
 - `BX_CRONTAB_SUPPORT` mode (best effort from `dbconn.php`)
 - `cron_events.php` entrypoint presence
 - cron file/entry state with managed/domain/slug marker checks
+- nginx SEF fallback state for Bitrix URLs (`/bitrix/urlrewrite.php`)
 
 ## Cron Status
 
