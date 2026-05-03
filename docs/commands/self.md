@@ -113,6 +113,38 @@ Typical use:
 sudo /root/simai-env/simai-admin.sh self sudo-admin-doctor --login simai-admin
 ```
 
+## ssh-hardening-ensure
+Apply the recommended operational-safe SSH hardening profile.
+
+This profile is intentionally not the most restrictive possible model. It keeps
+root SSH available as a key-only break-glass path, disables password and
+keyboard-interactive SSH login, and keeps normal work on the non-root sudo admin
+account.
+
+Behavior:
+- writes `/etc/ssh/sshd_config.d/01-simai-hardening.conf`
+- sets `PermitRootLogin prohibit-password`
+- sets `PasswordAuthentication no`
+- sets `KbdInteractiveAuthentication no`
+- sets `PubkeyAuthentication yes`
+- validates `sshd -t`
+- reloads ssh/sshd if syntax is valid
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes
+ssh simai-admin@<server>
+sudo -n /root/simai-env/simai-admin.sh self ssh-hardening-ensure --confirm yes
+```
+
+## ssh-hardening-doctor
+Read-only check for the operational-safe SSH profile.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self ssh-hardening-doctor
+```
+
 ## version
 Show local version, remote version, and update status.
 

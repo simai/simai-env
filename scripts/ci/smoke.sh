@@ -149,5 +149,9 @@ grep -q 'register_cmd "self" "sudo-admin-doctor"' admin/commands/self.sh || fail
 grep -q 'useradd -m -s /bin/bash "$login"' admin/commands/self.sh || fail "sudo-admin-ensure must create a normal shell user"
 grep -q 'usermod -aG sudo "$login"' admin/commands/self.sh || fail "sudo-admin-ensure must add user to sudo group"
 grep -q 'visudo -cf "$sudoers"' admin/commands/self.sh || fail "sudo-admin-ensure must validate sudoers file"
+grep -q 'register_cmd "self" "ssh-hardening-ensure"' admin/commands/self.sh || fail "ssh-hardening-ensure command not registered"
+grep -q 'register_cmd "self" "ssh-hardening-doctor"' admin/commands/self.sh || fail "ssh-hardening-doctor command not registered"
+grep -q 'PermitRootLogin prohibit-password' admin/commands/self.sh || fail "SSH hardening must keep root key-only"
+grep -q 'PasswordAuthentication no' admin/commands/self.sh || fail "SSH hardening must disable password auth"
 
 echo "Smoke checks passed"

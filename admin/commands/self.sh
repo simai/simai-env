@@ -553,6 +553,120 @@ self_sudo_admin_ensure_handler() {
   progress_done "Sudo admin ready"
 }
 
+self_ssh_hardening_file() {
+  echo "/etc/ssh/sshd_config.d/01-simai-hardening.conf"
+}
+
+self_sshd_effective_value() {
+  local key="$1"
+  sshd -T 2>/dev/null | awk -v target="$key" '$1 == target {print $2; exit}'
+}
+
+self_ssh_hardening_doctor_handler() {
+  local pass=0 warn_count=0 fail_count=0 rows=()
+  self_ssh_hardening_add_result() {
+    local state="$1" check="$2" detail="$3"
+    rows+=("${state}|${check}|${detail}")
+    case "$state" in
+      PASS) ((pass++)) ;;
+      WARN) ((warn_count++)) ;;
+      FAIL) ((fail_count++)) ;;
+    esac
+  }
+
+  if command -v sshd >/dev/null 2>&1; then
+    if sshd -t >/dev/null 2>&1; then
+      self_ssh_hardening_add_result "PASS" "sshd syntax" "OK"
+    else
+      self_ssh_hardening_add_result "FAIL" "sshd syntax" "sshd -t failed"
+    fi
+  else
+    self_ssh_hardening_add_result "FAIL" "sshd" "missing"
+  fi
+
+  local file
+  file=$(self_ssh_hardening_file)
+  if [[ -f "$file" ]]; then
+    self_ssh_hardening_add_result "PASS" "Managed snippet" "$file"
+  else
+    self_ssh_hardening_add_result "WARN" "Managed snippet" "missing ${file}"
+  fi
+
+  local permit_root password_auth kbd_auth pubkey_auth
+  permit_root=$(self_sshd_effective_value "permitrootlogin")
+  password_auth=$(self_sshd_effective_value "passwordauthentication")
+  kbd_auth=$(self_sshd_effective_value "kbdinteractiveauthentication")
+  pubkey_auth=$(self_sshd_effective_value "pubkeyauthentication")
+
+  if [[ "$permit_root" == "without-password" || "$permit_root" == "prohibit-password" ]]; then
+    self_ssh_hardening_add_result "PASS" "Root SSH" "key-only (${permit_root})"
+  elif [[ "$permit_root" == "no" ]]; then
+    self_ssh_hardening_add_result "WARN" "Root SSH" "disabled; operational-safe model keeps root as key-only break-glass"
+  else
+    self_ssh_hardening_add_result "FAIL" "Root SSH" "expected key-only, actual ${permit_root:-unknown}"
+  fi
+  if [[ "$password_auth" == "no" ]]; then
+    self_ssh_hardening_add_result "PASS" "PasswordAuthentication" "no"
+  else
+    self_ssh_hardening_add_result "FAIL" "PasswordAuthentication" "expected no, actual ${password_auth:-unknown}"
+  fi
+  if [[ "$kbd_auth" == "no" ]]; then
+    self_ssh_hardening_add_result "PASS" "KbdInteractiveAuthentication" "no"
+  else
+    self_ssh_hardening_add_result "FAIL" "KbdInteractiveAuthentication" "expected no, actual ${kbd_auth:-unknown}"
+  fi
+  if [[ "$pubkey_auth" == "yes" ]]; then
+    self_ssh_hardening_add_result "PASS" "PubkeyAuthentication" "yes"
+  else
+    self_ssh_hardening_add_result "FAIL" "PubkeyAuthentication" "expected yes, actual ${pubkey_auth:-unknown}"
+  fi
+
+  if os_svc_has_unit "fail2ban" && os_svc_is_active "fail2ban"; then
+    self_ssh_hardening_add_result "PASS" "fail2ban" "active"
+  else
+    self_ssh_hardening_add_result "WARN" "fail2ban" "not active"
+  fi
+
+  ui_header "SIMAI ENV · SSH hardening doctor"
+  print_kv_table "PASS|${pass}" "WARN|${warn_count}" "FAIL|${fail_count}"
+  ui_section "Checks"
+  print_kv_table "${rows[@]}"
+  local status="SUCCESS"
+  [[ $fail_count -gt 0 ]] && status="FAILED"
+  ui_result_table "Status|${status}" "Mode|operational-safe"
+  [[ $fail_count -eq 0 ]]
+}
+
+self_ssh_hardening_ensure_handler() {
+  parse_kv_args "$@"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  if [[ "$confirm" != "yes" ]]; then
+    error "--confirm yes is required to modify sshd hardening"
+    return 1
+  fi
+  command -v sshd >/dev/null 2>&1 || {
+    error "sshd is required"
+    return 1
+  }
+  local file dir
+  file=$(self_ssh_hardening_file)
+  dir=$(dirname "$file")
+  mkdir -p "$dir"
+  cat >"$file" <<'EOF'
+# simai-managed: operational-safe SSH hardening
+# Root stays available as a key-only break-glass path.
+PermitRootLogin prohibit-password
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+EOF
+  chmod 0644 "$file"
+  chown root:root "$file" 2>/dev/null || true
+  sshd -t || return 1
+  systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+  self_ssh_hardening_doctor_handler
+}
+
 self_version_handler() {
   self_auto_update_check_now "yes"
   local local_version remote_version status update_ref
@@ -1477,6 +1591,8 @@ register_cmd "self" "version" "Show local and remote simai-env version" "self_ve
 register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" ""
 register_cmd "self" "sudo-admin-ensure" "Create or repair a non-root sudo admin user" "self_sudo_admin_ensure_handler" "" "login= copy-root-keys= authorized-keys-file= nopasswd= confirm="
 register_cmd "self" "sudo-admin-doctor" "Check non-root sudo admin readiness" "self_sudo_admin_doctor_handler" "" "login="
+register_cmd "self" "ssh-hardening-ensure" "Apply operational-safe SSH hardening" "self_ssh_hardening_ensure_handler" "" "confirm="
+register_cmd "self" "ssh-hardening-doctor" "Check operational-safe SSH hardening" "self_ssh_hardening_doctor_handler" "" ""
 register_cmd "self" "auto-update-status" "Show automatic update status" "self_auto_update_status_handler" "" ""
 register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" ""
 register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" ""

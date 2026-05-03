@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.71] - 2026-05-04
+### Added
+- Added `self ssh-hardening-ensure` to apply the recommended operational-safe SSH profile: root key-only break-glass access, no password or keyboard-interactive login, public-key auth enabled, and `sshd -t` validation before reload.
+- Added `self ssh-hardening-doctor` as a read-only check for the operational-safe SSH profile and fail2ban state.
+
+### Changed
+- Documented the security posture decision: prefer operational-safe hardening over maximum lock-down so normal environment operations remain reliable.
+
 ## [1.12.70] - 2026-05-04
 ### Changed
 - Managed PHP bootstrap/install baselines now include `php<version>-redis`, matching Laravel's recommended Redis extension check.
