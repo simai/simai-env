@@ -80,6 +80,8 @@ Acceptance checks:
 
 ### Batch 2: SSL And DNS For Bitrix Sites
 
+Status: completed in first-pass user content on 2026-05-03. Future improvements should be based on new provider support, screenshots, or renewal behavior changes.
+
 Target file:
 
 - `docs/user/bitrix/ssl.md`

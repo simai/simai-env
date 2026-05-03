@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.58] - 2026-05-03
+### Changed
+- Expanded the Bitrix SSL user guide with standard vs wildcard certificate decisions, DNS prerequisites, Cloudflare token setup, manual DNS challenge limitations, renewal notes, and handoff checks.
+
 ## [1.12.57] - 2026-05-03
 ### Changed
 - Expanded the Bitrix agents-on-cron user guide with menu and CLI flows, status-field explanations, restore/PHP-switch follow-up checks, and troubleshooting for scheduler readiness.
