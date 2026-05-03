@@ -139,7 +139,7 @@ detect_missing_php_packages() {
   local ver="$1" include_common="${2:-yes}"
   local pkgs=("php${ver}-fpm" "php${ver}-cli" "php${ver}-common")
   if [[ "${include_common,,}" == "yes" ]]; then
-    pkgs+=("php${ver}-curl" "php${ver}-mbstring" "php${ver}-xml" "php${ver}-zip" "php${ver}-gd" "php${ver}-intl" "php${ver}-mysql" "php${ver}-bcmath" "php${ver}-opcache")
+    pkgs+=("php${ver}-curl" "php${ver}-mbstring" "php${ver}-xml" "php${ver}-zip" "php${ver}-gd" "php${ver}-intl" "php${ver}-mysql" "php${ver}-bcmath" "php${ver}-opcache" "php${ver}-redis")
   fi
   local missing=() pkg
   for pkg in "${pkgs[@]}"; do

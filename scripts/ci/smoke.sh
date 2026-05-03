@@ -126,6 +126,8 @@ done
 grep -q 'fail2ban' simai-env.sh || fail "bootstrap must install/configure fail2ban"
 grep -q 'simai-sshd.local' simai-env.sh || fail "bootstrap must create managed fail2ban sshd jail"
 grep -q 'fail2ban sshd jail' admin/commands/self.sh || fail "self status must report fail2ban jail state"
+grep -q 'php${PHP_VERSION}-redis' simai-env.sh || fail "bootstrap PHP stack must include php-redis"
+grep -q 'php${ver}-redis' admin/lib/php_utils.sh || fail "php install helper must include php-redis"
 
 # 10) Nginx templates must deny dotfiles except ACME challenges
 for tmpl in templates/nginx-*.conf; do

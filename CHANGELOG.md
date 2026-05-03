@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.70] - 2026-05-04
+### Changed
+- Managed PHP bootstrap/install baselines now include `php<version>-redis`, matching Laravel's recommended Redis extension check.
+- CI smoke checks now assert that the PHP Redis extension package remains included in bootstrap and PHP install helpers.
+
 ## [1.12.69] - 2026-05-04
 ### Added
 - Added `self sudo-admin-ensure` to create or repair a managed non-root sudo operator account with SSH keys and validated sudoers.

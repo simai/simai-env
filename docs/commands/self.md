@@ -182,6 +182,7 @@ Options:
 Behavior:
 - installs/repairs base packages
 - installs/enables the managed fail2ban SSH jail (`/etc/fail2ban/jail.d/simai-sshd.local`)
+- installs the PHP Redis extension with the managed PHP stack so Laravel cache/session/queue setups have the expected extension available
 - refreshes shared platform services
 - installs `wp-cli` best-effort
 - initializes profile activation defaults

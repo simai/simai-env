@@ -3,7 +3,7 @@
 Profiles describe site types in a single registry (`profiles/*.profile.sh`) and are interpreted by simai-admin. Current profiles:
 
 - **generic**: PHP site with placeholder `<project-root>/public/index.php`; optional DB; recommended extensions include intl/gd/opcache; healthcheck enabled.
-- **laravel**: PHP app with `artisan` and `bootstrap/app.php`; requires DB; cron/queue supported; healthcheck enabled.
+- **laravel**: PHP app with `artisan` and `bootstrap/app.php`; requires DB; cron/queue supported; healthcheck enabled; recommends the Redis PHP extension for cache/session/queue setups.
 - **static**: No PHP/DB; serves `<project-root>/public/index.html`; no cron/queue; healthcheck served directly by nginx at `/healthcheck` (local-only).
 - **alias**: Points to an existing site; no PHP/DB resources of its own; allows aliasing to another root/target.
 - **wordpress**: PHP WordPress site; DB required; cron supported (`wp-cron.php`); healthcheck enabled.
