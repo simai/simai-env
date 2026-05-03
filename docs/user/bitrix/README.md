@@ -14,6 +14,17 @@ Use `bitrix` for 1C-Bitrix Site Management or Bitrix24 box-style sites.
 - [Database](database.md): managed DB and application credential notes.
 - [Diagnostics](diagnostics.md): checks after install, restore, or runtime changes.
 
+## First Launch Checklist
+
+Use this route for a new operator flow:
+
+1. Create infrastructure: [Create site](create-site.md).
+2. Choose fresh install or restore: [Install vs restore](install-vs-restore.md).
+3. Make sure DB choice matches the scenario: [Database](database.md).
+4. Complete Bitrix browser installer or restore wizard.
+5. Run `Bitrix complete setup`.
+6. Verify the result: [Diagnostics](diagnostics.md).
+
 ## Typical Fresh Install Flow
 
 ```text

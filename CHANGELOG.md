@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.56] - 2026-05-03
+### Changed
+- Expanded the Bitrix user documentation for the first-launch path: site creation, fresh install vs restore, database choices, diagnostics, and the initial handoff checklist.
+
 ## [1.12.55] - 2026-05-03
 ### Changed
 - Reorganized user profile documentation into profile-specific folders under `docs/user/`, with Bitrix split into focused guides for creation, install/restore, cron agents, ownership, nginx routing, uploads, SSL, database, and diagnostics.

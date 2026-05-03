@@ -53,6 +53,8 @@ Future files can be added only when one existing file becomes too broad. Prefer 
 
 ### Batch 1: Creation And First Successful Launch
 
+Status: completed in docs structure and first-pass user content on 2026-05-03. Future improvements should be based on new live-server findings, not on restructuring.
+
 Target files:
 
 - `docs/user/bitrix/create-site.md`
