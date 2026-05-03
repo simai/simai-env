@@ -75,9 +75,21 @@ grep -q "listen 80 default_server" admin/lib/site_utils.sh || fail "site_utils m
 grep -q "return 444" admin/lib/site_utils.sh || fail "site_utils missing return 444"
 
 # 3) No mysql password via argv (-p<pass>)
-bad_mysql=$(find . -type f \( -name '*.sh' -o -name '*.profile.sh' \) -not -path './.git/*' -not -path './scripts/ci/smoke.sh' -print0 | xargs -0 grep -nE 'mysql[^\\n]*-p[^[:space:]]' || true)
+bad_mysql=$(
+  find . \
+    \( -path './.git' -o -path '*/node_modules' -o -path '*/vendor' \) -prune -o \
+    -type f \( -name '*.sh' -o -name '*.profile.sh' \) \
+    -not -path './scripts/ci/smoke.sh' -print0 |
+    xargs -0 grep -nE 'mysql[^\\n]*-p[^[:space:]]' || true
+)
 if [[ -n "$bad_mysql" ]]; then
   fail "mysql password via argv found:\n${bad_mysql}"
 fi
+
+# 4) site doctor must keep security baseline checks visible
+grep -q "doctor_world_writable_count" admin/commands/doctor.sh || fail "site doctor missing world-writable filesystem check helper"
+grep -q "World-writable files" admin/commands/doctor.sh || fail "site doctor missing world-writable filesystem result"
+grep -q "doctor_mysql_public_listeners" admin/commands/doctor.sh || fail "site doctor missing MySQL public listener check helper"
+grep -q "MySQL network exposure" admin/commands/doctor.sh || fail "site doctor missing MySQL network exposure result"
 
 echo "Smoke checks passed"

@@ -293,12 +293,14 @@ Options:
 - `--include-target` (`yes|no`, default `yes`) – for alias, run a partial (non-recursive) target inspection with prefixed results
 
 Checks (non-destructive):
-- Filesystem: root/docroot, markers, bootstrap files, writable paths, .env permissions
+- Filesystem: root/docroot, markers, bootstrap files, writable paths, `.env`
+  permissions, world-writable files/directories
 - nginx: config/symlink presence, healthcheck policy vs profile, `nginx -t`
 - PHP: version installed, php-fpm service/pool/socket, required/recommended extensions, INI expectations
 - Cron: `/etc/cron.d/<project-slug>` when profile enables cron
 - SSL: cert files present when metadata says ssl=on
-- DB: mysql service presence when profile requires DB; `.env` presence for required DB profiles
+- DB: mysql service presence when profile requires DB, public listener exposure
+  on `3306/33060`, `.env` presence for required DB profiles
 - Alias profiles: when `--include-target=yes`, performs a prefixed partial check of the target site (root/docroot/markers/healthcheck/nginx/php service/pool/socket) without recursion
 
 Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
@@ -315,6 +317,9 @@ Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
 - The admin menu lists profiles from the registry `profiles/*.profile.sh`; default ordering: `generic`, `laravel`, `static`, `alias`.
 - CLI `--profile` must match a registered profile; registry is declarative only (no executable logic).
 - **doctor**: `simai-admin.sh site doctor --domain <domain> [--strict yes|no] [--include-target yes|no]`  
-  Read-only contract diagnostic: checks profile validity, filesystem/docroot, nginx healthcheck policy, PHP/cron/SSL/DB expectations. No fixes applied. Use `--strict yes` to exit non-zero on FAIL.
+  Read-only contract diagnostic: checks profile validity, filesystem/docroot,
+  world-writable files, nginx healthcheck policy, PHP/cron/SSL/DB expectations,
+  and MySQL network exposure. No fixes applied. Use `--strict yes` to exit
+  non-zero on FAIL.
 - **drift**: `simai-admin.sh site drift --domain <domain> [--fix yes]`  
   Checks metadata/cron drift; `--fix yes` can migrate marked legacy cron blocks to `/etc/cron.d/<slug>` (safe markers only). Does not auto-fix metadata/DB/files/SSL.

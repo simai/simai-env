@@ -48,6 +48,35 @@ doctor_nginx_location_is_local_only() {
   return 1
 }
 
+doctor_world_writable_count() {
+  local path="$1"
+  [[ -d "$path" ]] || {
+    echo 0
+    return 0
+  }
+  find "$path" -xdev \( -type f -o -type d \) -perm -0002 -printf . 2>/dev/null | wc -c | tr -d ' '
+}
+
+doctor_world_writable_sample() {
+  local path="$1" limit="${2:-3}"
+  [[ -d "$path" ]] || return 0
+  find "$path" -xdev \( -type f -o -type d \) -perm -0002 -printf '%m %u:%g %p\n' 2>/dev/null | head -n "$limit"
+}
+
+doctor_mysql_public_listeners() {
+  command -v ss >/dev/null 2>&1 || return 0
+  ss -ltn 2>/dev/null |
+    awk '
+      NR == 1 { next }
+      $4 ~ /:3306$/ || $4 ~ /:33060$/ {
+        addr = $4
+        if (addr !~ /^127[.]0[.]0[.]1:/ && addr !~ /^\[::1\]:/) {
+          print addr
+        }
+      }
+    '
+}
+
 site_doctor_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -213,6 +242,14 @@ site_doctor_handler() {
       else
         doctor_add_result "WARN" "fs" ".env permissions" "Mode ${mode}" "Set chmod 640 ${root}/.env"
       fi
+    fi
+    local world_writable_count world_writable_sample
+    world_writable_count=$(doctor_world_writable_count "$root")
+    if [[ "${world_writable_count:-0}" -gt 0 ]]; then
+      world_writable_sample=$(doctor_world_writable_sample "$root" 3 | paste -sd '; ' -)
+      doctor_add_result "FAIL" "fs" "World-writable files" "${world_writable_count} item(s) under ${root}: ${world_writable_sample}" "Remove global write bit: find ${root} -xdev \\( -type f -o -type d \\) -perm -0002 -exec chmod o-w {} +"
+    else
+      doctor_add_result "PASS" "fs" "World-writable files" "None under ${root}" ""
     fi
     if [[ "$profile" == "bitrix" && -d "$doc_root" ]]; then
       local root_owned_count
@@ -584,6 +621,13 @@ progress_step "DB checks"
 if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
   if os_svc_is_active mysql || os_svc_is_active mariadb || os_svc_is_active percona || os_svc_is_active mysqld; then
     doctor_add_result "PASS" "db" "MySQL service" "Active" ""
+    local mysql_public
+    mysql_public=$(doctor_mysql_public_listeners | paste -sd ', ' -)
+    if [[ -n "$mysql_public" ]]; then
+      doctor_add_result "WARN" "db" "MySQL network exposure" "Public listener(s): ${mysql_public}" "Bind MySQL to 127.0.0.1 or protect 3306/33060 with firewall when external DB access is not required"
+    else
+      doctor_add_result "PASS" "db" "MySQL network exposure" "Local-only or not listening" ""
+    fi
   else
     doctor_add_result "WARN" "db" "MySQL service" "Inactive" "Install/enable MySQL or Percona"
   fi

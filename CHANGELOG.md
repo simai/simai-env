@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.63] - 2026-05-04
+### Added
+- `site doctor` now reports world-writable files/directories under the project root as filesystem failures.
+- `site doctor` now reports public MySQL listeners on `3306/33060` as database exposure warnings.
+
+### Changed
+- CI smoke checks now assert that these security baseline checks remain wired into `site doctor`.
+
 ## [1.12.62] - 2026-05-04
 ### Fixed
 - Fixed Bitrix ownership command ShellCheck warnings by avoiding a counter name collision with an earlier `failed` array.
