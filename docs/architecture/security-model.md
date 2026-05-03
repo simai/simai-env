@@ -6,6 +6,7 @@
   - dedicated user `simai`
   - per-site PHP-FPM pools (static/alias skip pools)
   - sockets/logs owned by `simai`:www-data
+  - optional non-root sudo operator account managed by `self sudo-admin-ensure`; root SSH should only be tightened further after that account is tested
 - Secrets never logged: passwords are shown only in summaries and redacted in logs/audit.
 - SSL:
   - TLS configs regenerated from templates; certs stored under `/etc/letsencrypt/live/<domain>/` or `/etc/nginx/ssl/<domain>/`.

@@ -390,6 +390,169 @@ self_supply_chain_doctor_handler() {
   [[ $fail_count -eq 0 ]]
 }
 
+self_sudo_admin_login_default() {
+  echo "${SIMAI_SUDO_ADMIN_USER:-simai-admin}"
+}
+
+self_sudo_admin_sudoers_file() {
+  local login="$1"
+  echo "/etc/sudoers.d/90-simai-admin-${login}"
+}
+
+self_sudo_admin_validate_login() {
+  local login="$1"
+  if [[ ! "$login" =~ ^[a-z][a-z0-9-]{2,31}$ ]]; then
+    error "Invalid sudo admin login '${login}'. Use lowercase letters, numbers, and dashes only (3-32 chars, must start with a letter)."
+    return 1
+  fi
+  if [[ "$login" == "root" || "$login" == "$SIMAI_USER" ]]; then
+    error "Login '${login}' is reserved; choose another name."
+    return 1
+  fi
+}
+
+self_sudo_admin_doctor_handler() {
+  parse_kv_args "$@"
+  local login="${PARSED_ARGS[login]:-$(self_sudo_admin_login_default)}"
+  self_sudo_admin_validate_login "$login" || return 1
+  local pass=0 warn_count=0 fail_count=0 rows=()
+  self_sudo_admin_add_result() {
+    local state="$1" check="$2" detail="$3"
+    rows+=("${state}|${check}|${detail}")
+    case "$state" in
+      PASS) ((pass++)) ;;
+      WARN) ((warn_count++)) ;;
+      FAIL) ((fail_count++)) ;;
+    esac
+  }
+
+  if id "$login" >/dev/null 2>&1; then
+    self_sudo_admin_add_result "PASS" "User" "$login exists"
+  else
+    self_sudo_admin_add_result "FAIL" "User" "$login missing"
+  fi
+  if id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -qx sudo; then
+    self_sudo_admin_add_result "PASS" "sudo group" "$login is in sudo"
+  else
+    self_sudo_admin_add_result "FAIL" "sudo group" "$login is not in sudo"
+  fi
+  local sudoers
+  sudoers=$(self_sudo_admin_sudoers_file "$login")
+  if [[ -f "$sudoers" ]]; then
+    self_sudo_admin_add_result "PASS" "sudoers file" "$sudoers"
+    if visudo -cf "$sudoers" >/dev/null 2>&1; then
+      self_sudo_admin_add_result "PASS" "sudoers syntax" "OK"
+    else
+      self_sudo_admin_add_result "FAIL" "sudoers syntax" "visudo check failed"
+    fi
+  else
+    self_sudo_admin_add_result "WARN" "sudoers file" "missing managed sudoers file"
+  fi
+  local auth_file="/home/${login}/.ssh/authorized_keys"
+  if [[ -f "$auth_file" ]]; then
+    self_sudo_admin_add_result "PASS" "authorized_keys" "$auth_file"
+  else
+    self_sudo_admin_add_result "FAIL" "authorized_keys" "missing ${auth_file}"
+  fi
+  if [[ -d "/home/${login}/.ssh" ]]; then
+    local ssh_mode auth_mode owner
+    ssh_mode=$(stat -c '%a' "/home/${login}/.ssh" 2>/dev/null || true)
+    auth_mode=$(stat -c '%a' "$auth_file" 2>/dev/null || true)
+    owner=$(stat -c '%U:%G' "/home/${login}/.ssh" 2>/dev/null || true)
+    if [[ "$ssh_mode" == "700" && "$auth_mode" == "600" && "$owner" == "${login}:${login}" ]]; then
+      self_sudo_admin_add_result "PASS" "SSH permissions" ".ssh=${ssh_mode}, authorized_keys=${auth_mode}, owner=${owner}"
+    else
+      self_sudo_admin_add_result "WARN" "SSH permissions" ".ssh=${ssh_mode:-missing}, authorized_keys=${auth_mode:-missing}, owner=${owner:-unknown}"
+    fi
+  fi
+  if sudo -n -u "$login" true >/dev/null 2>&1; then
+    self_sudo_admin_add_result "PASS" "sudo executable" "sudo can switch to ${login}"
+  else
+    self_sudo_admin_add_result "WARN" "sudo executable" "sudo -u ${login} check failed"
+  fi
+
+  ui_header "SIMAI ENV · Sudo admin doctor"
+  print_kv_table "PASS|${pass}" "WARN|${warn_count}" "FAIL|${fail_count}"
+  ui_section "Checks"
+  print_kv_table "${rows[@]}"
+  local status="SUCCESS"
+  [[ $fail_count -gt 0 ]] && status="FAILED"
+  ui_result_table "Status|${status}" "Login|${login}"
+  [[ $fail_count -eq 0 ]]
+}
+
+self_sudo_admin_ensure_handler() {
+  parse_kv_args "$@"
+  local login="${PARSED_ARGS[login]:-$(self_sudo_admin_login_default)}"
+  local copy_root_keys="${PARSED_ARGS[copy-root-keys]:-yes}"
+  local authorized_keys_file="${PARSED_ARGS[authorized-keys-file]:-}"
+  local nopasswd="${PARSED_ARGS[nopasswd]:-yes}"
+  local confirm="${PARSED_ARGS[confirm]:-no}"
+  self_sudo_admin_validate_login "$login" || return 1
+  if [[ "$confirm" != "yes" ]]; then
+    error "--confirm yes is required to create or modify a sudo admin user"
+    return 1
+  fi
+  if ! command -v sudo >/dev/null 2>&1; then
+    error "sudo is required"
+    return 1
+  fi
+  if ! command -v visudo >/dev/null 2>&1; then
+    error "visudo is required"
+    return 1
+  fi
+
+  progress_init 5
+  progress_step "Ensuring sudo admin user ${login}"
+  if ! id "$login" >/dev/null 2>&1; then
+    useradd -m -s /bin/bash "$login"
+  fi
+  usermod -aG sudo "$login"
+
+  progress_step "Preparing SSH authorized_keys"
+  local ssh_dir="/home/${login}/.ssh" auth_file="/home/${login}/.ssh/authorized_keys"
+  install -d -m 0700 -o "$login" -g "$login" "$ssh_dir"
+  if [[ -n "$authorized_keys_file" ]]; then
+    if [[ ! -f "$authorized_keys_file" || -L "$authorized_keys_file" ]]; then
+      error "Authorized keys file must be a regular file: ${authorized_keys_file}"
+      return 1
+    fi
+    install -m 0600 -o "$login" -g "$login" "$authorized_keys_file" "$auth_file"
+  elif [[ "$copy_root_keys" == "yes" && -f /root/.ssh/authorized_keys && ! -L /root/.ssh/authorized_keys ]]; then
+    install -m 0600 -o "$login" -g "$login" /root/.ssh/authorized_keys "$auth_file"
+  elif [[ ! -f "$auth_file" ]]; then
+    error "No SSH keys provided. Use --authorized-keys-file <file> or --copy-root-keys yes."
+    return 1
+  fi
+  chmod 0700 "$ssh_dir"
+  chmod 0600 "$auth_file"
+  chown -R "${login}:${login}" "$ssh_dir"
+
+  progress_step "Writing managed sudoers"
+  local sudoers
+  sudoers=$(self_sudo_admin_sudoers_file "$login")
+  if [[ "$nopasswd" == "yes" ]]; then
+    printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$login" >"$sudoers"
+  else
+    printf '%s ALL=(ALL) ALL\n' "$login" >"$sudoers"
+  fi
+  chmod 0440 "$sudoers"
+  chown root:root "$sudoers" 2>/dev/null || true
+  visudo -cf "$sudoers" >/dev/null || {
+    rm -f "$sudoers"
+    error "sudoers validation failed; removed ${sudoers}"
+    return 1
+  }
+
+  progress_step "Checking sshd syntax"
+  if command -v sshd >/dev/null 2>&1; then
+    sshd -t || return 1
+  fi
+  progress_step "Running sudo admin doctor"
+  self_sudo_admin_doctor_handler --login "$login" || return 1
+  progress_done "Sudo admin ready"
+}
+
 self_version_handler() {
   self_auto_update_check_now "yes"
   local local_version remote_version status update_ref
@@ -1312,6 +1475,8 @@ self_site_review_status_handler() {
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" ""
+register_cmd "self" "sudo-admin-ensure" "Create or repair a non-root sudo admin user" "self_sudo_admin_ensure_handler" "" "login= copy-root-keys= authorized-keys-file= nopasswd= confirm="
+register_cmd "self" "sudo-admin-doctor" "Check non-root sudo admin readiness" "self_sudo_admin_doctor_handler" "" "login="
 register_cmd "self" "auto-update-status" "Show automatic update status" "self_auto_update_status_handler" "" ""
 register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" ""
 register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" ""

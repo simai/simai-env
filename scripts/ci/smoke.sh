@@ -141,4 +141,11 @@ grep -q 'register_cmd "self" "supply-chain-doctor"' admin/commands/self.sh || fa
 grep -q 'updater_tmp=$(mktemp -d)' admin/commands/self.sh || fail "self update must run updater from a temporary snapshot"
 grep -q 'INSTALL_DIR="${SCRIPT_DIR}" "${updater_tmp}/update.sh"' admin/commands/self.sh || fail "self update must target current install dir from temporary updater"
 
+# 12) non-root sudo admin workflow must be managed and diagnosable
+grep -q 'register_cmd "self" "sudo-admin-ensure"' admin/commands/self.sh || fail "sudo-admin-ensure command not registered"
+grep -q 'register_cmd "self" "sudo-admin-doctor"' admin/commands/self.sh || fail "sudo-admin-doctor command not registered"
+grep -q 'useradd -m -s /bin/bash "$login"' admin/commands/self.sh || fail "sudo-admin-ensure must create a normal shell user"
+grep -q 'usermod -aG sudo "$login"' admin/commands/self.sh || fail "sudo-admin-ensure must add user to sudo group"
+grep -q 'visudo -cf "$sudoers"' admin/commands/self.sh || fail "sudo-admin-ensure must validate sudoers file"
+
 echo "Smoke checks passed"

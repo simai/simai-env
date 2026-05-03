@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.69] - 2026-05-04
+### Added
+- Added `self sudo-admin-ensure` to create or repair a managed non-root sudo operator account with SSH keys and validated sudoers.
+- Added `self sudo-admin-doctor` as a read-only readiness check for the non-root sudo operator account.
+
+### Changed
+- CI smoke checks now assert that the sudo admin workflow remains wired and validates sudoers before use.
+
 ## [1.12.68] - 2026-05-04
 ### Changed
 - Bootstrap now installs `fail2ban` and writes a managed `/etc/fail2ban/jail.d/simai-sshd.local` SSH jail baseline.

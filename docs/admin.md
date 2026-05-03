@@ -58,6 +58,8 @@ See `docs/architecture/profiles.md`.
 - `self supply-chain-doctor`: read-only diagnostics for self-update/install guardrails.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
 - `self bootstrap`: installs/enables the managed fail2ban SSH jail as part of the base utility baseline.
+- `self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes`: create or repair a non-root sudo operator account before any future root SSH lock-down.
+- `self sudo-admin-doctor --login simai-admin`: read-only readiness check for that account.
 - `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
 - `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
 - `self auto-update-run-check`: refresh update availability now without applying the update.

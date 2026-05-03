@@ -79,6 +79,40 @@ Typical use:
 sudo /root/simai-env/simai-admin.sh self supply-chain-doctor
 ```
 
+## sudo-admin-ensure
+Create or repair a non-root sudo admin user for operator login.
+
+Options:
+- `--login <login>` (default `simai-admin`)
+- `--copy-root-keys yes|no` (default `yes`) — copy `/root/.ssh/authorized_keys` when no explicit key file is provided.
+- `--authorized-keys-file <path>` — use a regular file with authorized SSH keys.
+- `--nopasswd yes|no` (default `yes`) — write a managed sudoers file with or without `NOPASSWD`.
+- `--confirm yes` — required because this modifies users, SSH keys, and sudoers.
+
+Behavior:
+- creates a normal shell user if missing
+- adds the user to the `sudo` group
+- installs SSH `authorized_keys` with `0700/0600` permissions
+- writes `/etc/sudoers.d/90-simai-admin-<login>`
+- validates sudoers with `visudo -cf`
+- validates `sshd -t` when sshd is available
+- does not disable root SSH; do that only after the new user login has been tested
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes
+ssh simai-admin@<server>
+sudo -n /root/simai-env/simai-admin.sh self sudo-admin-doctor --login simai-admin
+```
+
+## sudo-admin-doctor
+Read-only readiness check for a non-root sudo admin user.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-doctor --login simai-admin
+```
+
 ## version
 Show local version, remote version, and update status.
 
