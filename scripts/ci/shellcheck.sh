@@ -11,7 +11,11 @@ fi
 files=()
 while IFS= read -r -d '' f; do
   files+=("$f")
-done < <(find . -type f \( -name '*.sh' -o -name '*.profile.sh' \) -not -path './.git/*' -print0)
+done < <(
+  find . \
+    \( -path './.git' -o -path '*/node_modules' -o -path '*/vendor' \) -prune -o \
+    -type f \( -name '*.sh' -o -name '*.profile.sh' \) -print0
+)
 
 if [[ ${#files[@]} -eq 0 ]]; then
   echo "No shell files found"

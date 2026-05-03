@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.62] - 2026-05-04
+### Fixed
+- Fixed Bitrix ownership command ShellCheck warnings by avoiding a counter name collision with an earlier `failed` array.
+- Updated ShellCheck CI file discovery to skip vendored `node_modules` and `vendor` trees.
+
 ## [1.12.61] - 2026-05-03
 ### Changed
 - Added a Bitrix troubleshooting index by symptom and reshaped the Bitrix user README into a navigation map for first launch, common operations, and diagnostics.

@@ -971,7 +971,7 @@ bitrix_ownership_handler() {
   ui_header "SIMAI ENV · Bitrix ownership"
 
   local rows=()
-  local total_before=0 total_after=0 fixed=0 failed=0
+  local total_before=0 total_after=0 fixed_count=0 failure_count=0
   local root kind count_before count_after group status
   while IFS='|' read -r root kind; do
     [[ -n "$root" ]] || continue
@@ -984,10 +984,10 @@ bitrix_ownership_handler() {
       [[ "$root" == /home/"${SIMAI_USER:-simai}"/git/* ]] && group="${SIMAI_USER:-simai}"
       if bitrix_ownership_fix_path "$root" "$group"; then
         count_after=$(bitrix_ownership_count_root_owned "$root")
-        fixed=$((fixed + count_before - count_after))
+        fixed_count=$((fixed_count + count_before - count_after))
         [[ "$count_after" -eq 0 ]] || status="partial"
       else
-        failed=$((failed + 1))
+        failure_count=$((failure_count + 1))
         status="failed"
       fi
     fi
@@ -1006,15 +1006,15 @@ bitrix_ownership_handler() {
     "Apply|${apply}" \
     "Root-owned before|${total_before}" \
     "Root-owned after|${total_after}" \
-    "Fixed|${fixed}" \
-    "Failures|${failed}"
+    "Fixed|${fixed_count}" \
+    "Failures|${failure_count}"
 
   if [[ "$apply" != "yes" && "$total_before" -gt 0 ]]; then
     ui_next_steps
     ui_kv "Repair" "simai-admin.sh bitrix ownership --domain ${BX_DOMAIN} --apply yes --confirm yes"
   fi
   if [[ "$apply" == "yes" ]]; then
-    [[ "$failed" -eq 0 && "$total_after" -eq 0 ]]
+    [[ "$failure_count" -eq 0 && "$total_after" -eq 0 ]]
     return $?
   fi
   return 0
