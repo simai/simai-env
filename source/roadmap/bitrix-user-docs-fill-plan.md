@@ -124,6 +124,8 @@ Acceptance checks:
 
 ### Batch 4: Nginx, Routing, Hosts, And Upload Limits
 
+Status: completed in first-pass user content on 2026-05-03. Future improvements should be based on new routing/upload incidents or additional automated repair commands.
+
 Target files:
 
 - `docs/user/bitrix/nginx-routing.md`

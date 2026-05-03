@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.59] - 2026-05-03
+### Changed
+- Expanded the Bitrix nginx routing and uploads user guides with SEF fallback, host variable, wildcard host, upload body limit, HTTP 413, verification, repair, and handoff guidance.
+
 ## [1.12.58] - 2026-05-03
 ### Changed
 - Expanded the Bitrix SSL user guide with standard vs wildcard certificate decisions, DNS prerequisites, Cloudflare token setup, manual DNS challenge limitations, renewal notes, and handoff checks.
