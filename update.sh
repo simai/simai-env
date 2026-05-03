@@ -95,6 +95,7 @@ mkdir -p "$INSTALL_DIR"
 cp -R "${SRC_DIR}/." "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/simai-env.sh"
 chmod +x "$INSTALL_DIR/simai-admin.sh"
+chmod +x "$INSTALL_DIR/update.sh"
 # Clean up deprecated files
 rm -f "$INSTALL_DIR/admin/commands/alias.sh"
 

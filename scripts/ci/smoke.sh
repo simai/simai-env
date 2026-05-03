@@ -135,5 +135,7 @@ grep -q "update_repo_is_allowed" lib/update_channel.sh || fail "update channel m
 grep -q "update_archive_entries_safe" lib/update_channel.sh || fail "update channel missing archive validation helper"
 grep -q "SIMAI_UPDATE_ALLOW_UNRESOLVED_REF" update.sh || fail "update.sh missing explicit unresolved-ref escape hatch"
 grep -q 'register_cmd "self" "supply-chain-doctor"' admin/commands/self.sh || fail "self supply-chain-doctor command not registered"
+grep -q 'updater_tmp=$(mktemp -d)' admin/commands/self.sh || fail "self update must run updater from a temporary snapshot"
+grep -q 'INSTALL_DIR="${SCRIPT_DIR}" "${updater_tmp}/update.sh"' admin/commands/self.sh || fail "self update must target current install dir from temporary updater"
 
 echo "Smoke checks passed"

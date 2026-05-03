@@ -266,7 +266,19 @@ self_update_handler() {
   info "Running updater ${updater}"
   progress_init 2
   progress_step "Downloading and applying update"
-  "$updater"
+  local updater_tmp=""
+  updater_tmp=$(mktemp -d)
+  mkdir -p "${updater_tmp}/lib"
+  cp "$updater" "${updater_tmp}/update.sh"
+  cp "${SCRIPT_DIR}/lib/platform.sh" "${updater_tmp}/lib/platform.sh"
+  cp "${SCRIPT_DIR}/lib/update_channel.sh" "${updater_tmp}/lib/update_channel.sh"
+  chmod +x "${updater_tmp}/update.sh"
+  if ! INSTALL_DIR="${SCRIPT_DIR}" "${updater_tmp}/update.sh"; then
+    rm -rf "$updater_tmp"
+    progress_done "Update failed"
+    return 1
+  fi
+  rm -rf "$updater_tmp"
   local smoke_strict="${SIMAI_UPDATE_SMOKE_STRICT:-no}"
   if ! self_post_update_smoke "${SCRIPT_DIR}" "$smoke_strict"; then
     progress_done "Update completed with smoke failures"

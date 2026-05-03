@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.67] - 2026-05-04
+### Fixed
+- `self update` now runs `update.sh` from a temporary snapshot so the updater is not overwritten while it is still executing.
+- `update.sh` now restores executable mode on the installed `update.sh` after applying an update.
+
 ## [1.12.66] - 2026-05-04
 ### Added
 - Added `self supply-chain-doctor` as a read-only check for update ref syntax, repo allowlist state, SHA resolution, custom-repo/unresolved-ref escape hatches, and archive validation helpers.

@@ -52,6 +52,7 @@ Behavior:
 - refuses non-official update repositories by default; use `SIMAI_UPDATE_ALLOW_CUSTOM_REPO=yes` only for a GitHub fork you explicitly trust
 - refuses unresolved ref tarball fallback by default; use `SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes` only when `git`/network SHA resolution is intentionally unavailable
 - validates archive paths and entry types before extracting the update payload
+- runs the updater from a temporary snapshot so the script is not overwritten while it is still executing
 - creates a best-effort pre-update backup in `/root/simai-backups/`
 - runs a fast post-update smoke check
 - reloads the menu automatically when the command is run from menu mode
