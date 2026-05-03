@@ -48,7 +48,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: docara
-        run: npm ci
+        run: npm install
 
       - name: Build frontend assets
         working-directory: docara
