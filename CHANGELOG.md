@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.55] - 2026-05-03
+### Changed
+- Reorganized user profile documentation into profile-specific folders under `docs/user/`, with Bitrix split into focused guides for creation, install/restore, cron agents, ownership, nginx routing, uploads, SSL, database, and diagnostics.
+
 ## [1.12.44] - 2026-04-22
 ### Added
 - Wildcard Let's Encrypt now supports `--dns-provider manual` in addition to Cloudflare, using an interactive Certbot DNS challenge that prints the TXT records to add manually.

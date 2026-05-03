@@ -36,7 +36,9 @@ You can point `SHELLCHECK_BIN` to a custom binary if not in PATH.
 
 ## More docs
 - Docs entrypoint: `docs/README.md`
+- User documentation: `docs/user/README.md`
 - User profile workflows: `docs/user/profile-workflows.md`
+- Bitrix user workflows: `docs/user/bitrix/README.md`
 - Daily ops quickstart: `docs/operations/daily-ops-quickstart.md`
 - Profile ops matrix: `docs/operations/profile-ops-matrix.md`
 - Bitrix production runbook: `docs/operations/bitrix-production-runbook.md`

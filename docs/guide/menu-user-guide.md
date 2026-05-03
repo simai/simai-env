@@ -9,6 +9,7 @@ sudo /root/simai-env/simai-admin.sh menu
 It focuses on the everyday menu flow, not on internal implementation details.
 
 For profile-specific workflows after site creation, see `docs/user/profile-workflows.md`.
+For detailed CMS/profile notes, start from `docs/user/README.md`.
 
 Fresh install defaults:
 - new installs enable only the core profiles at first: `static`, `generic`, and `alias`
