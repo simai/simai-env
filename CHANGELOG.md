@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.61] - 2026-05-03
+### Changed
+- Added a Bitrix troubleshooting index by symptom and reshaped the Bitrix user README into a navigation map for first launch, common operations, and diagnostics.
+
 ## [1.12.60] - 2026-05-03
 ### Changed
 - Expanded the Bitrix ownership user guide with root-owned file symptoms, restore/module/cache/upload scenarios, repair behavior, project access guidance, and handoff checks.

@@ -45,6 +45,7 @@ docs/user/bitrix/
   ssl.md
   database.md
   diagnostics.md
+  troubleshooting.md
 ```
 
 Future files can be added only when one existing file becomes too broad. Prefer expanding existing files first.
@@ -167,6 +168,8 @@ Acceptance checks:
 - The repair command is documented as deliberate and confirmed, not invisible automation.
 
 ### Batch 6: Troubleshooting Index
+
+Status: completed in first-pass user content on 2026-05-03. Future improvements should be added as new real symptoms appear.
 
 Target files:
 

@@ -120,6 +120,7 @@ Before handing a Bitrix site to a developer or customer:
 
 ## Common Symptoms And Where To Go
 
+- For the full symptom index, see [Troubleshooting](troubleshooting.md).
 - Human-readable Bitrix URLs open wrong content: [Nginx routing](nginx-routing.md).
 - Large PDF/upload fails with `Network error` or `413`: [Uploads](uploads.md).
 - Modules cannot be deleted or updated: [Ownership](ownership.md).

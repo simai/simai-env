@@ -18,7 +18,7 @@ sudo /root/simai-env/simai-admin.sh menu
 - [Alias](alias/README.md): additional domain pointing to an existing site.
 - [Laravel](laravel/README.md): Laravel project setup, scheduler, queue, and finalize flow.
 - [WordPress](wordpress/README.md): WordPress installer, cron, and finalize flow.
-- [Bitrix](bitrix/README.md): 1C-Bitrix and Bitrix24 box-style sites.
+- [Bitrix](bitrix/README.md): 1C-Bitrix and Bitrix24 box-style sites, including [troubleshooting](bitrix/troubleshooting.md).
 
 ## Standard Check After Site Work
 

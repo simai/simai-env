@@ -2,21 +2,15 @@
 
 Use `bitrix` for 1C-Bitrix Site Management or Bitrix24 box-style sites.
 
-## Start Here
+This section is for operators who work mainly through:
 
-- [Create site](create-site.md): what the menu creates and what remains after creation.
-- [Install vs restore](install-vs-restore.md): fresh installer and `restore.php` scenarios.
-- [Agents on cron](agents-cron.md): move Bitrix agents from web hits to cron.
-- [Ownership](ownership.md): detect and repair root-owned files.
-- [Nginx routing](nginx-routing.md): Bitrix URL rewriting and nginx-specific request variables.
-- [Uploads](uploads.md): file upload limits and `413 Request Entity Too Large`.
-- [SSL](ssl.md): regular and wildcard HTTPS notes.
-- [Database](database.md): managed DB and application credential notes.
-- [Diagnostics](diagnostics.md): checks after install, restore, or runtime changes.
+```bash
+sudo /root/simai-env/simai-admin.sh menu
+```
 
-## First Launch Checklist
+## Start A New Bitrix Site
 
-Use this route for a new operator flow:
+Use this route for first launch:
 
 1. Create infrastructure: [Create site](create-site.md).
 2. Choose fresh install or restore: [Install vs restore](install-vs-restore.md).
@@ -25,48 +19,46 @@ Use this route for a new operator flow:
 5. Run `Bitrix complete setup`.
 6. Verify the result: [Diagnostics](diagnostics.md).
 
-## Operations After Install
+## Common Operations
 
-- Move agents to cron and verify scheduler readiness: [Agents on cron](agents-cron.md).
-- Repair file ownership after restore or module operations: [Ownership](ownership.md).
-- Check nginx routing and request host variables: [Nginx routing](nginx-routing.md).
-- Diagnose large upload failures: [Uploads](uploads.md).
+- [Agents on cron](agents-cron.md): move Bitrix agents from web hits to cron and verify scheduler readiness.
+- [SSL](ssl.md): issue standard or wildcard HTTPS certificate.
+- [Nginx routing](nginx-routing.md): check CHPU/SEF fallback, host variables, and wildcard host mode.
+- [Uploads](uploads.md): diagnose `Network error`, `413 Request Entity Too Large`, and upload size limits.
+- [Ownership](ownership.md): detect and repair root-owned files after restore, module operations, or manual file changes.
+- [Diagnostics](diagnostics.md): run the standard handoff checks.
 
-## Typical Fresh Install Flow
+## Find By Symptom
 
-```text
-Sites -> Create site
-Applications -> Bitrix -> Bitrix status
-Open the Bitrix installer in the browser
-Applications -> Bitrix -> Bitrix complete setup
-Applications -> Bitrix -> Bitrix status
-Diagnostics -> Site health check
-```
+Use [Troubleshooting](troubleshooting.md) when you know the symptom but not the command:
 
-## Typical Restore Flow
+- site opens slowly on first request
+- subdomain opens wrong host or wrong data
+- HTTPS issue fails
+- restore stops near the end
+- FileInput shows `Network error`
+- Bitrix module cannot be deleted
+- CHPU/SEF page opens wrong content
+- agents status is not ready
+- `site doctor` has warnings but no failures
 
-```text
-Sites -> Create site
-Applications -> Bitrix -> Bitrix restore from backup
-Open restore.php in the browser
-Complete the restore wizard
-Applications -> Bitrix -> Bitrix complete setup
-Applications -> Bitrix -> Bitrix status
-Diagnostics -> Site health check
-```
+## What Site Creation Does Automatically
 
-## What Is Automatic During Site Creation
+For the Bitrix profile, site creation prepares:
 
-- Bitrix nginx routing uses `/bitrix/urlrewrite.php`
-- upload body limit is set for Bitrix FileInput uploads
-- CSS/JS static files are served with gzip/cache headers
-- PHP-FPM pool is created with Bitrix-required INI values
-- DB can be created
-- managed cron file is created
+- Bitrix nginx routing through `/bitrix/urlrewrite.php`
+- upload body limit for common Bitrix FileInput uploads
+- CSS/JS static compression/cache headers
+- PHP-FPM pool with Bitrix-required INI values
+- optional managed DB/user
+- managed cron file
 
-## What Is Not Fully Automatic At Creation
+## What Still Requires Post-Install Action
 
-- Bitrix browser installation or restore
+Site creation does not finish:
+
+- Bitrix browser installation
+- Bitrix restore wizard
 - final PHP/cron/cache baseline after installation
 - agents switch from web hits to cron
 
