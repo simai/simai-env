@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.68] - 2026-05-04
+### Changed
+- Bootstrap now installs `fail2ban` and writes a managed `/etc/fail2ban/jail.d/simai-sshd.local` SSH jail baseline.
+- `self status` now reports `fail2ban` service state and managed SSH jail presence.
+- CI smoke checks now assert the fail2ban SSH baseline remains wired.
+
 ## [1.12.67] - 2026-05-04
 ### Fixed
 - `self update` now runs `update.sh` from a temporary snapshot so the updater is not overwritten while it is still executing.

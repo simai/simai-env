@@ -17,6 +17,7 @@ Output includes:
 - install dir
 - OS and whether it is supported
 - nginx / mysql / redis service state
+- fail2ban service state and managed sshd jail presence
 - php-fpm versions and CLI PHP
 - component versions
 - certbot timer state
@@ -146,6 +147,7 @@ Options:
 
 Behavior:
 - installs/repairs base packages
+- installs/enables the managed fail2ban SSH jail (`/etc/fail2ban/jail.d/simai-sshd.local`)
 - refreshes shared platform services
 - installs `wp-cli` best-effort
 - initializes profile activation defaults

@@ -501,7 +501,7 @@ install_packages() {
   apt_update_once
   os_cmd_pkg_install \
     software-properties-common ca-certificates curl gnupg lsb-release sudo cron acl \
-    git unzip htop rsyslog logrotate certbot
+    git unzip htop rsyslog logrotate certbot fail2ban
   run_long "Installing base utilities" "${OS_CMD[@]}" || fail "Failed to install base utilities"
   os_svc_enable_now cron || true
   if command -v systemctl >/dev/null 2>&1; then
@@ -511,6 +511,32 @@ install_packages() {
       systemctl enable --now certbot.timer >>"$LOG_FILE" 2>&1 || warn "Failed to enable certbot.timer"
     fi
   fi
+}
+
+configure_fail2ban_sshd() {
+  if ! command -v fail2ban-client >/dev/null 2>&1; then
+    warn "fail2ban is not installed; skipping SSH ban baseline"
+    return
+  fi
+  mkdir -p /etc/fail2ban/jail.d
+  cat >/etc/fail2ban/jail.d/simai-sshd.local <<'EOF'
+[sshd]
+enabled = true
+backend = systemd
+mode = normal
+maxretry = 5
+findtime = 10m
+bantime = 1h
+EOF
+  chmod 0644 /etc/fail2ban/jail.d/simai-sshd.local
+  chown root:root /etc/fail2ban/jail.d/simai-sshd.local 2>/dev/null || true
+  if command -v fail2ban-server >/dev/null 2>&1; then
+    fail2ban-server -t >>"$LOG_FILE" 2>&1 || {
+      warn "fail2ban configuration test failed; SSH ban baseline not enabled"
+      return
+    }
+  fi
+  os_svc_enable_now fail2ban || warn "Failed to enable fail2ban"
 }
 
 install_php_stack() {
@@ -894,6 +920,7 @@ configure_queue_service() {
 
 install_stack() {
   install_packages
+  configure_fail2ban_sshd
   install_php_stack
   install_nginx
   install_mysql
@@ -1012,6 +1039,7 @@ bootstrap_flow() {
   chown "$SIMAI_USER":www-data "$WWW_ROOT"
   progress_step "Installing base utilities"
   install_packages
+  configure_fail2ban_sshd
   progress_step "Installing PHP ${PHP_VERSION}"
   install_php_stack
   progress_step "Installing nginx"

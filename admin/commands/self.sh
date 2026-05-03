@@ -440,10 +440,11 @@ self_status_handler() {
     fi
   }
 
-  local nginx_state mysql_state redis_state
+  local nginx_state mysql_state redis_state fail2ban_state
   nginx_state=$(svc_state "nginx")
   mysql_state=$(svc_state "mysql")
   redis_state=$(svc_state "redis-server")
+  fail2ban_state=$(svc_state "fail2ban")
 
   local nginx_version="unknown"
   if command -v nginx >/dev/null 2>&1; then
@@ -468,6 +469,10 @@ self_status_handler() {
   local certbot_version="unknown"
   if command -v certbot >/dev/null 2>&1; then
     certbot_version=$(certbot --version 2>/dev/null)
+  fi
+  local fail2ban_jail="missing"
+  if [[ -f /etc/fail2ban/jail.d/simai-sshd.local ]]; then
+    fail2ban_jail="present"
   fi
   local certbot_timer="unknown"
   if command -v systemctl >/dev/null 2>&1; then
@@ -529,6 +534,8 @@ self_status_handler() {
     "mysql version|${mysql_version}" \
     "redis|${redis_state}" \
     "redis version|${redis_version}" \
+    "fail2ban|${fail2ban_state}" \
+    "fail2ban sshd jail|${fail2ban_jail}" \
     "php-fpm|${php_status}" \
     "php cli|${php_cli_version}" \
     "certbot version|${certbot_version}" \

@@ -57,6 +57,7 @@ See `docs/architecture/profiles.md`.
   - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
 - `self supply-chain-doctor`: read-only diagnostics for self-update/install guardrails.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
+- `self bootstrap`: installs/enables the managed fail2ban SSH jail as part of the base utility baseline.
 - `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
 - `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
 - `self auto-update-run-check`: refresh update availability now without applying the update.

@@ -123,6 +123,9 @@ for src in admin/lib/site_utils.sh simai-env.sh; do
   grep -q 'clear_env = yes' "$src" || fail "${src} missing PHP-FPM clear_env hardening"
   grep -q 'security.limit_extensions = .php' "$src" || fail "${src} missing PHP-FPM extension hardening"
 done
+grep -q 'fail2ban' simai-env.sh || fail "bootstrap must install/configure fail2ban"
+grep -q 'simai-sshd.local' simai-env.sh || fail "bootstrap must create managed fail2ban sshd jail"
+grep -q 'fail2ban sshd jail' admin/commands/self.sh || fail "self status must report fail2ban jail state"
 
 # 10) Nginx templates must deny dotfiles except ACME challenges
 for tmpl in templates/nginx-*.conf; do
