@@ -428,3 +428,40 @@ main {
 }
 
 
+
+/* Project header branding */
+.header--wrap {
+  padding-inline: 1rem !important;
+}
+
+.sf-logo {
+  gap: var(--sf-b3);
+  color: var(--sf-on-surface);
+  text-decoration: none;
+  min-width: 0;
+
+  &-mark {
+    display: inline-flex;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+
+    svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  &-title {
+    display: inline-block;
+    max-width: 220px;
+    overflow: hidden;
+    color: var(--sf-on-surface);
+    font-size: var(--sf-b6);
+    line-height: var(--sf-c2);
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

@@ -68,6 +68,10 @@ return [
     'cachePath' => $projectRoot . '/.cache',
     'siteName' => 'simai-env',
     'siteDescription' => 'Documentation for simai-env: user workflows, CLI reference, architecture, and operations.',
+    'brand' => [
+        'title' => 'simai-env',
+        'logoSvg' => null,
+    ],
     'github' => 'https://github.com/simai/simai-env',
     'githubEditBasePath' => 'docara',
     'turbo' => false,
