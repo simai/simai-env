@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.60] - 2026-05-03
+### Changed
+- Expanded the Bitrix ownership user guide with root-owned file symptoms, restore/module/cache/upload scenarios, repair behavior, project access guidance, and handoff checks.
+
 ## [1.12.59] - 2026-05-03
 ### Changed
 - Expanded the Bitrix nginx routing and uploads user guides with SEF fallback, host variable, wildcard host, upload body limit, HTTP 413, verification, repair, and handoff guidance.

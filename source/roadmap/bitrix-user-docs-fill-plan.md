@@ -147,6 +147,8 @@ Acceptance checks:
 
 ### Batch 5: Ownership, Permissions, And Safe File Operations
 
+Status: completed in first-pass user content on 2026-05-03. Future improvements should be based on new module/restore/deploy ownership incidents.
+
 Target file:
 
 - `docs/user/bitrix/ownership.md`
