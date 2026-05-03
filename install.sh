@@ -38,6 +38,71 @@ is_supported_os() {
   [[ "$OS_ID" == "ubuntu" && ( "$OS_VERSION_ID" == "22.04" || "$OS_VERSION_ID" == "24.04" ) ]]
 }
 
+install_ref_is_valid() {
+  local ref="${1:-}"
+  [[ "$ref" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]
+}
+
+install_repo_http_url() {
+  local url="${1:-https://github.com/simai/simai-env}"
+  url="${url%.git}"
+  url="${url%/}"
+  case "$url" in
+    git@github.com:*) url="https://github.com/${url#git@github.com:}" ;;
+    ssh://git@github.com/*) url="https://github.com/${url#ssh://git@github.com/}" ;;
+  esac
+  printf '%s\n' "$url"
+}
+
+install_repo_is_allowed() {
+  local repo_url="$1"
+  [[ "$repo_url" == "https://github.com/simai/simai-env" ]] && return 0
+  [[ "${SIMAI_INSTALL_ALLOW_CUSTOM_REPO:-no}" == "yes" ]] && [[ "$repo_url" == https://github.com/*/* ]] && return 0
+  return 1
+}
+
+install_resolve_ref_sha() {
+  local ref="$1" repo_url="$2" sha=""
+  command -v git >/dev/null 2>&1 || return 1
+  sha=$(git ls-remote "$repo_url" "$ref" 2>/dev/null | awk 'NR==1{print $1}')
+  if [[ -z "$sha" && "$ref" == refs/tags/* ]]; then
+    sha=$(git ls-remote "$repo_url" "${ref}^{}" 2>/dev/null | awk 'NR==1{print $1}')
+  fi
+  [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+  printf '%s\n' "$sha"
+}
+
+install_archive_entries_safe() {
+  local archive="$1"
+  local entry_type entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "$entry" == /* || "$entry" == ".." || "$entry" == ../* || "$entry" == */../* || "$entry" == */.. ]]; then
+      echo "Unsafe archive path: ${entry}" >&2
+      return 1
+    fi
+  done < <(tar -tzf "$archive")
+  while IFS= read -r entry_type; do
+    case "$entry_type" in
+      d|-) ;;
+      *)
+        echo "Unsafe archive entry type: ${entry_type}" >&2
+        return 1
+        ;;
+    esac
+  done < <(tar -tvzf "$archive" | awk 'NF {print substr($0,1,1)}')
+}
+
+install_find_extracted_source_dir() {
+  local dest="$1"
+  local found=()
+  mapfile -t found < <(find "$dest" -mindepth 1 -maxdepth 1 -type d -name "simai-env-*" | sort)
+  if [[ ${#found[@]} -ne 1 ]]; then
+    return 1
+  fi
+  printf '%s\n' "${found[0]}"
+}
+
 check_supported_os() {
   read_os_release
   if is_supported_os; then
@@ -88,14 +153,35 @@ TMP_DIR=$(mktemp -d)
 cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-TARBALL_URL="${REPO_URL}/archive/${REF}.tar.gz"
+if ! install_ref_is_valid "$REF"; then
+  echo "Invalid install ref: ${REF} (expected refs/heads/<branch> or refs/tags/<tag>)" >&2
+  exit 1
+fi
+REPO_HTTP_URL=$(install_repo_http_url "$REPO_URL")
+if ! install_repo_is_allowed "$REPO_HTTP_URL"; then
+  echo "Refusing install repo: ${REPO_HTTP_URL}" >&2
+  echo "Use the official repo or set SIMAI_INSTALL_ALLOW_CUSTOM_REPO=yes for a GitHub fork you trust." >&2
+  exit 1
+fi
+TARGET_SHA="$(install_resolve_ref_sha "$REF" "$REPO_HTTP_URL" 2>/dev/null || true)"
+if [[ -n "$TARGET_SHA" ]]; then
+  TARBALL_URL="${REPO_HTTP_URL}/archive/${TARGET_SHA}.tar.gz"
+else
+  TARBALL_URL="${REPO_HTTP_URL}/archive/${REF}.tar.gz"
+fi
 
-echo "Downloading simai-env (branch: ${REPO_BRANCH})..."
+echo "Downloading simai-env (ref: ${REF})..."
+if [[ -n "$TARGET_SHA" ]]; then
+  echo "Resolved target commit: ${TARGET_SHA}"
+else
+  echo "Target commit could not be resolved before bootstrap; using ref tarball."
+fi
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 
 echo "Unpacking..."
+install_archive_entries_safe "$TMP_DIR/simai-env.tar.gz"
 tar --no-same-owner --no-same-permissions -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
-SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
+SRC_DIR=$(install_find_extracted_source_dir "$TMP_DIR" || true)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
   echo "Could not locate extracted sources" >&2

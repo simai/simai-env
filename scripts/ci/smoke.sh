@@ -60,6 +60,9 @@ rm -rf "$tmp_backup_dir"
 grep -q "BASH_SOURCE" install.sh && fail "install.sh must not use BASH_SOURCE (stdin regression)"
 grep -qE 'source[[:space:]]+.*platform\.sh' install.sh && fail "install.sh must not source platform.sh before download"
 grep -q "platform_" install.sh && fail "install.sh must not call platform_* (stdin regression)"
+grep -q "install_repo_is_allowed" install.sh || fail "install.sh must restrict install repo by default"
+grep -q "install_archive_entries_safe" install.sh || fail "install.sh must validate archive entries before extraction"
+grep -q "install_find_extracted_source_dir" install.sh || fail "install.sh must require exactly one extracted source dir"
 # 12) install/platform must not source /etc/os-release directly
 grep -qE '^[[:space:]]*(source|\.)[[:space:]]+/etc/os-release' install.sh && fail "install.sh must not source /etc/os-release directly (env pollution regression)"
 grep -qE '^[[:space:]]*(source|\.)[[:space:]]+/etc/os-release' lib/platform.sh && fail "platform_detect_os must not source /etc/os-release directly (env pollution regression)"
@@ -126,5 +129,11 @@ for tmpl in templates/nginx-*.conf; do
   [[ -f "$tmpl" ]] || continue
   grep -q 'location ~ \^/\\\.(?!well-known/)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
 done
+
+# 11) self-update supply-chain guardrails must stay wired
+grep -q "update_repo_is_allowed" lib/update_channel.sh || fail "update channel missing repo allowlist helper"
+grep -q "update_archive_entries_safe" lib/update_channel.sh || fail "update channel missing archive validation helper"
+grep -q "SIMAI_UPDATE_ALLOW_UNRESOLVED_REF" update.sh || fail "update.sh missing explicit unresolved-ref escape hatch"
+grep -q 'register_cmd "self" "supply-chain-doctor"' admin/commands/self.sh || fail "self supply-chain-doctor command not registered"
 
 echo "Smoke checks passed"

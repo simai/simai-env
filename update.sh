@@ -16,8 +16,13 @@ REF=${SIMAI_UPDATE_REF:-${REF:-$(update_ref_default)}}
 UPDATE_BACKUP_ROOT=${SIMAI_UPDATE_BACKUP_DIR:-/root/simai-backups}
 REPO_HTTP_URL=$(update_repo_http_url "${REPO_URL:-https://github.com/simai/simai-env}")
 
-if [[ ! "$REF" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]; then
+if ! update_ref_is_valid "$REF"; then
   echo "Invalid update ref: ${REF} (expected refs/heads/<branch> or refs/tags/<tag>)" >&2
+  exit 1
+fi
+if ! update_repo_is_allowed "$REPO_HTTP_URL"; then
+  echo "Refusing update repo: ${REPO_HTTP_URL}" >&2
+  echo "Use the official repo or set SIMAI_UPDATE_ALLOW_CUSTOM_REPO=yes for a GitHub fork you trust." >&2
   exit 1
 fi
 
@@ -46,6 +51,11 @@ cleanup() { rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
 TARGET_SHA="$(update_resolve_ref_sha "$REF" "$REPO_HTTP_URL" 2>/dev/null || true)"
+if [[ -z "$TARGET_SHA" && "${SIMAI_UPDATE_ALLOW_UNRESOLVED_REF:-no}" != "yes" ]]; then
+  echo "Could not resolve ${REF} to a commit SHA for ${REPO_HTTP_URL}" >&2
+  echo "Install git/network access or set SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes to allow a ref tarball fallback." >&2
+  exit 1
+fi
 TARBALL_URL="$(update_tarball_url "$REF" "$REPO_HTTP_URL")"
 
 PREV_VERSION="(unknown)"
@@ -73,8 +83,8 @@ if [[ -n "$TARGET_SHA" ]]; then
   echo "Resolved target commit: ${TARGET_SHA}"
 fi
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
-tar --no-same-owner --no-same-permissions -xzf "$TMP_DIR/simai-env.tar.gz" -C "$TMP_DIR"
-SRC_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "simai-env-*" | head -n 1)
+update_extract_archive "$TMP_DIR/simai-env.tar.gz" "$TMP_DIR"
+SRC_DIR=$(update_find_extracted_source_dir "$TMP_DIR" || true)
 
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
   echo "Could not locate extracted sources" >&2

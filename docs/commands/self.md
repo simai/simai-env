@@ -48,7 +48,10 @@ Update the installed `simai-env` tree in place.
 
 Behavior:
 - resolves the configured update ref
-- downloads the exact target revision
+- downloads the exact target revision when `git` can resolve it to a commit SHA
+- refuses non-official update repositories by default; use `SIMAI_UPDATE_ALLOW_CUSTOM_REPO=yes` only for a GitHub fork you explicitly trust
+- refuses unresolved ref tarball fallback by default; use `SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes` only when `git`/network SHA resolution is intentionally unavailable
+- validates archive paths and entry types before extracting the update payload
 - creates a best-effort pre-update backup in `/root/simai-backups/`
 - runs a fast post-update smoke check
 - reloads the menu automatically when the command is run from menu mode
@@ -56,6 +59,22 @@ Behavior:
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self update
+```
+
+## supply-chain-doctor
+Run a read-only check of self-update/install supply-chain guardrails.
+
+Checks include:
+- configured update ref syntax
+- update repository allowlist state
+- `git` availability for SHA-pinned updates
+- whether the configured ref resolves to a commit SHA
+- whether custom-repo or unresolved-ref escape hatches are enabled
+- whether archive validation helpers are loaded
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self supply-chain-doctor
 ```
 
 ## version

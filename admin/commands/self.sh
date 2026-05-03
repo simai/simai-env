@@ -305,6 +305,79 @@ self_bootstrap_handler() {
   progress_done "Bootstrap completed"
 }
 
+self_supply_chain_doctor_handler() {
+  local repo_url ref target_sha status pass=0 warn_count=0 fail_count=0
+  repo_url=$(update_repo_http_url "${REPO_URL:-https://github.com/simai/simai-env}")
+  ref="$(self_update_ref)"
+
+  local rows=()
+  self_supply_chain_add_result() {
+    local state="$1" check="$2" detail="$3"
+    rows+=("${state}|${check}|${detail}")
+    case "$state" in
+      PASS) ((pass++)) ;;
+      WARN) ((warn_count++)) ;;
+      FAIL) ((fail_count++)) ;;
+    esac
+  }
+
+  if update_ref_is_valid "$ref"; then
+    self_supply_chain_add_result "PASS" "Update ref" "$ref"
+  else
+    self_supply_chain_add_result "FAIL" "Update ref" "Invalid ref: ${ref}"
+  fi
+
+  if update_repo_is_allowed "$repo_url"; then
+    self_supply_chain_add_result "PASS" "Update repo" "$repo_url"
+  else
+    self_supply_chain_add_result "FAIL" "Update repo" "Refused: ${repo_url}"
+  fi
+
+  if command -v git >/dev/null 2>&1; then
+    self_supply_chain_add_result "PASS" "git" "$(command -v git)"
+    target_sha=$(update_resolve_ref_sha "$ref" "$repo_url" 2>/dev/null || true)
+    if [[ -n "$target_sha" ]]; then
+      self_supply_chain_add_result "PASS" "Target SHA" "$target_sha"
+    else
+      self_supply_chain_add_result "FAIL" "Target SHA" "Could not resolve ${ref}"
+    fi
+  else
+    self_supply_chain_add_result "FAIL" "git" "Required for SHA-pinned self update"
+  fi
+
+  if [[ "${SIMAI_UPDATE_ALLOW_CUSTOM_REPO:-no}" == "yes" ]]; then
+    self_supply_chain_add_result "WARN" "Custom repo override" "SIMAI_UPDATE_ALLOW_CUSTOM_REPO=yes"
+  else
+    self_supply_chain_add_result "PASS" "Custom repo override" "disabled"
+  fi
+  if [[ "${SIMAI_UPDATE_ALLOW_UNRESOLVED_REF:-no}" == "yes" ]]; then
+    self_supply_chain_add_result "WARN" "Unresolved ref fallback" "SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes"
+  else
+    self_supply_chain_add_result "PASS" "Unresolved ref fallback" "disabled"
+  fi
+
+  for required in update_archive_entries_safe update_extract_archive update_find_extracted_source_dir; do
+    if declare -F "$required" >/dev/null 2>&1; then
+      self_supply_chain_add_result "PASS" "$required" "available"
+    else
+      self_supply_chain_add_result "FAIL" "$required" "missing"
+    fi
+  done
+
+  ui_header "SIMAI ENV · Supply-chain doctor"
+  print_kv_table \
+    "PASS|${pass}" \
+    "WARN|${warn_count}" \
+    "FAIL|${fail_count}"
+  ui_section "Checks"
+  print_kv_table "${rows[@]}"
+
+  status="SUCCESS"
+  [[ $fail_count -gt 0 ]] && status="FAILED"
+  ui_result_table "Status|${status}" "Update ref|${ref}" "Repo|${repo_url}"
+  [[ $fail_count -eq 0 ]]
+}
+
 self_version_handler() {
   self_auto_update_check_now "yes"
   local local_version remote_version status update_ref
@@ -1219,6 +1292,7 @@ self_site_review_status_handler() {
 
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
+register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" ""
 register_cmd "self" "auto-update-status" "Show automatic update status" "self_auto_update_status_handler" "" ""
 register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" ""
 register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" ""

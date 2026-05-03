@@ -10,6 +10,12 @@ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | \
   REF=refs/tags/vX.Y.Z INSTALL_DIR=/opt/simai-env sudo -E bash
 ```
 
+Security notes:
+- The installer accepts the official `https://github.com/simai/simai-env` repository by default.
+- To install from a GitHub fork, set `SIMAI_INSTALL_ALLOW_CUSTOM_REPO=yes` explicitly and treat that fork as trusted code.
+- When `git` is available before bootstrap, the installer resolves the ref to a commit SHA and downloads that SHA archive.
+- The installer validates archive paths and entry types before extraction.
+
 - Install a new project directly (non-menu):
 ```bash
 sudo /root/simai-env/simai-env.sh --domain your-domain.tld --project-name myapp \

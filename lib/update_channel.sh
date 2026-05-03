@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
+update_ref_is_valid() {
+  local ref="${1:-}"
+  [[ "$ref" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]
+}
+
 update_ref_default() {
   local branch="${SIMAI_UPDATE_BRANCH:-main}"
   local ref="${SIMAI_UPDATE_REF:-refs/heads/${branch}}"
-  if [[ "$ref" =~ ^refs/(heads|tags)/[A-Za-z0-9._/-]+$ ]]; then
+  if update_ref_is_valid "$ref"; then
     printf '%s\n' "$ref"
     return 0
   fi
@@ -23,6 +28,51 @@ update_repo_http_url() {
       ;;
   esac
   printf '%s\n' "$url"
+}
+
+update_repo_is_allowed() {
+  local repo_url
+  repo_url="$(update_repo_http_url "${1:-}")"
+  [[ "$repo_url" == "https://github.com/simai/simai-env" ]] && return 0
+  [[ "${SIMAI_UPDATE_ALLOW_CUSTOM_REPO:-no}" == "yes" ]] && [[ "$repo_url" == https://github.com/*/* ]] && return 0
+  return 1
+}
+
+update_archive_entries_safe() {
+  local archive="$1"
+  local entry_type entry
+  while IFS= read -r entry; do
+    [[ -z "$entry" ]] && continue
+    if [[ "$entry" == /* || "$entry" == ".." || "$entry" == ../* || "$entry" == */../* || "$entry" == */.. ]]; then
+      echo "Unsafe archive path: ${entry}" >&2
+      return 1
+    fi
+  done < <(tar -tzf "$archive")
+  while IFS= read -r entry_type; do
+    case "$entry_type" in
+      d|-) ;;
+      *)
+        echo "Unsafe archive entry type: ${entry_type}" >&2
+        return 1
+        ;;
+    esac
+  done < <(tar -tvzf "$archive" | awk 'NF {print substr($0,1,1)}')
+}
+
+update_extract_archive() {
+  local archive="$1" dest="$2"
+  update_archive_entries_safe "$archive" || return 1
+  tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$dest"
+}
+
+update_find_extracted_source_dir() {
+  local dest="$1"
+  local found=()
+  mapfile -t found < <(find "$dest" -mindepth 1 -maxdepth 1 -type d -name "simai-env-*" | sort)
+  if [[ ${#found[@]} -ne 1 ]]; then
+    return 1
+  fi
+  printf '%s\n' "${found[0]}"
 }
 
 update_repo_slug() {

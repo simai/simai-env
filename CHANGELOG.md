@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.66] - 2026-05-04
+### Added
+- Added `self supply-chain-doctor` as a read-only check for update ref syntax, repo allowlist state, SHA resolution, custom-repo/unresolved-ref escape hatches, and archive validation helpers.
+
+### Changed
+- Hardened `update.sh` to refuse non-official update repositories by default, require ref-to-SHA resolution unless explicitly overridden, and validate archive paths/types before extraction.
+- Hardened `install.sh` with the same default official-repo guard and archive validation, while preserving an explicit `SIMAI_INSTALL_ALLOW_CUSTOM_REPO=yes` escape hatch for trusted GitHub forks.
+- CI smoke checks now assert installer/update supply-chain guardrails remain wired.
+
 ## [1.12.65] - 2026-05-04
 ### Changed
 - Hardened `site remove --remove-files yes` so project file deletion is allowed only for real directories under the managed web root, rejects symlink roots, and uses `rm --one-file-system`.
