@@ -12,7 +12,13 @@
 
 ### Безопасность
 - Архив **не** содержит SSL приватных ключей, `.env` и другие секреты.
+- Импорт принимает только ожидаемые пути: `manifest.json`, `NOTES.txt`,
+  `nginx/`, `php-fpm/`, `cron.d/`, `systemd/`.
+- Импорт отклоняет абсолютные пути, `.`/`..` компоненты, backslash,
+  symlink/hardlink/device entries и другие неожиданные типы tar entries.
 - Cron импортируется только если файл содержит заголовки `simai-managed: yes` и корректный slug (и, по возможности, domain).
+- Systemd queue unit импортируется только если имя соответствует ожидаемому
+  `laravel-queue-<slug>.service`.
 - `enabled` в manifest — булево значение (true/false).
 
 ### Создание/импорт

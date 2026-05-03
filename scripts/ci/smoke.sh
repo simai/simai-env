@@ -92,4 +92,16 @@ grep -q "World-writable files" admin/commands/doctor.sh || fail "site doctor mis
 grep -q "doctor_mysql_public_listeners" admin/commands/doctor.sh || fail "site doctor missing MySQL public listener check helper"
 grep -q "MySQL network exposure" admin/commands/doctor.sh || fail "site doctor missing MySQL network exposure result"
 
+# 5) backup import must reject unsafe archive entries
+grep -q "backup_archive_path_safe" admin/lib/backup_utils.sh || fail "backup import missing archive path safety helper"
+grep -q "backup_archive_types_safe" admin/lib/backup_utils.sh || fail "backup import missing archive type safety helper"
+grep -q "Unsafe archive entry type" admin/lib/backup_utils.sh || fail "backup import must reject symlink/hardlink/device entries"
+grep -q "unexpected unit name" admin/lib/backup_utils.sh || fail "backup import must reject unexpected systemd unit names"
+
+# 6) access subsystem must expose a read-only security doctor
+grep -q 'register_cmd "access" "doctor"' admin/commands/access.sh || fail "access doctor command not registered"
+grep -q "ForceCommand internal-sftp" admin/commands/access.sh || fail "access doctor must check internal-sftp restriction"
+grep -q "ChrootDirectory" admin/commands/access.sh || fail "access doctor must check chroot rule"
+grep -q "expected root:root 755" admin/commands/access.sh || fail "access doctor must check project chroot ownership/mode"
+
 echo "Smoke checks passed"

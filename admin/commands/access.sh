@@ -96,6 +96,152 @@ access_show_handler() {
     "Reset password: simai-admin.sh access reset-password --login ${login}"
 }
 
+access_doctor_add_result() {
+  local status="$1" check="$2" detail="$3"
+  ACCESS_DOCTOR_ROWS+=("${status}|${check}|${detail}")
+}
+
+access_doctor_print() {
+  local row status check detail
+  local pass=0 warn=0 fail=0
+  for row in "${ACCESS_DOCTOR_ROWS[@]}"; do
+    status="${row%%|*}"
+    case "$status" in
+      PASS) pass=$((pass + 1)) ;;
+      WARN) warn=$((warn + 1)) ;;
+      FAIL) fail=$((fail + 1)) ;;
+    esac
+  done
+  ui_section "Summary"
+  print_kv_table "PASS|${pass}" "WARN|${warn}" "FAIL|${fail}"
+  ui_section "Checks"
+  for row in "${ACCESS_DOCTOR_ROWS[@]}"; do
+    status="${row%%|*}"
+    detail="${row#*|}"
+    check="${detail%%|*}"
+    detail="${detail#*|}"
+    printf '[%s] %s — %s\n' "$status" "$check" "$detail"
+  done
+  [[ "$fail" -eq 0 ]]
+}
+
+access_doctor_handler() {
+  parse_kv_args "$@"
+  ui_header "SIMAI ENV · Access doctor"
+  local strict="${PARSED_ARGS[strict]:-no}"
+  ACCESS_DOCTOR_ROWS=()
+
+  if [[ -f "$SIMAI_ACCESS_SSHD_SNIPPET" ]]; then
+    access_doctor_add_result "PASS" "sshd snippet" "$SIMAI_ACCESS_SSHD_SNIPPET"
+    if grep -q "ForceCommand internal-sftp" "$SIMAI_ACCESS_SSHD_SNIPPET" &&
+      grep -q "AllowTcpForwarding no" "$SIMAI_ACCESS_SSHD_SNIPPET" &&
+      grep -q "X11Forwarding no" "$SIMAI_ACCESS_SSHD_SNIPPET" &&
+      grep -q "PermitTTY no" "$SIMAI_ACCESS_SSHD_SNIPPET"; then
+      access_doctor_add_result "PASS" "SFTP restriction" "ForceCommand internal-sftp with forwarding disabled"
+    else
+      access_doctor_add_result "FAIL" "SFTP restriction" "Missing internal-sftp or forwarding restrictions in sshd snippet"
+    fi
+    if grep -q "ChrootDirectory ${SIMAI_ACCESS_JAIL_BASE}/%u" "$SIMAI_ACCESS_SSHD_SNIPPET"; then
+      access_doctor_add_result "PASS" "Project chroot rule" "ChrootDirectory uses managed jail base"
+    else
+      access_doctor_add_result "FAIL" "Project chroot rule" "Missing managed ChrootDirectory rule"
+    fi
+  else
+    access_doctor_add_result "WARN" "sshd snippet" "Missing ${SIMAI_ACCESS_SSHD_SNIPPET}; no managed access users may exist"
+  fi
+  if sshd -t >/dev/null 2>&1; then
+    access_doctor_add_result "PASS" "sshd syntax" "OK"
+  else
+    access_doctor_add_result "FAIL" "sshd syntax" "sshd -t failed"
+  fi
+
+  local metadata_dir
+  metadata_dir=$(access_dir)
+  if [[ -d "$metadata_dir" ]]; then
+    local meta_mode meta_owner
+    meta_mode=$(stat -c "%a" "$metadata_dir" 2>/dev/null || echo "")
+    meta_owner=$(stat -c "%U:%G" "$metadata_dir" 2>/dev/null || echo "")
+    if [[ "$meta_owner" == "root:root" && "$meta_mode" =~ ^7[05]0$|^755$ ]]; then
+      access_doctor_add_result "PASS" "metadata dir" "${meta_owner} ${meta_mode}"
+    else
+      access_doctor_add_result "WARN" "metadata dir" "${meta_owner:-unknown} ${meta_mode:-unknown}"
+    fi
+  else
+    access_doctor_add_result "PASS" "metadata dir" "No metadata directory yet"
+  fi
+
+  local -a logins=()
+  mapfile -t logins < <(access_list_logins 2>/dev/null || true)
+  if [[ ${#logins[@]} -eq 0 ]]; then
+    access_doctor_add_result "PASS" "managed users" "No access entries found"
+  fi
+
+  local login file mode owner type enabled shell jail site_dir root
+  for login in "${logins[@]}"; do
+    file=$(access_metadata_file "$login")
+    mode=$(stat -c "%a" "$file" 2>/dev/null || echo "")
+    owner=$(stat -c "%U:%G" "$file" 2>/dev/null || echo "")
+    if [[ "$owner" == "root:root" && "$mode" == "640" ]]; then
+      access_doctor_add_result "PASS" "${login}: metadata" "${owner} ${mode}"
+    else
+      access_doctor_add_result "FAIL" "${login}: metadata" "${owner:-unknown} ${mode:-unknown}; expected root:root 640"
+    fi
+    access_load_metadata "$login" || {
+      access_doctor_add_result "FAIL" "${login}: metadata load" "failed"
+      continue
+    }
+    type="${ACCESS_META[TYPE]:-}"
+    enabled="${ACCESS_META[ENABLED]:-}"
+    if id -u "$login" >/dev/null 2>&1; then
+      shell=$(getent passwd "$login" | awk -F: '{print $7}')
+      if [[ "$shell" == "/usr/sbin/nologin" || "$shell" == "/sbin/nologin" ]]; then
+        access_doctor_add_result "PASS" "${login}: shell" "$shell"
+      else
+        access_doctor_add_result "FAIL" "${login}: shell" "$shell; expected nologin"
+      fi
+    elif [[ "$enabled" == "no" ]]; then
+      access_doctor_add_result "WARN" "${login}: user" "system user missing for disabled access"
+    else
+      access_doctor_add_result "FAIL" "${login}: user" "system user missing"
+    fi
+    if [[ "$type" == "project" ]]; then
+      jail="${ACCESS_META[JAIL_PATH]:-$(access_project_jail_root "$login")}"
+      site_dir=$(access_project_site_dir "$login")
+      root="${ACCESS_META[ROOT_PATH]:-}"
+      if [[ -d "$jail" ]]; then
+        mode=$(stat -c "%a" "$jail" 2>/dev/null || echo "")
+        owner=$(stat -c "%U:%G" "$jail" 2>/dev/null || echo "")
+        if [[ "$owner" == "root:root" && "$mode" == "755" ]]; then
+          access_doctor_add_result "PASS" "${login}: chroot" "${owner} ${mode}"
+        else
+          access_doctor_add_result "FAIL" "${login}: chroot" "${owner:-unknown} ${mode:-unknown}; expected root:root 755"
+        fi
+      else
+        access_doctor_add_result "FAIL" "${login}: chroot" "missing ${jail}"
+      fi
+      if [[ -n "$root" && -d "$root" ]]; then
+        access_doctor_add_result "PASS" "${login}: project root" "$root"
+      else
+        access_doctor_add_result "FAIL" "${login}: project root" "missing ${root:-<empty>}"
+      fi
+      if [[ "$enabled" == "yes" ]]; then
+        if access_mount_is_active "$site_dir"; then
+          access_doctor_add_result "PASS" "${login}: bind mount" "$site_dir"
+        else
+          access_doctor_add_result "WARN" "${login}: bind mount" "not active at ${site_dir}"
+        fi
+      fi
+    fi
+  done
+
+  access_doctor_print
+  local rc=$?
+  if [[ "${strict,,}" == "yes" ]]; then
+    return "$rc"
+  fi
+  return 0
+}
+
 access_create_global_handler() {
   parse_kv_args "$@"
   local login="${PARSED_ARGS[login]:-}"
@@ -417,6 +563,7 @@ access_add_key_handler() {
 
 register_cmd "access" "list" "List managed file accesses" "access_list_handler" "" "scope= domain=" ""
 register_cmd "access" "show" "Show access details" "access_show_handler" "login" "" ""
+register_cmd "access" "doctor" "Check managed access security baseline" "access_doctor_handler" "" "strict=no" ""
 register_cmd "access" "create-global" "Create global SFTP access" "access_create_global_handler" "login" "password=" ""
 register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password=" ""
 register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" ""

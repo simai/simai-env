@@ -233,8 +233,14 @@ backup_apply_files() {
     else
       for unit in "$systemd_dir"/*.service; do
         [[ -f "$unit" ]] || continue
-        local dst
-        dst="/etc/systemd/system/$(basename "$unit")"
+        local unit_name expected_unit dst
+        unit_name=$(basename "$unit")
+        expected_unit=$(queue_unit_name "$slug" 2>/dev/null || true)
+        if [[ -z "$expected_unit" || "$unit_name" != "$expected_unit" ]]; then
+          warn "Skipping queue unit import: unexpected unit name ${unit_name}"
+          continue
+        fi
+        dst="/etc/systemd/system/${unit_name}"
         backup_backup_if_exists "$dst" "$ts" rollback_ref
         cp "$unit" "$dst"
       done
@@ -291,6 +297,56 @@ backup_reload_services() {
   fi
   return 0
 }
+
+backup_archive_path_allowed() {
+  local path="$1"
+  case "$path" in
+    manifest.json|NOTES.txt) return 0 ;;
+    nginx/*|php-fpm/*|cron.d/*|systemd/*) return 0 ;;
+  esac
+  return 1
+}
+
+backup_archive_path_safe() {
+  local path="$1"
+  while [[ "$path" == ./* ]]; do
+    path="${path#./}"
+  done
+  [[ -z "$path" ]] && return 0
+  [[ "$path" == "." ]] && return 0
+  [[ "$path" != -* ]] || return 1
+  [[ "$path" != /* ]] || return 1
+  [[ "$path" != *\\* ]] || return 1
+  [[ "$path" != *$'\r'* && "$path" != *$'\n'* ]] || return 1
+  local part
+  local -a _backup_path_parts=()
+  IFS='/' read -r -a _backup_path_parts <<<"$path"
+  for part in "${_backup_path_parts[@]}"; do
+    [[ -n "$part" && "$part" != "." && "$part" != ".." ]] || return 1
+  done
+  backup_archive_path_allowed "$path"
+}
+
+backup_archive_types_safe() {
+  local file="$1"
+  local listing line type
+  if ! listing=$(tar -tzvf "$file" 2>/dev/null); then
+    error "Failed to inspect archive entry types"
+    return 1
+  fi
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    type="${line:0:1}"
+    case "$type" in
+      -|d) ;;
+      *)
+        error "Unsafe archive entry type '${type}' detected"
+        return 1
+        ;;
+    esac
+  done <<<"$listing"
+}
+
 backup_safe_extract_archive() {
   local file="$1" dst="$2"
   if [[ ! -f "$file" ]]; then
@@ -304,11 +360,12 @@ backup_safe_extract_archive() {
   fi
   while IFS= read -r p; do
     [[ -z "$p" ]] && continue
-    [[ "$p" == -* ]] && { error "Unsafe path in archive: ${p}"; return 1; }
-    [[ "$p" == /* ]] && { error "Absolute path in archive: ${p}"; return 1; }
-    [[ "$p" == *".."* ]] && { error "Path traversal detected in archive: ${p}"; return 1; }
-    [[ "$p" == *\\* ]] && { error "Backslash in path not allowed: ${p}"; return 1; }
+    if ! backup_archive_path_safe "$p"; then
+      error "Unsafe or unexpected path in archive: ${p}"
+      return 1
+    fi
   done <<<"$paths"
+  backup_archive_types_safe "$file" || return 1
   tar --no-same-owner --no-same-permissions -xzf "$file" -C "$dst"
 }
 

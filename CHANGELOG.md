@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.64] - 2026-05-04
+### Added
+- Added `access doctor` as a read-only security baseline check for managed SFTP access, sshd snippet restrictions, metadata permissions, nologin shells, project chroot ownership, and bind mount state.
+
+### Changed
+- Hardened backup import archive validation to allow only expected config-bundle paths and reject symlink, hardlink, device, absolute, traversal, and unexpected tar entries.
+- Backup import now skips unexpected queue unit names instead of importing arbitrary `.service` files from the archive.
+- CI smoke checks now assert that access and backup security hardening remains wired.
+
 ## [1.12.63] - 2026-05-04
 ### Added
 - `site doctor` now reports world-writable files/directories under the project root as filesystem failures.

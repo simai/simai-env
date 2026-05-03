@@ -30,6 +30,21 @@ Show one access entry.
 Options:
 - `--login <login>` (required outside menu)
 
+## `access doctor`
+Run read-only security diagnostics for the managed access subsystem.
+
+Checks include:
+- managed sshd snippet presence and `sshd -t`
+- SFTP-only restrictions (`ForceCommand internal-sftp`, no TTY, no forwarding)
+- project chroot rule
+- access metadata permissions
+- managed user shell (`nologin`)
+- project chroot ownership/mode (`root:root 755`)
+- project root and bind mount state for enabled project access
+
+Options:
+- `--strict yes|no` (default `no`; return non-zero on FAIL when `yes`)
+
 ## `access create-global`
 Create a global SFTP-only user with access to all projects under `WWW_ROOT`.
 

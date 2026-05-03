@@ -38,6 +38,8 @@ What it does:
 - prints manifest details
 - verifies file checksums inside the archive
 - does not change system state
+- rejects unsafe tar entries such as absolute paths, traversal, symlinks,
+  hardlinks, devices, and unexpected top-level directories
 - rejects platform pre-update archives such as `simai-env-preupdate-*.tar.gz`, because they are not site settings bundles and do not contain `manifest.json`
 
 ## import
@@ -65,7 +67,10 @@ Behavior:
 
 Import rules:
 - cron is restored only for matching managed simai cron files
-- queue unit is restored only for profiles that support queue workers
+- queue unit is restored only for profiles that support queue workers and only
+  when the unit name matches `laravel-queue-<slug>.service`
+- archive extraction is allowlisted to config-bundle paths and rejects
+  symlinks, hardlinks, devices, absolute paths, and path traversal
 - SSL keys and project `.env` are never imported from this archive type
 
 ## Notes
