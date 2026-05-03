@@ -1,0 +1,92 @@
+.docsearch-input {
+  &__main {
+    max-height: 14rem;
+    // gap/overflow now via utility classes in markup
+  }
+
+  &__holder {
+    // position/inline offset moved to utilities in markup
+    top: calc(100% + 6px);
+    min-width: 100%;
+    width: 100%;
+    background: var(--sf-surface-0);
+    padding: var(--sf-b6);
+    border-radius: var(--sf-radius-1);
+    border: var(--sf-a1) solid var(--sf-outline-variant);
+    box-shadow: 0px 0px var(--sf-a3) var(--sf-outline-variant);
+    z-index: 10;
+  }
+
+}
+
+.search {
+  &--result {
+    transition: .3s background-color ease;
+
+    &:hover {
+      background-color: var(--sf-surface-container-hover);
+    }
+
+    &-title {
+      color: var(--sf-on-surface);
+
+    }
+
+    &-content {
+      color: var(--sf-on-surface-variant);
+    }
+  }
+
+  &--wrap {
+    @include breakpoint(mobile) {
+      opacity: 0;
+      &.visible {
+        width: 100%;
+        opacity: 1;
+      }
+    }
+
+
+    //max-width: 400px;
+    &.open {
+      .sf {
+        &-input {
+          &-container {}
+          border-color: var(--sf-primary-hover)
+        }
+      }
+    }
+
+
+
+    mark {
+      color: #d20e21;
+    }
+
+    .sf {
+      &-input {
+        .sf-input-inner-label {
+          padding-inline-end: var(--sf-text-height-1);
+        }
+
+        &-body {
+          &--right {
+            // padding/position moved to utilities in markup/component
+          }
+        }
+
+        &-close {
+          --sf-close--diameter: var(--sf-text-height-1);
+          color: var(--sf-outline);
+        }
+
+        &-search {
+          &-container {
+            width: var(--sf-f7);
+            transition: .3s all ease;
+          }
+        }
+      }
+    }
+  }
+}

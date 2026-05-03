@@ -1,0 +1,12 @@
+.env
+vendor/
+node_modules/
+build_*/
+.cache/
+.docara-state/
+source/assets/build/
+source/docs/.translate.php
+output/
+*.bak
+*.bak_*
+*.codex-bak-*

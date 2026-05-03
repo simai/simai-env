@@ -1,0 +1,110 @@
+.side-menu {
+
+  min-width: 200px;
+  width: 100%;
+  margin-inline-start: -1px;
+  &.read {
+    display: none;
+  }
+  @include breakpoint(midTablet) {
+    position: fixed;
+    display: flex;
+    inset-inline-start: -100%;
+    top: var(--sf-header-height);
+    background: var(--sf-surface-0);
+    height: calc(100% - var(--sf-header-height));
+    width: 100%;
+    transition: .3s all ease;
+    z-index: 200;
+    padding: var(--sf-b2);
+    border: 0;
+    &.active {
+      inset-inline-start: 0;
+    }
+    &-navigation {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+  }
+
+
+  h5.sf-side-menu-header {
+    font-weight: var(--sf-weight--bold);
+    margin: unset;
+    padding-top: var(--sf-a8);
+  }
+
+  .sf-side-menu-list {
+    position: relative;
+    .sf-side-menu-list-item {
+      line-height: var(--sf-text-height-1);
+      position: relative;
+      padding-top: calc(var(--sf-b2) / 2);
+      padding-bottom: calc(var(--sf-b2) / 2);
+
+      &:has(.active) {
+        &:before {
+          top: 0;
+          bottom: 0;
+          content: '';
+          position: absolute;
+          inset-inline-start: calc(-1 * calc(var(--sf-c2)));
+          width: 1px;
+          background: var(--sf-on-surface);
+        }
+      }
+
+
+      a {
+        font-size: var(--sf-b4);
+        color: var(--sf-on-surface);
+        transition: font-weight 0.2s;
+        &.active {
+          font-weight: 700;
+        }
+      }
+    }
+
+    a {
+      padding: unset;
+    }
+  }
+}
+
+.sf {
+  &-button {
+    &-readMode,
+    &-bug {
+      @include breakpoint(midTablet) {
+        position: fixed;
+        inset-inline-end: var(--sf-space-2);
+        top: calc(var(--sf-header-height) + var(--sf-a8));
+        &.sf-button--on-surface-transparent {
+          background-color: color-mix(in srgb, var(--sf-transparent), var(--sf-neutral-50) 30%);
+        }
+      }
+    }
+  }
+
+}
+
+body {
+  .sf-button {
+    &-bug, &-readMode {
+      @include breakpoint(midTablet) {
+        font-size: var(--sf-c0);
+        line-height: var(--sf-c0);
+      }
+
+    }
+    &-readMode {
+      @include breakpoint(tablet) {
+        display: none;
+      }
+    }
+  }
+}
+
+

@@ -8,3 +8,5 @@ output/
 testing/test-config.env
 testing/secrets/
 source/
+!docara/source/
+!docara/source/**
