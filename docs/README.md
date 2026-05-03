@@ -3,6 +3,7 @@
 This directory contains architecture, development, and command reference docs for simai-env.
 
 - Menu-first user guide: `docs/guide/menu-user-guide.md`.
+- User profile workflows: `docs/user/profile-workflows.md`.
 - Admin usage map: see `docs/admin.md` and `docs/commands/`.
 - File access management: `docs/commands/access.md`.
 - WordPress ops reference: `docs/commands/wp.md`.

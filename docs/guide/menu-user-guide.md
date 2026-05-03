@@ -8,6 +8,8 @@ sudo /root/simai-env/simai-admin.sh menu
 
 It focuses on the everyday menu flow, not on internal implementation details.
 
+For profile-specific workflows after site creation, see `docs/user/profile-workflows.md`.
+
 Fresh install defaults:
 - new installs enable only the core profiles at first: `static`, `generic`, and `alias`
 - additional profiles such as `wordpress`, `laravel`, and `bitrix` can be enabled later from `Advanced -> Profiles`
