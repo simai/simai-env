@@ -7,6 +7,7 @@ bitrix_cron_markers() {
   BX_CRON_DOMAIN_MATCH="no"
   BX_CRON_SLUG_MATCH="no"
   BX_CRON_ENTRY_MATCH="no"
+  BX_CRON_SHORT_OPEN_TAG_MATCH="no"
   if [[ ! -f "$cron_file" ]]; then
     return 0
   fi
@@ -14,6 +15,7 @@ bitrix_cron_markers() {
   grep -Eq "^# simai-domain: ${domain}$" "$cron_file" && BX_CRON_DOMAIN_MATCH="yes"
   grep -Eq "^# simai-slug: ${slug}$" "$cron_file" && BX_CRON_SLUG_MATCH="yes"
   grep -Eq "cron_events\\.php" "$cron_file" && BX_CRON_ENTRY_MATCH="yes"
+  grep -Eq "short_open_tag=1.*cron_events\\.php" "$cron_file" && BX_CRON_SHORT_OPEN_TAG_MATCH="yes"
 }
 
 bitrix_prepare_site() {
@@ -115,8 +117,8 @@ bitrix_dbconn_drop_const() {
 }
 
 bitrix_agents_ready_state() {
-  local cron_managed="$1" cron_domain_match="$2" cron_slug_match="$3" cron_entry="$4" _crontab="$5" crontab_support="$6"
-  if [[ "$cron_managed" == "yes" && "$cron_domain_match" == "yes" && "$cron_slug_match" == "yes" && "$cron_entry" == "yes" && "$crontab_support" == "true" ]]; then
+  local cron_managed="$1" cron_domain_match="$2" cron_slug_match="$3" cron_entry="$4" _crontab="$5" crontab_support="$6" cron_short_open_tag="${7:-yes}"
+  if [[ "$cron_managed" == "yes" && "$cron_domain_match" == "yes" && "$cron_slug_match" == "yes" && "$cron_entry" == "yes" && "$cron_short_open_tag" == "yes" && "$crontab_support" == "true" ]]; then
     echo "yes"
     return 0
   fi
@@ -278,7 +280,7 @@ bitrix_status_handler() {
   fi
   db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
-  install_stage=$(bitrix_perf_install_stage "$short_install" "$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "${BX_CRON_ENTRY_MATCH:-no}" "$bx_crontab" "$bx_crontab_support")" "$web_state")
+  install_stage=$(bitrix_perf_install_stage "$short_install" "$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "${BX_CRON_ENTRY_MATCH:-no}" "$bx_crontab" "$bx_crontab_support" "${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}")" "$web_state")
   open_url=$(bitrix_installer_open_url "$BX_DOMAIN" "$BX_DOC_ROOT")
 
   ui_result_table \
@@ -339,12 +341,14 @@ bitrix_cron_status_handler() {
   local cron_managed="no"
   local cron_domain_match="no"
   local cron_slug_match="no"
+  local cron_short_open_tag_match="no"
   if [[ -f "$BX_CRON_FILE" ]]; then
     cron_file_state="present"
     bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
     cron_managed="${BX_CRON_MANAGED:-no}"
     cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
     cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
+    cron_short_open_tag_match="${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}"
     if [[ "${BX_CRON_ENTRY_MATCH:-no}" == "yes" ]]; then
       cron_line_state="present"
     fi
@@ -353,6 +357,7 @@ bitrix_cron_status_handler() {
     "Domain|${BX_DOMAIN}" \
     "Scheduler file|${BX_CRON_FILE} (${cron_file_state})" \
     "Scheduler entry (cron_events.php)|${cron_line_state}" \
+    "CLI short_open_tag|${cron_short_open_tag_match}" \
     "Managed file|${cron_managed}" \
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}"
@@ -404,6 +409,7 @@ bitrix_agents_status_handler() {
   local bx_crontab_support="missing"
   local cron_file_state="missing"
   local cron_entry_match="no"
+  local cron_short_open_tag_match="no"
   local cron_managed="no"
   local cron_domain_match="no"
   local cron_slug_match="no"
@@ -420,9 +426,10 @@ bitrix_agents_status_handler() {
     cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
     cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
+    cron_short_open_tag_match="${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}"
   fi
   local ready
-  ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support" "$cron_short_open_tag_match")
 
   ui_result_table \
     "Domain|${BX_DOMAIN}" \
@@ -434,6 +441,7 @@ bitrix_agents_status_handler() {
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}" \
     "Scheduler entry (cron_events.php)|${cron_entry_match}" \
+    "CLI short_open_tag|${cron_short_open_tag_match}" \
     "Agents via scheduler|${ready}"
   ui_next_steps
   ui_kv "Plan sync" "simai-admin.sh bitrix agents-sync --domain ${BX_DOMAIN}"
@@ -512,13 +520,14 @@ bitrix_agents_sync_handler() {
   fi
 
   cron_site_write "$BX_DOMAIN" "$BX_SLUG" "bitrix" "$BX_ROOT" "$BX_PHP_VERSION"
-  local cron_managed="no" cron_domain_match="no" cron_slug_match="no" cron_entry_match="no"
+  local cron_managed="no" cron_domain_match="no" cron_slug_match="no" cron_entry_match="no" cron_short_open_tag_match="no"
   if [[ -f "$BX_CRON_FILE" ]]; then
     bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
     cron_managed="${BX_CRON_MANAGED:-no}"
     cron_domain_match="${BX_CRON_DOMAIN_MATCH:-no}"
     cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
+    cron_short_open_tag_match="${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}"
   fi
 
   ui_result_table \
@@ -530,7 +539,8 @@ bitrix_agents_sync_handler() {
     "Managed file|${cron_managed}" \
     "Domain marker|${cron_domain_match}" \
     "Site marker|${cron_slug_match}" \
-    "Scheduler entry (cron_events.php)|${cron_entry_match}"
+    "Scheduler entry (cron_events.php)|${cron_entry_match}" \
+    "CLI short_open_tag|${cron_short_open_tag_match}"
   ui_next_steps
   ui_kv "Verify" "simai-admin.sh bitrix agents-status --domain ${BX_DOMAIN}"
 }
@@ -1070,7 +1080,7 @@ bitrix_perf_status_handler() {
     cron_slug_match="${BX_CRON_SLUG_MATCH:-no}"
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
-  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support" "${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}")
   db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
   web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
   install_stage=$(bitrix_perf_install_stage "$short_install" "$agents_ready" "$web_state")
@@ -1195,7 +1205,7 @@ bitrix_perf_apply_handler() {
     cron_entry_match="${BX_CRON_ENTRY_MATCH:-no}"
   fi
   local agents_ready="no"
-  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support")
+  agents_ready=$(bitrix_agents_ready_state "$cron_managed" "$cron_domain_match" "$cron_slug_match" "$cron_entry_match" "$bx_crontab" "$bx_crontab_support" "${BX_CRON_SHORT_OPEN_TAG_MATCH:-no}")
   if [[ ("$short_install" != "true" || "$agents_ready" == "yes") && -f "$BX_DBCONN_FILE" ]]; then
     if run_command bitrix agents-sync --domain "$domain" --apply yes --confirm yes; then
       agents_status="applied"

@@ -526,7 +526,7 @@ site_doctor_handler() {
         ;;
       bitrix)
         cron_expect_label="cron_events.php entry"
-        cron_expect_pattern="cron_events\\.php"
+        cron_expect_pattern="short_open_tag=1.*cron_events\\.php"
         ;;
     esac
     if [[ -f "$cron_file" ]]; then

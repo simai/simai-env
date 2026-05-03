@@ -30,7 +30,8 @@ simai-admin.sh bitrix cron-status --domain <domain>
 ```
 
 Read-only cron diagnostics for Bitrix (`/etc/cron.d/<slug>` + `cron_events.php` entry),
-including simai-managed/domain/slug marker checks.
+including simai-managed/domain/slug marker checks and the CLI `short_open_tag=1`
+flag required by legacy Bitrix core files that still contain short PHP tags.
 
 ## Cron Sync
 
@@ -50,6 +51,7 @@ Read-only status for "agents via cron" baseline:
 - `BX_CRONTAB`
 - `BX_CRONTAB_SUPPORT`
 - cron marker consistency for `/etc/cron.d/<slug>`
+- CLI `short_open_tag=1` marker in the cron command
 - combined readiness flag (`Agents via cron ready`)
 
 ## Agents Sync
@@ -59,7 +61,7 @@ simai-admin.sh bitrix agents-sync --domain <domain> [--apply yes] [--confirm yes
 ```
 
 - Default is plan-only (`--apply no`).
-- Apply mode rewrites managed cron entry and normalizes `dbconn.php` constants for web-safe cron mode (`BX_CRONTAB` removed, `BX_CRONTAB_SUPPORT=true`).
+- Apply mode rewrites managed cron entry with `php -d short_open_tag=1 ... cron_events.php` and normalizes `dbconn.php` constants for web-safe cron mode (`BX_CRONTAB` removed, `BX_CRONTAB_SUPPORT=true`).
 - In CLI mode use `--confirm yes` with `--apply yes`.
 - Creates `dbconn.php.bak.<timestamp>` before modification.
 

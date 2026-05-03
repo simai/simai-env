@@ -33,7 +33,7 @@ PROFILE_DB_REQUIRED_PRIVILEGES=()
 
 # Background processes
 PROFILE_SUPPORTS_CRON="yes"
-PROFILE_CRON_RECOMMENDED=("* * * * * php public/bitrix/modules/main/tools/cron_events.php >/dev/null 2>&1")
+PROFILE_CRON_RECOMMENDED=("* * * * * php -d short_open_tag=1 public/bitrix/modules/main/tools/cron_events.php >/dev/null 2>&1")
 PROFILE_SUPPORTS_QUEUE="no"
 PROFILE_QUEUE_SYSTEM="none"
 

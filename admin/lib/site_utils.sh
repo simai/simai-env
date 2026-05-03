@@ -190,7 +190,7 @@ EOF
       echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
       ;;
     bitrix)
-      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
+      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} -d short_open_tag=1 public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
       ;;
   esac
 }
