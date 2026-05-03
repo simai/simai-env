@@ -104,4 +104,27 @@ grep -q "ForceCommand internal-sftp" admin/commands/access.sh || fail "access do
 grep -q "ChrootDirectory" admin/commands/access.sh || fail "access doctor must check chroot rule"
 grep -q "expected root:root 755" admin/commands/access.sh || fail "access doctor must check project chroot ownership/mode"
 
+# 7) destructive site removal must stay constrained to the managed web root
+grep -q 'Refusing to remove path outside managed web root' admin/lib/site_utils.sh || fail "site remove missing managed web-root removal guard"
+grep -q 'Refusing to remove symlink project path' admin/lib/site_utils.sh || fail "site remove must reject symlink project roots"
+grep -q 'rm -rf --one-file-system' admin/lib/site_utils.sh || fail "site remove must avoid crossing filesystem boundaries"
+
+# 8) DNS provider credentials must stay private and non-symlinked
+grep -q 'DNS credentials file must not be a symlink' admin/commands/ssl.sh || fail "ssl DNS credentials must reject symlinks"
+grep -q 'chown root:root "$file"' admin/commands/ssl.sh || fail "ssl DNS credentials must enforce root ownership"
+grep -q 'chmod 0600 "$file"' admin/commands/ssl.sh || fail "ssl DNS credentials must enforce 0600 permissions"
+
+# 9) New PHP-FPM pools must include baseline hardening directives
+for src in admin/lib/site_utils.sh simai-env.sh; do
+  grep -q 'listen.mode = 0660' "$src" || fail "${src} missing PHP-FPM socket mode hardening"
+  grep -q 'clear_env = yes' "$src" || fail "${src} missing PHP-FPM clear_env hardening"
+  grep -q 'security.limit_extensions = .php' "$src" || fail "${src} missing PHP-FPM extension hardening"
+done
+
+# 10) Nginx templates must deny dotfiles except ACME challenges
+for tmpl in templates/nginx-*.conf; do
+  [[ -f "$tmpl" ]] || continue
+  grep -q 'location ~ \^/\\\.(?!well-known/)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
+done
+
 echo "Smoke checks passed"

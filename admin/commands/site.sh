@@ -1295,7 +1295,7 @@ site_remove_handler() {
   progress_step "Removing project files (if approved)"
   if [[ $remove_files -eq 1 ]]; then
     if [[ $root_valid -eq 1 ]]; then
-      remove_project_files "$path"
+      remove_project_files "$path" || warn "Project files were not removed automatically"
     else
       warn "Skipping file removal due to invalid path"
     fi

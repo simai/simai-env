@@ -40,6 +40,7 @@ Behavior:
   - readiness checks for site host mode, DNS resolution, provider/plugin availability, and credentials file presence where applicable
 - Wildcard renewal reuses stored per-site DNS settings from `/etc/simai-env/sites/<domain>/ssl.env` for automatic providers.
 - Wildcard certificates issued with `--dns-provider manual` do not auto-renew; run the same manual wildcard command again when renewal is needed.
+- Cloudflare credentials files are treated as secrets: they must be regular files, not symlinks, and `ssl letsencrypt` enforces `root:root` owner with `0600` permissions before calling Certbot.
 
 Typical use:
 ```bash

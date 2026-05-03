@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.65] - 2026-05-04
+### Changed
+- Hardened `site remove --remove-files yes` so project file deletion is allowed only for real directories under the managed web root, rejects symlink roots, and uses `rm --one-file-system`.
+- Hardened Cloudflare DNS credentials handling for wildcard SSL: credentials must be regular files and are enforced as `root:root` with `0600` permissions before Certbot runs.
+- New PHP-FPM pools now include baseline hardening directives: `listen.mode = 0660`, `clear_env = yes`, and `security.limit_extensions = .php`.
+- CI smoke checks now assert site removal, SSL credentials, PHP-FPM hardening, and nginx dotfile-deny invariants.
+
 ## [1.12.64] - 2026-05-04
 ### Added
 - Added `access doctor` as a read-only security baseline check for managed SFTP access, sshd snippet restrictions, metadata permissions, nologin shells, project chroot ownership, and bind mount state.

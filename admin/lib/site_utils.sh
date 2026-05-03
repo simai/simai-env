@@ -946,12 +946,15 @@ group = www-data
 listen = /run/php/php${php_version}-fpm-${project}.sock
 listen.owner = ${SIMAI_USER}
 listen.group = www-data
+listen.mode = 0660
 pm = ${fpm_pm}
 pm.max_children = ${fpm_max_children}
 pm.process_idle_timeout = ${fpm_idle_timeout}
 pm.max_requests = ${fpm_max_requests}
 request_terminate_timeout = 120s
 chdir = ${project_path}
+clear_env = yes
+security.limit_extensions = .php
 php_admin_value[error_log] = /var/log/php${php_version}-fpm-${project}.log
 php_admin_flag[log_errors] = on
 EOF
@@ -1580,9 +1583,32 @@ remove_project_files() {
   local path="$1"
   if [[ -z "$path" || "$path" == "/" ]]; then
     warn "Skip removing dangerous path: ${path:-<empty>}"
-    return
+    return 1
   fi
-  rm -rf "$path"
+  if [[ ! -e "$path" && ! -L "$path" ]]; then
+    warn "Project path does not exist, nothing to remove: ${path}"
+    return 0
+  fi
+  if ! validate_path "$path"; then
+    warn "Refusing to remove invalid project path: ${path}"
+    return 1
+  fi
+  if [[ "$path" != "$WWW_ROOT/"* || "$path" == "$WWW_ROOT" ]]; then
+    warn "Refusing to remove path outside managed web root ${WWW_ROOT}: ${path}"
+    return 1
+  fi
+  if [[ -L "$path" ]]; then
+    warn "Refusing to remove symlink project path: ${path}"
+    return 1
+  fi
+  local resolved_root resolved_path
+  resolved_root=$(readlink -f "$WWW_ROOT" 2>/dev/null || true)
+  resolved_path=$(readlink -f "$path" 2>/dev/null || true)
+  if [[ -z "$resolved_root" || -z "$resolved_path" || "$resolved_path" != "$resolved_root/"* ]]; then
+    warn "Refusing to remove path outside resolved managed web root: ${path}"
+    return 1
+  fi
+  rm -rf --one-file-system "$path"
 }
 
 install_healthcheck() {

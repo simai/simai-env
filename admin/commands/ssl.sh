@@ -84,11 +84,29 @@ ssl_dns_provider_credentials_flag() {
 
 ssl_ensure_dns_credentials_file() {
   local file="$1"
+  if [[ -L "$file" ]]; then
+    error "DNS credentials file must not be a symlink: ${file}"
+    return 1
+  fi
   if [[ ! -f "$file" ]]; then
     error "DNS credentials file not found: ${file}"
     return 1
   fi
-  chmod 0600 "$file" 2>/dev/null || true
+  chown root:root "$file" 2>/dev/null || {
+    error "Failed to set DNS credentials owner to root:root: ${file}"
+    return 1
+  }
+  chmod 0600 "$file" 2>/dev/null || {
+    error "Failed to set DNS credentials mode 0600: ${file}"
+    return 1
+  }
+  local owner_group mode
+  owner_group=$(stat -c '%U:%G' "$file" 2>/dev/null || true)
+  mode=$(stat -c '%a' "$file" 2>/dev/null || true)
+  if [[ "$owner_group" != "root:root" || "$mode" != "600" ]]; then
+    error "DNS credentials file must be root:root 0600: ${file} (actual ${owner_group:-unknown} ${mode:-unknown})"
+    return 1
+  fi
   return 0
 }
 

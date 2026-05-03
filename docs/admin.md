@@ -25,7 +25,7 @@ See `docs/architecture/profiles.md`.
 - Domain -> project slug auto-derived if not provided.
 - PHP version selection from installed `/etc/php/*` when not passed.
 - Healthcheck copied to `public/healthcheck.php` for php-mode profiles; static uses nginx-served `/healthcheck` (local-only); alias inherits target.
-- Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
+- Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx). Destructive file removal is constrained to real project directories under the managed web root and refuses symlink roots or resolved paths outside that root.
 - Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP,
   cron, SSL, DB) with PASS/WARN/FAIL summary; it fails on world-writable
   project files/directories, warns about public MySQL listeners, and for Bitrix

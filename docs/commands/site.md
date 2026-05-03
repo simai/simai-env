@@ -98,6 +98,11 @@ Examples:
 - Dry-run with flags (still plan-only): `simai-admin.sh site remove --domain <domain> --remove-files yes --drop-db yes --dry-run yes`
 - Apply destructive removal (confirm required in CLI): `simai-admin.sh site remove --domain <domain> --remove-files yes --confirm yes`
 
+Safety guards:
+- Managed file removal is allowed only for real project directories under the configured web root (`/home/simai/www` by default).
+- Symlink project roots, resolved paths outside the managed web root, and filesystem-boundary crossings are refused.
+- Alias sites do not remove target files; remove or repair the target site explicitly.
+
 ## list
 List domains from nginx sites-available with profile, PHP version, root/alias target, and brief SSL status (off/LE:YYYY-MM-DD/custom).
 

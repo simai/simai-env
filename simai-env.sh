@@ -790,12 +790,15 @@ group = www-data
 listen = /run/php/php${PHP_VERSION}-fpm-${PROJECT_NAME}.sock
 listen.owner = ${SIMAI_USER}
 listen.group = www-data
+listen.mode = 0660
 pm = ${fpm_pm}
 pm.max_children = ${fpm_max_children}
 pm.process_idle_timeout = ${fpm_idle_timeout}
 pm.max_requests = ${fpm_max_requests}
 request_terminate_timeout = 120s
 chdir = ${PROJECT_PATH}
+clear_env = yes
+security.limit_extensions = .php
 php_admin_value[error_log] = /var/log/php${PHP_VERSION}-fpm-${PROJECT_NAME}.log
 php_admin_flag[log_errors] = on
 EOF
