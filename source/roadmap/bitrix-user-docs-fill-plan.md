@@ -100,6 +100,8 @@ Acceptance checks:
 
 ### Batch 3: Cron Agents And Runtime Jobs
 
+Status: completed in first-pass user content on 2026-05-03. Future improvements should be based on new live-server findings or menu label changes.
+
 Target file:
 
 - `docs/user/bitrix/agents-cron.md`

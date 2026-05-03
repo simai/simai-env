@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.57] - 2026-05-03
+### Changed
+- Expanded the Bitrix agents-on-cron user guide with menu and CLI flows, status-field explanations, restore/PHP-switch follow-up checks, and troubleshooting for scheduler readiness.
+
 ## [1.12.56] - 2026-05-03
 ### Changed
 - Expanded the Bitrix user documentation for the first-launch path: site creation, fresh install vs restore, database choices, diagnostics, and the initial handoff checklist.

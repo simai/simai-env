@@ -25,6 +25,13 @@ Use this route for a new operator flow:
 5. Run `Bitrix complete setup`.
 6. Verify the result: [Diagnostics](diagnostics.md).
 
+## Operations After Install
+
+- Move agents to cron and verify scheduler readiness: [Agents on cron](agents-cron.md).
+- Repair file ownership after restore or module operations: [Ownership](ownership.md).
+- Check nginx routing and request host variables: [Nginx routing](nginx-routing.md).
+- Diagnose large upload failures: [Uploads](uploads.md).
+
 ## Typical Fresh Install Flow
 
 ```text
