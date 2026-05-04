@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.72] - 2026-05-04
+### Added
+- Added `self admin-mode-status` to show the current administration model: simple root key-only, hardened sudo-admin, password-login-enabled, or custom.
+- Added user documentation for the admin access model, including root key-only owner workflows, optional `simai-admin`, runtime-only `simai`, Access users, and Transmit/WinSCP implications.
+
+### Changed
+- `self status` now reports the detected admin access mode and links to the admin access status command.
+- Clarified in security docs that root key-only is an acceptable simple administration path, while `simai-admin` remains an optional hardened path and `simai` must not receive sudo.
+
 ## [1.12.71] - 2026-05-04
 ### Added
 - Added `self ssh-hardening-ensure` to apply the recommended operational-safe SSH profile: root key-only break-glass access, no password or keyboard-interactive login, public-key auth enabled, and `sshd -t` validation before reload.

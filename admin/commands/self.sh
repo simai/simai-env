@@ -411,6 +411,15 @@ self_sudo_admin_validate_login() {
   fi
 }
 
+self_sudo_admin_is_ready() {
+  local login="${1:-$(self_sudo_admin_login_default)}"
+  [[ -n "$login" ]] || return 1
+  id "$login" >/dev/null 2>&1 || return 1
+  id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -qx sudo || return 1
+  [[ -f "$(self_sudo_admin_sudoers_file "$login")" ]] || return 1
+  [[ -f "/home/${login}/.ssh/authorized_keys" ]] || return 1
+}
+
 self_sudo_admin_doctor_handler() {
   parse_kv_args "$@"
   local login="${PARSED_ARGS[login]:-$(self_sudo_admin_login_default)}"
@@ -560,6 +569,98 @@ self_ssh_hardening_file() {
 self_sshd_effective_value() {
   local key="$1"
   sshd -T 2>/dev/null | awk -v target="$key" '$1 == target {print $2; exit}'
+}
+
+self_admin_mode_detect() {
+  local login="${1:-$(self_sudo_admin_login_default)}"
+  local permit_root password_auth kbd_auth pubkey_auth root_key_only=0 passwords_off=0 sudo_ready=0
+  if command -v sshd >/dev/null 2>&1; then
+    permit_root=$(self_sshd_effective_value "permitrootlogin")
+    password_auth=$(self_sshd_effective_value "passwordauthentication")
+    kbd_auth=$(self_sshd_effective_value "kbdinteractiveauthentication")
+    pubkey_auth=$(self_sshd_effective_value "pubkeyauthentication")
+  else
+    echo "unknown"
+    return 0
+  fi
+  if [[ "$permit_root" == "without-password" || "$permit_root" == "prohibit-password" ]]; then
+    root_key_only=1
+  fi
+  if [[ "$password_auth" == "no" && "$kbd_auth" == "no" && "$pubkey_auth" == "yes" ]]; then
+    passwords_off=1
+  fi
+  if self_sudo_admin_is_ready "$login"; then
+    sudo_ready=1
+  fi
+  if (( root_key_only == 1 && passwords_off == 1 && sudo_ready == 1 )); then
+    echo "hardened-sudo-admin"
+  elif (( root_key_only == 1 && passwords_off == 1 )); then
+    echo "simple-root-key-only"
+  elif [[ "$password_auth" == "yes" || "$kbd_auth" == "yes" ]]; then
+    echo "password-login-enabled"
+  else
+    echo "custom"
+  fi
+}
+
+self_admin_mode_status_handler() {
+  parse_kv_args "$@"
+  local login="${PARSED_ARGS[login]:-$(self_sudo_admin_login_default)}"
+  self_sudo_admin_validate_login "$login" || return 1
+
+  local mode permit_root password_auth kbd_auth pubkey_auth sudo_state root_role simai_role access_role
+  mode=$(self_admin_mode_detect "$login")
+  permit_root="unknown"
+  password_auth="unknown"
+  kbd_auth="unknown"
+  pubkey_auth="unknown"
+  if command -v sshd >/dev/null 2>&1; then
+    permit_root=$(self_sshd_effective_value "permitrootlogin")
+    password_auth=$(self_sshd_effective_value "passwordauthentication")
+    kbd_auth=$(self_sshd_effective_value "kbdinteractiveauthentication")
+    pubkey_auth=$(self_sshd_effective_value "pubkeyauthentication")
+  fi
+  sudo_state="not ready"
+  if self_sudo_admin_is_ready "$login"; then
+    sudo_state="ready"
+  elif id "$login" >/dev/null 2>&1; then
+    sudo_state="partial"
+  fi
+
+  root_role="owner/system admin; use SSH keys only"
+  simai_role="internal runtime user for sites; do not grant sudo"
+  access_role="developers/content editors; scoped SFTP access"
+
+  ui_header "SIMAI ENV · Admin access mode"
+  ui_result_table \
+    "Mode|${mode}" \
+    "Root SSH|${permit_root}" \
+    "Password SSH|${password_auth}" \
+    "Keyboard SSH|${kbd_auth}" \
+    "Public key SSH|${pubkey_auth}" \
+    "Sudo admin login|${login}" \
+    "Sudo admin state|${sudo_state}" \
+    "root role|${root_role}" \
+    "${SIMAI_USER:-simai} role|${simai_role}" \
+    "Access users role|${access_role}"
+
+  ui_next_steps
+  case "$mode" in
+    simple-root-key-only)
+      ui_kv "Menu as root" "/root/simai-env/simai-admin.sh menu"
+      ui_kv "Optional hardened admin" "simai-admin.sh self sudo-admin-ensure --login ${login} --copy-root-keys yes --confirm yes"
+      ;;
+    hardened-sudo-admin)
+      ui_kv "Menu as sudo admin" "sudo /root/simai-env/simai-admin.sh menu"
+      ui_kv "Check sudo admin" "simai-admin.sh self sudo-admin-doctor --login ${login}"
+      ;;
+    password-login-enabled)
+      ui_kv "Apply key-only SSH profile" "simai-admin.sh self ssh-hardening-ensure --confirm yes"
+      ;;
+    *)
+      ui_kv "Check SSH hardening" "simai-admin.sh self ssh-hardening-doctor"
+      ;;
+  esac
 }
 
 self_ssh_hardening_doctor_handler() {
@@ -765,6 +866,8 @@ self_status_handler() {
       certbot_timer="missing"
     fi
   fi
+  local admin_mode
+  admin_mode=$(self_admin_mode_detect "$(self_sudo_admin_login_default)")
 
   local php_status="not installed"
   if command -v systemctl >/dev/null 2>&1; then
@@ -813,12 +916,14 @@ self_status_handler() {
     "redis version|${redis_version}" \
     "fail2ban|${fail2ban_state}" \
     "fail2ban sshd jail|${fail2ban_jail}" \
+    "admin access mode|${admin_mode}" \
     "php-fpm|${php_status}" \
     "php cli|${php_cli_version}" \
     "certbot version|${certbot_version}" \
     "certbot timer|${certbot_timer}"
   ui_next_steps
   ui_kv "Diagnostics" "simai-admin.sh self platform-status"
+  ui_kv "Admin access" "simai-admin.sh self admin-mode-status"
   ui_kv "Performance" "simai-admin.sh self perf-status"
   ui_kv "Update" "simai-admin.sh self update"
 }
@@ -1589,6 +1694,7 @@ self_site_review_status_handler() {
 register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" ""
+register_cmd "self" "admin-mode-status" "Show admin access mode and user roles" "self_admin_mode_status_handler" "" "login="
 register_cmd "self" "sudo-admin-ensure" "Create or repair a non-root sudo admin user" "self_sudo_admin_ensure_handler" "" "login= copy-root-keys= authorized-keys-file= nopasswd= confirm="
 register_cmd "self" "sudo-admin-doctor" "Check non-root sudo admin readiness" "self_sudo_admin_doctor_handler" "" "login="
 register_cmd "self" "ssh-hardening-ensure" "Apply operational-safe SSH hardening" "self_ssh_hardening_ensure_handler" "" "confirm="

@@ -18,6 +18,7 @@ Output includes:
 - OS and whether it is supported
 - nginx / mysql / redis service state
 - fail2ban service state and managed sshd jail presence
+- admin access mode (`simple-root-key-only`, `hardened-sudo-admin`, or custom)
 - php-fpm versions and CLI PHP
 - component versions
 - certbot timer state
@@ -77,6 +78,27 @@ Checks include:
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self supply-chain-doctor
+```
+
+## admin-mode-status
+Show the current server administration access model.
+
+Output includes:
+- detected admin mode
+- effective root SSH policy
+- password and keyboard-interactive SSH policy
+- default sudo admin login and readiness
+- short role hints for `root`, `simai`, and managed Access users
+
+Typical modes:
+- `simple-root-key-only`: trusted owner/admin uses root through SSH keys; password login is disabled.
+- `hardened-sudo-admin`: non-root sudo admin is ready; root remains key-only break-glass.
+- `password-login-enabled`: SSH password login is still enabled.
+- `custom`: effective SSH settings do not match a managed profile.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self admin-mode-status
 ```
 
 ## sudo-admin-ensure

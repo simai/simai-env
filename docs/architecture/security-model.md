@@ -6,8 +6,12 @@
   - dedicated user `simai`
   - per-site PHP-FPM pools (static/alias skip pools)
   - sockets/logs owned by `simai`:www-data
-  - optional non-root sudo operator account managed by `self sudo-admin-ensure`; root SSH should only be tightened further after that account is tested
+  - optional non-root sudo operator account managed by `self sudo-admin-ensure`
+- Administration modes:
+  - simple mode: trusted owner/admin uses `root` through SSH keys only; password login is disabled
+  - hardened mode: `simai-admin` is the daily sudo operator and `root` remains key-only break-glass access
 - SSH hardening default: operational-safe mode. Password and keyboard-interactive SSH login are disabled, public-key login remains enabled, and root remains available as key-only break-glass access (`PermitRootLogin prohibit-password`) unless an operator explicitly chooses a stricter local policy.
+- The `simai` account is runtime-only and must not receive sudo; site PHP-FPM and cron run under it, so granting sudo would couple web compromise with server compromise.
 - Runtime hardening should not block normal site operations: missing Redis PHP extension is a recommendation/warning unless a specific application requires it.
 - Secrets never logged: passwords are shown only in summaries and redacted in logs/audit.
 - SSL:

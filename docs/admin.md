@@ -62,6 +62,7 @@ See `docs/architecture/profiles.md`.
 - `self sudo-admin-doctor --login simai-admin`: read-only readiness check for that account.
 - `self ssh-hardening-ensure --confirm yes`: apply operational-safe SSH hardening: root remains key-only as a break-glass path, password login is disabled, and `sshd -t` is checked before reload.
 - `self ssh-hardening-doctor`: read-only SSH hardening check.
+- `self admin-mode-status`: show whether the server is in simple root key-only mode, hardened sudo-admin mode, or a custom SSH state.
 - `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
 - `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
 - `self auto-update-run-check`: refresh update availability now without applying the update.

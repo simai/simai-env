@@ -9,6 +9,7 @@ sudo /root/simai-env/simai-admin.sh menu
 ## Main Guides
 
 - [Menu user guide](../guide/menu-user-guide.md): everyday menu sections and common actions.
+- [Admin access model](admin-access.md): root key-only, optional `simai-admin`, runtime `simai`, and Access users.
 - [Profile workflows](profile-workflows.md): which site profile to choose and where to continue.
 
 ## Profile Guides
