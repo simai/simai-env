@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 SCRIPT_DIR="$ROOT_DIR"
+export ADMIN_DIR="${ROOT_DIR}/admin"
 export LOG_FILE="${TMPDIR:-/tmp}/simai-env-registry-dispatch.log"
 export AUDIT_LOG_FILE="${TMPDIR:-/tmp}/simai-env-registry-dispatch-audit.log"
 

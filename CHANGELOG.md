@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.76 - 2026-07-11
+
+### Fixed
+- Export the repository-local `ADMIN_DIR` in the Linux registry dispatch
+  harness so command modules load consistently in GitHub Actions on Ubuntu
+  22.04 and 24.04.
+
 ## 1.12.75 - 2026-07-11
 
 ### Changed
