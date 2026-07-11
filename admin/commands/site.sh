@@ -446,7 +446,83 @@ site_print_add_next_steps() {
   fi
 }
 
+site_add_transaction_reset() {
+  SITE_ADD_TX_ACTIVE=0
+  SITE_ADD_TX_DOMAIN=""
+  SITE_ADD_TX_PROJECT=""
+  SITE_ADD_TX_PATH=""
+  SITE_ADD_TX_PHP=""
+  SITE_ADD_TX_PATH_CREATED=0
+  SITE_ADD_TX_PATH_PREEXISTED_EMPTY=0
+  SITE_ADD_TX_PATH_MODE=""
+  SITE_ADD_TX_PATH_UID=""
+  SITE_ADD_TX_PATH_GID=""
+  SITE_ADD_TX_POOL_CREATED=0
+  SITE_ADD_TX_NGINX_CREATED=0
+  SITE_ADD_TX_CRON_CREATED=0
+  SITE_ADD_TX_QUEUE_CREATED=0
+  SITE_ADD_TX_DB_CREATED=0
+  SITE_ADD_TX_DB_USER_CREATED=0
+  SITE_ADD_TX_DB_NAME=""
+  SITE_ADD_TX_DB_USER=""
+  SITE_ADD_TX_ACCESS_CREATED=0
+  SITE_ADD_TX_ACCESS_LOGIN=""
+  SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=0
+  SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED=0
+  SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT=""
+}
+
+site_add_transaction_rollback() {
+  [[ "${SITE_ADD_TX_ACTIVE:-0}" -eq 1 ]] || return 0
+  warn "Site creation failed; rolling back resources created by this invocation"
+  if [[ "${SITE_ADD_TX_ACCESS_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_ACCESS_LOGIN:-}" ]]; then
+    SIMAI_ADMIN_MENU=0 run_command access remove --login "$SITE_ADD_TX_ACCESS_LOGIN" >/dev/null 2>&1 || true
+  fi
+  if [[ "${SITE_ADD_TX_DB_CREATED:-0}" -eq 1 || "${SITE_ADD_TX_DB_USER_CREATED:-0}" -eq 1 ]]; then
+    local rollback_db="" rollback_user=""
+    [[ "${SITE_ADD_TX_DB_CREATED:-0}" -eq 1 ]] && rollback_db="${SITE_ADD_TX_DB_NAME:-}"
+    [[ "${SITE_ADD_TX_DB_USER_CREATED:-0}" -eq 1 ]] && rollback_user="${SITE_ADD_TX_DB_USER:-}"
+    site_db_apply_drop "$SITE_ADD_TX_DOMAIN" "$rollback_db" "$rollback_user" "yes" >/dev/null 2>&1 || true
+  fi
+  [[ "${SITE_ADD_TX_QUEUE_CREATED:-0}" -eq 1 ]] && remove_queue_unit "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
+  [[ "${SITE_ADD_TX_CRON_CREATED:-0}" -eq 1 ]] && remove_cron_file "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
+  [[ "${SITE_ADD_TX_NGINX_CREATED:-0}" -eq 1 ]] && remove_nginx_site "$SITE_ADD_TX_DOMAIN" >/dev/null 2>&1 || true
+  if [[ "${SITE_ADD_TX_POOL_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_PHP:-}" ]]; then
+    remove_php_pool_version "$SITE_ADD_TX_PROJECT" "$SITE_ADD_TX_PHP" >/dev/null 2>&1 || true
+  fi
+  if [[ "${SITE_ADD_TX_PATH_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_PATH:-}" ]]; then
+    remove_project_files "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
+  elif [[ "${SITE_ADD_TX_PATH_PREEXISTED_EMPTY:-0}" -eq 1 && -n "${SITE_ADD_TX_PATH:-}" ]]; then
+    remove_project_files "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
+    install -d -m "${SITE_ADD_TX_PATH_MODE:-0755}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
+    chown "${SITE_ADD_TX_PATH_UID:-0}:${SITE_ADD_TX_PATH_GID:-0}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
+  fi
+  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env"
+  rmdir -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}" >/dev/null 2>&1 || true
+  if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED:-0}" -eq 1 ]]; then
+    if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED:-0}" -eq 1 ]]; then
+      printf '%s\n' "$SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT" | write_profiles_allowlist
+    else
+      rm -f -- "$(profiles_enabled_file)"
+    fi
+  fi
+  SITE_ADD_TX_ACTIVE=0
+}
+
 site_add_handler() {
+  site_add_transaction_reset
+  local rc=0
+  if site_add_handler_impl "$@"; then
+    SITE_ADD_TX_ACTIVE=0
+    return 0
+  else
+    rc=$?
+  fi
+  site_add_transaction_rollback
+  return "$rc"
+}
+
+site_add_handler_impl() {
   parse_kv_args "$@"
   require_args "domain" || return 1
 
@@ -511,6 +587,12 @@ site_add_handler() {
     error "Site ${domain} already exists. Use site info/update actions for the existing site instead of site add."
     return 1
   fi
+  local existing_site_state_dir
+  existing_site_state_dir="$(site_sites_config_dir)/${domain}"
+  if [[ -d "$existing_site_state_dir" && -n "$(find "$existing_site_state_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+    error "Partial managed metadata already exists for ${domain} at ${existing_site_state_dir}. Resolve or remove that partial state before site add."
+    return 1
+  fi
   host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || true)
   if [[ -z "$host_mode" ]]; then
     error "Unsupported host mode: ${PARSED_ARGS[host-mode]:-}"
@@ -520,7 +602,7 @@ site_add_handler() {
     wildcard_domain="$(site_default_wildcard_domain "$domain")"
   fi
 
-  ensure_user
+  local enable_all_profiles_after_confirm="no"
   local profiles_available=()
   mapfile -t profiles_available < <(list_enabled_profile_ids 2>/dev/null || true)
   local all_profiles=()
@@ -533,17 +615,13 @@ site_add_handler() {
       local profile_scope_choice=""
       profile_scope_choice=$(select_from_list \
         "Enable all bundled profiles now so Bitrix, WordPress, and Laravel appear in the list?" \
-        "enable-all" \
-        "enable-all" \
-        "continue")
+        "continue" \
+        "continue" \
+        "enable-all")
       case "$profile_scope_choice" in
         enable-all)
-          if ! run_command profile init --mode all --force yes; then
-            error "Failed to enable all bundled profiles"
-            return 1
-          fi
-          mapfile -t profiles_available < <(list_enabled_profile_ids 2>/dev/null || true)
-          mapfile -t all_profiles < <(list_profile_ids 2>/dev/null || true)
+          enable_all_profiles_after_confirm="yes"
+          profiles_available=("${all_profiles[@]}")
           ;;
         "")
           command_cancelled
@@ -596,7 +674,7 @@ site_add_handler() {
       error "Unknown profile: ${profile}. Available: ${avail}"
       return 1
     fi
-    if ! is_profile_enabled "$profile"; then
+    if [[ "$enable_all_profiles_after_confirm" != "yes" ]] && ! is_profile_enabled "$profile"; then
       error "Profile '${profile}' is disabled. Enable it: simai-admin.sh profile enable --id ${profile} (or initialize all bundled profiles with: simai-admin.sh profile init --mode all --force yes)"
       return 1
     fi
@@ -721,10 +799,41 @@ site_add_handler() {
     else
       target_public_dir="${target_meta[public_dir]}"
     fi
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      echo
+      echo "===== Creation plan ====="
+      echo "Domain      : ${domain}"
+      echo "Profile     : alias"
+      echo "Target site : ${target_domain}"
+      echo "Root path   : ${target_path}"
+      local alias_confirm
+      alias_confirm=$(select_from_list "Create this alias now?" "no" "no" "yes")
+      if [[ "$alias_confirm" != "yes" ]]; then
+        command_cancelled
+        return $?
+      fi
+    fi
+    SITE_ADD_TX_ACTIVE=1
+    SITE_ADD_TX_DOMAIN="$domain"
+    SITE_ADD_TX_PROJECT="$project"
+    SITE_ADD_TX_PATH="$target_path"
+    SITE_ADD_TX_PHP="$php_version"
+    if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
+      SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=1
+      if profiles_allowlist_exists; then
+        SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED=1
+        SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT="$(read_profiles_allowlist || true)"
+      fi
+    fi
+    ensure_user
+    if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
+      run_command profile init --mode all --force yes || return 1
+    fi
     if ! create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$alias_template" "alias" "$target_domain" "$target_socket_project" "" "" "" "no" "no" "$template_id" "$target_public_dir"; then
       error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
       return 1
     fi
+    SITE_ADD_TX_NGINX_CREATED=1
     site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "$project" "alias" "$target_path" "$project" "$php_version" "none" "" "$target_domain" "$target_socket_project" "$template_id" "$target_public_dir" >/dev/null 2>&1 || true
     info "Alias added: domain=${domain}, target=${target_domain}, php=${php_version}"
     echo "===== Site summary ====="
@@ -738,6 +847,7 @@ site_add_handler() {
     echo "Nginx conf  : /etc/nginx/sites-available/${domain}.conf"
     echo "Healthcheck : uses target site (${target_domain})"
     echo "Log file    : ${LOG_FILE}"
+    SITE_ADD_TX_ACTIVE=0
     return
   fi
 
@@ -750,14 +860,84 @@ site_add_handler() {
     php_version=$(select_php_version_for_profile "$php_version") || return 1
   fi
 
+  if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
+    local create_db_rc=0
+    create_db=$(decide_create_db_for_profile) || create_db_rc=$?
+    [[ $create_db_rc -eq 0 ]] || return "$create_db_rc"
+  else
+    [[ -n "$create_db" && "${create_db,,}" == "yes" ]] && warn "Database creation ignored for profile ${profile}"
+    create_db="no"
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$access_create" ]]; then
+    local access_choice
+    access_choice=$(select_from_list "Create file access for this site?" "no" "no" "yes")
+    [[ "$access_choice" == "yes" ]] && access_create="yes" || access_create="no"
+  fi
+  if [[ "$access_create" == "yes" && -z "$access_login" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+      access_login=$(prompt "access login")
+      if [[ -z "$access_login" ]]; then
+        command_cancelled
+        return $?
+      fi
+    else
+      error "access-login is required for access-create"
+      return 1
+    fi
+  fi
+
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    echo
+    echo "===== Creation plan ====="
+    echo "Domain      : ${domain}"
+    echo "Project     : ${project}"
+    echo "Profile     : ${profile}"
+    echo "Host mode   : ${host_mode}"
+    echo "Usage class : ${usage_class}"
+    echo "PHP version : ${php_version}"
+    echo "Path        : ${path}"
+    echo "Database    : ${create_db:-no}"
+    echo "File access : ${access_create:-no}${access_login:+ (${access_login})}"
+    echo "SSL         : ${ssl_mode}"
+    local create_confirm
+    create_confirm=$(select_from_list "Create this site now?" "no" "no" "yes")
+    if [[ "$create_confirm" != "yes" ]]; then
+      command_cancelled
+      return $?
+    fi
+  fi
+
+  SITE_ADD_TX_ACTIVE=1
+  SITE_ADD_TX_DOMAIN="$domain"
+  SITE_ADD_TX_PROJECT="$project"
+  SITE_ADD_TX_PATH="$path"
+  SITE_ADD_TX_PHP="$php_version"
+  if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
+    SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=1
+    if profiles_allowlist_exists; then
+      SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED=1
+      SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT="$(read_profiles_allowlist || true)"
+    fi
+  fi
+  ensure_user
+  if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
+    run_command profile init --mode all --force yes || return 1
+  fi
+
   if [[ ! -d "$path" ]]; then
     info "Project path not found, creating: $path"
     mkdir -p "$path"
     path_created=1
+    SITE_ADD_TX_PATH_CREATED=1
     path_empty=1
   else
     if [[ -z "$(ls -A "$path" 2>/dev/null)" ]]; then
       path_empty=1
+      SITE_ADD_TX_PATH_PREEXISTED_EMPTY=1
+      SITE_ADD_TX_PATH_MODE="$(stat -c '%a' "$path")"
+      SITE_ADD_TX_PATH_UID="$(stat -c '%u' "$path")"
+      SITE_ADD_TX_PATH_GID="$(stat -c '%g' "$path")"
     else
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" || "$path_explicit" != "yes" ]]; then
         error "Target path ${path} already contains files. Menu-based site creation only supports a new empty directory."
@@ -797,7 +977,10 @@ site_add_handler() {
   ensure_project_permissions "$path"
 
   if [[ "$php_version" != "none" ]]; then
-    create_php_pool "$project" "$php_version" "$path" "$profile"
+    local pool_preexisted=0
+    [[ -f "/etc/php/${php_version}/fpm/pool.d/${project}.conf" ]] && pool_preexisted=1
+    create_php_pool "$project" "$php_version" "$path" "$profile" || return 1
+    [[ $pool_preexisted -eq 0 ]] && SITE_ADD_TX_POOL_CREATED=1
   fi
 
   local ssl_redirect="no" ssl_hsts="no"
@@ -807,6 +990,7 @@ site_add_handler() {
     error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
     return 1
   fi
+  SITE_ADD_TX_NGINX_CREATED=1
 
   local healthcheck_summary="disabled"
   if [[ "${PROFILE_HEALTHCHECK_ENABLED:-no}" == "yes" ]]; then
@@ -820,13 +1004,19 @@ site_add_handler() {
 
   local cron_summary="none"
   if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" ]]; then
+    local cron_preexisted=0
+    [[ -f "/etc/cron.d/${project}" ]] && cron_preexisted=1
     cron_site_write "$domain" "$project" "$profile" "$path" "$php_version"
+    [[ $cron_preexisted -eq 0 ]] && SITE_ADD_TX_CRON_CREATED=1
     cron_summary="/etc/cron.d/${project} (created/updated)"
   fi
 
   local queue_summary="none"
   if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
+    local queue_preexisted=0
+    [[ -f "/etc/systemd/system/laravel-queue-${project}.service" ]] && queue_preexisted=1
     create_queue_unit "$project" "$path" "$php_version" "$SIMAI_USER" || return 1
+    [[ $queue_preexisted -eq 0 ]] && SITE_ADD_TX_QUEUE_CREATED=1
     queue_summary="${QUEUE_UNIT_RESULT:-unknown}"
   fi
   local bitrix_preseed_summary="n/a"
@@ -835,18 +1025,12 @@ site_add_handler() {
   local db_export_summary="not exported"
 
   local db_summary="not requested"
-  if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
-    create_db=$(decide_create_db_for_profile) || return 1
-    if [[ "$create_db" != "yes" ]]; then
-      if [[ "${PROFILE_REQUIRES_DB}" == "required" ]]; then
-        db_summary="not configured yet (required later)"
-      else
-        db_summary="skipped by choice"
-      fi
+  if [[ "$create_db" != "yes" ]]; then
+    if [[ "${PROFILE_REQUIRES_DB}" == "required" ]]; then
+      db_summary="not configured yet (required later)"
+    elif [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
+      db_summary="skipped by choice"
     fi
-  else
-    [[ -n "$create_db" && "${create_db,,}" == "yes" ]] && warn "Database creation ignored for profile ${profile}"
-    create_db="no"
   fi
 
   if [[ "$create_db" == "yes" ]]; then
@@ -868,6 +1052,11 @@ site_add_handler() {
     if [[ -n "$db_pass" ]]; then
       DB_CREDS_PASS="$db_pass"
     fi
+    mysql_root_detect_cli || return 1
+    if db_exists "$DB_CREDS_NAME" || db_user_exists "$DB_CREDS_USER"; then
+      error "Database or database user already exists; refusing to modify resources not owned by this site creation"
+      return 1
+    fi
     local privs=()
     if [[ -n "${PROFILE_DB_REQUIRED_PRIVILEGES+x}" && ${#PROFILE_DB_REQUIRED_PRIVILEGES[@]} -gt 0 ]]; then
       privs=("${PROFILE_DB_REQUIRED_PRIVILEGES[@]}")
@@ -878,6 +1067,10 @@ site_add_handler() {
     if ! site_db_apply_create "$domain" "$DB_CREDS_NAME" "$DB_CREDS_USER" "$DB_CREDS_PASS" "$DB_CREDS_CHARSET" "$DB_CREDS_COLLATION" "${privs[@]}"; then
       return 1
     fi
+    SITE_ADD_TX_DB_CREATED="${SITE_DB_APPLY_CREATED_DB:-0}"
+    SITE_ADD_TX_DB_USER_CREATED="${SITE_DB_APPLY_CREATED_USER:-0}"
+    SITE_ADD_TX_DB_NAME="$DB_CREDS_NAME"
+    SITE_ADD_TX_DB_USER="$DB_CREDS_USER"
     db_summary="created"
     local do_export="no"
     if [[ "$profile" == "generic" ]]; then
@@ -962,20 +1155,11 @@ site_add_handler() {
     fi
   fi
 
-  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    if [[ -z "$access_create" ]]; then
-      local access_choice
-      access_choice=$(select_from_list "Create file access for this site?" "no" "no" "yes")
-      [[ "$access_choice" == "yes" ]] && access_create="yes" || access_create="no"
-    fi
-  fi
   if [[ "$access_create" == "yes" ]]; then
-    if [[ -z "$access_login" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      access_login=$(prompt "access login")
-      [[ -z "$access_login" ]] && command_cancelled && return $?
-    fi
     if [[ -n "$access_login" ]]; then
       run_command access create-project --domain "$domain" --login "$access_login" ${access_password:+--password "$access_password"} || return $?
+      SITE_ADD_TX_ACCESS_CREATED=1
+      SITE_ADD_TX_ACCESS_LOGIN="$access_login"
     else
       error "access-login is required for access-create"
       return 1
@@ -1049,6 +1233,7 @@ site_add_handler() {
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"
   site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary" "$host_mode" "$wildcard_domain" "$primary_ip" "$bitrix_files"
+  SITE_ADD_TX_ACTIVE=0
 }
 
 site_remove_handler() {
@@ -1572,6 +1757,12 @@ site_set_php_handler() {
     return 0
   fi
 
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local switch_choice
+    switch_choice=$(select_from_list "Switch ${domain} from PHP ${old_php:-unknown} to ${php_version}?" "no" "no" "yes")
+    [[ "$switch_choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
+
   progress_init 4
   progress_step "Preparing PHP-FPM pool"
   if ! create_php_pool "$socket_project" "$php_version" "$root" "$profile"; then
@@ -1944,11 +2135,11 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files=" "menu:internal-confirm"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
-register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
+register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""
 register_cmd "site" "info" "Show site details" "site_info_handler" "" "domain="
 register_cmd "site" "runtime-status" "Show site runtime state" "site_runtime_status_handler" "" "domain="
-register_cmd "site" "runtime-suspend" "Suspend site runtime" "site_runtime_suspend_handler" "" "domain= confirm="
-register_cmd "site" "runtime-resume" "Resume site runtime" "site_runtime_resume_handler" "" "domain= confirm="
+register_cmd "site" "runtime-suspend" "Suspend site runtime" "site_runtime_suspend_handler" "domain" "confirm=" "menu:confirm"
+register_cmd "site" "runtime-resume" "Resume site runtime" "site_runtime_resume_handler" "domain" "confirm=" "menu:confirm"

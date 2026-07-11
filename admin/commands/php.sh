@@ -92,7 +92,7 @@ php_install_handler() {
     fi
     include_common="$choice"
     local proceed
-    proceed=$(select_from_list "Proceed with installation?" "yes" "no" "yes")
+    proceed=$(select_from_list "Proceed with installation?" "no" "no" "yes")
     if [[ "$proceed" != "yes" ]]; then
       command_cancelled "Installation cancelled"
       return $?
@@ -179,5 +179,5 @@ php_install_handler() {
 }
 
 register_cmd "php" "list" "List installed PHP versions and FPM status" "php_list_handler" "" ""
-register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "" "php="
-register_cmd "php" "install" "Install a PHP version (FPM/CLI + base extensions)" "php_install_handler" "" "php= include-common= confirm="
+register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "" "php=" "menu:confirm"
+register_cmd "php" "install" "Install a PHP version (FPM/CLI + base extensions)" "php_install_handler" "" "php= include-common= confirm=" "menu:internal-confirm"

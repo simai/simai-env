@@ -8,7 +8,7 @@ site_remove_metadata_cleanup() {
 
   [[ -d "$config_dir" ]] || return 0
 
-  rm -f -- "${config_dir}/perf.env"
+  rm -f -- "${config_dir}/perf.env" "${config_dir}/runtime.env"
   if [[ "$remove_db_env" == "yes" ]]; then
     rm -f -- "${config_dir}/db.env"
   elif [[ -e "${config_dir}/db.env" ]]; then

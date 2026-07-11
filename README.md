@@ -12,6 +12,12 @@ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | s
 sudo /root/simai-env/simai-admin.sh menu
 ```
 
+CLI help is generated from the command registry:
+```bash
+sudo /root/simai-env/simai-admin.sh help
+sudo /root/simai-env/simai-admin.sh help site
+```
+
 On first run the menu may offer to install required packages (bootstrap). Accepting will install nginx/php/mysql/node/certbot and related utilities without touching your sites.
 
 Scripts only (no bootstrap during install):
@@ -24,7 +30,8 @@ curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | s
 - Profiles: generic, laravel, static, alias (set via admin CLI).
 - Healthcheck endpoints are local-only by default.
 - Reserved domains (RFC 2606) are blocked unless explicitly allowed.
-- Bash history note: if your password/command contains `!`, wrap it in single quotes (e.g., `--pass 'S3cret!pass'`) to avoid history expansion, or disable history expansion (`set +H`).
+- Do not put credentials directly into reusable shell snippets or documentation;
+  prefer interactive prompts and protected environment/config files.
 
 ## Local checks
 Run CI checks locally:
@@ -35,6 +42,7 @@ ShellCheck runs with warnings treated as errors to prevent regressions.
 You can point `SHELLCHECK_BIN` to a custom binary if not in PATH.
 
 ## More docs
+- Releases: `docs/releases/README.md`
 - Docs entrypoint: `docs/README.md`
 - User documentation: `docs/user/README.md`
 - User profile workflows: `docs/user/profile-workflows.md`

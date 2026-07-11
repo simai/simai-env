@@ -345,6 +345,11 @@ site_usage_set_handler() {
     error "Use --confirm yes to update site usage"
     return 1
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Set ${domain} activity class to ${usage_class}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   site_usage_apply_class "$domain" "$usage_class" "$confirm" || return 1
 
   ui_header "SIMAI ENV · Site activity"
@@ -407,6 +412,11 @@ site_auto_optimize_enable_handler() {
     error "Use --confirm yes to update site automatic optimization"
     return 1
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Enable automatic optimization for ${domain}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   site_auto_optimize_write_override "$domain" "yes" || return 1
   ui_success "Site automatic optimization enabled"
   print_kv_table \
@@ -424,6 +434,11 @@ site_auto_optimize_disable_handler() {
   if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
     error "Use --confirm yes to update site automatic optimization"
     return 1
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Exclude ${domain} from automatic optimization?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
   fi
   site_auto_optimize_write_override "$domain" "no" || return 1
   ui_success "Site automatic optimization disabled"
@@ -443,6 +458,11 @@ site_auto_optimize_reset_handler() {
     error "Use --confirm yes to reset site automatic optimization override"
     return 1
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Reset automatic optimization for ${domain} to defaults?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   site_auto_optimize_write_override "$domain" "inherit" || return 1
   ui_success "Site automatic optimization reset to inherit"
   print_kv_table \
@@ -454,8 +474,8 @@ site_auto_optimize_reset_handler() {
 register_cmd "site" "perf-status" "Show per-site performance/runtime governance" "site_perf_status_handler" "" "domain="
 register_cmd "site" "perf-tune" "Apply per-site FPM governance mode" "site_perf_tune_handler" "" "domain= mode= confirm="
 register_cmd "site" "usage-status" "Show user-facing site usage class" "site_usage_status_handler" "" "domain="
-register_cmd "site" "usage-set" "Set user-facing site usage class" "site_usage_set_handler" "" "domain= class= usage= confirm="
+register_cmd "site" "usage-set" "Set user-facing site usage class" "site_usage_set_handler" "" "domain= class= usage= confirm=" "menu:internal-confirm"
 register_cmd "site" "auto-optimize-status" "Show per-site automatic optimization status" "site_auto_optimize_status_handler" "" "domain="
-register_cmd "site" "auto-optimize-enable" "Enable automatic optimization for one site" "site_auto_optimize_enable_handler" "" "domain= confirm="
-register_cmd "site" "auto-optimize-disable" "Disable automatic optimization for one site" "site_auto_optimize_disable_handler" "" "domain= confirm="
-register_cmd "site" "auto-optimize-reset" "Reset site automatic optimization to inherit" "site_auto_optimize_reset_handler" "" "domain= confirm="
+register_cmd "site" "auto-optimize-enable" "Enable automatic optimization for one site" "site_auto_optimize_enable_handler" "" "domain= confirm=" "menu:internal-confirm"
+register_cmd "site" "auto-optimize-disable" "Disable automatic optimization for one site" "site_auto_optimize_disable_handler" "" "domain= confirm=" "menu:internal-confirm"
+register_cmd "site" "auto-optimize-reset" "Reset site automatic optimization to inherit" "site_auto_optimize_reset_handler" "" "domain= confirm=" "menu:internal-confirm"

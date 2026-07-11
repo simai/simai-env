@@ -113,6 +113,6 @@ bash /root/simai-env/testing/run-regression.sh full
 
 ## 7) Safety notes
 
-- Use disposable domains for destructive testing (`*.env.sf8.ru`, `*.sf0.ru`).
+- Use only disposable domains under `*.env.sf8.ru` for destructive testing.
 - Do not store private keys or DB passwords in git.
 - Avoid mutating non-test domains unless explicitly approved.

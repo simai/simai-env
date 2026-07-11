@@ -44,15 +44,17 @@ test_site_metadata_cleanup() {
   mkdir -p "${tmp}/full"
   : >"${tmp}/full/db.env"
   : >"${tmp}/full/perf.env"
+  : >"${tmp}/full/runtime.env"
   assert_success site_remove_metadata_cleanup "${tmp}/full" yes
   [[ ! -e "${tmp}/full" ]] || fail "empty full-removal metadata directory remains"
 
   mkdir -p "${tmp}/partial"
   : >"${tmp}/partial/db.env"
   : >"${tmp}/partial/perf.env"
+  : >"${tmp}/partial/runtime.env"
   assert_success site_remove_metadata_cleanup "${tmp}/partial" no
-  [[ -f "${tmp}/partial/db.env" && ! -e "${tmp}/partial/perf.env" ]] \
-    || fail "partial cleanup did not preserve db.env and remove perf.env"
+  [[ -f "${tmp}/partial/db.env" && ! -e "${tmp}/partial/perf.env" && ! -e "${tmp}/partial/runtime.env" ]] \
+    || fail "partial cleanup did not preserve db.env and remove managed runtime metadata"
 
   mkdir -p "${tmp}/unexpected"
   : >"${tmp}/unexpected/db.env"
@@ -61,6 +63,65 @@ test_site_metadata_cleanup() {
   assert_failure site_remove_metadata_cleanup "${tmp}/unexpected" yes
   [[ -f "${tmp}/unexpected/owner-note" ]] || fail "unexpected metadata entry was removed"
   rm -rf "$tmp"
+}
+
+test_command_option_validation() {
+  local core="${ROOT_DIR}/admin/core.sh"
+  grep -Fq 'validate_command_options "$section" "$name" "$@" || return 1' "$core" \
+    || fail "command dispatch does not validate options"
+  grep -Fq 'Unknown option for ${section} ${name}: --${option}' "$core" \
+    || fail "unknown-option error contract is missing"
+  grep -Fq 'Unexpected positional argument for ${section} ${name}: ${arg}' "$core" \
+    || fail "unexpected positional arguments do not fail closed"
+}
+
+test_menu_contract() {
+  local menu="${ROOT_DIR}/admin/menu.sh"
+  grep -Fq '"10|Remove site"' "$menu" || fail "regular site action keys changed"
+  grep -Fq '"20|Automatic optimization..."' "$menu" || fail "advanced site actions are not grouped"
+  grep -Fq '10)' "$menu" || fail "System advanced toggle key is missing"
+  grep -Fq 'show_advanced=0' "$menu" || fail "System advanced toggle is miswired"
+  grep -Fq '11) menu_toggle_backend' "$menu" || fail "System backend toggle is miswired"
+  grep -Fq 'select_from_list "Install required packages now?" "no" "no" "yes"' "$menu" || fail "bootstrap confirmation is not safe by default"
+  grep -Fq 'menu_command_needs_confirmation' "$menu" || fail "managed-state menu confirmation gate is missing"
+  grep -Fq '[[ -z "$choice" ]] && { echo ""; return 0; }' "$menu" || fail "blank menu choice can still terminate set -e menu"
+  grep -Fq '"$cmd" != "create-global" && "$cmd" != "create-project"' "$menu" || fail "project access creation can reuse an existing-login picker"
+}
+
+test_second_audit_p2_p3_contracts() {
+  local core="${ROOT_DIR}/admin/core.sh"
+  local menu="${ROOT_DIR}/admin/menu.sh"
+  local ui="${ROOT_DIR}/lib/ui.sh"
+  local help="${ROOT_DIR}/simai-admin.sh"
+  grep -Fq 'ui_terminal_geometry' "$core" || fail "terminal-aware dialog geometry is missing"
+  grep -Fq '[WORKING] %s... %ss' "$core" || fail "non-TTY long-operation heartbeat is missing"
+  grep -Fq 'for step in "$@"' "$ui" || fail "next steps are still discarded"
+  grep -Fq 'command_exit=not_started' "$menu" || fail "pre-command cancellation marker is still misleading"
+  grep -Fq 'Advanced Bitrix operations...' "$menu" || fail "Bitrix Advanced menu is still overloaded"
+  grep -Fq 'Advanced system operations...' "$menu" || fail "System Advanced menu is still overloaded"
+  grep -Fq 'simai-admin.sh help [section]' "$help" || fail "registry-derived help entrypoint is missing"
+  ! grep -Fq -- '--pass secret' "$help" || fail "root help exposes a password literal"
+  /usr/bin/python3 "${ROOT_DIR}/scripts/ci/command_coverage.py" --root "$ROOT_DIR" --check \
+    | grep -Fq '"total": 131' || fail "command coverage does not classify all 131 commands"
+}
+
+test_second_audit_p1_contracts() {
+  local site="${ROOT_DIR}/admin/commands/site.sh"
+  local runner="${ROOT_DIR}/testing/run-regression.sh"
+  local config="${ROOT_DIR}/testing/test-config.example.env"
+  grep -Fq 'site_add_transaction_rollback' "$site" || fail "site add owned-resource rollback is missing"
+  grep -Fq 'Site creation failed; rolling back resources created by this invocation' "$site" || fail "site add rollback is not observable"
+  grep -Fq '"continue" \' "$site" || fail "profile expansion is not default-safe"
+  local confirm_line ensure_line
+  confirm_line=$(grep -n 'Create this site now?' "$site" | head -1 | cut -d: -f1)
+  ensure_line=$(grep -n '^  ensure_user$' "$site" | tail -1 | cut -d: -f1)
+  [[ -n "$confirm_line" && -n "$ensure_line" && $ensure_line -gt $confirm_line ]] \
+    || fail "site add still ensures the platform user before final confirmation"
+  grep -Fq 'TEST_SYNC_UPDATE:-no' "$runner" || fail "smoke update default is still mutating"
+  grep -Fq -- '--remove_files yes' "$runner" || fail "runner cleanup retains db.env"
+  grep -Fq 'cleanup_on_exit' "$runner" || fail "runner cleanup does not preserve/override final status"
+  grep -Fqx 'TEST_SYNC_UPDATE=no' "$config" || fail "example config enables runtime sync"
+  grep -Fqx 'ALLOW_DESTRUCTIVE_TESTS=no' "$config" || fail "example config enables destructive tests"
 }
 
 test_db_drop_failure_propagation() {
@@ -195,6 +256,10 @@ EOF
 
 test_install_mode_contract
 test_site_metadata_cleanup
+test_command_option_validation
+test_menu_contract
+test_second_audit_p1_contracts
+test_second_audit_p2_p3_contracts
 test_db_drop_failure_propagation
 test_updater_transaction
 echo "[correction-regression] ok"

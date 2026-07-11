@@ -24,6 +24,21 @@ declare -Ag CMD_FLAGS=()
 
 ui_init
 
+ui_terminal_geometry() {
+  local rows="${LINES:-}" cols="${COLUMNS:-}"
+  [[ "$rows" =~ ^[0-9]+$ ]] || rows="$(tput lines 2>/dev/null || echo 24)"
+  [[ "$cols" =~ ^[0-9]+$ ]] || cols="$(tput cols 2>/dev/null || echo 80)"
+  (( rows < 16 )) && rows=16
+  (( cols < 50 )) && cols=50
+  (( rows > 42 )) && rows=42
+  (( cols > 120 )) && cols=120
+  UI_DIALOG_HEIGHT=$((rows - 2))
+  UI_DIALOG_WIDTH=$((cols - 4))
+  UI_LIST_HEIGHT=$((UI_DIALOG_HEIGHT - 8))
+  (( UI_LIST_HEIGHT < 5 )) && UI_LIST_HEIGHT=5
+  return 0
+}
+
 menu_can_use_whiptail() {
   [[ "${SIMAI_MENU_BACKEND:-auto}" == "whiptail" ]] || return 1
   [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]] || return 1
@@ -52,10 +67,11 @@ select_from_list() {
       fi
     done
     local choice rc
+    ui_terminal_geometry
     if [[ -n "$selected_tag" ]]; then
-      choice=$(whiptail --title "SIMAI ENV" --default-item "$selected_tag" --menu "$prompt" 20 100 10 "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
+      choice=$(whiptail --title "SIMAI ENV" --default-item "$selected_tag" --menu "$prompt" "$UI_DIALOG_HEIGHT" "$UI_DIALOG_WIDTH" "$UI_LIST_HEIGHT" "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
     else
-      choice=$(whiptail --title "SIMAI ENV" --menu "$prompt" 20 100 10 "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
+      choice=$(whiptail --title "SIMAI ENV" --menu "$prompt" "$UI_DIALOG_HEIGHT" "$UI_DIALOG_WIDTH" "$UI_LIST_HEIGHT" "${items[@]}" 3>&1 1>&2 2>&3) || rc=$?
     fi
     rc=${rc:-0}
     if [[ $rc -ne 0 || -z "$choice" ]]; then
@@ -80,9 +96,15 @@ select_from_list() {
   done
   echo "  [0] Cancel" >&2
   if [[ -n "$default" ]]; then
-    read -r -p "Enter choice [${default}]: " choice || true
+    if ! read -r -p "Enter choice [${default}]: " choice; then
+      echo ""
+      return 1
+    fi
   else
-    read -r -p "Enter choice: " choice || true
+    if ! read -r -p "Enter choice: " choice; then
+      echo ""
+      return 1
+    fi
   fi
   case "${choice,,}" in
     0|cancel|back|q|quit|exit)
@@ -140,6 +162,16 @@ print_kv_table() {
     [[ ${#key} -gt $key_width ]] && key_width=${#key}
     [[ ${#val} -gt $val_width ]] && val_width=${#val}
   done
+  local terminal_width="${COLUMNS:-}"
+  [[ "$terminal_width" =~ ^[0-9]+$ ]] || terminal_width="$(tput cols 2>/dev/null || echo 80)"
+  if [[ "$terminal_width" -lt 80 || $((key_width + val_width + 7)) -gt "$terminal_width" ]]; then
+    for row in "${rows[@]}"; do
+      key="${row%%|*}"
+      val="${row#*|}"
+      printf "%s:\n  %s\n" "$key" "$val"
+    done
+    return 0
+  fi
   local sep
   sep="+$(printf '%*s' "$((key_width+2))" "" | tr ' ' '-')+$(printf '%*s' "$((val_width+2))" "" | tr ' ' '-')+"
   printf "%s\n" "$sep"
@@ -168,13 +200,18 @@ run_long() {
   local spinner='|/-\\'
   local i=0
   local interrupted=0
+  local heartbeat_interval="${SIMAI_PROGRESS_INTERVAL:-5}"
+  [[ "$heartbeat_interval" =~ ^[1-9][0-9]*$ ]] || heartbeat_interval=5
   trap 'interrupted=1; kill '"$cmd_pid"' 2>/dev/null || true' INT TERM
   while kill -0 "$cmd_pid" 2>/dev/null; do
     if [[ $has_tty -eq 1 ]]; then
       local elapsed=$(( $(date +%s) - start ))
       printf "\r[%s] %s... %ss" "${spinner:i%4:1}" "$desc" "$elapsed" >/dev/tty
-      i=$((i+1))
+    elif (( i % heartbeat_interval == 0 )); then
+      local elapsed=$(( $(date +%s) - start ))
+      printf "[WORKING] %s... %ss\n" "$desc" "$elapsed" >&2
     fi
+    i=$((i+1))
     sleep 1
   done
   wait "$cmd_pid"
@@ -288,6 +325,39 @@ get_optional_opts() {
   echo "${CMD_OPTIONAL["${section}:${name}"]:-}"
 }
 
+validate_command_options() {
+  local section="$1" name="$2"
+  shift 2
+  local key="${section}:${name}"
+  local allowed=" ${CMD_REQUIRED[$key]:-} ${CMD_OPTIONAL[$key]:-} "
+  local arg option token
+  while [[ $# -gt 0 ]]; do
+    arg="$1"
+    shift
+    if [[ "$arg" != --* ]]; then
+      error "Unexpected positional argument for ${section} ${name}: ${arg}"
+      return 1
+    fi
+    option="${arg#--}"
+    option="${option%%=*}"
+    local found=0
+    for token in $allowed; do
+      token="${token%%=*}"
+      if [[ "$token" == "$option" ]]; then
+        found=1
+        break
+      fi
+    done
+    if [[ $found -eq 0 ]]; then
+      error "Unknown option for ${section} ${name}: --${option}"
+      return 1
+    fi
+    if [[ "$arg" != *=* && $# -gt 0 && "$1" != --* ]]; then
+      shift
+    fi
+  done
+}
+
 run_command() {
   local section="$1" name="$2"
   shift 2
@@ -297,6 +367,7 @@ run_command() {
     error "Unknown command: ${section} ${name}"
     return 1
   fi
+  validate_command_options "$section" "$name" "$@" || return 1
   ensure_audit_log
   local corr_id
   corr_id=$(uuidgen 2>/dev/null || date +"%Y%m%d%H%M%S%N")
@@ -337,7 +408,8 @@ parse_kv_args() {
         fi
         ;;
       *)
-        shift
+        error "Unexpected positional argument: $1"
+        return 1
         ;;
     esac
   done

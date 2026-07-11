@@ -1,10 +1,3 @@
----
-extends: _core._layouts.documentation
-section: content
-title: Menu User Guide
-description: Menu User Guide
----
-
 # Menu User Guide
 
 This guide is for the person who mainly works through:
@@ -28,7 +21,13 @@ Fresh install defaults:
 - Failed commands return you to the menu instead of dropping you to the shell.
 - When a command needs required values such as `domain`, `file`, or `php`, the menu asks for them.
 - Empty selection or cancel returns safely to the menu.
+- Actions that change managed state show the action and target, then require an explicit `yes`; the default is `no`.
+- Site creation collects all choices first and shows a final plan before it writes files or service configuration.
+- Empty Enter keeps the current menu open; EOF/Escape returns safely to the previous level (or exits from the root menu).
 - `Advanced mode` lives inside `System`.
+- Dialog size follows the current terminal. At narrow widths, result tables use
+  a stacked key/value layout instead of overflowing horizontally.
+- Long operations print a periodic `WORKING` heartbeat and elapsed time.
 
 ## Main sections
 
@@ -41,7 +40,7 @@ Common actions:
 - `Site info`
 - `Site activity`
 - `Set activity`
-- `Optimization override status`
+- `Automatic optimization...` (Advanced mode; opens a focused submenu)
 - `Pause site`
 - `Resume site`
 - `Change site PHP`
@@ -117,7 +116,7 @@ Use this section for read-only checks.
 
 Common actions:
 - `Site health check`
-- `Configuration check`
+- `Configuration drift status`
 - `Platform status`
 
 ### Logs
@@ -149,7 +148,10 @@ This section is the shared application/CMS area. It now opens into three submenu
 - `WordPress`
 - `Bitrix`
 
-Regular mode keeps only the most common actions in each submenu. Advanced mode shows installer, scheduler, cache, and maintenance commands.
+Regular mode keeps only the most common actions in each submenu. Advanced mode
+shows installer, scheduler, cache, and maintenance commands. Dense Bitrix and
+System maintenance sets open as focused submenus so `Back` remains visible in
+small terminals.
 
 Common Laravel actions inside `Applications -> Laravel`:
 - `Laravel status`
@@ -163,14 +165,14 @@ Common Laravel actions inside `Applications -> Laravel`:
 
 Common WordPress actions inside `Applications -> WordPress`:
 - `WordPress status`
-- `WordPress optimization`
-- `WordPress complete setup`
+- `WordPress optimization status`
+- `Complete WordPress setup`
 
 Common Bitrix actions inside `Applications -> Bitrix`:
 - `Bitrix status`
-- `Bitrix optimization`
-- `Bitrix complete setup`
-- `Bitrix restore from backup`
+- `Bitrix optimization status`
+- `Complete Bitrix setup`
+- `Prepare Bitrix restore`
 
 ### Profiles
 Use this section to inspect and manage profile availability.
@@ -285,9 +287,9 @@ Notes:
 - Then the profile-specific status in the `Applications` section
 
 ## Where to read more
-- Command reference: `/Users/rim/Documents/GitHub/simai-env/docs/commands/`
-- Daily operator quickstart: `/Users/rim/Documents/GitHub/simai-env/docs/operations/daily-ops-quickstart.md`
+- [Command reference](../commands/README.md)
+- [Daily operator quickstart](../operations/daily-ops-quickstart.md)
 - Profile runbooks:
-  - `/Users/rim/Documents/GitHub/simai-env/docs/operations/bitrix-production-runbook.md`
-  - `/Users/rim/Documents/GitHub/simai-env/docs/operations/wordpress-production-runbook.md`
-  - `/Users/rim/Documents/GitHub/simai-env/docs/operations/laravel-production-runbook.md`
+  - `docs/operations/bitrix-production-runbook.md`
+  - `docs/operations/wordpress-production-runbook.md`
+  - `docs/operations/laravel-production-runbook.md`

@@ -23,14 +23,42 @@ source "${ADMIN_DIR}/lib/access_utils.sh"
 load_command_modules "${ADMIN_DIR}/commands"
 
 usage() {
+  local requested_section="${1:-}"
   cat <<USAGE
 simai-admin.sh <section> <command> [options]
 simai-admin.sh menu      # interactive menu
+simai-admin.sh help [section]
 
 Examples:
   simai-admin.sh site add --domain your-domain.tld --profile generic --php 8.2
-  simai-admin.sh db create --name simai_app --user simai --pass secret
+  simai-admin.sh site db-create --domain your-domain.tld --dry_run yes
+  simai-admin.sh site db-create --domain your-domain.tld --confirm yes
 USAGE
+  local section name key flags required optional
+  if [[ -n "$requested_section" ]]; then
+    if ! list_sections | grep -Fxq "$requested_section"; then
+      echo "Unknown help section: ${requested_section}" >&2
+      return 1
+    fi
+    echo
+    echo "Commands in ${requested_section}:"
+    for name in $(list_commands_for_section "$requested_section"); do
+      key="${requested_section}:${name}"
+      flags="${CMD_FLAGS[$key]:-}"
+      [[ " ${flags} " == *" menu:hidden " ]] && continue
+      required="${CMD_REQUIRED[$key]:-}"
+      optional="${CMD_OPTIONAL[$key]:-}"
+      printf "  %-28s %s\n" "${requested_section} ${name}" "${CMD_DESCRIPTIONS[$key]:-}"
+      [[ -n "$required" ]] && printf "    required: %s\n" "$required"
+      [[ -n "$optional" ]] && printf "    optional: %s\n" "$optional"
+    done
+    return 0
+  fi
+  echo
+  echo "Sections (use 'simai-admin.sh help <section>' for commands):"
+  list_sections | while IFS= read -r section; do
+    printf "  %s\n" "$section"
+  done
 }
 
 main() {
@@ -49,8 +77,8 @@ main() {
     menu)
       run_menu "$@"
       ;;
-    -h|--help)
-      usage
+    -h|--help|help)
+      usage "${1:-}"
       ;;
     *)
       local section="$cmd"

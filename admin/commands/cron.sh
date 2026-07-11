@@ -85,5 +85,5 @@ cron_remove_handler() {
   ui_kv "Review site status" "simai-admin.sh site info --domain ${domain}"
 }
 
-register_cmd "cron" "add" "Enable schedule:run scheduler entry for site" "cron_add_handler" "domain" "user="
-register_cmd "cron" "remove" "Disable schedule:run scheduler entry for site" "cron_remove_handler" "domain" ""
+register_cmd "cron" "add" "Enable schedule:run scheduler entry for site" "cron_add_handler" "domain" "user=" "menu:confirm"
+register_cmd "cron" "remove" "Disable schedule:run scheduler entry for site" "cron_remove_handler" "domain" "" "menu:confirm"

@@ -262,6 +262,11 @@ access_create_global_handler() {
     error "System user ${login} already exists; refusing to attach managed access metadata"
     return 1
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local create_choice
+    create_choice=$(select_from_list "Create global file access ${login}?" "no" "no" "yes")
+    [[ "$create_choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   [[ -z "$password" ]] && password="$(access_generate_password)"
   access_ensure_global_group || return 1
   access_write_sshd_snippet || return 1
@@ -338,6 +343,11 @@ access_create_project_handler() {
   if [[ ! -d "$root" ]]; then
     error "Project root ${root} does not exist"
     return 1
+  fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local create_choice
+    create_choice=$(select_from_list "Create project file access ${login} for ${domain}?" "no" "no" "yes")
+    [[ "$create_choice" == "yes" ]] || { command_cancelled; return $?; }
   fi
   [[ -z "$password" ]] && password="$(access_generate_password)"
   access_ensure_project_group || return 1
@@ -416,6 +426,11 @@ access_enable_handler() {
   local login="${PARSED_ARGS[login]:-}"
   login=$(access_pick_login "$login") || return $?
   access_load_metadata "$login" || { error "Access login ${login} not found"; return 1; }
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Enable access ${login}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
     local root="${ACCESS_META[ROOT_PATH]:-}"
     local jail="${ACCESS_META[JAIL_PATH]:-$(access_project_jail_root "$login")}"
@@ -532,6 +547,11 @@ access_add_key_handler() {
     error "No valid SSH public key found in ${key_file}"
     return 1
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Add this SSH key to access ${login}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   access_install_pubkey "$login" "$pubkey" || return 1
   access_load_metadata "$login" || { error "Access login ${login} not found"; return 1; }
   local now auth_mode
@@ -564,10 +584,10 @@ access_add_key_handler() {
 register_cmd "access" "list" "List managed file accesses" "access_list_handler" "" "scope= domain=" ""
 register_cmd "access" "show" "Show access details" "access_show_handler" "login" "" ""
 register_cmd "access" "doctor" "Check managed access security baseline" "access_doctor_handler" "" "strict=no" ""
-register_cmd "access" "create-global" "Create global SFTP access" "access_create_global_handler" "login" "password=" ""
-register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password=" ""
-register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" ""
-register_cmd "access" "enable" "Enable access" "access_enable_handler" "login" "" ""
-register_cmd "access" "reset-password" "Reset access password" "access_reset_password_handler" "login" "password=" ""
-register_cmd "access" "remove" "Remove access" "access_remove_handler" "login" "" ""
-register_cmd "access" "add-key" "Add SSH public key for access" "access_add_key_handler" "login pubkey-file" ""
+register_cmd "access" "create-global" "Create global SFTP access" "access_create_global_handler" "login" "password=" "menu:internal-confirm"
+register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password=" "menu:internal-confirm"
+register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" "menu:internal-confirm"
+register_cmd "access" "enable" "Enable access" "access_enable_handler" "login" "" "menu:internal-confirm"
+register_cmd "access" "reset-password" "Reset access password" "access_reset_password_handler" "login" "password=" "menu:confirm"
+register_cmd "access" "remove" "Remove access" "access_remove_handler" "login" "" "menu:internal-confirm"
+register_cmd "access" "add-key" "Add SSH public key for access" "access_add_key_handler" "login pubkey-file" "" "menu:internal-confirm"

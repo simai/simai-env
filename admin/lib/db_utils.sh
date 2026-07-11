@@ -183,6 +183,8 @@ site_db_apply_create() {
   local priv_str
   priv_str=$(printf "%s, " "${privs[@]}"); priv_str="${priv_str%, }"
 
+  SITE_DB_APPLY_CREATED_DB=0
+  SITE_DB_APPLY_CREATED_USER=0
   local created_db=0 created_user=0
   if ! db_exists "$db_name"; then
     if ! mysql_root_exec_stdin "CREATE DATABASE \`${db_name}\` DEFAULT CHARACTER SET ${charset} COLLATE ${coll}"; then
@@ -190,6 +192,8 @@ site_db_apply_create() {
       return 1
     fi
     created_db=1
+    # shellcheck disable=SC2034 # transaction ownership signal consumed by site add
+    SITE_DB_APPLY_CREATED_DB=1
   fi
   if db_user_exists "$db_user"; then
     if ! mysql_root_exec_stdin "ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}'"; then
@@ -204,6 +208,8 @@ site_db_apply_create() {
       return 1
     fi
     created_user=1
+    # shellcheck disable=SC2034 # transaction ownership signal consumed by site add
+    SITE_DB_APPLY_CREATED_USER=1
   fi
   if ! mysql_root_exec_stdin "GRANT ${priv_str} ON \`${db_name}\`.* TO '${db_user}'@'localhost'"; then
     error "Failed to grant privileges to ${db_user}"

@@ -80,6 +80,8 @@ self_auto_update_status_from_versions() {
     echo "n/a"
   elif [[ "$local_version" == "$remote_version" ]]; then
     echo "up to date"
+  elif [[ "$(printf '%s\n%s\n' "$local_version" "$remote_version" | sort -V | tail -1)" == "$local_version" ]]; then
+    echo "local candidate ahead"
   else
     echo "update available"
   fi
@@ -1691,7 +1693,7 @@ self_site_review_status_handler() {
   ui_kv "Open health review" "simai-admin.sh self health-review-status"
 }
 
-register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" ""
+register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" "" "menu:confirm"
 register_cmd "self" "version" "Show local and remote simai-env version" "self_version_handler" "" ""
 register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" ""
 register_cmd "self" "admin-mode-status" "Show admin access mode and user roles" "self_admin_mode_status_handler" "" "login="
@@ -1700,16 +1702,16 @@ register_cmd "self" "sudo-admin-doctor" "Check non-root sudo admin readiness" "s
 register_cmd "self" "ssh-hardening-ensure" "Apply operational-safe SSH hardening" "self_ssh_hardening_ensure_handler" "" "confirm="
 register_cmd "self" "ssh-hardening-doctor" "Check operational-safe SSH hardening" "self_ssh_hardening_doctor_handler" "" ""
 register_cmd "self" "auto-update-status" "Show automatic update status" "self_auto_update_status_handler" "" ""
-register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" ""
-register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" ""
-register_cmd "self" "auto-update-disable" "Disable automatic updates" "self_auto_update_disable_handler" "" ""
+register_cmd "self" "auto-update-enable-check" "Enable automatic update checks" "self_auto_update_enable_check_handler" "" "" "menu:confirm"
+register_cmd "self" "auto-update-enable-apply" "Enable safe automatic updates" "self_auto_update_enable_apply_handler" "" "" "menu:confirm"
+register_cmd "self" "auto-update-disable" "Disable automatic updates" "self_auto_update_disable_handler" "" "" "menu:confirm"
 register_cmd "self" "auto-update-run-check" "Check for simai-env updates now" "self_auto_update_run_check_handler" "" ""
-register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version="
+register_cmd "self" "bootstrap" "Repair Environment (base stack: nginx/php/mysql/certbot/etc.)" "self_bootstrap_handler" "" "php= mysql= node-version=" "menu:confirm"
 register_cmd "self" "status" "Show platform/service status" "self_status_handler" "" ""
 register_cmd "self" "platform-status" "Show platform diagnostic status" "self_platform_status_handler" "" ""
 register_cmd "self" "auto-optimize-status" "Show simple automatic optimization status" "self_auto_optimize_status_handler" "" ""
-register_cmd "self" "auto-optimize-enable" "Enable simple automatic optimization" "self_auto_optimize_enable_handler" "" ""
-register_cmd "self" "auto-optimize-disable" "Disable simple automatic optimization" "self_auto_optimize_disable_handler" "" ""
+register_cmd "self" "auto-optimize-enable" "Enable simple automatic optimization" "self_auto_optimize_enable_handler" "" "" "menu:confirm"
+register_cmd "self" "auto-optimize-disable" "Disable simple automatic optimization" "self_auto_optimize_disable_handler" "" "" "menu:confirm"
 register_cmd "self" "health-review-status" "Show platform health review status" "self_health_review_status_handler" "" ""
 register_cmd "self" "site-review-status" "Show site review status" "self_site_review_status_handler" "" ""
 register_cmd "self" "scheduler" "Run the internal simai scheduler tick" "self_scheduler_handler" "" ""
@@ -1719,5 +1721,5 @@ register_cmd "self" "scheduler-disable" "Disable scheduler globally or by job" "
 register_cmd "self" "scheduler-run" "Run one scheduler job immediately" "self_scheduler_run_handler" "" "job="
 register_cmd "self" "perf-status" "Show server optimization status" "self_perf_status_handler" "" ""
 register_cmd "self" "perf-plan" "Show FPM reduction plan for oversubscribed servers" "self_perf_plan_handler" "" "limit="
-register_cmd "self" "perf-rebalance" "Apply safe/parked FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= mode= confirm="
+register_cmd "self" "perf-rebalance" "Apply safe/parked FPM tuning to top heavy pools" "self_perf_rebalance_handler" "" "limit= mode= confirm=" "menu:confirm menu:bulk"
 register_cmd "self" "perf-apply" "Apply managed performance baseline preset" "self_perf_apply_handler" "" "preset= confirm="

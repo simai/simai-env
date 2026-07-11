@@ -1,10 +1,3 @@
----
-extends: _core._layouts.documentation
-section: content
-title: Site
-description: Site
----
-
 # site commands
 
 Run with `sudo /root/simai-env/simai-admin.sh site <command> [options]` or via menu.
@@ -70,6 +63,8 @@ Behavior:
   - the wildcard HTTPS command to run after DNS is ready
 - If the target domain already exists as a configured site, `site add` now refuses to continue instead of silently reattaching or downgrading the site profile.
 - Menu-based `site add` now expects a new empty project directory. Reusing a non-empty path requires an explicit CLI `--path` flow and is refused in the regular menu wizard.
+- The menu wizard collects DB, access, SSL, runtime, and target choices before the first filesystem/service change, then shows a final creation plan with a default-safe `no` confirmation.
+- If an apply-stage failure occurs after confirmation, site creation rolls back only resources created by that invocation; pre-existing pools, paths, databases, users and access entries are not treated as owned cleanup targets.
 - Required markers: if the directory is newly created or empty, missing markers do not block immediately; bootstrap files are applied first, then markers are rechecked. On non-empty directories without markers, the command now errors instead of falling back to `generic`.
 - `/healthcheck.php` is localhost-only by default for php-mode profiles; test with `curl -i -H "Host: <domain>" http://127.0.0.1/healthcheck.php`. Static uses nginx-mode healthcheck at `/healthcheck` (local-only).
 - Web root is profile-driven (`PROFILE_PUBLIC_DIR`, empty/"." means project root).
@@ -101,7 +96,7 @@ Behavior:
 - PHP/cron/queue removal only when the profile requires PHP (alias/static skip automatically; cron removal is profile-gated).
 - DB prompts only when `PROFILE_REQUIRES_DB != no`; static/alias skip DB prompts entirely. DB drop flags are errors for such profiles even in dry-run.
 - File removal and DB/user drops happen only when explicitly confirmed (defaults to “no” in CLI; menu asks). Uses safe fallback slug for derived paths when metadata is invalid.
-- A full successful DB and user drop removes `db.env`; site removal always removes `perf.env` and removes the metadata directory when it becomes empty. Partial DB/file/metadata failures return a non-zero status and preserve unresolved metadata for inspection.
+- A full successful DB and user drop removes `db.env`; site removal always removes managed `perf.env` and `runtime.env`, then removes the metadata directory when it becomes empty. Partial DB/file/metadata failures return a non-zero status and preserve unresolved metadata for inspection.
 - Alias profile: refuses file/DB removal flags and ignores path overrides (manage on the target site instead).
 
 ### Destructive operations and `--confirm`

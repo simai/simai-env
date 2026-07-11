@@ -562,7 +562,7 @@ laravel_perf_apply_handler() {
 }
 
 register_cmd "laravel" "status" "Show Laravel status" "laravel_status_handler" "domain" ""
-register_cmd "laravel" "app-ready" "Bootstrap Laravel application (composer scaffold + env)" "laravel_app_ready_handler" "domain" ""
-register_cmd "laravel" "finalize" "Complete Laravel post-bootstrap baseline" "laravel_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging= mode= migrate="
+register_cmd "laravel" "app-ready" "Bootstrap Laravel application (composer scaffold + env)" "laravel_app_ready_handler" "domain" "" "menu:confirm"
+register_cmd "laravel" "finalize" "Complete Laravel post-bootstrap baseline" "laravel_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging= mode= migrate=" "menu:confirm"
 register_cmd "laravel" "perf-status" "Show Laravel optimization status" "laravel_perf_status_handler" "" "domain="
 register_cmd "laravel" "perf-apply" "Apply Laravel optimization baseline" "laravel_perf_apply_handler" "" "domain= mode= confirm="

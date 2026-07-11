@@ -1,5 +1,36 @@
 # Changelog
+
+## 1.12.75 - 2026-07-11
+
+### Changed
+- Advanced Sites, System and Bitrix operations are grouped into focused
+  submenus while routine shortcut numbers remain stable.
+- Menu labels now distinguish status views, plans and mutating actions.
+- Whiptail geometry and key/value output adapt to smaller terminal sizes, and
+  long non-TTY operations emit periodic progress heartbeats.
+- Root help is generated from the command registry and supports
+  `simai-admin.sh help <section>`.
+
+### Fixed
+- Access results now render every promised non-secret next step.
+- Pre-command menu cancellation reports `command_exit=not_started` instead of
+  a misleading process exit code.
+- Unexpected positional CLI arguments fail closed and name the rejected token.
+- Registry-derived coverage classifies all 131 commands and the Linux dispatch
+  harness proves every registered route rejects unknown options before handler
+  execution.
 All notable changes to this project will be documented in this file.
+
+## [1.12.74] - 2026-07-11
+### Fixed
+- Made menu Enter/EOF/Escape handling safe under `set -e` and kept invalid input recoverable.
+- Standardized default-no commit points for managed-state menu operations and fixed project-access login creation.
+- Moved Create site host/profile writes after final confirmation and added owned-resource rollback for failed apply stages.
+- Made regression smoke read-only by default and made full cleanup exhaustive across site, DB/user, pool, cron/queue, archive, temporary and failed-config residue.
+- Reconciled CLI validation examples, operator documentation and Docara mirrors with the current contracts and authorized `*.env.sf8.ru` test zone.
+
+### Changed
+- The version/status banner distinguishes a local candidate newer than the configured update channel instead of reporting it as up to date.
 
 ## [1.12.73] - 2026-07-11
 ### Changed

@@ -1,10 +1,3 @@
----
-extends: _core._layouts.documentation
-section: content
-title: Runbook
-description: Runbook
----
-
 # Operator Runbook (Daily Ops)
 
 This runbook targets day-to-day server operations for simai-env on Ubuntu 22.04/24.04.
@@ -120,6 +113,6 @@ bash /root/simai-env/testing/run-regression.sh full
 
 ## 7) Safety notes
 
-- Use disposable domains for destructive testing (`*.env.sf8.ru`, `*.sf0.ru`).
+- Use only disposable domains under `*.env.sf8.ru` for destructive testing.
 - Do not store private keys or DB passwords in git.
 - Avoid mutating non-test domains unless explicitly approved.

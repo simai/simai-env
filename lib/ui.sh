@@ -70,6 +70,10 @@ ui_result_warn() {
 
 ui_next_steps() {
   ui_section "Next steps"
+  local step
+  for step in "$@"; do
+    printf "  - %s\n" "$step"
+  done
 }
 
 ui_kv() {

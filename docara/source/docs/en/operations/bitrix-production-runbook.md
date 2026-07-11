@@ -1,10 +1,3 @@
----
-extends: _core._layouts.documentation
-section: content
-title: Bitrix Production Runbook
-description: Bitrix Production Runbook
----
-
 # Bitrix Production Runbook
 
 This runbook describes the recommended Bitrix workflow on `simai-env` from fresh provisioning
@@ -22,7 +15,7 @@ to post-install hardening and daily operations.
 Create the site, PHP-FPM pool, DB user, managed cron file, and initial nginx config:
 
 ```bash
-/root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php 8.3 --db yes --force
+/root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php 8.3 --db yes
 ```
 
 Recommended immediate checks:

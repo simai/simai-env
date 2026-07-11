@@ -5,10 +5,13 @@ prompt() {
   local label="$1" default="${2:-}"
   local value
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]] && command -v whiptail >/dev/null 2>&1 && [[ -r /dev/tty && -w /dev/tty ]]; then
+    ui_terminal_geometry
+    local input_width="$UI_DIALOG_WIDTH"
+    (( input_width > 90 )) && input_width=90
     if [[ -n "$default" ]]; then
-      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 90 "$default" 3>&1 1>&2 2>&3) || return 1
+      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 "$input_width" "$default" 3>&1 1>&2 2>&3) || return 1
     else
-      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 90 3>&1 1>&2 2>&3) || return 1
+      value=$(whiptail --title "SIMAI ENV" --inputbox "$label" 10 "$input_width" 3>&1 1>&2 2>&3) || return 1
     fi
     echo "$value"
     return 0
@@ -48,6 +51,9 @@ print_version_banner() {
     local_version="$(cat "${SCRIPT_DIR}/VERSION")"
   fi
   [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  if declare -F self_auto_update_status_from_versions >/dev/null 2>&1; then
+    status="$(self_auto_update_status_from_versions "$local_version" "$remote_version")"
+  fi
   [[ -z "$status" ]] && status="n/a"
   local GREEN=$'\e[32m' RED=$'\e[31m' RESET=$'\e[0m'
   local status_padded
@@ -86,8 +92,8 @@ preflight_bootstrap() {
   fi
   echo "Missing components detected: ${missing[*]}"
   local choice
-  choice=$(select_from_list "Install required packages now?" "yes" "yes" "no")
-  [[ -z "$choice" ]] && choice="yes"
+  choice=$(select_from_list "Install required packages now?" "no" "no" "yes")
+  [[ -z "$choice" ]] && choice="no"
   if [[ "$choice" == "yes" ]]; then
     set +e
     run_command self bootstrap
@@ -254,6 +260,19 @@ actsellistbox=black,cyan
   export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
   menu_init_whiptail_theme
 
+  menu_toggle_backend() {
+    if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
+      export SIMAI_MENU_BACKEND="text"
+      return 0
+    fi
+    if command -v whiptail >/dev/null 2>&1; then
+      export SIMAI_MENU_BACKEND="whiptail"
+      menu_init_whiptail_theme
+    else
+      warn "whiptail is not installed; backend stays text."
+    fi
+  }
+
   menu_choose_key() {
     local title="$1" prompt_text="$2" default_key="${3:-}"
     shift 3
@@ -274,14 +293,15 @@ actsellistbox=black,cyan
         fi
       done
       local out rc=0
+      ui_terminal_geometry
       if [[ -n "$selected" ]]; then
-        out=$(whiptail --title "$title" --default-item "$selected" --menu "$prompt_text" 22 100 14 "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
+        out=$(whiptail --title "$title" --default-item "$selected" --menu "$prompt_text" "$UI_DIALOG_HEIGHT" "$UI_DIALOG_WIDTH" "$UI_LIST_HEIGHT" "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
       else
-        out=$(whiptail --title "$title" --menu "$prompt_text" 22 100 14 "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
+        out=$(whiptail --title "$title" --menu "$prompt_text" "$UI_DIALOG_HEIGHT" "$UI_DIALOG_WIDTH" "$UI_LIST_HEIGHT" "${opts[@]}" 3>&1 1>&2 2>&3) || rc=$?
       fi
       if [[ $rc -ne 0 ]]; then
-        echo ""
-        return 1
+        echo "0"
+        return 0
       fi
       echo "$out"
       return 0
@@ -297,12 +317,18 @@ actsellistbox=black,cyan
     done
     local choice=""
     if [[ -n "$default_key" ]]; then
-      read -r -p "${prompt_text} [${default_key}]: " choice || true
+      if ! read -r -p "${prompt_text} [${default_key}]: " choice; then
+        echo "0"
+        return 0
+      fi
       [[ -z "$choice" ]] && choice="$default_key"
     else
-      read -r -p "${prompt_text}: " choice || true
+      if ! read -r -p "${prompt_text}: " choice; then
+        echo "0"
+        return 0
+      fi
     fi
-    [[ -z "$choice" ]] && { echo ""; return 1; }
+    [[ -z "$choice" ]] && { echo ""; return 0; }
     for item in "${items[@]}"; do
       key="${item%%|*}"
       if [[ "$choice" == "$key" ]]; then
@@ -363,7 +389,7 @@ actsellistbox=black,cyan
         fi
         ;;
       login)
-        if [[ "$section" == "access" && "$cmd" != "create-global" ]]; then
+        if [[ "$section" == "access" && "$cmd" != "create-global" && "$cmd" != "create-project" ]]; then
           local access_logins=()
           if declare -F access_list_logins >/dev/null 2>&1; then
             mapfile -t access_logins < <(access_list_logins 2>/dev/null || true)
@@ -407,6 +433,99 @@ actsellistbox=black,cyan
     echo "$val"
   }
 
+  menu_cancel_before_command() {
+    local section="$1" cmd="$2"
+    echo
+    echo "Result: ${section} ${cmd}"
+    echo "Status: CANCELLED"
+    echo "(cancelled before command start)"
+    if menu_can_use_whiptail; then
+      whiptail --title "SIMAI ENV" --msgbox "Result: ${section} ${cmd}\nStatus: CANCELLED\n(cancelled before command start)" 12 70
+    else
+      echo
+      read -r -p "Press Enter to continue..." _ || true
+    fi
+    echo "---- done (${section} ${cmd}), command_exit=not_started ----"
+  }
+
+  menu_arg_value_is_yes() {
+    local wanted="$1"
+    shift
+    local arg next=""
+    while [[ $# -gt 0 ]]; do
+      arg="$1"
+      shift
+      case "$arg" in
+        --${wanted}=*)
+          [[ "${arg#*=}" == "yes" ]] && return 0
+          ;;
+        "--${wanted}")
+          next="${1:-}"
+          [[ $# -gt 0 ]] && shift
+          [[ "$next" == "yes" ]] && return 0
+          ;;
+      esac
+    done
+    return 1
+  }
+
+  menu_command_needs_confirmation() {
+    local section="$1" cmd="$2"
+    shift 2
+    local flags
+    flags="$(get_command_flags "$section" "$cmd")"
+    if [[ " ${flags} " == *" menu:confirm "* ]]; then
+      return 0
+    fi
+    menu_arg_value_is_yes apply "$@" && return 0
+    menu_arg_value_is_yes fix "$@" && return 0
+    menu_arg_value_is_yes all "$@" && return 0
+    menu_arg_value_is_yes confirm "$@" && return 0
+    return 1
+  }
+
+  menu_command_scope() {
+    local arg value=""
+    while [[ $# -gt 0 ]]; do
+      arg="$1"
+      shift
+      case "$arg" in
+        --domain=*|--login=*|--id=*|--file=*)
+          printf '%s\n' "${arg#*=}"
+          return 0
+          ;;
+        --domain|--login|--id|--file)
+          value="${1:-}"
+          [[ -n "$value" ]] && printf '%s\n' "$value" && return 0
+          ;;
+        --all=yes)
+          printf '%s\n' "all managed targets"
+          return 0
+          ;;
+        --all)
+          value="${1:-}"
+          [[ "$value" == "yes" ]] && printf '%s\n' "all managed targets" && return 0
+          ;;
+      esac
+    done
+    printf '%s\n' "platform scope"
+  }
+
+  menu_confirm_command() {
+    local section="$1" cmd="$2"
+    shift 2
+    local desc scope choice
+    desc="$(get_command_desc "$section" "$cmd")"
+    [[ -z "$desc" ]] && desc="${section} ${cmd}"
+    scope="$(menu_command_scope "$@")"
+    choice=$(select_from_list \
+      $'Confirm managed-state change\nAction: '"${desc}"$'\nTarget: '"${scope}" \
+      "no" \
+      "no" \
+      "yes")
+    [[ "$choice" == "yes" ]]
+  }
+
   run_menu_command() {
     local section="$1" cmd="$2"; shift 2
     echo "---- running ${section} ${cmd} ----"
@@ -423,22 +542,17 @@ actsellistbox=black,cyan
         fi
         val=$(menu_prompt_required_arg "$section" "$cmd" "$key")
         if [[ -z "$val" ]]; then
-          local cancel_rc="${SIMAI_RC_CANCELLED:-89}"
-          echo
-          echo "Result: ${section} ${cmd}"
-          echo "Status: CANCELLED"
-          echo "(cancelled before command start)"
-          if menu_can_use_whiptail; then
-            whiptail --title "SIMAI ENV" --msgbox "Result: ${section} ${cmd}\nStatus: CANCELLED\n(cancelled before command start)" 12 70
-          else
-            echo
-            read -r -p "Press Enter to continue..." _ || true
-          fi
-          echo "---- done (${section} ${cmd}), exit=${cancel_rc} ----"
+          menu_cancel_before_command "$section" "$cmd"
           return 0
         fi
         args+=("--$key" "$val")
       done
+    fi
+    if menu_command_needs_confirmation "$section" "$cmd" "${args[@]}"; then
+      if ! menu_confirm_command "$section" "$cmd" "${args[@]}"; then
+        menu_cancel_before_command "$section" "$cmd"
+        return 0
+      fi
     fi
     local out_file
     out_file="$(mktemp)"
@@ -466,6 +580,23 @@ actsellistbox=black,cyan
     warn "Invalid choice."
   }
 
+  site_automation_menu() {
+    while true; do
+      local -a items=("1|Automatic optimization status" "2|Exclude site from automatic optimization" "3|Include site in automatic optimization" "4|Restore inherited optimization defaults" "0|Back")
+      local ch=""
+      ch=$(menu_choose_key "Sites · Automatic optimization" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command site auto-optimize-status ;;
+        2) run_menu_command site auto-optimize-disable ;;
+        3) run_menu_command site auto-optimize-enable ;;
+        4) run_menu_command site auto-optimize-reset ;;
+        0) break ;;
+        "") continue ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
   sites_menu() {
     while true; do
       menu_auto_update_apply_if_safe "sites"
@@ -489,15 +620,12 @@ actsellistbox=black,cyan
           "3|Site info"
           "4|Activity & optimization"
           "5|Change activity class"
-          "6|Automatic optimization for this site"
-          "7|Exclude site from automatic optimization"
-          "8|Include site in automatic optimization"
-          "9|Use automatic optimization defaults"
-          "10|Site availability"
-          "11|Pause site"
-          "12|Resume site"
-          "13|Change site PHP"
-          "14|Remove site"
+          "6|Site availability"
+          "7|Pause site"
+          "8|Resume site"
+          "9|Change site PHP"
+          "10|Remove site"
+          "20|Automatic optimization..."
           "0|Back"
         )
       fi
@@ -509,69 +637,12 @@ actsellistbox=black,cyan
         3) run_menu_command site info ;;
         4) run_menu_command site usage-status ;;
         5) run_menu_command site usage-set ;;
-        6)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site auto-optimize-status
-          else
-            run_menu_command site runtime-status
-          fi
-          ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site auto-optimize-disable
-          else
-            run_menu_command site runtime-suspend
-          fi
-          ;;
-        8)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site auto-optimize-enable
-          else
-            run_menu_command site runtime-resume
-          fi
-          ;;
-        9)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site auto-optimize-reset
-          else
-            run_menu_command site set-php
-          fi
-          ;;
-        10)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site runtime-status
-          else
-            run_menu_command site remove
-          fi
-          ;;
-        11)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site runtime-suspend
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        12)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site runtime-resume
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        13)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site set-php
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        14)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site remove
-          else
-            menu_invalid_choice
-          fi
-          ;;
+        6) run_menu_command site runtime-status ;;
+        7) run_menu_command site runtime-suspend ;;
+        8) run_menu_command site runtime-resume ;;
+        9) run_menu_command site set-php ;;
+        10) run_menu_command site remove ;;
+        20) [[ $show_advanced -eq 1 ]] && site_automation_menu || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -644,7 +715,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|List databases" "2|Database server status" "3|Prepare site database" "4|Write DB credentials to project .env" "5|Rotate database password" "6|Remove database for site" "0|Back")
+        items=("1|List databases" "2|Database server status" "3|Prepare site database" "4|Write DB credentials to project .env" "5|Rotate database password" "20|Remove database for site" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
@@ -654,7 +725,7 @@ actsellistbox=black,cyan
         3) run_menu_command site db-create ;;
         4) run_menu_command site db-export ;;
         5) run_menu_command site db-rotate ;;
-        6)
+        20)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site db-drop
           else
@@ -674,11 +745,11 @@ actsellistbox=black,cyan
       menu_auto_update_apply_if_safe "diagnostics"
       local -a items=(
         "1|Site health check"
-        "2|Configuration check"
+        "2|Configuration drift status"
         "3|Platform status"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Site health check" "2|Configuration check" "3|Repair configuration" "4|Platform status")
+        items=("1|Site health check" "2|Configuration drift status" "3|Platform status" "20|Repair configuration drift")
       fi
       items+=("0|Back")
       local ch=""
@@ -686,14 +757,8 @@ actsellistbox=black,cyan
       case "$ch" in
         1) run_menu_command site doctor ;;
         2) run_menu_command site drift ;;
-        3)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command site drift --fix yes
-          else
-            run_menu_command self platform-status
-          fi
-          ;;
-        4) run_menu_command self platform-status ;;
+        3) run_menu_command self platform-status ;;
+        20) [[ $show_advanced -eq 1 ]] && run_menu_command site drift --fix yes || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -740,7 +805,7 @@ actsellistbox=black,cyan
         "3|Preview import"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items+=("4|Import archive now")
+        items+=("20|Import archive now")
       fi
       items+=("0|Back")
       local ch=""
@@ -749,7 +814,7 @@ actsellistbox=black,cyan
         1) run_menu_command backup export ;;
         2) run_menu_command backup inspect ;;
         3) run_menu_command backup import --apply no ;;
-        4)
+        20)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command backup import --apply yes
           else
@@ -780,7 +845,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Laravel status" "2|Laravel prepare app" "3|Laravel complete setup" "4|Laravel optimization" "5|Laravel cache clear" "6|Laravel scheduler enable" "7|Laravel scheduler disable" "8|Laravel worker status" "9|Laravel worker restart" "10|Laravel worker logs" "0|Back")
+        items=("1|Laravel status" "2|Prepare Laravel app" "3|Complete Laravel setup" "4|Clear Laravel cache" "5|Enable Laravel scheduler" "6|Disable Laravel scheduler" "7|Laravel worker status" "8|Restart Laravel worker" "9|Laravel worker logs" "20|Laravel optimization status" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Applications · Laravel" "Enter choice" "" "${items[@]}")
@@ -788,55 +853,13 @@ actsellistbox=black,cyan
         1) run_menu_command laravel status ;;
         2) run_menu_command laravel app-ready ;;
         3) run_menu_command laravel finalize ;;
-        4)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command laravel perf-status
-          else
-            run_menu_command cache clear
-          fi
-          ;;
-        5)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command cache clear
-          else
-            run_menu_command cron add
-          fi
-          ;;
-        6)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command cron add
-          else
-            run_menu_command cron remove
-          fi
-          ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command cron remove
-          else
-            run_menu_command queue status
-          fi
-          ;;
-        8)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command queue status
-          else
-            run_menu_command queue restart
-          fi
-          ;;
-        9)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command queue restart
-          else
-            run_menu_command queue logs
-          fi
-          ;;
-        10)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command queue logs
-          else
-            menu_invalid_choice
-          fi
-          ;;
+        4) run_menu_command cache clear ;;
+        5) run_menu_command cron add ;;
+        6) run_menu_command cron remove ;;
+        7) run_menu_command queue status ;;
+        8) run_menu_command queue restart ;;
+        9) run_menu_command queue logs ;;
+        20) [[ $show_advanced -eq 1 ]] && run_menu_command laravel perf-status || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -850,12 +873,12 @@ actsellistbox=black,cyan
       menu_auto_update_apply_if_safe "applications:wordpress"
       local -a items=(
         "1|WordPress status"
-        "2|WordPress optimization"
-        "3|WordPress complete setup"
+        "2|WordPress optimization status"
+        "3|Complete WordPress setup"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|WordPress status" "2|WordPress optimization" "3|WordPress complete setup" "4|WordPress installer ready" "5|WordPress scheduler status" "6|WordPress scheduler sync" "7|WordPress cache clear" "0|Back")
+        items=("1|WordPress status" "2|WordPress optimization status" "3|Complete WordPress setup" "20|Prepare WordPress installer" "21|WordPress scheduler status" "22|Sync WordPress scheduler" "23|Clear WordPress cache" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Applications · WordPress" "Enter choice" "" "${items[@]}")
@@ -863,28 +886,28 @@ actsellistbox=black,cyan
         1) run_menu_command wp status ;;
         2) run_menu_command wp perf-status ;;
         3) run_menu_command wp finalize ;;
-        4)
+        20)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp installer-ready
           else
             menu_invalid_choice
           fi
           ;;
-        5)
+        21)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cron-status
           else
             menu_invalid_choice
           fi
           ;;
-        6)
+        22)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cron-sync
           else
             menu_invalid_choice
           fi
           ;;
-        7)
+        23)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command wp cache-clear
           else
@@ -899,19 +922,54 @@ actsellistbox=black,cyan
     done
   }
 
+  bitrix_advanced_menu() {
+    while true; do
+      local -a items=(
+        "1|Repair Bitrix ownership"
+        "2|Bitrix scheduler status"
+        "3|Sync Bitrix scheduler"
+        "4|Clear Bitrix cache"
+        "5|Bitrix agents status"
+        "6|Bitrix agents readiness plan"
+        "7|Generate Bitrix DB config"
+        "8|Prepare Bitrix installer"
+        "9|Sync Bitrix PHP baseline for all sites"
+        "10|Apply Bitrix agents configuration"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "Applications · Bitrix · Advanced" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command bitrix ownership --apply yes ;;
+        2) run_menu_command bitrix cron-status ;;
+        3) run_menu_command bitrix cron-sync ;;
+        4) run_menu_command bitrix cache-clear ;;
+        5) run_menu_command bitrix agents-status ;;
+        6) run_menu_command bitrix agents-sync ;;
+        7) run_menu_command bitrix db-preseed ;;
+        8) run_menu_command bitrix installer-ready ;;
+        9) run_menu_command bitrix php-baseline-sync --all yes ;;
+        10) run_menu_command bitrix agents-sync --apply yes ;;
+        0) break ;;
+        "") continue ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
   bitrix_app_menu() {
     while true; do
       menu_auto_update_apply_if_safe "applications:bitrix"
       local -a items=(
         "1|Bitrix status"
-        "2|Bitrix optimization"
-        "3|Bitrix complete setup"
-        "4|Bitrix restore from backup"
-        "5|Bitrix ownership check"
+        "2|Bitrix optimization status"
+        "3|Complete Bitrix setup"
+        "4|Prepare Bitrix restore"
+        "5|Bitrix ownership status"
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Bitrix status" "2|Bitrix optimization" "3|Bitrix complete setup" "4|Bitrix restore from backup" "5|Bitrix ownership check" "6|Bitrix ownership repair" "7|Bitrix scheduler status" "8|Bitrix scheduler sync" "9|Bitrix cache clear" "10|Bitrix agents status" "11|Bitrix agents readiness" "12|Bitrix DB preseed" "13|Bitrix installer ready" "14|Bitrix PHP baseline sync (all)" "15|Bitrix agents sync (apply)" "0|Back")
+        items=("1|Bitrix status" "2|Bitrix optimization status" "3|Complete Bitrix setup" "4|Prepare Bitrix restore" "5|Bitrix ownership status" "20|Advanced Bitrix operations..." "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Applications · Bitrix" "Enter choice" "" "${items[@]}")
@@ -923,76 +981,7 @@ actsellistbox=black,cyan
           run_menu_command bitrix restore-ready
           ;;
         5) run_menu_command bitrix ownership ;;
-        6)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix ownership --apply yes
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        8)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cron-sync
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        9)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix cache-clear
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        10)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        11)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-sync
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        12)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix db-preseed
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        13)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix installer-ready
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        14)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix php-baseline-sync --all yes
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        15)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command bitrix agents-sync --apply yes
-          else
-            menu_invalid_choice
-          fi
-          ;;
+        20) [[ $show_advanced -eq 1 ]] && bitrix_advanced_menu || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -1090,6 +1079,35 @@ actsellistbox=black,cyan
     done
   }
 
+  system_advanced_menu() {
+    while true; do
+      local -a items=(
+        "1|Apply optimization plan"
+        "2|Enable update checks"
+        "3|Enable safe automatic updates"
+        "4|Disable automatic updates"
+        "5|Automation scheduler status"
+        "6|Health review status"
+        "7|Site review status"
+        "0|Back"
+      )
+      local ch=""
+      ch=$(menu_choose_key "System · Advanced operations" "Enter choice" "" "${items[@]}")
+      case "$ch" in
+        1) run_menu_command self perf-rebalance --mode auto --confirm yes ;;
+        2) run_menu_command self auto-update-enable-check ;;
+        3) run_menu_command self auto-update-enable-apply ;;
+        4) run_menu_command self auto-update-disable ;;
+        5) run_menu_command self scheduler-status ;;
+        6) run_menu_command self health-review-status ;;
+        7) run_menu_command self site-review-status ;;
+        0) break ;;
+        "") continue ;;
+        *) menu_invalid_choice ;;
+      esac
+    done
+  }
+
   system_menu() {
     while true; do
       menu_auto_update_apply_if_safe "system"
@@ -1097,18 +1115,22 @@ actsellistbox=black,cyan
       adv_label="Advanced mode (currently: $([[ $show_advanced -eq 1 ]] && echo ON || echo OFF))"
       local backend_label="Menu backend (currently: ${SIMAI_MENU_BACKEND:-text})"
       local auto_opt_label
-      auto_opt_label="Automatic optimization (currently: $(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no))"
+      if [[ "$(scheduler_job_enabled "auto_optimize" 2>/dev/null || echo no)" == "yes" ]]; then
+        auto_opt_label="Turn automatic optimization off"
+      else
+        auto_opt_label="Turn automatic optimization on"
+      fi
       local auto_update_mode="check"
       if declare -F self_auto_update_mode >/dev/null 2>&1; then
         auto_update_mode="$(self_auto_update_mode 2>/dev/null || echo check)"
       fi
-      local auto_update_label="Automatic updates (currently: ${auto_update_mode})"
+      local auto_update_label="Automatic updates status (currently: ${auto_update_mode})"
       local -a items=(
         "1|Platform status"
         "2|Optimization status"
         "3|${auto_opt_label}"
         "4|Optimization plan"
-        "5|Repair platform"
+        "5|Repair/install platform components"
         "6|Update simai-env"
         "7|Version"
         "8|${auto_update_label}"
@@ -1118,7 +1140,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|Platform status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization plan" "5|Apply optimization plan" "6|Repair platform" "7|Update simai-env" "8|Version" "9|${auto_update_label}" "10|Check for updates now" "11|Turn update checks on" "12|Turn safe auto-update on" "13|Turn automatic updates off" "14|${adv_label}" "15|${backend_label}" "16|Automation scheduler status" "17|Health review" "18|Site review" "0|Back")
+        items=("1|Platform status" "2|Optimization status" "3|${auto_opt_label}" "4|Optimization plan" "5|Repair/install platform components" "6|Update simai-env" "7|Version" "8|${auto_update_label}" "9|Check for updates now" "10|${adv_label}" "11|${backend_label}" "20|Advanced system operations..." "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "System" "Enter choice" "" "${items[@]}")
@@ -1132,140 +1154,22 @@ actsellistbox=black,cyan
             run_menu_command self auto-optimize-enable
           fi
           ;;
-        4)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self perf-plan
-          else
-            run_menu_command self perf-plan
-          fi
-          ;;
-        5)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self perf-rebalance --mode auto --confirm yes
-          else
-            run_menu_command self bootstrap
-          fi
-          ;;
-        6)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self bootstrap
-          else
-            run_menu_command self update
-          fi
-          ;;
-        7)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self update
-          else
-            run_menu_command self version
-          fi
-          ;;
-        8)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self version
-          else
-            run_menu_command self auto-update-status
-          fi
-          ;;
-        9)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self auto-update-run-check
-          else
-            run_menu_command self auto-update-run-check
-          fi
-          ;;
+        4) run_menu_command self perf-plan ;;
+        5) run_menu_command self bootstrap ;;
+        6) run_menu_command self update ;;
+        7) run_menu_command self version ;;
+        8) run_menu_command self auto-update-status ;;
+        9) run_menu_command self auto-update-run-check ;;
         10)
           if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self auto-update-enable-check
+            show_advanced=0
           else
             show_advanced=1
-            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
           fi
+          export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
           ;;
-        11)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self auto-update-enable-apply
-          else
-            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
-              export SIMAI_MENU_BACKEND="text"
-            else
-              if command -v whiptail >/dev/null 2>&1; then
-                export SIMAI_MENU_BACKEND="whiptail"
-                menu_init_whiptail_theme
-              else
-                warn "whiptail is not installed; backend stays text."
-              fi
-            fi
-          fi
-          ;;
-        12)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self auto-update-disable
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        13)
-          if [[ $show_advanced -eq 1 ]]; then
-            show_advanced=0
-            export SIMAI_MENU_SHOW_ADVANCED="$show_advanced"
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        14)
-          if [[ $show_advanced -eq 1 ]]; then
-            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
-              export SIMAI_MENU_BACKEND="text"
-            else
-              if command -v whiptail >/dev/null 2>&1; then
-                export SIMAI_MENU_BACKEND="whiptail"
-                menu_init_whiptail_theme
-              else
-                warn "whiptail is not installed; backend stays text."
-              fi
-            fi
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        15)
-          if [[ $show_advanced -eq 1 ]]; then
-            if [[ "${SIMAI_MENU_BACKEND:-text}" == "whiptail" ]]; then
-              export SIMAI_MENU_BACKEND="text"
-            else
-              if command -v whiptail >/dev/null 2>&1; then
-                export SIMAI_MENU_BACKEND="whiptail"
-                menu_init_whiptail_theme
-              else
-                warn "whiptail is not installed; backend stays text."
-              fi
-            fi
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        16)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self scheduler-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        17)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self health-review-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
-        18)
-          if [[ $show_advanced -eq 1 ]]; then
-            run_menu_command self site-review-status
-          else
-            menu_invalid_choice
-          fi
-          ;;
+        11) menu_toggle_backend ;;
+        20) [[ $show_advanced -eq 1 ]] && system_advanced_menu || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;

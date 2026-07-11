@@ -427,6 +427,11 @@ profile_enable_handler() {
     info "Profile ${id} already enabled"
     return 0
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Enable profile ${id}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   current+=("$id")
   printf "%s\n" "${current[@]}" | write_profiles_allowlist
   info "Profile ${id} enabled"
@@ -474,6 +479,11 @@ profile_disable_handler() {
   elif [[ ${#used[@]} -gt 0 ]]; then
     warn "Disabling profile ${id} that is used by sites: ${used[*]}"
   fi
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+    local choice
+    choice=$(select_from_list "Disable profile ${id}?" "no" "no" "yes")
+    [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
+  fi
   local remaining=()
   mapfile -t remaining < <(read_profiles_allowlist || true)
   if [[ ${#remaining[@]} -eq 0 ]]; then
@@ -518,6 +528,6 @@ profile_init_handler() {
 register_cmd "profile" "list" "List profiles and activation status" "profile_list_handler" "" "all=no"
 register_cmd "profile" "used-by" "Show profile usage summary" "profile_used_by_handler" "" "id="
 register_cmd "profile" "used-by-one" "Show sites using a specific profile" "profile_used_by_handler" "id" ""
-register_cmd "profile" "enable" "Enable a profile" "profile_enable_handler" "id" ""
-register_cmd "profile" "disable" "Disable a profile" "profile_disable_handler" "id" "force=no"
-register_cmd "profile" "init" "Initialize profile activation allowlist" "profile_init_handler" "" "mode=core force=no"
+register_cmd "profile" "enable" "Enable a profile" "profile_enable_handler" "id" "" "menu:internal-confirm"
+register_cmd "profile" "disable" "Disable a profile" "profile_disable_handler" "id" "force=no" "menu:internal-confirm"
+register_cmd "profile" "init" "Initialize profile activation allowlist" "profile_init_handler" "" "mode=core force=no" "menu:confirm"

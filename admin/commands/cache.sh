@@ -37,7 +37,7 @@ cache_clear_handler() {
     local rc=$?
     if [[ $rc -eq 2 ]]; then
       error "php${php_version} not found on this system."
-      echo "Install it with: simai-admin.sh php install --version ${php_version}"
+      echo "Install it with: simai-admin.sh php install --php ${php_version}"
     else
       error "Unable to resolve PHP binary for version: ${php_version}"
     fi
@@ -59,5 +59,5 @@ cache_clear_handler() {
   progress_done "Laravel cache cleared"
 }
 
-register_cmd "cache" "clear" "Clear Laravel caches (laravel-only)" "cache_clear_handler" "domain" ""
-register_cmd "cache" "run" "Alias for cache clear" "cache_clear_handler" "domain" ""
+register_cmd "cache" "clear" "Clear Laravel caches (laravel-only)" "cache_clear_handler" "domain" "" "menu:confirm"
+register_cmd "cache" "run" "Alias for cache clear" "cache_clear_handler" "domain" "" "menu:confirm"

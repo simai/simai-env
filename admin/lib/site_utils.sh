@@ -1371,11 +1371,13 @@ remove_nginx_site() {
       if [[ -n "$backup" && -f "$backup" ]]; then
         cp -p "$backup" "$site_available" >>"$LOG_FILE" 2>&1 || true
         ln -sf "$site_available" "$site_enabled"
+        rm -f -- "$backup"
       fi
       return 1
     fi
   os_svc_reload nginx || true
   fi
+  [[ -z "$backup" ]] || rm -f -- "$backup"
 }
 
 ensure_nginx_catchall() {

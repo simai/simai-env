@@ -7,7 +7,7 @@ This repository is tested against a dedicated server and disposable DNS zones.
 - Server: `root@5.129.198.85`
 - Reference domain: `env.sf8.ru`
 - Disposable Let's Encrypt zone: `*.env.sf8.ru`
-- Disposable manual SSL zone: `*.sf0.ru`
+- Disposable manual SSL zone: `*.env.sf8.ru`
 
 ## Domain Policy
 
@@ -22,7 +22,7 @@ Use `*.env.sf8.ru` for disposable test sites:
 
 Use `env.sf8.ru` only as a stable smoke/regression reference site.
 
-Use `*.sf0.ru` only for manual SSL scenarios:
+Use a separate disposable name under `*.env.sf8.ru` for manual SSL scenarios:
 
 - `ssl install`
 - `ssl status`
@@ -36,7 +36,7 @@ Use predictable temporary names:
 - `t-laravel-<id>.env.sf8.ru`
 - `t-static-<id>.env.sf8.ru`
 - `t-alias-<id>.env.sf8.ru`
-- `t-manual-<id>.sf0.ru`
+- `t-manual-<id>.env.sf8.ru`
 
 Recommended `<id>` format: `YYMMDD-NN`.
 
@@ -64,6 +64,23 @@ bash testing/run-regression.sh negative
 bash testing/run-regression.sh full
 ```
 
+The runner is read-only by default. Set `TEST_SYNC_UPDATE=yes` only for an
+explicit action-gated candidate synchronization step. Mutating modes also
+require both `ALLOW_DESTRUCTIVE_TESTS=yes` and
+`AUTO_CLEANUP_TEST_SITES=yes`; the example config keeps all three switches off.
+
+Registry coverage is available as machine-readable JSON:
+
+```bash
+/usr/bin/python3 scripts/ci/command_coverage.py --check
+bash scripts/ci/registry_dispatch_harness.sh
+```
+
+The JSON contains one row for every registered command, its menu/CLI/legacy
+surface and whether runtime execution exists or remains explicitly `not_run`.
+The Linux dispatcher harness checks every route without executing handlers by
+injecting an unknown option that must fail before dispatch.
+
 Modes:
 
 - `release-gate` wrapper runs shell syntax checks + `full` regression (mandatory for releases).
@@ -71,7 +88,6 @@ Modes:
 - `core` runs smoke plus a disposable generic site lifecycle with DB and backup checks.
 - `menu` runs interactive menu cancel-flow checks in text backend (`site info`, `ssl status`, `site remove`).
 - `backend` probes `SIMAI_MENU_BACKEND=whiptail` activation (skips if `whiptail` is not installed on target host).
-- `negative` runs expected-failure checks (missing domain/file) to validate error handling.
 - `negative` runs expected-failure checks (missing domain/file, broken manual cert paths, backup import profile-compatibility guards).
 - `full` runs smoke + core + menu + backend + negative.
 
@@ -82,13 +98,13 @@ Do not store private keys or certificate bundles in git.
 Recommended locations:
 
 - Local workstation: `testing/secrets/` or another non-repo path
-- Server: `/root/test-certs/sf0/`
+- Server: `/root/test-certs/env-sf8/`
 
 Expected manual SSL files on the server:
 
-- `/root/test-certs/sf0/fullchain.pem`
-- `/root/test-certs/sf0/privkey.pem`
-- `/root/test-certs/sf0/chain.pem`
+- `/root/test-certs/env-sf8/fullchain.pem`
+- `/root/test-certs/env-sf8/privkey.pem`
+- `/root/test-certs/env-sf8/chain.pem`
 
 ## Safe vs Mutating Checks
 
@@ -139,7 +155,7 @@ Do not mutate non-test domains or user-managed sites unless explicitly requested
 8. `queue status/restart/logs`
 9. `site db-create/db-rotate/db-export/db-drop`
 10. `site add` for `alias`
-11. `ssl install` for `*.sf0.ru`
+11. `ssl install` for a disposable `*.env.sf8.ru` name
 12. `ssl remove`
 13. `site remove`
 
@@ -151,6 +167,14 @@ Do not mutate non-test domains or user-managed sites unless explicitly requested
 4. non-existent domain
 5. broken manual cert path
 6. non-zero command exit must not kill menu
+7. every command rejects an unknown option and a stray positional token
+
+### Terminal UX
+
+Check text and whiptail menus with `LINES`/`COLUMNS` equivalent to `60x20`,
+`80x24` and `120x40`. Primary actions and `Back` must remain reachable, narrow
+tables must switch to stacked output, and a safe long-running fixture must emit
+at least one `WORKING` heartbeat and handle interruption.
 
 ## Notes
 

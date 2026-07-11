@@ -34,6 +34,12 @@ SIMAI_ROOT="${TEST_SIMAI_ROOT:-/root/simai-env}"
 _test_domain=""
 _wp_test_domain=""
 _bitrix_test_domain=""
+_test_db_name=""
+_test_db_user=""
+_wp_db_name=""
+_wp_db_user=""
+_bitrix_db_name=""
+_bitrix_db_user=""
 
 remote() {
   ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" "$@"
@@ -76,29 +82,50 @@ run_menu_case() {
   fi
 }
 
-cleanup() {
-  if [[ -z "${_test_domain}" ]]; then
-    return 0
-  fi
-  echo "[cleanup] ${_test_domain}"
-  remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_test_domain}' --confirm yes >/dev/null 2>&1 || true"
-  remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
-  if [[ -n "${_wp_test_domain}" ]]; then
-    echo "[cleanup] ${_wp_test_domain}"
-    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_wp_test_domain}' --confirm yes >/dev/null 2>&1 || true"
-    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_wp_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
-  fi
-  if [[ -n "${_bitrix_test_domain}" ]]; then
-    echo "[cleanup] ${_bitrix_test_domain}"
-    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${_bitrix_test_domain}' --confirm yes >/dev/null 2>&1 || true"
-    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${_bitrix_test_domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true"
+capture_db_identity() {
+  local domain="$1"
+  remote "set -a; source '/etc/simai-env/sites/${domain}/db.env'; set +a; printf '%s %s\\n' \"\$DB_NAME\" \"\$DB_USER\""
+}
+
+assert_remote_site_absent() {
+  local domain="$1" db_name="${2:-}" db_user="${3:-}"
+  local project="${domain//./-}"
+  if ! remote "set -e; test ! -e '/etc/nginx/sites-available/${domain}.conf'; test ! -e '/etc/nginx/sites-enabled/${domain}.conf'; test ! -e '/home/simai/www/${domain}'; test ! -e '/etc/simai-env/sites/${domain}'; test ! -e '/etc/cron.d/${project}'; test ! -e '/etc/systemd/system/laravel-queue-${project}.service'; ! find /etc/php -path '*/pool.d/${project}.conf' -print -quit | grep -q .; ! find /etc/nginx/sites-available /root/simai-backups /tmp -maxdepth 2 -name '*${domain}*' -print -quit | grep -q .; [[ -z '${db_name}' ]] || [[ \$(mysql -NBe \"SELECT COUNT(*) FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${db_name}'\" 2>/dev/null) -eq 0 ]]; [[ -z '${db_user}' ]] || [[ \$(mysql -NBe \"SELECT COUNT(*) FROM mysql.user WHERE User='${db_user}'\" 2>/dev/null) -eq 0 ]]"; then
+    echo "[fail] cleanup residue remains for ${domain}" >&2
+    return 1
   fi
 }
 
-trap cleanup EXIT
+cleanup_one() {
+  local domain="$1" db_name="${2:-}" db_user="${3:-}" failed=0
+  [[ -n "$domain" ]] || return 0
+  echo "[cleanup] ${domain}"
+  remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site db-drop --domain '${domain}' --remove_files yes --confirm yes >/dev/null 2>&1 || true" || failed=1
+  remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh site remove --domain '${domain}' --remove-files yes --confirm yes >/dev/null 2>&1 || true" || failed=1
+  remote "rm -f -- /root/simai-backups/'${domain}'-regression.tar.gz /root/simai-backups/'${domain}'-negative-base.tar.gz /root/simai-backups/'${domain}'-negative-unknown-profile.tar.gz /root/simai-backups/'${domain}'-negative-phpnone.tar.gz /etc/nginx/sites-available/'${domain}'.conf.bak.* /etc/nginx/sites-available/'${domain}'.conf.failed.*; rm -rf -- /tmp/simai-neg-unknown-'${domain}' /tmp/simai-neg-phpnone-'${domain}'" || failed=1
+  assert_remote_site_absent "$domain" "$db_name" "$db_user" || failed=1
+  return "$failed"
+}
+
+cleanup() {
+  local failed=0
+  cleanup_one "${_test_domain:-}" "${_test_db_name:-}" "${_test_db_user:-}" || failed=1
+  cleanup_one "${_wp_test_domain:-}" "${_wp_db_name:-}" "${_wp_db_user:-}" || failed=1
+  cleanup_one "${_bitrix_test_domain:-}" "${_bitrix_db_name:-}" "${_bitrix_db_user:-}" || failed=1
+  return "$failed"
+}
+
+cleanup_on_exit() {
+  local rc=$?
+  trap - EXIT
+  cleanup || rc=1
+  exit "$rc"
+}
+
+trap cleanup_on_exit EXIT
 
 run_smoke() {
-  if [[ "${TEST_SYNC_UPDATE:-yes}" == "yes" ]]; then
+  if [[ "${TEST_SYNC_UPDATE:-no}" == "yes" ]]; then
     run_cmd "self update (sync test host)" "SIMAI_UPDATE_SMOKE_STRICT=yes ./simai-admin.sh self update >/dev/null"
   fi
   run_cmd "self status" "./simai-admin.sh self status >/dev/null"
@@ -110,12 +137,15 @@ run_smoke() {
 }
 
 run_core() {
+  [[ "${ALLOW_DESTRUCTIVE_TESTS:-no}" == "yes" ]] || { echo "Set ALLOW_DESTRUCTIVE_TESTS=yes for core tests" >&2; exit 1; }
+  [[ "${AUTO_CLEANUP_TEST_SITES:-no}" == "yes" ]] || { echo "Set AUTO_CLEANUP_TEST_SITES=yes for core tests" >&2; exit 1; }
   local suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
   local stamp
   stamp="$(date +%y%m%d-%H%M%S)"
   _test_domain="t-core-${stamp}${suffix}"
 
-  run_cmd "site add (generic + db)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php-version 8.2 --db yes --force >/dev/null"
+  run_cmd "site add (generic + db)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db yes >/dev/null"
+  read -r _test_db_name _test_db_user < <(capture_db_identity "${_test_domain}")
   run_cmd "site info" "./simai-admin.sh site info --domain '${_test_domain}' >/dev/null"
   run_cmd "site db-status" "./simai-admin.sh site db-status --domain '${_test_domain}' >/dev/null"
   run_cmd "site db-export" "./simai-admin.sh site db-export --domain '${_test_domain}' --confirm yes >/dev/null"
@@ -129,7 +159,8 @@ run_core() {
   local wp_stamp
   wp_stamp="$(date +%y%m%d-%H%M%S)"
   _wp_test_domain="t-wp-${wp_stamp}${wp_suffix}"
-  run_cmd "site add (wordpress + db)" "./simai-admin.sh site add --domain '${_wp_test_domain}' --profile wordpress --php-version 8.2 --db yes --force >/dev/null"
+  run_cmd "site add (wordpress + db)" "./simai-admin.sh site add --domain '${_wp_test_domain}' --profile wordpress --php 8.2 --db yes >/dev/null"
+  read -r _wp_db_name _wp_db_user < <(capture_db_identity "${_wp_test_domain}")
   run_cmd "wp status" "./simai-admin.sh wp status --domain '${_wp_test_domain}' >/dev/null"
   run_cmd "wp cron-status" "./simai-admin.sh wp cron-status --domain '${_wp_test_domain}' >/dev/null"
   run_cmd "wp cron-sync" "./simai-admin.sh wp cron-sync --domain '${_wp_test_domain}' >/dev/null"
@@ -138,7 +169,8 @@ run_core() {
   local bx_stamp
   bx_stamp="$(date +%y%m%d-%H%M%S)"
   _bitrix_test_domain="t-bitrix-${bx_stamp}${bx_suffix}"
-  run_cmd "site add (bitrix + db)" "./simai-admin.sh site add --domain '${_bitrix_test_domain}' --profile bitrix --php-version 8.2 --db yes --force >/dev/null"
+  run_cmd "site add (bitrix + db)" "./simai-admin.sh site add --domain '${_bitrix_test_domain}' --profile bitrix --php 8.2 --db yes >/dev/null"
+  read -r _bitrix_db_name _bitrix_db_user < <(capture_db_identity "${_bitrix_test_domain}")
   run_cmd "bitrix status" "./simai-admin.sh bitrix status --domain '${_bitrix_test_domain}' >/dev/null"
   run_cmd "bitrix cron-status" "./simai-admin.sh bitrix cron-status --domain '${_bitrix_test_domain}' >/dev/null"
   run_cmd "bitrix cron-sync" "./simai-admin.sh bitrix cron-sync --domain '${_bitrix_test_domain}' >/dev/null"
@@ -147,10 +179,11 @@ run_core() {
 }
 
 run_menu() {
-  run_menu_case "menu site info cancel" $'1\n3\n\n0\n0\n' "---- done (site info), exit=0 ----"
-  run_menu_case "menu ssl status cancel" $'2\n2\n\n0\n0\n' "---- done (ssl status), exit=0 ----"
-  run_menu_case "menu site remove cancel" $'1\n5\n\n0\n0\n' "---- done (site remove), exit=0 ----"
-  run_menu_case "menu backup inspect cancel" $'7\n2\n\n0\n0\n' "---- done (backup inspect), exit=0 ----"
+  run_menu_case "menu site info cancel" $'1\n3\n0\n\n0\n0\n' "---- done (site info), exit=89 ----"
+  run_menu_case "menu ssl status cancel" $'2\n2\n0\n\n0\n0\n' "---- done (ssl status), exit=89 ----"
+  run_menu_case "menu site remove cancel" $'1\n10\n0\n\n0\n0\n' "---- done (site remove), exit=89 ----"
+  run_menu_case "menu backup inspect cancel" $'8\n2\n0\n\n0\n0\n' "---- done (backup inspect), command_exit=not_started ----"
+  run_menu_case "menu access pre-dispatch cancel" $'5\n3\n0\n\n0\n0\n' "---- done (access create-project), command_exit=not_started ----"
 }
 
 run_backend() {
@@ -182,12 +215,14 @@ run_backend() {
 }
 
 run_negative() {
+  [[ "${ALLOW_DESTRUCTIVE_TESTS:-no}" == "yes" ]] || { echo "Set ALLOW_DESTRUCTIVE_TESTS=yes for negative tests" >&2; exit 1; }
+  [[ "${AUTO_CLEANUP_TEST_SITES:-no}" == "yes" ]] || { echo "Set AUTO_CLEANUP_TEST_SITES=yes for negative tests" >&2; exit 1; }
   if [[ -z "${_test_domain:-}" ]]; then
     local suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
     local stamp
     stamp="$(date +%y%m%d-%H%M%S)"
     _test_domain="t-neg-${stamp}${suffix}"
-    run_cmd "site add (negative fixture)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php-version 8.2 --db no --force >/dev/null"
+    run_cmd "site add (negative fixture)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db no >/dev/null"
   fi
 
   local backup_base="/root/simai-backups/${_test_domain}-negative-base.tar.gz"
