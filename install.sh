@@ -5,6 +5,41 @@ REPO_URL=${REPO_URL:-https://github.com/simai/simai-env}
 REPO_BRANCH=${REPO_BRANCH:-${VERSION:-main}}           # branch name (VERSION kept for backward compatibility override)
 REF=${REF:-refs/heads/${REPO_BRANCH}}  # override to pin a tag: REF=refs/tags/vX.Y.Z (see GitHub releases/tags)
 INSTALL_DIR=${INSTALL_DIR:-/root/simai-env}
+MODE="${SIMAI_INSTALL_MODE:-full}"
+NO_BOOT="${SIMAI_INSTALL_NO_BOOTSTRAP:-0}"
+
+install_mode_validate() {
+  case "$MODE" in
+    full|scripts) ;;
+    *)
+      echo "Invalid SIMAI_INSTALL_MODE: ${MODE} (expected: full or scripts)" >&2
+      return 1
+      ;;
+  esac
+  case "$NO_BOOT" in
+    0|1) ;;
+    *)
+      echo "Invalid SIMAI_INSTALL_NO_BOOTSTRAP: ${NO_BOOT} (expected: 0 or 1)" >&2
+      return 1
+      ;;
+  esac
+}
+
+install_bootstrap_enabled() {
+  [[ "$MODE" == "full" && "$NO_BOOT" == "0" ]]
+}
+
+install_profile_init_enabled() {
+  [[ "$MODE" == "full" ]]
+}
+
+# Test-only source seam: expose pure mode decisions without downloading or
+# changing the host. Normal execution never sets this variable.
+if [[ "${SIMAI_INSTALL_SOURCE_ONLY:-0}" == "1" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
+install_mode_validate
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
@@ -196,11 +231,9 @@ chmod +x "$INSTALL_DIR/update.sh"
 
 echo "Installed to $INSTALL_DIR"
 
-MODE="${SIMAI_INSTALL_MODE:-full}"
-NO_BOOT="${SIMAI_INSTALL_NO_BOOTSTRAP:-0}"
 MENU_LAUNCHED=0
 
-if [[ "$NO_BOOT" != "1" && "$MODE" != "scripts" ]]; then
+if install_bootstrap_enabled; then
   echo "[1/3] Running bootstrap (packages and services)..."
   export DEBIAN_FRONTEND=noninteractive
   if ! "${INSTALL_DIR}/simai-env.sh" bootstrap --php 8.2 --mysql percona --node-version 20 --silent; then
@@ -214,7 +247,7 @@ else
   echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 20"
 fi
 
-if [[ "$MODE" != "scripts" ]]; then
+if install_profile_init_enabled; then
   if [[ $EUID -eq 0 ]]; then
     if [[ ! -f /etc/simai-env/profiles.enabled ]]; then
       has_simai=0

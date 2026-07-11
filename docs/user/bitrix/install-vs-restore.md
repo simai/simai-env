@@ -1,6 +1,9 @@
 # Bitrix Install Vs Restore
 
 After `Sites -> Create site`, Bitrix still needs an application setup step.
+Site creation is infrastructure-first by default: it does not publish
+`bitrixsetup.php` or `restore.php` unless you explicitly choose that helper in
+the menu or pass `--bitrix-files setup|restore`.
 
 There are two normal paths:
 
@@ -46,6 +49,12 @@ sudo /root/simai-env/simai-admin.sh bitrix installer-ready --domain <domain>
 sudo /root/simai-env/simai-admin.sh bitrix finalize --domain <domain> --confirm yes
 ```
 
+You can also prepare the fresh installer during site creation:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php 8.2 --create-db yes --bitrix-files setup
+```
+
 What `installer-ready` prepares:
 
 - Bitrix DB config files from managed `db.env` when DB exists
@@ -75,6 +84,12 @@ CLI equivalent:
 ```bash
 sudo /root/simai-env/simai-admin.sh bitrix restore-ready --domain <domain>
 sudo /root/simai-env/simai-admin.sh bitrix finalize --domain <domain> --confirm yes
+```
+
+You can also prepare `restore.php` during site creation:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site add --domain <domain> --profile bitrix --php 8.2 --create-db yes --bitrix-files restore
 ```
 
 What `restore-ready` prepares:

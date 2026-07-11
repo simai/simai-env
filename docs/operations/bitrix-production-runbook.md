@@ -29,7 +29,9 @@ Recommended immediate checks:
 Notes:
 - At this stage `dbconn.php` stays installer-safe.
 - Agents-via-cron is not enabled yet.
-- `site add` already prepares DB credentials and tries to download `bitrixsetup.php` best effort.
+- `site add` defaults to no public Bitrix helper files. Use `--bitrix-files setup`
+  for a fresh installer helper, `--bitrix-files restore` for backup restore, or
+  run `bitrix installer-ready` / `bitrix restore-ready` after site creation.
 
 ## 3) Phase 2: Prepare the Installer
 
@@ -43,7 +45,7 @@ This step ensures:
 - `public/bitrix/.settings.php`
 - `public/bitrix/php_interface/dbconn.php`
 - `public/bitrix/php_interface/after_connect_d7.php`
-- `public/bitrixsetup.php` (best effort)
+- `public/bitrixsetup.php` when the setup helper is requested
 
 Recommended verification:
 

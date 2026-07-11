@@ -19,6 +19,7 @@ Options:
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
 - DB (optional): `--create-db=yes|no` (alias: `--db=yes|no`), `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated), `--db-export=yes|no` (export to project `.env`; default yes for required DB profiles, no otherwise), `--skip-db-required=yes|no` (default `no`; allow required-DB profiles to be created without DB — for migration only, emits warning)
 - Access (optional): `--access-create=yes|no`, `--access-login`, `--access-password` (create project-scoped SFTP access after site creation; menu prompts when omitted)
+- Bitrix helper files (Bitrix profile only): `--bitrix-files=none|setup|restore`. Default is `none` so new Bitrix sites do not expose public installer/restore scripts until the operator chooses the required flow.
 
 Behavior:
 - Generic uses placeholder and profile-driven docroot (`PROFILE_PUBLIC_DIR`, default `public`); Laravel requires `artisan`. Static is nginx-only (no PHP/DB) with `index.html` placeholder under docroot and nginx-served `/healthcheck` (local-only). Alias points the domain to an existing site (reuses its root, no DB/pool creation).
@@ -29,6 +30,11 @@ Behavior:
   - `*.domain -> A -> <server-ip>`
 - The same summary and `site info` also print the next wildcard HTTPS step for the currently supported DNS provider flow (Cloudflare DNS challenge).
 - If `create-db=yes` (or `db=yes`), creates or reuses the managed DB/user for the site and stores creds in `/etc/simai-env/sites/<domain>/db.env` (0640 root:root); for `generic`, exports to `<project>/.env` idempotently; for required DB profiles, `.env` export stays enabled by default and menu no longer asks a separate technical question about it. In menu mode, DB setup now offers a clearer branch between creating a managed DB now and continuing without DB setup. Required-DB profiles can still be created without DB only when `--skip-db-required yes` is supplied in CLI (intended for migration); create DB later via `site db-create`.
+- For Bitrix profile, `site add` asks in menu mode whether to prepare public helper files:
+  - `none`: create only infrastructure; no `bitrixsetup.php` or `restore.php` is added.
+  - `setup`: download current `bitrixsetup.php` from the official Bitrix URL and write DB preseed files when managed DB credentials exist.
+  - `restore`: download current `restore.php` from the official Bitrix URLs, prepare restore-writable paths, and write DB preseed files when managed DB credentials exist.
+  CLI default is `none`. Use `bitrix installer-ready` or `bitrix restore-ready` later if the choice changes.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
 - After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
@@ -65,6 +71,9 @@ Examples:
 - Create without TLS: `simai-admin.sh site add --domain example.com --profile generic --php 8.3`
 - Create and issue TLS immediately: `simai-admin.sh site add --domain example.com --profile generic --php 8.3 --ssl yes --ssl-email ops@example.com`
 - Create one site for domain plus subdomains: `simai-admin.sh site add --domain obr.site --profile generic --host-mode wildcard`
+- Create Bitrix infrastructure only: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes`
+- Create Bitrix and prepare fresh installer helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files setup`
+- Create Bitrix and prepare restore helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files restore`
 
 ## remove
 Remove site resources (profile-driven; no fixes on target data unless confirmed).
@@ -85,6 +94,7 @@ Behavior:
 - PHP/cron/queue removal only when the profile requires PHP (alias/static skip automatically; cron removal is profile-gated).
 - DB prompts only when `PROFILE_REQUIRES_DB != no`; static/alias skip DB prompts entirely. DB drop flags are errors for such profiles even in dry-run.
 - File removal and DB/user drops happen only when explicitly confirmed (defaults to “no” in CLI; menu asks). Uses safe fallback slug for derived paths when metadata is invalid.
+- A full successful DB and user drop removes `db.env`; site removal always removes `perf.env` and removes the metadata directory when it becomes empty. Partial DB/file/metadata failures return a non-zero status and preserve unresolved metadata for inspection.
 - Alias profile: refuses file/DB removal flags and ignores path overrides (manage on the target site instead).
 
 ### Destructive operations and `--confirm`

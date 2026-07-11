@@ -157,4 +157,12 @@ grep -q 'register_cmd "self" "ssh-hardening-doctor"' admin/commands/self.sh || f
 grep -q 'PermitRootLogin prohibit-password' admin/commands/self.sh || fail "SSH hardening must keep root key-only"
 grep -q 'PasswordAuthentication no' admin/commands/self.sh || fail "SSH hardening must disable password auth"
 
+# 13) Bitrix site creation must not expose public helper scripts by default
+grep -q 'bitrix-files=' admin/commands/site.sh || fail "site add must expose --bitrix-files"
+grep -q 'site_bitrix_files_normalize' admin/commands/site.sh || fail "site add missing Bitrix helper mode normalization"
+grep -q 'Prepare Bitrix web helper files now?' admin/commands/site.sh || fail "menu site add must ask about Bitrix helper files"
+grep -q 'bitrix_files" == "setup"' admin/commands/site.sh || fail "site add must gate bitrixsetup.php behind setup mode"
+grep -q 'bitrix_files" == "restore"' admin/commands/site.sh || fail "site add must gate restore.php behind restore mode"
+grep -q 'Default is `none`' docs/commands/site.md || fail "site command docs must document safe Bitrix helper default"
+
 echo "Smoke checks passed"

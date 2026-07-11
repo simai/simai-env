@@ -1,12 +1,21 @@
 .DS_Store
 *.swp
 *.bak
+*.bak_*
+*.bak-*
+*.codex-bak-*
 .idea/
 .vscode/
 .playwright-cli/
 output/
 testing/test-config.env
 testing/secrets/
+.env
+.env.*
+!.env.example
 source/
 !docara/source/
 !docara/source/**
+
+# SIMAI project memory runtime logs
+source/logs/

@@ -55,8 +55,10 @@ Behavior:
 - refuses unresolved ref tarball fallback by default; use `SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes` only when `git`/network SHA resolution is intentionally unavailable
 - validates archive paths and entry types before extracting the update payload
 - runs the updater from a temporary snapshot so the script is not overwritten while it is still executing
-- creates a best-effort pre-update backup in `/root/simai-backups/`
-- runs a fast post-update smoke check
+- requires a successful pre-update backup in `/root/simai-backups/` when an installation already exists; backup failure aborts before changing the installed tree
+- prepares and validates an exact staged tree, then swaps it into place so files removed by a release cannot survive as stale residue
+- runs strict smoke checks before and after activation; a post-activation failure automatically restores the previous tree and returns a non-zero status
+- keeps the timestamped recovery archive after a successful update
 - reloads the menu automatically when the command is run from menu mode
 
 Typical use:

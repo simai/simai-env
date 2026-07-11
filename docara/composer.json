@@ -9,5 +9,10 @@
     },
     "scripts": {
         "docs:create": "php bin/docs-create.php"
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        }
     }
 }

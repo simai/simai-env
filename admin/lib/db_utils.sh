@@ -223,6 +223,7 @@ site_db_apply_create() {
 
 site_db_apply_drop() {
   local domain="$1" db_name="$2" db_user="$3" remove_env="${4:-no}"
+  local failed=0
   mysql_root_detect_cli || return 1
   if [[ -n "$db_name" ]]; then
     if ! mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${db_name}\`"; then
@@ -231,14 +232,15 @@ site_db_apply_drop() {
     fi
   fi
   if [[ -n "$db_user" ]]; then
-    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'localhost'" || error "Failed to drop user ${db_user}@localhost"
-    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'127.0.0.1'" || error "Failed to drop user ${db_user}@127.0.0.1"
-    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'%'" || true
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'localhost'" || { error "Failed to drop user ${db_user}@localhost"; failed=1; }
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'127.0.0.1'" || { error "Failed to drop user ${db_user}@127.0.0.1"; failed=1; }
+    mysql_root_exec_stdin "DROP USER IF EXISTS '${db_user}'@'%'" || { error "Failed to drop user ${db_user}@%"; failed=1; }
   fi
-  mysql_root_exec_stdin "FLUSH PRIVILEGES" || true
-  if [[ "${remove_env,,}" == "yes" ]]; then
+  mysql_root_exec_stdin "FLUSH PRIVILEGES" || { error "Failed to flush privileges"; failed=1; }
+  if [[ $failed -eq 0 && "${remove_env,,}" == "yes" ]]; then
     rm -f "$(site_db_env_file "$domain")"
   fi
+  return "$failed"
 }
 
 site_db_apply_rotate() {

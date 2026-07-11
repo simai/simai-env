@@ -9,3 +9,6 @@ bash scripts/ci/shellcheck.sh
 
 echo "[ci] smoke invariants"
 bash scripts/ci/smoke.sh
+
+echo "[ci] correction regressions"
+bash scripts/ci/correction_regression.sh

@@ -1,6 +1,17 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [1.12.73] - 2026-07-11
+### Changed
+- `site add --profile bitrix` no longer downloads public Bitrix helper scripts by default; the safe default is `--bitrix-files none`.
+- Added `--bitrix-files none|setup|restore` to choose whether site creation prepares no public helper, `bitrixsetup.php`, or `restore.php`.
+- Interactive Bitrix site creation now asks which helper files to prepare, defaulting to `none`.
+- The scripts-only install example now passes `SIMAI_INSTALL_MODE=scripts` into the privileged installer process, and unsupported mode values fail early.
+- Self-update now requires a backup, activates an exact staged tree, runs strict smoke checks, and automatically rolls back a failed activation.
+- Full site removal now cleans `db.env`, `perf.env`, and an empty metadata directory only after the requested DB resources are removed successfully; partial failures return non-zero.
+- Docara development dependencies no longer include deprecated `docsearch.js`; BrowserSync and audited transitive dependencies were updated, with Node 20-compatible Webpack pinned.
+- Composer dependencies were updated to advisory-free Symfony patch releases while locking dependency resolution to the supported PHP 8.2 platform.
+
 ## [1.12.72] - 2026-05-04
 ### Added
 - Added `self admin-mode-status` to show the current administration model: simple root key-only, hardened sudo-admin, password-login-enabled, or custom.

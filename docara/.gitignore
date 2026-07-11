@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 vendor/
 node_modules/
 build_*/
@@ -9,4 +11,5 @@ source/docs/.translate.php
 output/
 *.bak
 *.bak_*
+*.bak-*
 *.codex-bak-*

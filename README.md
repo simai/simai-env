@@ -16,7 +16,7 @@ On first run the menu may offer to install required packages (bootstrap). Accept
 
 Scripts only (no bootstrap during install):
 ```bash
-SIMAI_INSTALL_MODE=scripts curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo env SIMAI_INSTALL_MODE=scripts bash
 ```
 
 ## Notes

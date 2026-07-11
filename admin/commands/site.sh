@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "${ADMIN_DIR}/lib/site_cleanup_utils.sh"
+
 site_ssl_mode_normalize() {
   local mode="${1:-no}"
   mode=$(echo "$mode" | tr '[:upper:]' '[:lower:]')
@@ -17,6 +19,35 @@ site_ssl_bool_normalize() {
     yes|true|on|1) echo "yes" ;;
     *) echo "no" ;;
   esac
+}
+
+site_bitrix_files_normalize() {
+  local mode="${1:-none}"
+  mode=$(echo "$mode" | tr '[:upper:]' '[:lower:]')
+  case "$mode" in
+    none|no|skip) echo "none" ;;
+    setup|bitrixsetup|bitrixsetup.php|install|installer) echo "setup" ;;
+    restore|restore.php|backup) echo "restore" ;;
+    *)
+      error "Unsupported Bitrix file preparation mode: ${1}. Use: none, setup, restore"
+      return 1
+      ;;
+  esac
+}
+
+site_menu_prepare_bitrix_files_choice() {
+  local choice=""
+  choice=$(select_from_list \
+    "Prepare Bitrix web helper files now?" \
+    "none" \
+    "none" \
+    "setup" \
+    "restore")
+  if [[ -z "$choice" ]]; then
+    command_cancelled
+    return $?
+  fi
+  PARSED_ARGS["bitrix-files"]="$choice"
 }
 
 site_pick_existing_domain() {
@@ -355,6 +386,7 @@ site_print_add_next_steps() {
   local host_mode="${4:-standard}"
   local wildcard_domain="${5:-}"
   local primary_ip="${6:-}"
+  local bitrix_files="${7:-none}"
 
   echo
   echo "===== Next steps ====="
@@ -377,7 +409,17 @@ site_print_add_next_steps() {
       echo "Status      : Applications -> WordPress status"
       ;;
     bitrix)
-      echo "Open site   : https://${domain}/"
+      case "$bitrix_files" in
+        setup)
+          echo "Open setup  : https://${domain}/bitrixsetup.php"
+          ;;
+        restore)
+          echo "Open restore: https://${domain}/restore.php"
+          ;;
+        *)
+          echo "Prepare     : Applications -> Bitrix installer or restore from backup"
+          ;;
+      esac
       echo "Complete    : Applications -> Bitrix complete setup"
       echo "Status      : Applications -> Bitrix status"
       ;;
@@ -442,6 +484,7 @@ site_add_handler() {
   local access_create="${PARSED_ARGS[access-create]:-}"
   local access_login="${PARSED_ARGS[access-login]:-}"
   local access_password="${PARSED_ARGS[access-password]:-}"
+  local bitrix_files="${PARSED_ARGS["bitrix-files"]:-none}"
   local target_domain="${PARSED_ARGS[target-domain]:-}" target_path="" target_project="" target_php=""
   local path_created=0 path_empty=0 need_post_bootstrap_marker_check=0
   local path_explicit="no"
@@ -560,6 +603,18 @@ site_add_handler() {
   fi
 
   load_profile "$profile" || return 1
+
+  if [[ "$profile" == "bitrix" ]]; then
+    if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS["bitrix-files"]:-}" ]]; then
+      site_menu_prepare_bitrix_files_choice || return $?
+    fi
+    bitrix_files=$(site_bitrix_files_normalize "${PARSED_ARGS["bitrix-files"]:-$bitrix_files}") || return 1
+  else
+    if [[ -n "${PARSED_ARGS["bitrix-files"]:-}" ]]; then
+      warn "--bitrix-files is ignored for profile ${profile}"
+    fi
+    bitrix_files="none"
+  fi
 
   if [[ "${PROFILE_IS_ALIAS:-no}" == "yes" && "$host_mode" != "standard" ]]; then
     warn "Host mode is ignored for alias profile; using standard host mode."
@@ -776,6 +831,7 @@ site_add_handler() {
   fi
   local bitrix_preseed_summary="n/a"
   local bitrix_installer_summary="n/a"
+  local bitrix_restore_summary="n/a"
   local db_export_summary="not exported"
 
   local db_summary="not requested"
@@ -851,26 +907,58 @@ site_add_handler() {
     local bitrix_short_install="${PROFILE_BITRIX_SHORT_INSTALL_DEFAULT:-yes}"
     local bitrix_setup_kind="missing"
     [[ "${bitrix_short_install,,}" == "yes" ]] && bitrix_short_install="yes" || bitrix_short_install="no"
-    if read_site_db_env "$domain" >/dev/null 2>&1; then
-      if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_short_install"; then
-        bitrix_preseed_summary="ready"
+    bitrix_preseed_summary="skipped (${bitrix_files})"
+    bitrix_installer_summary="skipped"
+    bitrix_restore_summary="skipped"
+    if [[ "$bitrix_files" == "setup" ]]; then
+      if read_site_db_env "$domain" >/dev/null 2>&1; then
+        if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_short_install"; then
+          bitrix_preseed_summary="ready"
+        else
+          bitrix_preseed_summary="failed"
+          warn "Failed to generate Bitrix DB preseed files from db.env"
+        fi
       else
-        bitrix_preseed_summary="failed"
-        warn "Failed to generate Bitrix DB preseed files from db.env"
+        bitrix_preseed_summary="skipped (no db.env)"
       fi
-    else
-      bitrix_preseed_summary="skipped (no db.env)"
     fi
-    if bitrix_download_setup_script "$doc_root" "no"; then
-      bitrix_setup_kind=$(bitrix_setup_script_kind "$(bitrix_setup_script_path "$doc_root")")
-      case "$bitrix_setup_kind" in
-        site-management) bitrix_installer_summary="ready" ;;
-        bitrix24-loader) bitrix_installer_summary="downloaded" ;;
-        *) bitrix_installer_summary="downloaded" ;;
-      esac
-    else
-      bitrix_installer_summary="failed"
-      warn "Failed to download bitrixsetup.php"
+    if [[ "$bitrix_files" == "setup" ]]; then
+      if bitrix_download_setup_script "$doc_root" "no"; then
+        bitrix_setup_kind=$(bitrix_setup_script_kind "$(bitrix_setup_script_path "$doc_root")")
+        case "$bitrix_setup_kind" in
+          site-management) bitrix_installer_summary="ready" ;;
+          bitrix24-loader) bitrix_installer_summary="downloaded" ;;
+          *) bitrix_installer_summary="downloaded" ;;
+        esac
+      else
+        bitrix_installer_summary="failed"
+        warn "Failed to download bitrixsetup.php"
+      fi
+    fi
+    if [[ "$bitrix_files" == "restore" ]]; then
+      local bitrix_restore_short_install="no"
+      if bitrix_prepare_restore_writable_paths "$doc_root"; then
+        bitrix_restore_summary="writable paths ready"
+      else
+        bitrix_restore_summary="writable paths failed"
+        warn "Failed to prepare writable Bitrix restore paths"
+      fi
+      if read_site_db_env "$domain" >/dev/null 2>&1; then
+        if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_restore_short_install"; then
+          bitrix_preseed_summary="ready"
+        else
+          bitrix_preseed_summary="failed"
+          warn "Failed to generate Bitrix DB preseed files from db.env"
+        fi
+      else
+        bitrix_preseed_summary="skipped (no db.env)"
+      fi
+      if bitrix_download_restore_script "$doc_root" "no"; then
+        bitrix_restore_summary="ready"
+      else
+        bitrix_restore_summary="failed"
+        warn "Failed to download restore.php"
+      fi
     fi
   fi
 
@@ -952,13 +1040,15 @@ site_add_handler() {
     echo "Database    : ${db_summary}"
   fi
   if [[ "$profile" == "bitrix" ]]; then
+    echo "Bitrix files     : ${bitrix_files}"
     echo "Bitrix DB preseed: ${bitrix_preseed_summary}"
     echo "Bitrix installer : ${bitrix_installer_summary}"
+    echo "Bitrix restore   : ${bitrix_restore_summary}"
   fi
   echo "SSL issue   : ${ssl_issue_summary}"
   echo "Healthcheck : ${healthcheck_summary}"
   echo "Log file    : ${LOG_FILE}"
-  site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary" "$host_mode" "$wildcard_domain" "$primary_ip"
+  site_print_add_next_steps "$profile" "$domain" "$ssl_issue_summary" "$host_mode" "$wildcard_domain" "$primary_ip" "$bitrix_files"
 }
 
 site_remove_handler() {
@@ -1254,6 +1344,7 @@ site_remove_handler() {
   fi
 
   progress_init 5
+  local removal_failed=0 db_drop_succeeded=0 db_user_drop_succeeded=0
   progress_step "Removing nginx configuration"
   if ! remove_nginx_site "$domain"; then
     error "Failed to remove nginx config for ${domain}"
@@ -1295,29 +1386,47 @@ site_remove_handler() {
   progress_step "Removing project files (if approved)"
   if [[ $remove_files -eq 1 ]]; then
     if [[ $root_valid -eq 1 ]]; then
-      remove_project_files "$path" || warn "Project files were not removed automatically"
+      if ! remove_project_files "$path"; then
+        warn "Project files were not removed automatically"
+        removal_failed=1
+      fi
     else
       warn "Skipping file removal due to invalid path"
+      removal_failed=1
     fi
   fi
 
-  progress_step "Dropping database (if approved)"
-  if [[ $drop_db -eq 1 ]]; then
-    if ! db_validate_db_name "$db_name"; then return 1; fi
-    if ! site_db_apply_drop "$domain" "$db_name" "" "no"; then
-      warn "Failed to drop database ${db_name}"
+  progress_step "Dropping database resources (if approved)"
+  if [[ $drop_db -eq 1 ]] && ! db_validate_db_name "$db_name"; then return 1; fi
+  if [[ $drop_user -eq 1 ]] && ! db_validate_db_user "$db_user"; then return 1; fi
+  if [[ $drop_db -eq 1 || $drop_user -eq 1 ]]; then
+    local drop_db_name="" drop_db_user=""
+    [[ $drop_db -eq 1 ]] && drop_db_name="$db_name"
+    [[ $drop_user -eq 1 ]] && drop_db_user="$db_user"
+    if site_db_apply_drop "$domain" "$drop_db_name" "$drop_db_user" "no"; then
+      [[ $drop_db -eq 1 ]] && db_drop_succeeded=1
+      [[ $drop_user -eq 1 ]] && db_user_drop_succeeded=1
+    else
+      warn "Failed to remove all requested database resources"
+      removal_failed=1
     fi
   fi
 
-  progress_step "Dropping database user (if approved)"
-  if [[ $drop_user -eq 1 ]]; then
-    if ! db_validate_db_user "$db_user"; then return 1; fi
-    if ! site_db_apply_drop "$domain" "" "$db_user" "no"; then
-      warn "Failed to drop user ${db_user}"
-    fi
+  progress_step "Cleaning site metadata"
+  local remove_db_env=no
+  if [[ $drop_db -eq 1 && $drop_user -eq 1 && $db_drop_succeeded -eq 1 && $db_user_drop_succeeded -eq 1 ]]; then
+    remove_db_env=yes
+  fi
+  if ! site_remove_metadata_cleanup "$(site_sites_config_dir)/${domain}" "$remove_db_env"; then
+    warn "Site metadata cleanup was incomplete"
+    removal_failed=1
   fi
 
-  info "Site remove completed for ${domain}"
+  if [[ $removal_failed -eq 0 ]]; then
+    info "Site remove completed for ${domain}"
+  else
+    error "Site remove completed with unresolved failures for ${domain}"
+  fi
   local php_summary="none"
   if [[ "$is_alias" != "yes" && "${requires_php}" != "no" ]]; then
     php_summary="$([[ -n "$php_version" ]] && echo removed || echo cleaned)"
@@ -1327,11 +1436,29 @@ site_remove_handler() {
   local queue_summary
   queue_summary="$([[ $removed_queue -eq 1 ]] && echo removed || echo none)"
   local db_summary
-  db_summary="$([[ $drop_db -eq 1 ]] && echo dropped || echo kept)"
+  if [[ $drop_db -eq 0 ]]; then
+    db_summary="kept"
+  elif [[ $db_drop_succeeded -eq 1 ]]; then
+    db_summary="dropped"
+  else
+    db_summary="failed"
+  fi
   local db_user_summary
-  db_user_summary="$([[ $drop_user -eq 1 ]] && echo dropped || echo kept)"
+  if [[ $drop_user -eq 0 ]]; then
+    db_user_summary="kept"
+  elif [[ $db_user_drop_succeeded -eq 1 ]]; then
+    db_user_summary="dropped"
+  else
+    db_user_summary="failed"
+  fi
   local files_summary
-  files_summary="$([[ $remove_files -eq 1 ]] && echo removed || echo kept)"
+  if [[ $remove_files -eq 0 ]]; then
+    files_summary="kept"
+  elif [[ $removal_failed -eq 0 ]]; then
+    files_summary="removed"
+  else
+    files_summary="requested; inspect warnings"
+  fi
   if [[ "$is_alias" == "yes" ]]; then
     php_summary="skipped (alias profile)"
     cron_summary="skipped (alias profile)"
@@ -1357,6 +1484,7 @@ site_remove_handler() {
     echo "Database   : ${db_summary}"
     echo "DB user    : ${db_user_summary}"
   fi
+  return "$removal_failed"
 }
 
 site_set_php_handler() {
@@ -1816,7 +1944,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password="
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files="
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool="
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

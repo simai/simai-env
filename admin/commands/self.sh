@@ -279,7 +279,7 @@ self_update_handler() {
     return 1
   fi
   rm -rf "$updater_tmp"
-  local smoke_strict="${SIMAI_UPDATE_SMOKE_STRICT:-no}"
+  local smoke_strict="${SIMAI_UPDATE_SMOKE_STRICT:-yes}"
   if ! self_post_update_smoke "${SCRIPT_DIR}" "$smoke_strict"; then
     progress_done "Update completed with smoke failures"
     return 1

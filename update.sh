@@ -44,10 +44,55 @@ check_supported_os() {
   exit 1
 }
 
+update_safe_remove_transaction_dir() {
+  local path="$1" parent="$2" base="$3" name
+  [[ -n "$path" && "$path" != "/" && "$path" != "$parent" ]] || return 1
+  [[ "$(dirname "$path")" == "$parent" ]] || return 1
+  name=$(basename "$path")
+  case "$name" in
+    ".${base}.stage."*|".${base}.rollback."*|".${base}.failed."*) ;;
+    *) return 1 ;;
+  esac
+  [[ ! -L "$path" ]] || return 1
+  rm -rf -- "$path"
+}
+
+update_post_apply_smoke() {
+  local root="$1" required
+  for required in simai-env.sh simai-admin.sh update.sh; do
+    if [[ ! -x "${root}/${required}" ]]; then
+      echo "Post-update smoke failed: ${required} is missing or not executable" >&2
+      return 1
+    fi
+    if ! bash -n "${root}/${required}"; then
+      echo "Post-update smoke failed: bash -n ${required}" >&2
+      return 1
+    fi
+  done
+  if [[ ! -f "${root}/scripts/ci/smoke.sh" ]]; then
+    echo "Post-update smoke failed: scripts/ci/smoke.sh is missing" >&2
+    return 1
+  fi
+  (cd "$root" && bash scripts/ci/smoke.sh)
+}
+
 check_supported_os
 
 TMP_DIR=$(mktemp -d)
-cleanup() { rm -rf "$TMP_DIR"; }
+INSTALL_PARENT=$(cd "$(dirname "$INSTALL_DIR")" && pwd)
+INSTALL_BASE=$(basename "$INSTALL_DIR")
+TRANSACTION_ID="$(date +%Y%m%d-%H%M%S)-$$"
+STAGE_DIR="${INSTALL_PARENT}/.${INSTALL_BASE}.stage.${TRANSACTION_ID}"
+ROLLBACK_DIR="${INSTALL_PARENT}/.${INSTALL_BASE}.rollback.${TRANSACTION_ID}"
+FAILED_DIR="${INSTALL_PARENT}/.${INSTALL_BASE}.failed.${TRANSACTION_ID}"
+cleanup() {
+  local rc=$?
+  if [[ -e "$STAGE_DIR" ]]; then
+    update_safe_remove_transaction_dir "$STAGE_DIR" "$INSTALL_PARENT" "$INSTALL_BASE" || true
+  fi
+  rm -rf -- "$TMP_DIR"
+  return "$rc"
+}
 trap cleanup EXIT
 
 TARGET_SHA="$(update_resolve_ref_sha "$REF" "$REPO_HTTP_URL" 2>/dev/null || true)"
@@ -64,46 +109,81 @@ if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
 fi
 BACKUP_ARCHIVE=""
 if [[ -d "$INSTALL_DIR" ]]; then
-  if mkdir -p "${UPDATE_BACKUP_ROOT:-/root/simai-backups}" 2>/dev/null; then
-    ts=$(date +%Y%m%d-%H%M%S)
-    BACKUP_ARCHIVE="${UPDATE_BACKUP_ROOT:-/root/simai-backups}/simai-env-preupdate-${ts}.tar.gz"
-    if tar -czf "$BACKUP_ARCHIVE" -C "$INSTALL_DIR" .; then
-      echo "Pre-update backup created: ${BACKUP_ARCHIVE}"
-    else
-      echo "Warning: failed to create pre-update backup at ${BACKUP_ARCHIVE}" >&2
-      BACKUP_ARCHIVE=""
-    fi
-  else
-    echo "Warning: cannot create backup directory ${UPDATE_BACKUP_ROOT:-/root/simai-backups}; continuing without backup" >&2
+  if ! mkdir -p "$UPDATE_BACKUP_ROOT"; then
+    echo "Cannot create backup directory ${UPDATE_BACKUP_ROOT}; update aborted" >&2
+    exit 1
   fi
+  BACKUP_ARCHIVE="${UPDATE_BACKUP_ROOT}/simai-env-preupdate-${TRANSACTION_ID}.tar.gz"
+  if ! tar -czf "$BACKUP_ARCHIVE" -C "$INSTALL_DIR" .; then
+    rm -f -- "$BACKUP_ARCHIVE"
+    echo "Failed to create pre-update backup at ${BACKUP_ARCHIVE}; update aborted" >&2
+    exit 1
+  fi
+  echo "Pre-update backup created: ${BACKUP_ARCHIVE}"
 fi
 
-echo "Updating simai-env (ref: ${REF}) into ${INSTALL_DIR}..."
+echo "Staging simai-env update (ref: ${REF}) for ${INSTALL_DIR}..."
 if [[ -n "$TARGET_SHA" ]]; then
   echo "Resolved target commit: ${TARGET_SHA}"
 fi
 curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/simai-env.tar.gz"
 update_extract_archive "$TMP_DIR/simai-env.tar.gz" "$TMP_DIR"
 SRC_DIR=$(update_find_extracted_source_dir "$TMP_DIR" || true)
-
 if [[ -z "${SRC_DIR}" || ! -d "${SRC_DIR}" ]]; then
   echo "Could not locate extracted sources" >&2
   exit 1
 fi
 
-mkdir -p "$INSTALL_DIR"
-cp -R "${SRC_DIR}/." "$INSTALL_DIR/"
-chmod +x "$INSTALL_DIR/simai-env.sh"
-chmod +x "$INSTALL_DIR/simai-admin.sh"
-chmod +x "$INSTALL_DIR/update.sh"
-# Clean up deprecated files
-rm -f "$INSTALL_DIR/admin/commands/alias.sh"
+mkdir "$STAGE_DIR"
+cp -R "${SRC_DIR}/." "$STAGE_DIR/"
+chmod +x "$STAGE_DIR/simai-env.sh" "$STAGE_DIR/simai-admin.sh" "$STAGE_DIR/update.sh"
+update_post_apply_smoke "$STAGE_DIR"
+
+if [[ -e "$INSTALL_DIR" ]]; then
+  if ! mv -- "$INSTALL_DIR" "$ROLLBACK_DIR"; then
+    echo "Failed to move the current installation into rollback position" >&2
+    exit 1
+  fi
+fi
+if ! mv -- "$STAGE_DIR" "$INSTALL_DIR"; then
+  echo "Failed to activate staged update; restoring previous installation" >&2
+  if [[ -e "$ROLLBACK_DIR" ]]; then
+    mv -- "$ROLLBACK_DIR" "$INSTALL_DIR" || {
+      echo "CRITICAL: automatic rollback failed; previous tree remains at ${ROLLBACK_DIR}" >&2
+      exit 1
+    }
+  fi
+  exit 1
+fi
+
+if ! update_post_apply_smoke "$INSTALL_DIR"; then
+  echo "Post-update smoke failed; restoring previous installation" >&2
+  mv -- "$INSTALL_DIR" "$FAILED_DIR" || {
+    echo "CRITICAL: cannot move failed installation aside" >&2
+    exit 1
+  }
+  if [[ -e "$ROLLBACK_DIR" ]]; then
+    mv -- "$ROLLBACK_DIR" "$INSTALL_DIR" || {
+      echo "CRITICAL: automatic rollback failed; previous tree remains at ${ROLLBACK_DIR}" >&2
+      exit 1
+    }
+    update_post_apply_smoke "$INSTALL_DIR" || {
+      echo "CRITICAL: restored installation failed smoke; inspect ${INSTALL_DIR}" >&2
+      exit 1
+    }
+  fi
+  update_safe_remove_transaction_dir "$FAILED_DIR" "$INSTALL_PARENT" "$INSTALL_BASE" || true
+  exit 1
+fi
+
+if [[ -e "$ROLLBACK_DIR" ]]; then
+  update_safe_remove_transaction_dir "$ROLLBACK_DIR" "$INSTALL_PARENT" "$INSTALL_BASE"
+fi
 
 NEW_VERSION="(unknown)"
 if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
   NEW_VERSION=$(cat "${INSTALL_DIR}/VERSION")
 fi
-
 if [[ -n "$TARGET_SHA" ]]; then
   echo "Updated to ${REF} (${TARGET_SHA}) at ${INSTALL_DIR}"
 else
@@ -111,6 +191,6 @@ else
 fi
 echo "Version: ${PREV_VERSION} -> ${NEW_VERSION}"
 if [[ -n "$BACKUP_ARCHIVE" ]]; then
-  echo "Rollback (manual): rm -rf ${INSTALL_DIR}/* && tar -xzf ${BACKUP_ARCHIVE} -C ${INSTALL_DIR}"
+  echo "Recovery archive: ${BACKUP_ARCHIVE}"
 fi
 echo "Run scripts from ${INSTALL_DIR} as usual."

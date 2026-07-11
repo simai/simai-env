@@ -147,6 +147,33 @@ sudo /root/simai-env/simai-admin.sh site add \
   --create-db yes
 ```
 
+By default this creates infrastructure only and does not place public
+`bitrixsetup.php` or `restore.php` into the docroot. This is the safer default:
+prepare helper scripts only when you know whether the site is a fresh install or
+a restore.
+
+Fresh install helper:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site add \
+  --domain <domain> \
+  --profile bitrix \
+  --php 8.2 \
+  --create-db yes \
+  --bitrix-files setup
+```
+
+Backup restore helper:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site add \
+  --domain <domain> \
+  --profile bitrix \
+  --php 8.2 \
+  --create-db yes \
+  --bitrix-files restore
+```
+
 Wildcard/subdomain site:
 
 ```bash
