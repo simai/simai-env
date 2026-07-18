@@ -19,8 +19,8 @@ On this machine, the Homebrew `php` binary is broken because of an ICU mismatch,
 cd docara
 /Applications/ServBay/bin/php /Applications/ServBay/bin/composer install
 DOCARA_SKIP_FRONTEND_INSTALL=true /Applications/ServBay/bin/php vendor/bin/docara init --update
-npm ci
-npx -p node@20 -c "npm run prod"
+YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc install --frozen-lockfile --production=false --non-interactive
+YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc prod
 /Applications/ServBay/bin/php vendor/bin/docara build production
 ```
 
@@ -37,5 +37,5 @@ The repository publishes the Docara site through GitHub Pages Actions.
 ## Notes
 
 - `config.php` uses `DOCARA_BASE_URL` from the environment, so the same site can build locally and on GitHub Pages.
-- The workflow is pinned to Node 20 because newer local Node versions break the current Laravel Mix stack.
-- `webpack` is pinned in `package.json` for compatibility with the current Docara frontend toolchain.
+- The workflow uses Node 20, Yarn 1.22.22 and Vite from the committed lockfile.
+- Laravel Mix, webpack and `docara-mix` are not part of this site.

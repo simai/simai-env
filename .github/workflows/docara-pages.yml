@@ -48,11 +48,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: docara
-        run: npm install
+        run: YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc install --frozen-lockfile --production=false --non-interactive
 
       - name: Build frontend assets
         working-directory: docara
-        run: npm run prod
+        run: YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc prod
 
       - name: Build Docara site
         working-directory: docara
