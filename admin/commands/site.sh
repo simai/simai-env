@@ -35,7 +35,35 @@ site_bitrix_files_normalize() {
   esac
 }
 
+site_add_cancel_message() {
+  local domain="$1"
+  local step="$2"
+  printf "Site creation cancelled at step '%s' for %s. No site changes were applied.\n" "$step" "$domain"
+}
+
+site_add_cancelled() {
+  local domain="$1"
+  local step="$2"
+  command_cancelled "$(site_add_cancel_message "$domain" "$step")"
+}
+
+site_add_confirm_creation() {
+  local domain="$1"
+  local choice=""
+  choice=$(select_from_list \
+    $'Final confirmation\nDomain: '"${domain}"$'\nChoose yes to create the site.\nChoose no to cancel without creating files or configuration.' \
+    "no" \
+    "no" \
+    "yes")
+  if [[ "$choice" != "yes" ]]; then
+    site_add_cancelled "$domain" "final confirmation"
+    return $?
+  fi
+  return 0
+}
+
 site_menu_prepare_bitrix_files_choice() {
+  local domain="$1"
   local choice=""
   choice=$(select_from_list \
     "Prepare Bitrix web helper files now?" \
@@ -44,7 +72,7 @@ site_menu_prepare_bitrix_files_choice() {
     "setup" \
     "restore")
   if [[ -z "$choice" ]]; then
-    command_cancelled
+    site_add_cancelled "$domain" "Bitrix helper selection"
     return $?
   fi
   PARSED_ARGS["bitrix-files"]="$choice"
@@ -329,6 +357,7 @@ site_issue_default_ssl_after_create() {
 site_menu_prepare_ssl_choice() {
   local default_mode="$1"
   local email_default="$2"
+  local domain="$3"
 
   local default_choice="no"
   case "$(site_ssl_mode_normalize "$default_mode")" in
@@ -339,7 +368,7 @@ site_menu_prepare_ssl_choice() {
   local choice=""
   choice=$(select_from_list "Issue Let's Encrypt certificate after site creation?" "$default_choice" "no" "yes")
   if [[ -z "$choice" ]]; then
-    command_cancelled
+    site_add_cancelled "$domain" "SSL selection"
     return $?
   fi
 
@@ -349,7 +378,7 @@ site_menu_prepare_ssl_choice() {
     local email=""
     email=$(prompt "Let's Encrypt email" "$email_default")
     if [[ -z "$email" ]]; then
-      command_cancelled
+      site_add_cancelled "$domain" "Let's Encrypt email"
       return $?
     fi
     PARSED_ARGS[ssl-email]="$email"
@@ -362,7 +391,7 @@ site_menu_prepare_host_mode() {
   local choice=""
   choice=$(select_from_list "Serve all first-level subdomains too?" "no" "no" "yes")
   if [[ -z "$choice" ]]; then
-    command_cancelled
+    site_add_cancelled "$domain" "host mode selection"
     return $?
   fi
   if [[ "$choice" == "yes" ]]; then
@@ -624,7 +653,7 @@ site_add_handler_impl() {
           profiles_available=("${all_profiles[@]}")
           ;;
         "")
-          command_cancelled
+          site_add_cancelled "$domain" "profile availability selection"
           return $?
           ;;
         *)
@@ -657,7 +686,7 @@ site_add_handler_impl() {
     fi
     profile=$(select_from_list "Select profile" "$default_profile" "${ordered[@]}")
     if [[ -z "$profile" ]]; then
-      command_cancelled
+      site_add_cancelled "$domain" "profile selection"
       return $?
     fi
   fi
@@ -684,7 +713,7 @@ site_add_handler_impl() {
 
   if [[ "$profile" == "bitrix" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS["bitrix-files"]:-}" ]]; then
-      site_menu_prepare_bitrix_files_choice || return $?
+      site_menu_prepare_bitrix_files_choice "$domain" || return $?
     fi
     bitrix_files=$(site_bitrix_files_normalize "${PARSED_ARGS["bitrix-files"]:-$bitrix_files}") || return 1
   else
@@ -708,7 +737,7 @@ site_add_handler_impl() {
 
   if [[ -z "$usage_class" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-      usage_class=$(site_usage_select_class "") || return $?
+      usage_class=$(site_usage_select_class "" "$(site_add_cancel_message "$domain" "site activity selection")") || return $?
     else
       usage_class="standard"
     fi
@@ -721,7 +750,7 @@ site_add_handler_impl() {
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS[ssl]:-}" ]]; then
     if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
-      site_menu_prepare_ssl_choice "$ssl_mode" "$ssl_email" || return $?
+      site_menu_prepare_ssl_choice "$ssl_mode" "$ssl_email" "$domain" || return $?
       ssl_mode="${PARSED_ARGS[ssl]:-$ssl_mode}"
       ssl_email="${PARSED_ARGS[ssl-email]:-$ssl_email}"
     fi
@@ -743,6 +772,10 @@ site_add_handler_impl() {
       fi
     fi
     if [[ -z "$target_domain" ]]; then
+      if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
+        site_add_cancelled "$domain" "alias target selection"
+        return $?
+      fi
       error "Target site is required for alias"
       return 1
     fi
@@ -809,7 +842,7 @@ site_add_handler_impl() {
       local alias_confirm
       alias_confirm=$(select_from_list "Create this alias now?" "no" "no" "yes")
       if [[ "$alias_confirm" != "yes" ]]; then
-        command_cancelled
+        site_add_cancelled "$domain" "final alias confirmation"
         return $?
       fi
     fi
@@ -857,12 +890,12 @@ site_add_handler_impl() {
     fi
     php_version="none"
   else
-    php_version=$(select_php_version_for_profile "$php_version") || return 1
+    php_version=$(select_php_version_for_profile "$php_version" "$(site_add_cancel_message "$domain" "PHP selection")") || return $?
   fi
 
   if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
     local create_db_rc=0
-    create_db=$(decide_create_db_for_profile) || create_db_rc=$?
+    create_db=$(decide_create_db_for_profile "$(site_add_cancel_message "$domain" "database selection")") || create_db_rc=$?
     [[ $create_db_rc -eq 0 ]] || return "$create_db_rc"
   else
     [[ -n "$create_db" && "${create_db,,}" == "yes" ]] && warn "Database creation ignored for profile ${profile}"
@@ -870,15 +903,19 @@ site_add_handler_impl() {
   fi
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$access_create" ]]; then
-    local access_choice
-    access_choice=$(select_from_list "Create file access for this site?" "no" "no" "yes")
+    local access_choice=""
+    access_choice=$(select_from_list "Create file access for this site?" "no" "no" "yes") || true
+    if [[ -z "$access_choice" ]]; then
+      site_add_cancelled "$domain" "file access selection"
+      return $?
+    fi
     [[ "$access_choice" == "yes" ]] && access_create="yes" || access_create="no"
   fi
   if [[ "$access_create" == "yes" && -z "$access_login" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
       access_login=$(prompt "access login")
       if [[ -z "$access_login" ]]; then
-        command_cancelled
+        site_add_cancelled "$domain" "file access login"
         return $?
       fi
     else
@@ -900,12 +937,7 @@ site_add_handler_impl() {
     echo "Database    : ${create_db:-no}"
     echo "File access : ${access_create:-no}${access_login:+ (${access_login})}"
     echo "SSL         : ${ssl_mode}"
-    local create_confirm
-    create_confirm=$(select_from_list "Create this site now?" "no" "no" "yes")
-    if [[ "$create_confirm" != "yes" ]]; then
-      command_cancelled
-      return $?
-    fi
+    site_add_confirm_creation "$domain" || return $?
   fi
 
   SITE_ADD_TX_ACTIVE=1
@@ -1137,7 +1169,7 @@ site_add_handler_impl() {
         warn "Failed to prepare writable Bitrix restore paths"
       fi
       if read_site_db_env "$domain" >/dev/null 2>&1; then
-        if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_restore_short_install"; then
+        if bitrix_write_db_preseed_files "$domain" "$doc_root" "no" "$bitrix_restore_short_install" "no"; then
           bitrix_preseed_summary="ready"
         else
           bitrix_preseed_summary="failed"

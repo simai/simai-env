@@ -2,6 +2,7 @@
 
 site_usage_select_class() {
   local usage="${1:-}"
+  local cancel_message="${2:-}"
   if [[ -n "$usage" ]]; then
     site_usage_class_normalize "$usage"
     return $?
@@ -15,7 +16,7 @@ site_usage_select_class() {
       "high-traffic" \
       "rarely-used")
     [[ -z "$choice" ]] && {
-      command_cancelled
+      command_cancelled "${cancel_message:-Cancelled.}"
       return $?
     }
     site_usage_class_normalize "$choice"

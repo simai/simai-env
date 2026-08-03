@@ -77,6 +77,7 @@ ensure_profile_required_markers() {
 
 select_php_version_for_profile() {
   local desired="$1"
+  local cancel_message="${2:-}"
   local allowed=("${PROFILE_ALLOWED_PHP_VERSIONS[@]}")
   local allowed_csv="${allowed[*]}"
   local min_allowed="${PROFILE_ALLOWED_PHP_MIN_VERSION:-}"
@@ -135,7 +136,7 @@ select_php_version_for_profile() {
     default_sel=$(php_pick_preferred_version "${candidates[@]}")
     selected=$(select_from_list "Select PHP version" "$default_sel" "${candidates[@]}")
     if [[ -z "$selected" ]]; then
-      command_cancelled
+      command_cancelled "${cancel_message:-Cancelled.}"
       return $?
     fi
     echo "$selected"
@@ -163,6 +164,7 @@ select_php_version_for_profile() {
 }
 
 decide_create_db_for_profile() {
+  local cancel_message="${1:-}"
   local create_db="${PARSED_ARGS[create-db]:-${PARSED_ARGS[db]:-}}"
   local skip_db_required="${PARSED_ARGS[skip-db-required]:-no}"
   [[ "${skip_db_required,,}" != "yes" ]] && skip_db_required="no"
@@ -180,7 +182,7 @@ decide_create_db_for_profile() {
           "create-managed-db" \
           "continue-without-db")
         if [[ -z "$choice" ]]; then
-          command_cancelled
+          command_cancelled "${cancel_message:-Cancelled.}"
           return $?
         fi
         case "$choice" in
@@ -209,7 +211,7 @@ decide_create_db_for_profile() {
           "continue-without-db" \
           "create-managed-db")
         if [[ -z "$choice" ]]; then
-          command_cancelled
+          command_cancelled "${cancel_message:-Cancelled.}"
           return $?
         fi
         case "$choice" in

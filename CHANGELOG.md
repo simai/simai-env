@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.77 - 2026-08-03
+
+### Changed
+- The final `site add` menu confirmation now names the domain and explains that
+  the default-safe `no` choice exits without creating files or configuration.
+
+### Fixed
+- `site add` cancellation messages now identify the wizard step and domain in
+  `/var/log/simai-admin.log` instead of recording only a generic `Cancelled.`.
+- Bitrix archive restore preparation no longer creates a premature
+  `bitrix/php_interface/dbconn.php`. Modern UTF-8 archives can now start on the
+  supported PHP 8 baseline without an obsolete `mbstring.func_overload=2`
+  requirement, while fresh installer preseed behavior remains unchanged.
+
 ## 1.12.76 - 2026-07-11
 
 ### Fixed

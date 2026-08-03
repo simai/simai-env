@@ -113,7 +113,7 @@ test_second_audit_p1_contracts() {
   grep -Fq 'Site creation failed; rolling back resources created by this invocation' "$site" || fail "site add rollback is not observable"
   grep -Fq '"continue" \' "$site" || fail "profile expansion is not default-safe"
   local confirm_line ensure_line
-  confirm_line=$(grep -n 'Create this site now?' "$site" | head -1 | cut -d: -f1)
+  confirm_line=$(grep -n 'site_add_confirm_creation "$domain"' "$site" | tail -1 | cut -d: -f1)
   ensure_line=$(grep -n '^  ensure_user$' "$site" | tail -1 | cut -d: -f1)
   [[ -n "$confirm_line" && -n "$ensure_line" && $ensure_line -gt $confirm_line ]] \
     || fail "site add still ensures the platform user before final confirmation"
@@ -122,6 +122,91 @@ test_second_audit_p1_contracts() {
   grep -Fq 'cleanup_on_exit' "$runner" || fail "runner cleanup does not preserve/override final status"
   grep -Fqx 'TEST_SYNC_UPDATE=no' "$config" || fail "example config enables runtime sync"
   grep -Fqx 'ALLOW_DESTRUCTIVE_TESTS=no' "$config" || fail "example config enables destructive tests"
+}
+
+test_site_add_cancellation_ux() {
+  local tmp trace output rc=0
+  tmp=$(mktemp -d)
+  trace="${tmp}/select.trace"
+
+  (
+    export ADMIN_DIR="${ROOT_DIR}/admin"
+    register_cmd() { :; }
+    # shellcheck source=../../admin/commands/site.sh
+    source "${ROOT_DIR}/admin/commands/site.sh"
+    select_from_list() {
+      printf '%s\n' "$@" >"$trace"
+      printf 'no\n'
+    }
+    command_cancelled() {
+      printf '%s\n' "$1"
+      return 89
+    }
+    set +e
+    output=$(site_add_confirm_creation "update.rim1.ru")
+    rc=$?
+    set -e
+    [[ $rc -eq 89 ]] || fail "final site confirmation no longer returns CANCELLED (89)"
+    [[ "$output" == "Site creation cancelled at step 'final confirmation' for update.rim1.ru. No site changes were applied." ]] \
+      || fail "final site cancellation message is not stage-specific"
+    grep -Fq 'Final confirmation' "$trace" || fail "final confirmation heading is missing"
+    grep -Fq 'Domain: update.rim1.ru' "$trace" || fail "final confirmation does not name the domain"
+    grep -Fq 'Choose yes to create the site.' "$trace" || fail "final confirmation does not explain yes"
+    grep -Fq 'Choose no to cancel without creating files or configuration.' "$trace" \
+      || fail "final confirmation does not explain the safe no choice"
+    [[ "$(tail -n 3 "$trace" | head -n 1)" == "no" ]] || fail "final confirmation is no longer default-safe"
+  )
+
+  rm -rf "$tmp"
+}
+
+test_bitrix_restore_preseed_php8_compatibility() {
+  local tmp restore_root setup_root existing_root
+  tmp=$(mktemp -d)
+  restore_root="${tmp}/restore"
+  setup_root="${tmp}/setup"
+  existing_root="${tmp}/existing"
+  mkdir -p "$restore_root" "$setup_root" "${existing_root}/bitrix/php_interface"
+
+  (
+    SIMAI_USER=$(id -un)
+    export SIMAI_USER
+    export SCRIPT_DIR="$ROOT_DIR"
+    export SIMAI_ENV_ROOT="$ROOT_DIR"
+    read_site_db_env() {
+      printf '%s\n' \
+        'DB_NAME|bitrix_restore_test' \
+        'DB_USER|bitrix_restore_test' \
+        'DB_PASS|local-test-password' \
+        'DB_HOST|127.0.0.1'
+    }
+    bitrix_php_quote() {
+      local value="$1"
+      value=${value//\\/\\\\}
+      value=${value//\'/\\\'}
+      printf "'%s'" "$value"
+    }
+    # shellcheck source=../../admin/lib/site_utils.sh
+    source "${ROOT_DIR}/admin/lib/site_utils.sh"
+
+    assert_success bitrix_write_db_preseed_files example.test "$restore_root" no no no
+    [[ -s "${restore_root}/bitrix/.settings.php" ]] || fail "restore preseed did not create .settings.php"
+    [[ -s "${restore_root}/bitrix/php_interface/after_connect_d7.php" ]] || fail "restore preseed did not create after_connect_d7.php"
+    [[ ! -e "${restore_root}/bitrix/php_interface/dbconn.php" ]] \
+      || fail "restore preseed still creates premature dbconn.php"
+
+    assert_success bitrix_write_db_preseed_files example.test "$setup_root" no yes
+    [[ -s "${setup_root}/bitrix/php_interface/dbconn.php" ]] || fail "setup preseed no longer creates dbconn.php"
+    grep -Fq 'define("BX_UTF", true);' "${setup_root}/bitrix/php_interface/dbconn.php" \
+      || fail "setup preseed lost the UTF-8 contract"
+
+    printf '%s\n' '<?php // existing site-owned dbconn' >"${existing_root}/bitrix/php_interface/dbconn.php"
+    assert_success bitrix_write_db_preseed_files example.test "$existing_root" yes no no
+    grep -Fq 'existing site-owned dbconn' "${existing_root}/bitrix/php_interface/dbconn.php" \
+      || fail "restore preseed overwrote an existing site-owned dbconn.php"
+  )
+
+  rm -rf "$tmp"
 }
 
 test_db_drop_failure_propagation() {
@@ -260,6 +345,8 @@ test_command_option_validation
 test_menu_contract
 test_second_audit_p1_contracts
 test_second_audit_p2_p3_contracts
+test_site_add_cancellation_ux
+test_bitrix_restore_preseed_php8_compatibility
 test_db_drop_failure_propagation
 test_updater_transaction
 echo "[correction-regression] ok"

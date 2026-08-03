@@ -163,6 +163,10 @@ grep -q 'site_bitrix_files_normalize' admin/commands/site.sh || fail "site add m
 grep -q 'Prepare Bitrix web helper files now?' admin/commands/site.sh || fail "menu site add must ask about Bitrix helper files"
 grep -q 'bitrix_files" == "setup"' admin/commands/site.sh || fail "site add must gate bitrixsetup.php behind setup mode"
 grep -q 'bitrix_files" == "restore"' admin/commands/site.sh || fail "site add must gate restore.php behind restore mode"
+grep -q 'bitrix_write_db_preseed_files.*bitrix_restore_short_install.*"no"' admin/commands/site.sh \
+  || fail "site add restore mode must omit premature dbconn.php"
+grep -q 'bitrix_write_db_preseed_files.*short_install.*"no"' admin/commands/bitrix.sh \
+  || fail "bitrix restore-ready must omit premature dbconn.php"
 grep -q 'Default is `none`' docs/commands/site.md || fail "site command docs must document safe Bitrix helper default"
 
 echo "Smoke checks passed"

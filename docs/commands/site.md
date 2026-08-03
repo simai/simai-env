@@ -33,7 +33,7 @@ Behavior:
 - For Bitrix profile, `site add` asks in menu mode whether to prepare public helper files:
   - `none`: create only infrastructure; no `bitrixsetup.php` or `restore.php` is added.
   - `setup`: download current `bitrixsetup.php` from the official Bitrix URL and write DB preseed files when managed DB credentials exist.
-  - `restore`: download current `restore.php` from the official Bitrix URLs, prepare restore-writable paths, and write DB preseed files when managed DB credentials exist.
+  - `restore`: download current `restore.php` from the official Bitrix URLs, prepare restore-writable paths, and write `.settings.php` plus connection initialization from managed DB credentials without creating a premature `dbconn.php`. The archive restores its own `dbconn.php`; this avoids legacy `mbstring.func_overload` checks on PHP 8.
   CLI default is `none`. Use `bitrix installer-ready` or `bitrix restore-ready` later if the choice changes.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
@@ -63,7 +63,8 @@ Behavior:
   - the wildcard HTTPS command to run after DNS is ready
 - If the target domain already exists as a configured site, `site add` now refuses to continue instead of silently reattaching or downgrading the site profile.
 - Menu-based `site add` now expects a new empty project directory. Reusing a non-empty path requires an explicit CLI `--path` flow and is refused in the regular menu wizard.
-- The menu wizard collects DB, access, SSL, runtime, and target choices before the first filesystem/service change, then shows a final creation plan with a default-safe `no` confirmation.
+- The menu wizard collects DB, access, SSL, runtime, and target choices before the first filesystem/service change, then shows a final creation plan with a default-safe `no` confirmation. The final prompt names the domain and explains that `yes` creates the site while `no` exits without creating files or configuration.
+- Cancelling a `site add` wizard step returns `CANCELLED` (exit `89`) and writes the exact step and domain to `/var/log/simai-admin.log`; cancellations before final confirmation do not apply site changes.
 - If an apply-stage failure occurs after confirmation, site creation rolls back only resources created by that invocation; pre-existing pools, paths, databases, users and access entries are not treated as owned cleanup targets.
 - Required markers: if the directory is newly created or empty, missing markers do not block immediately; bootstrap files are applied first, then markers are rechecked. On non-empty directories without markers, the command now errors instead of falling back to `generic`.
 - `/healthcheck.php` is localhost-only by default for php-mode profiles; test with `curl -i -H "Host: <domain>" http://127.0.0.1/healthcheck.php`. Static uses nginx-mode healthcheck at `/healthcheck` (local-only).

@@ -776,7 +776,7 @@ bitrix_restore_ready_handler() {
   local preseed_state="skipped"
   if [[ "$preseed" == "yes" || "$preseed" == "auto" ]]; then
     if read_site_db_env "$BX_DOMAIN" >/dev/null 2>&1; then
-      if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite" "$short_install"; then
+      if bitrix_write_db_preseed_files "$BX_DOMAIN" "$BX_DOC_ROOT" "$overwrite" "$short_install" "no"; then
         preseed_state="ready"
       else
         preseed_state="failed"

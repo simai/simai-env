@@ -2935,7 +2935,7 @@ bitrix_prepare_restore_writable_paths() {
 }
 
 bitrix_write_db_preseed_files() {
-  local domain="$1" doc_root="$2" overwrite="${3:-no}" short_install="${4:-yes}"
+  local domain="$1" doc_root="$2" overwrite="${3:-no}" short_install="${4:-yes}" write_dbconn="${5:-yes}"
   local db_name="" db_user="" db_pass="" db_host="localhost"
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
@@ -2951,6 +2951,11 @@ bitrix_write_db_preseed_files() {
   if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
     return 1
   fi
+  write_dbconn=$(printf '%s' "$write_dbconn" | tr '[:upper:]' '[:lower:]')
+  case "$write_dbconn" in
+    yes|no) ;;
+    *) return 1 ;;
+  esac
 
   local bx_dir="${doc_root}/bitrix"
   local settings_file="${bx_dir}/.settings.php"
@@ -2963,14 +2968,19 @@ bitrix_write_db_preseed_files() {
   q_pass=$(bitrix_php_quote "$db_pass")
 
   local do_write="yes"
-  if [[ "${overwrite,,}" != "yes" && -s "$settings_file" && -s "$dbconn_file" && -s "$after_connect_file" ]]; then
-    do_write="no"
+  if [[ "$overwrite" != "yes" && -s "$settings_file" && -s "$after_connect_file" ]]; then
+    if [[ "$write_dbconn" == "no" || -s "$dbconn_file" ]]; then
+      do_write="no"
+    fi
   fi
   if [[ "$do_write" != "yes" ]]; then
     return 0
   fi
 
-  [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
+  case "$short_install" in
+    [Yy][Ee][Ss]) short_install="yes" ;;
+    *) short_install="no" ;;
+  esac
   local short_install_php="false"
   [[ "$short_install" == "yes" ]] && short_install_php="true"
 
@@ -2978,11 +2988,12 @@ bitrix_write_db_preseed_files() {
   chmod 0775 "${bx_dir}/php_interface" 2>/dev/null || true
   chown "${SIMAI_USER}:www-data" "${bx_dir}/php_interface" 2>/dev/null || true
 
-  local tmp_settings tmp_dbconn
-  local tmp_after_connect
+  local tmp_settings tmp_dbconn="" tmp_after_connect
   tmp_settings=$(mktemp)
-  tmp_dbconn=$(mktemp)
   tmp_after_connect=$(mktemp)
+  if [[ "$write_dbconn" == "yes" ]]; then
+    tmp_dbconn=$(mktemp)
+  fi
 
   cat >"$tmp_settings" <<EOF
 <?php
@@ -3004,7 +3015,8 @@ return [
 ];
 EOF
 
-  cat >"$tmp_dbconn" <<EOF
+  if [[ "$write_dbconn" == "yes" ]]; then
+    cat >"$tmp_dbconn" <<EOF
 <?php
 \$DBType = "mysql";
 \$DBHost = ${q_host};
@@ -3024,6 +3036,7 @@ if (!defined("SHORT_INSTALL")) {
     define("SHORT_INSTALL", ${short_install_php});
 }
 EOF
+  fi
 
   cat >"$tmp_after_connect" <<'EOF'
 <?php
@@ -3037,16 +3050,25 @@ $connection->queryExecute("SET SESSION innodb_strict_mode=0");
 $connection->queryExecute("SET SESSION collation_connection='utf8mb4_unicode_ci'");
 EOF
 
-  if ! php -l "$tmp_settings" >/dev/null 2>&1 || ! php -l "$tmp_dbconn" >/dev/null 2>&1 || ! php -l "$tmp_after_connect" >/dev/null 2>&1; then
+  if ! php -l "$tmp_settings" >/dev/null 2>&1 \
+    || ! php -l "$tmp_after_connect" >/dev/null 2>&1; then
+    rm -f "$tmp_settings" "$tmp_dbconn" "$tmp_after_connect"
+    return 1
+  fi
+  if [[ "$write_dbconn" == "yes" ]] && ! php -l "$tmp_dbconn" >/dev/null 2>&1; then
     rm -f "$tmp_settings" "$tmp_dbconn" "$tmp_after_connect"
     return 1
   fi
 
   mv "$tmp_settings" "$settings_file"
-  mv "$tmp_dbconn" "$dbconn_file"
+  if [[ "$write_dbconn" == "yes" ]]; then
+    mv "$tmp_dbconn" "$dbconn_file"
+  fi
   mv "$tmp_after_connect" "$after_connect_file"
-  chmod 0640 "$settings_file" "$dbconn_file" "$after_connect_file"
-  chown "${SIMAI_USER}:www-data" "$settings_file" "$dbconn_file" "$after_connect_file" 2>/dev/null || true
+  local -a written_files=("$settings_file" "$after_connect_file")
+  [[ "$write_dbconn" == "yes" ]] && written_files+=("$dbconn_file")
+  chmod 0640 "${written_files[@]}"
+  chown "${SIMAI_USER}:www-data" "${written_files[@]}" 2>/dev/null || true
   return 0
 }
 
