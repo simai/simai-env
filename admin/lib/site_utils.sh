@@ -2913,6 +2913,124 @@ bitrix_download_restore_script() {
   return 1
 }
 
+bitrix_restore_archive_validate() {
+  local doc_root="$1" requested="${2:-auto}"
+  local requested_normalized
+  requested_normalized=$(printf '%s' "$requested" | tr '[:upper:]' '[:lower:]')
+  BITRIX_RESTORE_ARCHIVE_STATE="not uploaded"
+  BITRIX_RESTORE_ARCHIVE_PATH=""
+  BITRIX_RESTORE_ARCHIVE_PARTS="0"
+  BITRIX_RESTORE_ARCHIVE_DETAIL="Upload the archive, then run restore-ready again"
+  export BITRIX_RESTORE_ARCHIVE_STATE BITRIX_RESTORE_ARCHIVE_PATH
+  export BITRIX_RESTORE_ARCHIVE_PARTS BITRIX_RESTORE_ARCHIVE_DETAIL
+
+  if [[ "$requested_normalized" == "none" ]]; then
+    BITRIX_RESTORE_ARCHIVE_STATE="skipped"
+    BITRIX_RESTORE_ARCHIVE_DETAIL="Archive validation explicitly skipped"
+    return 0
+  fi
+
+  local archive=""
+  if [[ "$requested_normalized" == "auto" ]]; then
+    local candidates=() file
+    shopt -s nullglob
+    for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar; do
+      [[ "$file" == *_encode.tar.gz ]] && continue
+      candidates+=("$file")
+    done
+    shopt -u nullglob
+    if [[ ${#candidates[@]} -eq 0 ]]; then
+      return 2
+    fi
+    if [[ ${#candidates[@]} -gt 1 ]]; then
+      BITRIX_RESTORE_ARCHIVE_STATE="ambiguous"
+      BITRIX_RESTORE_ARCHIVE_DETAIL="Multiple base archives found; pass --archive <filename>"
+      return 1
+    fi
+    archive="${candidates[0]}"
+  else
+    if [[ "$requested" == */* || "$requested" == "." || "$requested" == ".." ]]; then
+      BITRIX_RESTORE_ARCHIVE_STATE="invalid path"
+      BITRIX_RESTORE_ARCHIVE_DETAIL="Archive must be a filename inside the site document root"
+      return 1
+    fi
+    archive="${doc_root}/${requested}"
+    archive=$(printf '%s' "$archive" | sed -E 's/\.[0-9]+$//')
+  fi
+
+  BITRIX_RESTORE_ARCHIVE_PATH="$archive"
+  if [[ ! -s "$archive" ]]; then
+    BITRIX_RESTORE_ARCHIVE_STATE="missing"
+    BITRIX_RESTORE_ARCHIVE_DETAIL="Base archive is missing or empty"
+    return 1
+  fi
+
+  case "$archive" in
+    *.tar)
+      if tar -tf "$archive" >/dev/null 2>&1; then
+        BITRIX_RESTORE_ARCHIVE_STATE="ready"
+        BITRIX_RESTORE_ARCHIVE_PARTS="1"
+        BITRIX_RESTORE_ARCHIVE_DETAIL="Single-volume tar archive passed integrity check"
+        return 0
+      fi
+      ;;
+    *.tar.gz|*.tgz)
+      local extra_signature last_low last_high last_part=0
+      extra_signature=$(od -An -tx1 -j12 -N2 "$archive" 2>/dev/null | tr -d '[:space:]')
+      if [[ "$extra_signature" == "4c4e" ]]; then
+        last_low=$(od -An -tu1 -j14 -N1 "$archive" 2>/dev/null | tr -d '[:space:]')
+        last_high=$(od -An -tu1 -j15 -N1 "$archive" 2>/dev/null | tr -d '[:space:]')
+        if [[ ! "$last_low" =~ ^[0-9]+$ || ! "$last_high" =~ ^[0-9]+$ ]]; then
+          BITRIX_RESTORE_ARCHIVE_STATE="invalid header"
+          BITRIX_RESTORE_ARCHIVE_DETAIL="Cannot read Bitrix multi-volume metadata"
+          return 1
+        fi
+        last_part=$((last_low + last_high * 256))
+        if (( last_part > 9999 )); then
+          BITRIX_RESTORE_ARCHIVE_STATE="invalid header"
+          BITRIX_RESTORE_ARCHIVE_DETAIL="Unreasonable Bitrix archive part count"
+          return 1
+        fi
+      fi
+
+      local part index part_count=$((last_part + 1))
+      for ((index = 0; index <= last_part; index++)); do
+        part="$archive"
+        (( index > 0 )) && part="${archive}.${index}"
+        if [[ ! -s "$part" ]]; then
+          BITRIX_RESTORE_ARCHIVE_STATE="missing part"
+          BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
+          BITRIX_RESTORE_ARCHIVE_DETAIL="Missing or empty archive part: $(basename "$part")"
+          return 1
+        fi
+        if ! gzip -t "$part" >/dev/null 2>&1; then
+          BITRIX_RESTORE_ARCHIVE_STATE="corrupt part"
+          BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
+          BITRIX_RESTORE_ARCHIVE_DETAIL="Integrity check failed: $(basename "$part")"
+          return 1
+        fi
+      done
+
+      if (( last_part == 0 )) && ! tar -tzf "$archive" >/dev/null 2>&1; then
+        BITRIX_RESTORE_ARCHIVE_STATE="invalid archive"
+        BITRIX_RESTORE_ARCHIVE_PARTS="1"
+        BITRIX_RESTORE_ARCHIVE_DETAIL="The gzip stream is valid but does not contain a readable tar archive"
+        return 1
+      fi
+
+      BITRIX_RESTORE_ARCHIVE_STATE="ready"
+      BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
+      BITRIX_RESTORE_ARCHIVE_DETAIL="All archive volumes passed gzip integrity checks"
+      return 0
+      ;;
+  esac
+
+  BITRIX_RESTORE_ARCHIVE_STATE="corrupt"
+  BITRIX_RESTORE_ARCHIVE_PARTS="1"
+  BITRIX_RESTORE_ARCHIVE_DETAIL="Archive integrity check failed"
+  return 1
+}
+
 bitrix_prepare_restore_writable_paths() {
   local doc_root="$1"
   local dir

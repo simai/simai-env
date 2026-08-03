@@ -752,6 +752,7 @@ bitrix_restore_ready_handler() {
   local overwrite="${PARSED_ARGS[overwrite]:-no}"
   local preseed="${PARSED_ARGS[preseed]:-auto}"
   local short_install="${PARSED_ARGS[short-install]:-no}"
+  local archive="${PARSED_ARGS[archive]:-auto}"
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
   case "${preseed,,}" in
     yes|no|auto) preseed="${preseed,,}" ;;
@@ -796,9 +797,22 @@ bitrix_restore_ready_handler() {
     restore_state="ready"
   fi
 
+  local archive_state="not uploaded"
+  local archive_path="n/a"
+  local archive_parts="0"
+  local archive_detail="Upload the archive, then run restore-ready again"
+  local archive_rc=0
+  bitrix_restore_archive_validate "$BX_DOC_ROOT" "$archive" || archive_rc=$?
+  archive_state="$BITRIX_RESTORE_ARCHIVE_STATE"
+  archive_parts="$BITRIX_RESTORE_ARCHIVE_PARTS"
+  archive_detail="$BITRIX_RESTORE_ARCHIVE_DETAIL"
+  [[ -n "$BITRIX_RESTORE_ARCHIVE_PATH" ]] && archive_path="$BITRIX_RESTORE_ARCHIVE_PATH"
+
   local status="ready"
-  if [[ "$writable_state" != "ready" || "$restore_state" != "ready" || "$preseed_state" == "failed" ]]; then
+  if [[ "$writable_state" != "ready" || "$restore_state" != "ready" || "$preseed_state" == "failed" || $archive_rc -eq 1 ]]; then
     status="partial"
+  elif [[ $archive_rc -eq 2 ]]; then
+    status="waiting for archive"
   fi
 
   ui_result_table \
@@ -808,15 +822,24 @@ bitrix_restore_ready_handler() {
     "DB preseed|${preseed_state}" \
     "SHORT_INSTALL|${short_install}" \
     "restore.php|${restore_script} (${restore_state})" \
+    "Archive|${archive_state}" \
+    "Archive path|${archive_path}" \
+    "Archive parts|${archive_parts}" \
+    "Archive check|${archive_detail}" \
     "Status|${status}"
 
-  if [[ "$status" != "ready" ]]; then
+  if [[ "$status" == "partial" ]]; then
     warn "Restore ready is partial. Check network access, restore.php download, db.env, and writable path permissions."
     return 1
   fi
 
   ui_next_steps
-  ui_kv "Open restore wizard" "$(site_primary_url "$BX_DOMAIN")/restore.php"
+  if [[ "$status" == "waiting for archive" ]]; then
+    ui_kv "Upload archive" "Copy every archive volume into ${BX_DOC_ROOT}"
+    ui_kv "Validate archive" "simai-admin.sh bitrix restore-ready --domain ${BX_DOMAIN}"
+  else
+    ui_kv "Open restore wizard" "$(site_primary_url "$BX_DOMAIN")/restore.php"
+  fi
   ui_kv "After restore" "simai-admin.sh bitrix finalize --domain ${BX_DOMAIN} --confirm yes"
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
@@ -1336,7 +1359,7 @@ register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" "" "menu:confirm"
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install=" "menu:confirm"
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack=" "menu:confirm"
-register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install=" "menu:confirm"
+register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive=" "menu:confirm"
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended=" "menu:confirm menu:bulk"
 register_cmd "bitrix" "ownership" "Check/repair Bitrix file ownership drift" "bitrix_ownership_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""

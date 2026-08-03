@@ -167,6 +167,10 @@ grep -q 'bitrix_write_db_preseed_files.*bitrix_restore_short_install.*"no"' admi
   || fail "site add restore mode must omit premature dbconn.php"
 grep -q 'bitrix_write_db_preseed_files.*short_install.*"no"' admin/commands/bitrix.sh \
   || fail "bitrix restore-ready must omit premature dbconn.php"
+grep -q 'bitrix_restore_archive_validate' admin/commands/bitrix.sh \
+  || fail "bitrix restore-ready must validate an uploaded archive before opening the wizard"
+grep -q 'gzip -t.*part' admin/lib/site_utils.sh \
+  || fail "Bitrix multi-volume restore validation must test every gzip stream"
 grep -q 'Default is `none`' docs/commands/site.md || fail "site command docs must document safe Bitrix helper default"
 
 echo "Smoke checks passed"

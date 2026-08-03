@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.12.78 - 2026-08-03
+
+### Changed
+- Bitrix restore preparation now waits for an uploaded archive and validates
+  every volume before printing the browser wizard URL.
+- New Bitrix sites prepared for restore now direct the operator to upload all
+  volumes and rerun `restore-ready` instead of opening `restore.php`
+  immediately.
+
+### Fixed
+- Missing, empty, truncated, or corrupt Bitrix backup volumes now fail closed
+  with the first bad filename instead of allowing the upstream restore wizard
+  to report success after extracting only a partial archive.
+
 ## 1.12.77 - 2026-08-03
 
 ### Changed

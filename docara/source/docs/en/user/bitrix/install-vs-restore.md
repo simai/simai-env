@@ -79,6 +79,8 @@ Typical menu flow:
 ```text
 Sites -> Create site
 Applications -> Bitrix -> Bitrix restore from backup
+Upload the base archive and every numbered volume
+Applications -> Bitrix -> Bitrix restore from backup (validate archive)
 Open restore.php in the browser
 Complete the restore wizard
 Applications -> Bitrix -> Bitrix complete setup
@@ -104,8 +106,11 @@ What `restore-ready` prepares:
 - `public/restore.php`
 - restore-sensitive write permissions
 - optional DB preseed files when managed DB credentials are available
-- browser restore URL
+- integrity status for every uploaded archive volume
+- browser restore URL only after the archive passes validation
 - post-restore finalize command
+
+Upload every archive volume and run `restore-ready` again before opening the browser wizard. A missing or corrupt part stops the flow and identifies the first bad filename.
 
 The Bitrix restore wizard still runs in the browser. It may unpack files, restore database content, and change application configuration.
 

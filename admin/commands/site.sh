@@ -443,7 +443,8 @@ site_print_add_next_steps() {
           echo "Open setup  : https://${domain}/bitrixsetup.php"
           ;;
         restore)
-          echo "Open restore: https://${domain}/restore.php"
+          echo "Upload archive: copy every Bitrix backup volume into the document root"
+          echo "Validate      : simai-admin.sh bitrix restore-ready --domain ${domain}"
           ;;
         *)
           echo "Prepare     : Applications -> Bitrix installer or restore from backup"

@@ -209,6 +209,72 @@ test_bitrix_restore_preseed_php8_compatibility() {
   rm -rf "$tmp"
 }
 
+test_bitrix_restore_archive_integrity_gate() {
+  local tmp valid_root missing_root corrupt_root empty_root
+  tmp=$(mktemp -d)
+  valid_root="${tmp}/valid"
+  missing_root="${tmp}/missing"
+  corrupt_root="${tmp}/corrupt"
+  empty_root="${tmp}/empty"
+  mkdir -p "$valid_root" "$missing_root" "$corrupt_root" "$empty_root"
+
+  /usr/bin/python3 - "$valid_root" <<'PY'
+import gzip
+import pathlib
+import struct
+import sys
+
+root = pathlib.Path(sys.argv[1])
+parts = [b"first-volume\n" * 32, b"second-volume\n" * 32]
+for index, payload in enumerate(parts):
+    stream = gzip.compress(payload, mtime=0)
+    extra = b"LN" + struct.pack("<H", len(parts) - 1) + b"BX" + struct.pack("<I", len(payload))
+    stream = stream[:3] + b"\x04" + stream[4:10] + struct.pack("<H", len(extra)) + extra + stream[10:]
+    suffix = "" if index == 0 else f".{index}"
+    (root / f"backup.tar.gz{suffix}").write_bytes(stream)
+PY
+
+  cp -a "${valid_root}/." "$missing_root/"
+  rm -f "${missing_root}/backup.tar.gz.1"
+  cp -a "${valid_root}/." "$corrupt_root/"
+  /usr/bin/python3 - "${corrupt_root}/backup.tar.gz.1" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+data = path.read_bytes()
+path.write_bytes(data[:-8])
+PY
+
+  (
+    export SCRIPT_DIR="$ROOT_DIR"
+    export SIMAI_ENV_ROOT="$ROOT_DIR"
+    # shellcheck source=../../admin/lib/site_utils.sh
+    source "${ROOT_DIR}/admin/lib/site_utils.sh"
+
+    assert_success bitrix_restore_archive_validate "$valid_root" auto
+    [[ "$BITRIX_RESTORE_ARCHIVE_STATE" == "ready" && "$BITRIX_RESTORE_ARCHIVE_PARTS" == "2" ]] \
+      || fail "valid multi-volume Bitrix archive did not pass"
+
+    assert_failure bitrix_restore_archive_validate "$missing_root" auto
+    [[ "$BITRIX_RESTORE_ARCHIVE_STATE" == "missing part" ]] \
+      || fail "missing Bitrix archive part was not identified"
+
+    assert_failure bitrix_restore_archive_validate "$corrupt_root" auto
+    [[ "$BITRIX_RESTORE_ARCHIVE_STATE" == "corrupt part" ]] \
+      || fail "corrupt Bitrix archive part was not identified"
+
+    set +e
+    bitrix_restore_archive_validate "$empty_root" auto
+    local empty_rc=$?
+    set -e
+    [[ $empty_rc -eq 2 && "$BITRIX_RESTORE_ARCHIVE_STATE" == "not uploaded" ]] \
+      || fail "empty restore directory is not reported as waiting for upload"
+  )
+
+  rm -rf "$tmp"
+}
+
 test_db_drop_failure_propagation() {
   local tmp calls=0
   tmp=$(mktemp -d)
@@ -347,6 +413,7 @@ test_second_audit_p1_contracts
 test_second_audit_p2_p3_contracts
 test_site_add_cancellation_ux
 test_bitrix_restore_preseed_php8_compatibility
+test_bitrix_restore_archive_integrity_gate
 test_db_drop_failure_propagation
 test_updater_transaction
 echo "[correction-regression] ok"

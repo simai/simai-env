@@ -148,19 +148,22 @@ Notes:
 ## Restore Ready
 
 ```bash
-simai-admin.sh bitrix restore-ready --domain <domain> [--overwrite yes] [--preseed auto|yes|no] [--short-install yes|no]
+simai-admin.sh bitrix restore-ready --domain <domain> [--overwrite yes] [--preseed auto|yes|no] [--short-install yes|no] [--archive auto|none|<filename>]
 ```
 
 Prepares a Bitrix site for restore from an existing backup archive:
 - downloads `public/restore.php` from the official Bitrix script URL
 - normalizes ownership and write permissions for restore-sensitive directories
 - optionally writes `.settings.php` and connection initialization from site `db.env`; restore mode deliberately leaves `dbconn.php` to the archive
+- validates every volume of an uploaded Bitrix `tar.gz` backup before printing the browser restore URL
 - prints the browser restore URL and the post-restore finalize command
 
 Notes:
 - This flow is for backup restore/migration. Use `installer-ready` for a fresh Bitrix install.
 - `--preseed auto` writes restore-safe DB connection files only when site DB credentials are available. It does not create or overwrite `dbconn.php`, because a premature UTF-8 marker can trigger obsolete `mbstring.func_overload` validation before a PHP 8-compatible archive is unpacked.
 - `--overwrite yes` refreshes an existing `restore.php`.
+- With the default `--archive auto`, run the command again after uploading all archive volumes. If no archive is present, it prints upload and validation steps instead of inviting the operator to open the wizard.
+- A missing or corrupt volume fails closed and names the first bad file. `--archive <filename>` selects one base archive when several are present. `--archive none` is an explicit advanced bypass.
 - After the browser restore wizard finishes, run `bitrix finalize --domain <domain> --confirm yes`.
 
 ## Finalize
