@@ -173,4 +173,13 @@ grep -q 'gzip -t.*part' admin/lib/site_utils.sh \
   || fail "Bitrix multi-volume restore validation must test every gzip stream"
 grep -q 'Default is `none`' docs/commands/site.md || fail "site command docs must document safe Bitrix helper default"
 
+# 14) Iframe policy must be explicit, safe by default, and persistent.
+grep -q 'register_cmd "site" "frame-policy"' admin/commands/site.sh || fail "site frame-policy command missing"
+grep -q 'frame-policy=' admin/commands/site.sh || fail "site add must expose --frame-policy"
+grep -q 'frame-policy: ${frame_policy}' lib/site_metadata.sh || fail "frame policy metadata missing"
+grep -q 'SITE_META\[frame_policy\].*same-origin' admin/commands/ssl.sh || fail "SSL regeneration must preserve frame policy"
+grep -q 'frame-ancestors \*' admin/lib/site_utils.sh || fail "any frame policy header missing"
+grep -q 'frame-policy any' docs/commands/site.md || fail "frame policy docs missing"
+bash scripts/ci/frame_policy_test.sh || fail "frame policy functional checks failed"
+
 echo "Smoke checks passed"

@@ -132,6 +132,56 @@ site_host_mode_normalize() {
   esac
 }
 
+site_frame_policy_normalize() {
+  local mode="${1:-same-origin}"
+  mode=$(echo "$mode" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+  case "$mode" in
+    same-origin|sameorigin) echo "same-origin" ;;
+    any) echo "any" ;;
+    *)
+      error "Unsupported frame policy: ${1}. Use: same-origin, any"
+      return 1
+      ;;
+  esac
+}
+
+site_frame_policy_render_file() {
+  local source="$1" destination="$2" mode="$3"
+  mode=$(site_frame_policy_normalize "$mode") || return 1
+  if grep -Eq '^[[:space:]]*add_header[[:space:]]+Content-Security-Policy' "$source" \
+    && ! grep -Fq '# simai-frame-policy-start' "$source"; then
+    error "Custom Content-Security-Policy exists; refusing to overwrite it"
+    return 1
+  fi
+  awk -v mode="$mode" '
+    BEGIN { managed=0; inserted=0 }
+    /^[[:space:]]*# simai-frame-policy-start[[:space:]]*$/ { managed=1; next }
+    managed && /^[[:space:]]*# simai-frame-policy-end[[:space:]]*$/ { managed=0; next }
+    managed { next }
+    /^[[:space:]]*add_header[[:space:]]+X-Frame-Options[[:space:]]+"SAMEORIGIN"[[:space:]]+always;[[:space:]]*$/ { next }
+    {
+      print
+      if (!inserted && $0 ~ /^[[:space:]]*error_log[[:space:]]/) {
+        print ""
+        print "    # simai-frame-policy-start"
+        if (mode == "any") {
+          print "    add_header Content-Security-Policy \"frame-ancestors *\" always;"
+        } else {
+          print "    add_header X-Frame-Options \"SAMEORIGIN\" always;"
+        }
+        print "    # simai-frame-policy-end"
+        inserted=1
+      }
+    }
+    END { if (!inserted) exit 42 }
+  ' "$source" >"$destination" || {
+    local rc=$?
+    [[ $rc -eq 42 ]] && error "Could not locate nginx error_log anchor for frame policy"
+    rm -f "$destination"
+    return 1
+  }
+}
+
 site_default_wildcard_domain() {
   local domain="$1"
   echo "*.${domain}"
@@ -995,6 +1045,7 @@ create_nginx_site() {
   local public_dir="${15-public}"
   local host_mode="${16:-standard}"
   local wildcard_domain="${17:-}"
+  local frame_policy="${18:-same-origin}"
   if [[ ! -f "$template_path" ]]; then
     error "nginx template not found at ${template_path}"
     return 1
@@ -1017,6 +1068,7 @@ create_nginx_site() {
     php_socket_project="$slug"
   fi
   host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || echo "standard")
+  frame_policy=$(site_frame_policy_normalize "$frame_policy") || return 1
   if [[ "$host_mode" == "wildcard" && -z "$wildcard_domain" ]]; then
     wildcard_domain="$(site_default_wildcard_domain "$domain")"
   fi
@@ -1048,7 +1100,7 @@ create_nginx_site() {
   mkdir -p "$doc_root"
   chown -R "$SIMAI_USER":www-data "$doc_root" 2>/dev/null || true
   local meta_block
-  meta_block=$(site_nginx_metadata_render "$domain" "$slug" "$profile" "$project_path" "$project" "$php_version" "$ssl_meta" "" "$target" "$php_socket_project" "$template_id" "$public_dir" "$host_mode" "$wildcard_domain")
+  meta_block=$(site_nginx_metadata_render "$domain" "$slug" "$profile" "$project_path" "$project" "$php_version" "$ssl_meta" "" "$target" "$php_socket_project" "$template_id" "$public_dir" "$host_mode" "$wildcard_domain" "$frame_policy")
   local server_name_value
   server_name_value=$(site_server_name_value "$domain" "$host_mode" "$wildcard_domain")
   if [[ -f "$site_available" ]]; then
@@ -1073,6 +1125,14 @@ create_nginx_site() {
       -e "s#{{PHP_VERSION}}#${php_version}#g" \
       -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" "$template_path"
   } > "$site_available"
+  local frame_tmp
+  frame_tmp=$(mktemp)
+  if ! site_frame_policy_render_file "$site_available" "$frame_tmp" "$frame_policy"; then
+    rm -f "$frame_tmp"
+    restore_nginx_backup "$site_available" "$site_enabled" "$backup"
+    return 1
+  fi
+  mv "$frame_tmp" "$site_available"
   ln -sf "$site_available" "$site_enabled"
   if [[ -f /etc/nginx/sites-enabled/default ]]; then
     rm -f /etc/nginx/sites-enabled/default
@@ -1662,6 +1722,7 @@ site_nginx_metadata_parse() {
       public-dir) out[public_dir]="$val" ;;
       host-mode) out[host_mode]="$val" ;;
       wildcard-domain) out[wildcard_domain]="$val" ;;
+      frame-policy) out[frame_policy]="$val" ;;
       updated-at) out[updated_at]="$val" ;;
     esac
   done <"$file"
@@ -1694,7 +1755,7 @@ nginx_safe_write_config() {
 }
 
 site_nginx_metadata_upsert() {
-  local cfg="$1" domain="$2" slug="$3" profile="$4" root="$5" project="$6" php="$7" ssl="$8" updated_at="$9" target="${10}" socket_project="${11}" template="${12}" public_dir="${13}" host_mode="${14-}" wildcard_domain="${15-}"
+  local cfg="$1" domain="$2" slug="$3" profile="$4" root="$5" project="$6" php="$7" ssl="$8" updated_at="$9" target="${10}" socket_project="${11}" template="${12}" public_dir="${13}" host_mode="${14-}" wildcard_domain="${15-}" frame_policy="${16-}"
   declare -A parsed=()
   if site_nginx_metadata_parse "$cfg" parsed; then
     [[ -z "$domain" ]] && domain="${parsed[domain]}"
@@ -1712,6 +1773,7 @@ site_nginx_metadata_upsert() {
     fi
     [[ -z "$host_mode" ]] && host_mode="${parsed[host_mode]:-}"
     [[ -z "$wildcard_domain" ]] && wildcard_domain="${parsed[wildcard_domain]:-}"
+    [[ -z "$frame_policy" ]] && frame_policy="${parsed[frame_policy]:-}"
   fi
   [[ -z "$domain" ]] && domain="$(basename "${cfg%.conf}")"
   [[ -z "$slug" ]] && slug="$(project_slug_from_domain "$domain")"
@@ -1726,8 +1788,10 @@ site_nginx_metadata_upsert() {
     public_dir="public"
   fi
   [[ -z "$host_mode" ]] && host_mode="standard"
+  [[ -z "$frame_policy" ]] && frame_policy="same-origin"
+  frame_policy=$(site_frame_policy_normalize "$frame_policy") || return 1
   local block
-  block=$(site_nginx_metadata_render "$domain" "$slug" "$profile" "$root" "$project" "$php" "$ssl" "$updated_at" "$target" "$socket_project" "$template" "$public_dir" "$host_mode" "$wildcard_domain")
+  block=$(site_nginx_metadata_render "$domain" "$slug" "$profile" "$root" "$project" "$php" "$ssl" "$updated_at" "$target" "$socket_project" "$template" "$public_dir" "$host_mode" "$wildcard_domain" "$frame_policy")
   local body
   body=$(awk 'BEGIN{meta=1}
     {

@@ -13,6 +13,7 @@ Options:
 - `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
 - `--host-mode standard|wildcard` controls whether the site serves only the main domain or the main domain plus all first-level subdomains. Default is `standard`.
 - `--wildcard-domain` (optional) overrides the wildcard hostname stored in metadata for `--host-mode wildcard`. Default is `*.your-domain.tld`.
+- `--frame-policy same-origin|any` controls whether browsers may embed the site in an iframe. The safe default is `same-origin`; use `any` only for a dedicated embedded application endpoint.
 - `--usage` selects a user-facing activity class: `standard` (default), `high-traffic`, or `rarely-used`. simai-env maps this to the internal performance mode automatically.
 - `--target-domain` (alias only) set target non-interactively; required in CLI for alias when not in menu.
 - `--php` (optional; choose from installed if omitted; in menu the selector shows only installed versions that are compatible with the chosen profile)
@@ -74,9 +75,23 @@ Examples:
 - Create without TLS: `simai-admin.sh site add --domain example.com --profile generic --php 8.3`
 - Create and issue TLS immediately: `simai-admin.sh site add --domain example.com --profile generic --php 8.3 --ssl yes --ssl-email ops@example.com`
 - Create one site for domain plus subdomains: `simai-admin.sh site add --domain obr.site --profile generic --host-mode wildcard`
+- Create a dedicated iframe application endpoint: `simai-admin.sh site add --domain app.example.com --profile laravel --frame-policy any`
 - Create Bitrix infrastructure only: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes`
 - Create Bitrix and prepare fresh installer helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files setup`
 - Create Bitrix and prepare restore helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files restore`
+
+## frame-policy
+
+Change the embedding policy of an existing managed site. The setting is stored
+in nginx metadata and survives SSL regeneration.
+
+- Block cross-origin embedding (default): `simai-admin.sh site frame-policy --domain app.example.com --mode same-origin --confirm yes`
+- Allow embedding from any origin: `simai-admin.sh site frame-policy --domain app.example.com --mode any --confirm yes`
+
+`any` removes the legacy `X-Frame-Options: SAMEORIGIN` response header and adds
+`Content-Security-Policy: frame-ancestors *`. It should be enabled only on a
+dedicated application domain whose own authentication and authorization remain
+enabled.
 
 ## remove
 Remove site resources (profile-driven; no fixes on target data unless confirmed).

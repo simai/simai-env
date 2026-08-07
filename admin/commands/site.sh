@@ -35,6 +35,39 @@ site_bitrix_files_normalize() {
   esac
 }
 
+site_frame_policy_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}"
+  local mode="${PARSED_ARGS[mode]:-}"
+  local confirm="${PARSED_ARGS[confirm]:-}"
+  if ! validate_domain "$domain" "allow" || ! require_site_exists "$domain"; then
+    return 1
+  fi
+  mode=$(site_frame_policy_normalize "$mode") || return 1
+  if [[ "${confirm,,}" != "yes" ]]; then
+    error "Changing frame policy requires --confirm yes"
+    return 1
+  fi
+  local cfg="/etc/nginx/sites-available/${domain}.conf"
+  declare -A meta=()
+  site_nginx_metadata_parse "$cfg" meta || {
+    error "Managed nginx metadata not found for ${domain}"
+    return 1
+  }
+  local rendered
+  rendered=$(mktemp)
+  site_frame_policy_render_file "$cfg" "$rendered" "$mode" || {
+    rm -f "$rendered"
+    return 1
+  }
+  local content
+  content=$(<"$rendered")$'\n'
+  rm -f "$rendered"
+  nginx_safe_write_config "$cfg" "$content" || return 1
+  site_nginx_metadata_upsert "$cfg" "$domain" "${meta[slug]:-}" "${meta[profile]:-}" "${meta[root]:-}" "${meta[project]:-}" "${meta[php]:-}" "${meta[ssl]:-}" "" "${meta[target]:-}" "${meta[php_socket_project]:-}" "${meta[nginx_template]:-}" "${meta[public_dir]:-}" "${meta[host_mode]:-standard}" "${meta[wildcard_domain]:-}" "$mode" >/dev/null
+  ui_result_table "Domain|${domain}" "Frame policy|${mode}" "Nginx config|${cfg}"
+}
+
 site_add_cancel_message() {
   local domain="$1"
   local step="$2"
@@ -577,6 +610,7 @@ site_add_handler_impl() {
   local usage_class="${PARSED_ARGS[usage]:-${SIMAI_SITE_USAGE_DEFAULT:-}}"
   local host_mode="${PARSED_ARGS[host-mode]:-standard}"
   local wildcard_domain="${PARSED_ARGS[wildcard-domain]:-}"
+  local frame_policy="${PARSED_ARGS[frame-policy]:-same-origin}"
   local ssl_mode="${PARSED_ARGS[ssl]:-${SIMAI_SSL_AUTO_ISSUE_ON_CREATE:-no}}"
   local ssl_email="${PARSED_ARGS[ssl-email]:-${SIMAI_SSL_LE_EMAIL_DEFAULT:-}}"
   local ssl_redirect="${PARSED_ARGS[ssl-redirect]:-${SIMAI_SSL_REDIRECT_DEFAULT:-no}}"
@@ -592,6 +626,7 @@ site_add_handler_impl() {
   local access_password="${PARSED_ARGS[access-password]:-}"
   local bitrix_files="${PARSED_ARGS["bitrix-files"]:-none}"
   local target_domain="${PARSED_ARGS[target-domain]:-}" target_path="" target_project="" target_php=""
+  frame_policy=$(site_frame_policy_normalize "$frame_policy") || return 1
   local path_created=0 path_empty=0 need_post_bootstrap_marker_check=0
   local path_explicit="no"
   [[ -n "${PARSED_ARGS[path]:-}" ]] && path_explicit="yes"
@@ -1019,7 +1054,7 @@ site_add_handler_impl() {
   local ssl_redirect="no" ssl_hsts="no"
   local doc_root
   doc_root=$(site_compute_doc_root "$path" "$public_dir") || return 1
-  if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir" "$host_mode" "$wildcard_domain"; then
+  if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir" "$host_mode" "$wildcard_domain" "$frame_policy"; then
     error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
     return 1
   fi
@@ -2120,6 +2155,7 @@ site_info_handler() {
   local -a rows=(
     "Domain|${domain}"
     "Host mode|${host_mode}"
+    "Frame policy|${SITE_META[frame_policy]:-same-origin}"
     "Slug|${slug}"
     "Profile|${profile}"
     "Activity class|${usage_class}"
@@ -2168,7 +2204,8 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files=" "menu:internal-confirm"
+register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" ""

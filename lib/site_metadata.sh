@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Render canonical nginx metadata block (metadata v2).
 site_nginx_metadata_render() {
-  local domain="$1" slug="$2" profile="$3" root="$4" project="$5" php="$6" ssl="$7" updated_at="$8" target="$9" socket_project="${10}" template="${11}" public_dir="${12}" host_mode="${13:-standard}" wildcard_domain="${14:-}"
+  local domain="$1" slug="$2" profile="$3" root="$4" project="$5" php="$6" ssl="$7" updated_at="$8" target="$9" socket_project="${10}" template="${11}" public_dir="${12}" host_mode="${13:-standard}" wildcard_domain="${14:-}" frame_policy="${15:-same-origin}"
   [[ -z "$updated_at" ]] && updated_at="$(date +%Y-%m-%d)"
   cat <<EOF
 # simai-managed: yes
@@ -21,6 +21,7 @@ site_nginx_metadata_render() {
 # simai-public-dir: ${public_dir}
 # simai-host-mode: ${host_mode}
 # simai-wildcard-domain: ${wildcard_domain}
+# simai-frame-policy: ${frame_policy}
 # simai-updated-at: ${updated_at}
 
 EOF

@@ -405,7 +405,7 @@ ssl_apply_nginx() {
   else
     pd_val="${SITE_META[public_dir]}"
   fi
-  if ! create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "${SITE_META[target]:-}" "$SITE_SSL_SOCKET_PROJECT" "$cert" "$key" "$chain" "$redirect" "$hsts" "$template_id" "$pd_val" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}"; then
+  if ! create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "${SITE_META[target]:-}" "$SITE_SSL_SOCKET_PROJECT" "$cert" "$key" "$chain" "$redirect" "$hsts" "$template_id" "$pd_val" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}" "${SITE_META[frame_policy]:-same-origin}"; then
     return 1
   fi
   local ssl_type="custom"
@@ -892,7 +892,7 @@ ssl_remove_handler() {
   local template
   template=$(site_nginx_template_path_for_id "$template_id") || return 1
   info "Removing SSL config for ${domain}"
-  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "$template_id" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}"
+  create_nginx_site "$domain" "$SITE_SSL_PROJECT" "$SITE_SSL_ROOT" "$SITE_SSL_PHP" "$template" "$SITE_SSL_PROFILE" "" "$SITE_SSL_SOCKET_PROJECT" "" "" "" "no" "no" "$template_id" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}" "${SITE_META[frame_policy]:-same-origin}"
   site_nginx_metadata_upsert "/etc/nginx/sites-available/${domain}.conf" "$domain" "${SITE_META[project]}" "${SITE_META[profile]}" "${SITE_META[root]}" "${SITE_META[project]}" "${SITE_META[php]}" "none" "" "${SITE_META[target]:-}" "${SITE_META[php_socket_project]:-${SITE_META[project]}}" "${SITE_META[nginx_template]:-${SITE_META[profile]}}" "${SITE_SSL_PUBLIC_DIR}" "${SITE_META[host_mode]:-standard}" "${SITE_META[wildcard_domain]:-}" >/dev/null 2>&1 || true
   local ssl_kind="${SITE_META[ssl]:-none}"
   if [[ "$delete_cert" == "yes" ]]; then

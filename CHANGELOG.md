@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Managed sites now support persistent `same-origin` and `any` iframe policies
+  through `site add --frame-policy` and `site frame-policy`; SSL regeneration
+  preserves the selected policy.
+
 ## 1.12.78 - 2026-08-03
 
 ### Changed

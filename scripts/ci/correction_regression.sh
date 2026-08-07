@@ -102,7 +102,7 @@ test_second_audit_p2_p3_contracts() {
   grep -Fq 'simai-admin.sh help [section]' "$help" || fail "registry-derived help entrypoint is missing"
   ! grep -Fq -- '--pass secret' "$help" || fail "root help exposes a password literal"
   /usr/bin/python3 "${ROOT_DIR}/scripts/ci/command_coverage.py" --root "$ROOT_DIR" --check \
-    | grep -Fq '"total": 131' || fail "command coverage does not classify all 131 commands"
+    | grep -Fq '"total": 132' || fail "command coverage does not classify all 132 commands"
 }
 
 test_second_audit_p1_contracts() {
