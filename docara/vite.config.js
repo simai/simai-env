@@ -18,6 +18,36 @@ function copyStaticAssets() {
     copyIfExists('source/img', 'source/assets/build/img');
 }
 
+function writeLegacyMixManifest() {
+    const viteManifestPath = 'source/assets/build/manifest.json';
+    const logoPath = 'source/assets/build/img/logo.svg';
+
+    if (! existsSync(viteManifestPath) || ! existsSync(logoPath)) {
+        throw new Error('Vite compatibility assets are incomplete.');
+    }
+
+    const viteManifest = JSON.parse(readFileSync(viteManifestPath, 'utf8'));
+    const entryFile = (source) => {
+        const file = viteManifest[source]?.file;
+        if (typeof file !== 'string' || file === '' || file.includes('..')) {
+            throw new Error('Vite manifest entry is missing or unsafe: ' + source);
+        }
+
+        return '/' + file.replace(/^\/+/, '');
+    };
+    const mixManifest = {
+        '/css/main.css': entryFile('source/_core/_assets/css/main.scss'),
+        '/img/logo.svg': '/img/logo.svg',
+        '/js/main.js': entryFile('source/_core/_assets/js/main.js'),
+        '/js/turbo.js': entryFile('source/_core/_assets/js/turbo.js'),
+    };
+
+    writeFileSync(
+        'source/assets/build/mix-manifest.json',
+        JSON.stringify(mixManifest, null, 2) + '\n',
+    );
+}
+
 function rebuildStaticAssets() {
     rmSync('source/assets/build/img', { recursive: true, force: true });
     copyStaticAssets();
@@ -313,6 +343,7 @@ function docara() {
         },
         async closeBundle() {
             copyStaticAssets();
+            writeLegacyMixManifest();
             await runDocaraBuild(buildEnv);
         },
     };

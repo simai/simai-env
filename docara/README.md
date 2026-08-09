@@ -38,4 +38,4 @@ The repository publishes the Docara site through GitHub Pages Actions.
 
 - `config.php` uses `DOCARA_BASE_URL` from the environment, so the same site can build locally and on GitHub Pages.
 - The workflow uses Node 20, Yarn 1.22.22 and Vite from the committed lockfile.
-- Laravel Mix, webpack and `docara-mix` are not part of this site.
+- Legacy Mix and webpack dependencies are not part of this site.
