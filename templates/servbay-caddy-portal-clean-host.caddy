@@ -1,0 +1,4 @@
+# Add this matcher before the generic PHP route in a clean-host portal vhost.
+# The public portal handler resolves the current tenant and renders the map.
+@portalTechnicalMap path /map.php /map/*
+rewrite @portalTechnicalMap /simai-portal-technical.php?route=map
