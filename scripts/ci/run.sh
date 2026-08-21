@@ -7,6 +7,9 @@ bash scripts/ci/bash_syntax.sh
 echo "[ci] shellcheck"
 bash scripts/ci/shellcheck.sh
 
+echo "[ci] runtime observer static checks"
+bash testing/runtime-observer-static.sh
+
 echo "[ci] smoke invariants"
 bash scripts/ci/smoke.sh
 

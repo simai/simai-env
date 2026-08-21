@@ -8,6 +8,7 @@ This directory contains architecture, development, and command reference docs fo
 - Bitrix user workflows: `docs/user/bitrix/README.md`.
 - Admin usage map: see `docs/admin.md` and `docs/commands/`.
 - File access management: `docs/commands/access.md`.
+- Runtime change observer: `docs/commands/runtime-observer.md`.
 - WordPress ops reference: `docs/commands/wp.md`.
 - Bitrix ops reference: `docs/commands/bitrix.md`.
 - System/self reference: `docs/commands/self.md`.
