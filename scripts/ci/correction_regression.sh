@@ -75,6 +75,12 @@ test_command_option_validation() {
     || fail "unexpected positional arguments do not fail closed"
 }
 
+test_access_add_key_preserves_metadata() {
+  local access_commands="${ROOT_DIR}/admin/commands/access.sh"
+  grep -Fq '"MOUNT_UNIT|${ACCESS_META[MOUNT_UNIT]:-}"' "$access_commands" \
+    || fail "access add-key does not preserve the project bind-mount unit"
+}
+
 test_menu_contract() {
   local menu="${ROOT_DIR}/admin/menu.sh"
   grep -Fq '"10|Remove site"' "$menu" || fail "regular site action keys changed"
@@ -408,6 +414,7 @@ EOF
 test_install_mode_contract
 test_site_metadata_cleanup
 test_command_option_validation
+test_access_add_key_preserves_metadata
 test_menu_contract
 test_second_audit_p1_contracts
 test_second_audit_p2_p3_contracts

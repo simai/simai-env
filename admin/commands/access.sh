@@ -571,6 +571,7 @@ access_add_key_handler() {
     "ROOT_PATH|${ACCESS_META[ROOT_PATH]:-}" \
     "JAIL_PATH|${ACCESS_META[JAIL_PATH]:-}" \
     "HOME_PATH|${ACCESS_META[HOME_PATH]:-}" \
+    "MOUNT_UNIT|${ACCESS_META[MOUNT_UNIT]:-}" \
     "ENABLED|${ACCESS_META[ENABLED]:-yes}" \
     "AUTH_MODE|${auth_mode}" \
     "CREATED_AT|${ACCESS_META[CREATED_AT]:-}" \
