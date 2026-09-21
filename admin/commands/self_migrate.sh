@@ -60,6 +60,23 @@ self_migrate_home_owner() {
   chown root:root "$parent" && chmod 0755 "$parent" && SELF_MIGRATE_CHANGES+=("/home owner restored to root")
 }
 
+# Site users can read anything world-readable under the shared home. Report
+# directories other than the web root and shared code checkouts.
+self_migrate_report_open_home_dirs() {
+  local dir name mode
+  for dir in "$SIMAI_HOME"/*/; do
+    dir="${dir%/}"
+    [[ -d "$dir" && ! -L "$dir" ]] || continue
+    name=$(basename "$dir")
+    case "$name" in www|git|releases) continue ;; esac
+    mode=$(stat -c '%a' "$dir")
+    if (( (8#$mode & 8#005) != 0 )); then
+      warn "${dir} (mode ${mode}) is readable by site users; if sites do not need it: chmod o-rwx ${dir}"
+    fi
+  done
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -81,6 +98,7 @@ self_migrate_handler() {
   if (( legacy > 0 )); then
     warn "${legacy} PHP pool(s) still run as the shared ${SIMAI_BASE_USER} user; migrate them with: simai-admin.sh site isolate --domain <domain>"
   fi
+  self_migrate_report_open_home_dirs
   return 0
 }
 

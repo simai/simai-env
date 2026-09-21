@@ -96,6 +96,12 @@ and unit. Alias sites follow their target site. After migrating, run
 `site doctor` and open the site. Code that writes outside the project
 directory (for example to another site's folder) stops working by design.
 
+Symlinked modules keep working as long as their targets are readable by
+others (for example `/home/simai/git/<repo>` with mode `755`). Deploy scripts
+that used to write into the project as `simai` must now run as the site user
+(`sudo -u site-<slug> ...`) or as root followed by
+`chown -R site-<slug>:site-<slug> <project>`.
+
 ## frame-policy
 
 Change the embedding policy of an existing managed site. The setting is stored
