@@ -526,6 +526,18 @@ test_site_isolation_contracts() {
   grep -Fq 'run_user=$(site_effective_user "$slug")' "${ROOT_DIR}/admin/lib/site_utils.sh" \
     || fail "cron user is not resolved per site"
   grep -Fq 'Group={{GROUP}}' "${ROOT_DIR}/systemd/laravel-queue.service" || fail "queue unit group is not per site"
+  grep -Fq 'AuthorizedKeysFile ${SIMAI_OWNER_KEYS_DIR}/%u' "${ROOT_DIR}/admin/commands/owner.sh" \
+    || fail "owner SSH keys must come from the root-owned key directory"
+  (
+    error() { :; }
+    SIMAI_BASE_USER=simai
+    eval "$(extract_function owner_validate_name "${ROOT_DIR}/admin/commands/owner.sh")"
+    assert_success owner_validate_name acme
+    assert_failure owner_validate_name root
+    assert_failure owner_validate_name simai
+    assert_failure owner_validate_name site-x
+    assert_failure owner_validate_name 'a;b'
+  )
   extract_function bitrix_profile_ini_block "${ROOT_DIR}/admin/lib/site_utils.sh" | grep -Fq '; simai-profile-ini-begin' \
     || fail "Bitrix baseline must live in the profile ini block (site php-ini changes rewrite the site block)"
   ! extract_function create_php_pool "${ROOT_DIR}/admin/lib/site_utils.sh" | grep -Fq 'simai-site-ini-begin' \

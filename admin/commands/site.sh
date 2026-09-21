@@ -531,6 +531,7 @@ site_add_transaction_reset() {
   SITE_ADD_TX_ACCESS_CREATED=0
   SITE_ADD_TX_ACCESS_LOGIN=""
   SITE_ADD_TX_SITE_USER_CREATED=0
+  SITE_ADD_TX_OWNER_ASSIGNED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT=""
@@ -561,7 +562,7 @@ site_add_transaction_rollback() {
     install -d -m "${SITE_ADD_TX_PATH_MODE:-0755}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
     chown "${SITE_ADD_TX_PATH_UID:-0}:${SITE_ADD_TX_PATH_GID:-0}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
   fi
-  if [[ "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
+  if [[ ( "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 || "${SITE_ADD_TX_OWNER_ASSIGNED:-0}" -eq 1 ) && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
     site_user_delete "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   fi
   rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env"
@@ -1006,7 +1007,20 @@ site_add_handler_impl() {
   if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
     run_command profile init --mode all --force yes || return 1
   fi
-  if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]] && site_isolation_enabled; then
+  local site_owner="${PARSED_ARGS[owner]:-}"
+  if [[ -n "$site_owner" && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+    if ! site_is_owner "$site_owner"; then
+      error "Owner ${site_owner} does not exist. Create it first: simai-admin.sh owner create --name ${site_owner}"
+      return 1
+    fi
+    site_user_assign "$project" "$site_owner" || return 1
+    SITE_ADD_TX_OWNER_ASSIGNED=1
+    SIMAI_USER="$site_owner"
+    # shellcheck disable=SC2034 # read by site_utils.sh helpers
+    SIMAI_WEB_GROUP="$site_owner"
+    site_prepare_isolated_parents
+    info "Site runs as owner ${site_owner}"
+  elif [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]] && site_isolation_enabled; then
     local site_user=""
     site_user_for_project "$project" >/dev/null 2>&1 || SITE_ADD_TX_SITE_USER_CREATED=1
     site_user=$(site_user_create "$project") || return 1
@@ -1273,6 +1287,7 @@ site_add_handler_impl() {
     warn "Failed to apply site usage class ${usage_class} for ${domain}"
   fi
 
+  [[ -n "$site_owner" ]] && site_owner_link_site "$site_owner" "$domain" "$path"
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
   local primary_ip=""
   if [[ "$host_mode" == "wildcard" ]]; then
@@ -1675,7 +1690,7 @@ site_remove_handler() {
   fi
 
   if [[ "$is_alias" != "yes" ]] && site_user_for_project "$safe_project" >/dev/null 2>&1; then
-    if [[ $remove_files -eq 1 && $removal_failed -eq 0 ]]; then
+    if [[ $remove_files -eq 1 && $removal_failed -eq 0 ]] || site_is_owner "$(site_user_for_project "$safe_project")"; then
       site_user_delete "$safe_project" || warn "Failed to remove the site user of ${domain}"
     else
       warn "Site user $(site_user_for_project "$safe_project") is kept because the project files remain"
@@ -2204,6 +2219,7 @@ site_info_handler() {
     "Access log|${access_log}"
     "Error log|${error_log}"
     "PHP|${php}"
+    "Runs as|$(site_effective_user "${SITE_META[project]:-$(project_slug_from_domain "$domain")}")"
     "PHP socket|${php_socket}"
     "Runtime state|${runtime_state}"
     "SSL|${ssl_brief}"
@@ -2237,7 +2253,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

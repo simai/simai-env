@@ -35,7 +35,7 @@ site_isolate_acl_switch() {
 
 site_isolate_handler() {
   parse_kv_args "$@"
-  local domain="${PARSED_ARGS[domain]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
+  local domain="${PARSED_ARGS[domain]:-}" confirm="${PARSED_ARGS[confirm]:-no}" owner="${PARSED_ARGS[owner]:-}"
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
@@ -47,16 +47,29 @@ site_isolate_handler() {
     error "Alias sites run in their target site's pool; isolate the target site instead."
     return 1
   fi
-  local current
-  if current=$(site_user_for_project "$project" 2>/dev/null); then
-    info "${domain} already runs as ${current}"
+  if [[ -n "$owner" ]] && ! site_is_owner "$owner"; then
+    error "Owner ${owner} does not exist. Create it first: simai-admin.sh owner create --name ${owner}"
+    return 1
+  fi
+  local base="$SIMAI_BASE_USER" from="" from_group user
+  from=$(site_user_for_project "$project" 2>/dev/null) || from="$base"
+  from_group="$from"
+  [[ "$from" == "$base" ]] && from_group="www-data"
+  if [[ -n "$owner" ]]; then
+    user="$owner"
+  elif [[ "$from" != "$base" ]]; then
+    info "${domain} already runs as ${from}"
+    return 0
+  else
+    user=$(site_user_name_for_project "$project")
+  fi
+  if [[ "$user" == "$from" ]]; then
+    info "${domain} already runs as ${from}"
     return 0
   fi
   [[ -n "$root" && -d "$root" && ! -L "$root" ]] || { error "Project root not found: ${root:-unknown}"; return 1; }
   site_path_is_allowed_root "$root" || { error "Project root ${root} is outside the managed web roots"; return 1; }
 
-  local base="$SIMAI_BASE_USER" user
-  user=$(site_user_name_for_project "$project")
   local -a pools=()
   local pool
   for pool in /etc/php/*/fpm/pool.d/"${socket_project}".conf; do
@@ -69,7 +82,7 @@ site_isolate_handler() {
 
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
-    echo "  - create user and group ${user}; add www-data to group ${user}"
+    echo "  - run as ${user} instead of ${from}"
     echo "  - chown -R ${user}:${user} ${root}; chmod o-rwx ${root}"
     for pool in "${pools[@]}"; do echo "  - PHP-FPM pool ${pool}: user/group ${user}"; done
     [[ -f "$cron_file" ]] && echo "  - cron ${cron_file}: run as ${user}"
@@ -88,14 +101,19 @@ site_isolate_handler() {
   [[ -f "$cron_file" ]] && cp -p "$cron_file" "${backup_dir}/cron"
   [[ -n "$queue_unit" ]] && cp -p "$queue_unit" "${backup_dir}/queue"
 
-  local failed=""
-  site_user_create "$project" >/dev/null || failed="create user"
+  local failed="" created_user=0
+  if [[ -n "$owner" ]]; then
+    site_user_assign "$project" "$owner" || failed="assign owner"
+  else
+    id -u "$user" >/dev/null 2>&1 || created_user=1
+    site_user_create "$project" >/dev/null || failed="create user"
+  fi
   if [[ -z "$failed" ]]; then
     site_prepare_isolated_parents
     info "Changing ownership of ${root}"
     chown -R "${user}:${user}" "$root" && chmod o-rwx "$root" || failed="file ownership"
   fi
-  [[ -z "$failed" ]] && { site_isolate_acl_switch "$root" "$base" "$user" || failed="file ACLs"; }
+  [[ -z "$failed" ]] && { site_isolate_acl_switch "$root" "$from" "$user" || failed="file ACLs"; }
   if [[ -z "$failed" ]]; then
     local ver
     for pool in "${pools[@]}"; do
@@ -109,7 +127,7 @@ site_isolate_handler() {
     done
   fi
   if [[ -z "$failed" && -f "$cron_file" ]]; then
-    site_isolate_rewrite_cron "$cron_file" "$base" "$user" || failed="cron file"
+    site_isolate_rewrite_cron "$cron_file" "$from" "$user" || failed="cron file"
   fi
   if [[ -z "$failed" && -n "$queue_unit" ]]; then
     sed -i -E -e "s/^User=.*/User=${user}/" -e "s/^Group=.*/Group=${user}/" "$queue_unit" || failed="queue unit"
@@ -121,14 +139,22 @@ site_isolate_handler() {
     for pool in "${pools[@]}"; do cp -p "${backup_dir}/pool.${i}" "$pool"; i=$((i + 1)); done
     [[ -f "${backup_dir}/cron" ]] && cp -p "${backup_dir}/cron" "$cron_file"
     [[ -f "${backup_dir}/queue" ]] && cp -p "${backup_dir}/queue" "$queue_unit"
-    chown -R "${base}:www-data" "$root" 2>/dev/null || true
+    chown -R "${from}:${from_group}" "$root" 2>/dev/null || true
     chmod "$root_mode" "$root" 2>/dev/null || true
-    site_isolate_acl_switch "$root" "$user" "$base" >/dev/null 2>&1 || true
-    site_user_delete "$project" >/dev/null 2>&1 || true
+    site_isolate_acl_switch "$root" "$user" "$from" >/dev/null 2>&1 || true
+    if [[ "$from" == "$base" ]]; then
+      rm -f -- "$(site_users_registry_dir)/${project}"
+    else
+      site_user_assign "$project" "$from" >/dev/null 2>&1 || true
+    fi
+    (( created_user )) && site_user_remove_account "$user"
     rm -rf -- "$backup_dir"
     return 1
   fi
   rm -rf -- "$backup_dir"
+  [[ "$from" != "$base" ]] && site_user_remove_account "$from"
+  site_owner_unlink_site "$from" "$project"
+  site_owner_link_site "$user" "$domain" "$root"
 
   local ver
   for pool in "${pools[@]}"; do
@@ -157,4 +183,4 @@ site_isolate_handler() {
   ui_kv "Check the site" "simai-admin.sh site doctor --domain ${domain}"
 }
 
-register_cmd "site" "isolate" "Move a site to its own Unix user (files, PHP pool, cron, queue)" "site_isolate_handler" "domain" "confirm=" "tier:advanced"
+register_cmd "site" "isolate" "Move a site to its own Unix user or to an owner (files, PHP pool, cron, queue)" "site_isolate_handler" "domain" "owner= confirm=" "tier:advanced"

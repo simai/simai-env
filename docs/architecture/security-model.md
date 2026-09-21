@@ -11,6 +11,9 @@
     them because `www-data` is a member of each site group. A compromised
     site cannot read or modify another site. The mapping lives in
     `/etc/simai-env/site-users/<slug>`.
+  - owners (`owner create`) group several sites under one account with SSH
+    access for deploys; isolation is then between owners. Owner SSH keys live
+    in root-owned `/etc/ssh/simai-owner-keys/`.
   - sites created before this change keep running as `simai` until
     `site isolate --domain <domain> --confirm yes` moves them; while any
     legacy site remains, a compromise of one legacy site still exposes the

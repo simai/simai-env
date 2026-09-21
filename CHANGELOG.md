@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Owners (`owner create|add-key|list|remove`): accounts that run several sites,
+  like users in hosting panels. `site add --owner` and
+  `site isolate --owner` assign sites; developers deploy over SSH as the
+  owner with keys kept in root-owned `/etc/ssh/simai-owner-keys/`, so PHP
+  cannot add keys. `site info` shows which user a site runs as.
 - `self migrate` applies idempotent host migrations and runs after every
   `self update`: restores `/home` ownership, installs logrotate, upgrades the
   catch-all to port 443 (with `nginx -t` rollback), and moves observer storage

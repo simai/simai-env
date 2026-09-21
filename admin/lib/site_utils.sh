@@ -237,6 +237,19 @@ site_users_registry_dir() {
   echo "/etc/simai-env/site-users"
 }
 
+site_owners_registry_dir() {
+  echo "/etc/simai-env/owners"
+}
+
+# Owners are shared accounts (like hosting-panel users) that run several
+# sites and log in over SSH to deploy them.
+site_is_owner() {
+  local name="$1"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{1,30}$ ]] || return 1
+  [[ -f "$(site_owners_registry_dir)/${name}" ]] || return 1
+  id -u "$name" >/dev/null 2>&1
+}
+
 site_isolation_enabled() {
   [[ "${SIMAI_SITE_ISOLATION:-yes}" == "yes" ]]
 }
@@ -256,9 +269,30 @@ site_user_for_project() {
   file="$(site_users_registry_dir)/${project}"
   [[ -f "$file" && ! -L "$file" ]] || return 1
   user=$(head -n1 "$file")
-  [[ "$user" =~ ^site-[a-z0-9-]{1,27}$ ]] || return 1
+  if [[ ! "$user" =~ ^site-[a-z0-9-]{1,27}$ ]] && ! site_is_owner "$user"; then
+    return 1
+  fi
   id -u "$user" >/dev/null 2>&1 || return 1
   printf '%s\n' "$user"
+}
+
+site_user_assign() {
+  local project="$1" user="$2" registry
+  registry="$(site_users_registry_dir)"
+  install -d -m 0755 -o root -g root "$registry" || return 1
+  printf '%s\n' "$user" >"${registry}/${project}.tmp" && mv -f "${registry}/${project}.tmp" "${registry}/${project}"
+}
+
+# Removes a per-site account (never an owner) and its group and home.
+site_user_remove_account() {
+  local user="$1"
+  [[ "$user" =~ ^site-[a-z0-9-]{1,27}$ ]] || return 0
+  site_is_owner "$user" && return 0
+  pkill -KILL -u "$user" 2>/dev/null || true
+  gpasswd -d www-data "$user" >/dev/null 2>&1 || true
+  userdel "$user" >/dev/null 2>&1 || true
+  groupdel "$user" >/dev/null 2>&1 || true
+  rm -rf --one-file-system -- "/var/lib/simai-env/site-homes/${user:?}"
 }
 
 site_effective_user() {
@@ -332,9 +366,7 @@ site_user_create() {
   install -d -m 0700 -o "$user" -g "$user" "$home" || return 1
   # nginx reads static files through the site group.
   usermod -a -G "$user" www-data || return 1
-  registry="$(site_users_registry_dir)"
-  install -d -m 0755 -o root -g root "$registry" || return 1
-  printf '%s\n' "$user" >"${registry}/${project}.tmp" && mv -f "${registry}/${project}.tmp" "${registry}/${project}" || return 1
+  site_user_assign "$project" "$user" || return 1
   printf '%s\n' "$user"
 }
 
@@ -344,12 +376,28 @@ site_user_delete() {
     rm -f -- "$(site_users_registry_dir)/${project}"
     return 0
   }
-  pkill -KILL -u "$user" 2>/dev/null || true
-  gpasswd -d www-data "$user" >/dev/null 2>&1 || true
-  userdel "$user" >/dev/null 2>&1 || true
-  groupdel "$user" >/dev/null 2>&1 || true
-  rm -rf --one-file-system -- "/var/lib/simai-env/site-homes/${user:?}"
+  site_user_remove_account "$user"
   rm -f -- "$(site_users_registry_dir)/${project}"
+  site_owner_unlink_site "$user" "$project"
+}
+
+# Convenience links ~/sites/<domain> in an owner's home (created by root).
+site_owner_link_site() {
+  local owner="$1" domain="$2" root="$3" dir
+  site_is_owner "$owner" || return 0
+  dir="/home/${owner}/sites"
+  install -d -m 0755 -o root -g root "$dir" || return 0
+  ln -sfn "$root" "${dir}/${domain}"
+}
+
+site_owner_unlink_site() {
+  local owner="$1" project="$2" link
+  site_is_owner "$owner" || return 0
+  for link in "/home/${owner}/sites"/*; do
+    [[ -L "$link" ]] || continue
+    [[ "$(project_slug_from_domain "$(basename "$link")")" == "$project" ]] && rm -f -- "$link"
+  done
+  return 0
 }
 
 site_best_effort_primary_ip() {
