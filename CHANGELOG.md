@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- `backup data`, `data-verify`, `data-schedule` and `data-restore` back up the
+  site database and files with retention, checksums, a scratch-database
+  restore test, optional `age` encryption and rsync-over-SSH off-site copies.
+  Restore takes a safety dump first and stages files for review.
 - Managed sites now support persistent `same-origin` and `any` iframe policies
   through `site add --frame-policy` and `site frame-policy`; SSL regeneration
   preserves the selected policy.

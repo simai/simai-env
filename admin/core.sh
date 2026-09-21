@@ -486,10 +486,10 @@ ensure_audit_log() {
 ensure_simai_logrotate() {
   local conf="/etc/logrotate.d/simai-env"
   [[ -d /etc/logrotate.d ]] || return 0
-  grep -qs 'simai-logrotate-v1' "$conf" && return 0
+  grep -qs 'simai-logrotate-v2' "$conf" && return 0
   cat >"$conf" <<'EOF' || return 0
-# simai-logrotate-v1 (managed by simai-env)
-/var/log/simai-admin.log /var/log/simai-audit.log /var/log/simai-env.log /var/log/simai-scheduler.log {
+# simai-logrotate-v2 (managed by simai-env)
+/var/log/simai-admin.log /var/log/simai-audit.log /var/log/simai-env.log /var/log/simai-scheduler.log /var/log/simai-backup.log {
     weekly
     rotate 12
     compress

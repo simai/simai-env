@@ -61,7 +61,21 @@ Remove SSL:
 /root/simai-env/simai-admin.sh ssl remove --domain <domain>
 ```
 
-## 4) Config backup and restore
+## 4) Data backup (database + files)
+
+Enable a daily backup with a restore test on every new site:
+
+```bash
+/root/simai-env/simai-admin.sh backup data-schedule --domain <domain> --time 03:30 --keep 7
+/root/simai-env/simai-admin.sh backup data --domain <domain>
+/root/simai-env/simai-admin.sh backup data-verify --path /var/backups/simai/<domain>/<timestamp> --restore-test yes
+```
+
+Backups on the same disk do not survive a lost server: set
+`SIMAI_BACKUP_OFFSITE=user@host:/path` in `/etc/simai-env.conf`. Details:
+`docs/commands/backup.md`.
+
+## 4a) Config backup and restore
 
 Export:
 
