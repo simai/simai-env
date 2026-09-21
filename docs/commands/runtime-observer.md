@@ -22,9 +22,28 @@ database snapshot contains iblock/HL definitions, camp iblock structure,
 section/element metadata and hashes of SIMAI option values. Option values and
 database credentials are not stored.
 
-The repository is created under `/home/simai/runtime-observer/<project>/` with
-root-only permissions. It must not be exposed through nginx or pushed to a
+The repository is created under `/var/lib/simai-env/runtime-observer/<project>/`
+with root-only permissions. It must not be exposed through nginx or pushed to a
 public remote.
+
+The scheduled snapshot runs as root, so the observer refuses to work when any
+directory of its storage path is not owned by root or is writable by other
+users. Storage inside `/home/simai` is rejected because site PHP processes run
+as `simai`. The session state file is parsed as data and never executed.
+
+### Migrating from `/home/simai/runtime-observer`
+
+Earlier builds used `/home/simai/runtime-observer`. `observer doctor` reports
+such storage as `FAIL`. Move it once as root:
+
+```bash
+sudo install -d -m 0700 -o root -g root /var/lib/simai-env/runtime-observer
+sudo mv /home/simai/runtime-observer/<project> /var/lib/simai-env/runtime-observer/
+sudo chown -R root:root /var/lib/simai-env/runtime-observer
+sudo chmod -R go-rwx /var/lib/simai-env/runtime-observer
+```
+
+Check the moved `state/active.env` before the next scheduled snapshot.
 
 ## Initial setup
 

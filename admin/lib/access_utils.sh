@@ -32,7 +32,7 @@ access_generate_password() {
   if command -v openssl >/dev/null 2>&1; then
     openssl rand -base64 18 | tr -d '\n'
   else
-    date +%s%N | sha256sum | awk '{print substr($1,1,24)}'
+    generate_password 24
   fi
 }
 
@@ -293,9 +293,18 @@ access_unmount_project_root() {
   local login="$1"
   local site_dir
   site_dir=$(access_project_site_dir "$login")
+  access_mount_is_active "$site_dir" || return 0
+  umount "$site_dir" 2>/dev/null || true
   if access_mount_is_active "$site_dir"; then
-    umount "$site_dir" 2>/dev/null || true
+    error "Cannot unmount ${site_dir}; the project directory is still attached"
+    return 1
   fi
+}
+
+# Succeeds when a mount point exists at or below the given path.
+access_path_has_mounts() {
+  local path="$1"
+  awk -v p="$path" '$2 == p || index($2, p "/") == 1 { found = 1 } END { exit !found }' /proc/mounts 2>/dev/null
 }
 
 access_safe_remove_dir() {
@@ -307,7 +316,11 @@ access_safe_remove_dir() {
   if [[ "$path" == "$base" ]]; then
     return 1
   fi
-  rm -rf "$path"
+  if access_path_has_mounts "$path"; then
+    error "Refusing to remove ${path}: it still contains a mounted filesystem"
+    return 1
+  fi
+  rm -rf --one-file-system "$path"
 }
 
 access_prepare_project_jail() {

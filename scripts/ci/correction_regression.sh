@@ -108,7 +108,7 @@ test_second_audit_p2_p3_contracts() {
   grep -Fq 'simai-admin.sh help [section]' "$help" || fail "registry-derived help entrypoint is missing"
   ! grep -Fq -- '--pass secret' "$help" || fail "root help exposes a password literal"
   /usr/bin/python3 "${ROOT_DIR}/scripts/ci/command_coverage.py" --root "$ROOT_DIR" --check \
-    | grep -Fq '"total": 132' || fail "command coverage does not classify all 132 commands"
+    | grep -Fq '"unclassified": 0' || fail "command coverage leaves registered commands unclassified"
 }
 
 test_second_audit_p1_contracts() {
@@ -411,6 +411,59 @@ EOF
   rm -rf "$tmp"
 }
 
+extract_function() {
+  awk -v n="$1" '$0 ~ "^"n"\\(\\) \\{" {p=1} p {print} p && /^\}/ {exit}' "$2"
+}
+
+test_audit_p0_security_contracts() {
+  local tmp
+  tmp=$(mktemp -d)
+  (
+    error() { :; }
+    SIMAI_USER=$(id -un)
+    eval "$(extract_function generate_password "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    eval "$(extract_function env_set_kv "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    eval "$(extract_function observer_read_session "${ROOT_DIR}/admin/commands/runtime_observer.sh")"
+    eval "$(extract_function access_path_has_mounts "${ROOT_DIR}/admin/lib/access_utils.sh")"
+    eval "$(extract_function access_safe_remove_dir "${ROOT_DIR}/admin/lib/access_utils.sh")"
+
+    local pass i
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      pass=$(generate_password)
+      [[ ${#pass} -eq 32 && "$pass" =~ ^[A-Za-z0-9]+$ ]] || fail "generated DB password is ${#pass} chars (run ${i})"
+    done
+
+    printf 'keep\n' >"${tmp}/target"
+    ln -s "${tmp}/target" "${tmp}/.env"
+    assert_failure env_set_kv "${tmp}/.env" DB_PASSWORD leaked
+    [[ "$(cat "${tmp}/target")" == keep ]] || fail "env_set_kv wrote through a symlink"
+    rm -f "${tmp}/.env"
+    assert_success env_set_kv "${tmp}/.env" DB_HOST one
+    assert_success env_set_kv "${tmp}/.env" DB_HOST two
+    [[ "$(cat "${tmp}/.env")" == DB_HOST=two ]] || fail "env_set_kv did not upsert the key"
+
+    printf 'SESSION_ACTOR=$(touch %s/pwned)\nSESSION_BASE_COMMIT=x;id\n' "$tmp" >"${tmp}/active.env"
+    assert_failure observer_read_session "${tmp}/active.env"
+    [[ ! -e "${tmp}/pwned" ]] || fail "observer session file was executed"
+
+    mkdir -p "${tmp}/jails/u1"
+    assert_failure access_safe_remove_dir "${tmp}/jails" "${tmp}/jails"
+    assert_failure access_safe_remove_dir "${tmp}/jails" "${tmp}/other"
+    assert_success access_safe_remove_dir "${tmp}/jails" "${tmp}/jails/u1"
+    [[ ! -e "${tmp}/jails/u1" ]] || fail "access_safe_remove_dir did not remove the jail"
+  )
+  grep -Fq 'rm -rf --one-file-system "$path"' "${ROOT_DIR}/admin/lib/access_utils.sh" \
+    || fail "access jail removal may cross filesystem boundaries"
+  ! grep -Fq '/home/simai/runtime-observer' "${ROOT_DIR}/admin/commands/runtime_observer.sh" \
+    || fail "runtime observer storage is back under the site user's home"
+  ! grep -Eq '^[[:space:]]*source "\$\{root\}/state/' "${ROOT_DIR}/admin/commands/runtime_observer.sh" \
+    || fail "runtime observer executes its state files"
+  ! grep -Fq 'install -d -o "$SIMAI_USER" -g www-data "$(dirname "$SIMAI_HOME")"' \
+    "${ROOT_DIR}/admin/lib/site_utils.sh" "${ROOT_DIR}/simai-env.sh" \
+    || fail "ensure_user hands the home parent directory to the site user"
+  rm -rf "$tmp"
+}
+
 test_install_mode_contract
 test_site_metadata_cleanup
 test_command_option_validation
@@ -423,4 +476,5 @@ test_bitrix_restore_preseed_php8_compatibility
 test_bitrix_restore_archive_integrity_gate
 test_db_drop_failure_propagation
 test_updater_transaction
+test_audit_p0_security_contracts
 echo "[correction-regression] ok"

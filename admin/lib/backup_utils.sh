@@ -33,8 +33,8 @@ backup_stage_files() {
     local src="${_src_ref[$idx]}"
     local rel="${_dst_ref[$idx]}"
     local dst="${dst_root}/${rel}"
-    mkdir -p "$(dirname "$dst")"
-    cp -p "$src" "$dst"
+    mkdir -p "$(dirname "$dst")" || return 1
+    cp -p "$src" "$dst" || return 1
   done
 }
 

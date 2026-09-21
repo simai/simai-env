@@ -377,7 +377,16 @@ run_command() {
   audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id"
   info "Running command ${section} ${name} (corr_id=${corr_id})"
   local rc=0
-  if ( "$handler" "$@" ); then
+  if [[ "${SIMAI_STRICT_HANDLERS:-0}" == "1" ]]; then
+    # Strict mode: a failing step aborts the handler. Calling the subshell
+    # inside `if` would silently disable errexit, so run it as a plain command.
+    local had_errexit=0
+    [[ $- == *e* ]] && had_errexit=1
+    set +e
+    ( set -e; "$handler" "$@" )
+    rc=$?
+    (( had_errexit )) && set -e
+  elif ( "$handler" "$@" ); then
     rc=0
   else
     rc=$?

@@ -632,7 +632,13 @@ ensure_user() {
     useradd -m -s /bin/bash "$SIMAI_USER"
   fi
   usermod -a -G www-data "$SIMAI_USER" || true
-  install -d -o "$SIMAI_USER" -g www-data "$(dirname "$SIMAI_HOME")" 2>/dev/null || true
+  # The parent of the home directory (usually /home) must stay root-owned;
+  # earlier releases handed it to SIMAI_USER, so repair that state here.
+  local home_parent
+  home_parent=$(dirname "$SIMAI_HOME")
+  if [[ "$home_parent" == /home && "$(stat -c '%U' "$home_parent" 2>/dev/null)" == "$SIMAI_USER" ]]; then
+    chown root:root "$home_parent" && chmod 0755 "$home_parent"
+  fi
   install -d -o "$SIMAI_USER" -g www-data "$SIMAI_HOME" 2>/dev/null || true
   install -d -o "$SIMAI_USER" -g www-data "$WWW_ROOT" 2>/dev/null || true
   chown "$SIMAI_USER":www-data "$SIMAI_HOME" "$WWW_ROOT" 2>/dev/null || true
@@ -749,17 +755,32 @@ installed_php_versions() {
 }
 
 generate_password() {
-  head -c 24 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20
+  local length="${1:-32}" out="" chunk
+  while (( ${#out} < length )); do
+    chunk=$(head -c 64 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9')
+    out+="$chunk"
+  done
+  printf '%s' "${out:0:length}"
 }
 
+# Project directories are writable by the site user, so the file is never
+# followed as a symlink: it is read with O_NOFOLLOW and replaced by rename.
 env_set_kv() {
   local file="$1" key="$2" value="$3"
   local dir
   dir=$(dirname "$file")
-  mkdir -p "$dir"
-  [[ -f "$file" ]] || touch "$file"
-  chmod 0640 "$file"
-  chown "${SIMAI_USER}:${SIMAI_USER}" "$file" 2>/dev/null || true
+  mkdir -p "$dir" || return 1
+  if [[ -L "$file" ]] || [[ -e "$file" && ! -f "$file" ]]; then
+    error "Refusing to update ${file}: it is not a regular file"
+    return 1
+  fi
+  local src
+  src=$(mktemp) || return 1
+  if [[ -e "$file" ]] && ! dd if="$file" of="$src" iflag=nofollow status=none 2>/dev/null; then
+    rm -f "$src"
+    error "Refusing to update ${file}: it could not be read safely"
+    return 1
+  fi
   local encoded="$value"
   if [[ "$encoded" =~ [[:space:]\'\"] ]]; then
     encoded=${encoded//\\/\\\\}
@@ -767,7 +788,7 @@ env_set_kv() {
     encoded="\"${encoded}\""
   fi
   local tmp
-  tmp=$(mktemp)
+  tmp=$(mktemp) || { rm -f "$src"; return 1; }
   awk -v target="$key" -v replacement="$encoded" '
     BEGIN { done=0 }
     {
@@ -789,10 +810,11 @@ env_set_kv() {
         print target "=" replacement
       }
     }
-  ' "$file" >"$tmp"
-  mv "$tmp" "$file"
-  chmod 0640 "$file"
-  chown "${SIMAI_USER}:${SIMAI_USER}" "$file" 2>/dev/null || true
+  ' "$src" >"$tmp" || { rm -f "$src" "$tmp"; return 1; }
+  rm -f "$src"
+  chmod 0640 "$tmp"
+  chown "${SIMAI_USER}:${SIMAI_USER}" "$tmp" 2>/dev/null || true
+  mv -fT "$tmp" "$file" || { rm -f "$tmp"; return 1; }
 }
 
 validate_domain() {
@@ -1686,7 +1708,7 @@ install_healthcheck() {
 write_generic_env() {
   local project_path="$1" db_name="$2" db_user="$3" db_pass="$4"
   local env_file="${project_path}/.env"
-  env_set_kv "$env_file" "DB_CONNECTION" "mysql"
+  env_set_kv "$env_file" "DB_CONNECTION" "mysql" || return 1
   env_set_kv "$env_file" "DB_HOST" "127.0.0.1"
   env_set_kv "$env_file" "DB_PORT" "3306"
   env_set_kv "$env_file" "DB_DATABASE" "$db_name"
@@ -2106,16 +2128,24 @@ laravel_prepare_env_file() {
   local env_file env_example
   env_file=$(laravel_env_file_path "$root")
   env_example=$(laravel_env_example_file_path "$root")
-  if [[ ! -f "$env_file" && -f "$env_example" ]]; then
-    cp "$env_example" "$env_file"
-    chmod 0640 "$env_file"
-    chown "${SIMAI_USER}:www-data" "$env_file" 2>/dev/null || true
+  if [[ -L "$env_file" || -L "$env_example" ]]; then
+    error "Refusing to prepare ${env_file}: .env or .env.example is a symbolic link"
+    return 1
   fi
-  [[ -f "$env_file" ]] || touch "$env_file"
-  chmod 0640 "$env_file"
-  chown "${SIMAI_USER}:www-data" "$env_file" 2>/dev/null || true
+  if [[ ! -e "$env_file" && -f "$env_example" ]]; then
+    local tmp
+    tmp=$(mktemp) || return 1
+    if ! dd if="$env_example" of="$tmp" iflag=nofollow status=none 2>/dev/null; then
+      rm -f "$tmp"
+      error "Cannot read ${env_example} safely"
+      return 1
+    fi
+    chmod 0640 "$tmp"
+    chown "${SIMAI_USER}:www-data" "$tmp" 2>/dev/null || true
+    mv -fT "$tmp" "$env_file" || { rm -f "$tmp"; return 1; }
+  fi
 
-  env_set_kv "$env_file" "APP_ENV" "production"
+  env_set_kv "$env_file" "APP_ENV" "production" || return 1
   env_set_kv "$env_file" "APP_DEBUG" "false"
   env_set_kv "$env_file" "APP_URL" "$(site_primary_url "$domain")"
   env_set_kv "$env_file" "DB_CONNECTION" "mysql"

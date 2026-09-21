@@ -504,8 +504,14 @@ access_remove_handler() {
     [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
   fi
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
+    if id -u "$login" >/dev/null 2>&1; then
+      pkill -KILL -u "$login" 2>/dev/null || true
+    fi
     access_disable_mount_unit "$login" || true
-    access_unmount_project_root "$login" || true
+    access_unmount_project_root "$login" || {
+      error "Access ${login} was not removed; stop its sessions and retry"
+      return 1
+    }
   fi
   if id -u "$login" >/dev/null 2>&1; then
     userdel "$login" 2>/dev/null || userdel -r "$login" 2>/dev/null || true
@@ -513,7 +519,10 @@ access_remove_handler() {
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
     local jail_root
     jail_root="${ACCESS_META[JAIL_PATH]:-$(access_project_jail_root "$login")}"
-    access_safe_remove_dir "$SIMAI_ACCESS_JAIL_BASE" "$jail_root" || true
+    access_safe_remove_dir "$SIMAI_ACCESS_JAIL_BASE" "$jail_root" || {
+      error "Jail ${jail_root} was kept for manual review"
+      return 1
+    }
   fi
   if [[ "${ACCESS_META[TYPE]:-}" == "global" ]]; then
     local home

@@ -6,6 +6,29 @@
 - Managed sites now support persistent `same-origin` and `any` iframe policies
   through `site add --frame-policy` and `site frame-policy`; SSL regeneration
   preserves the selected policy.
+- `SIMAI_STRICT_HANDLERS=1` runs command handlers with errexit, so a failing
+  step aborts the command instead of continuing silently. Off by default until
+  the live regression suite passes with it enabled.
+
+### Security
+- Runtime observer storage moved to root-owned
+  `/var/lib/simai-env/runtime-observer`; the observer refuses storage writable
+  by non-root users, parses session state instead of sourcing it, and disables
+  Git hooks and fsmonitor. Existing `/home/simai/runtime-observer` storage must
+  be moved (see `docs/commands/runtime-observer.md`).
+- `access remove` stops the user's sessions, fails if the project bind mount
+  cannot be detached, and never removes a jail that still contains a mount.
+- Project `.env` updates no longer follow symbolic links, so a site user can
+  no longer redirect `chmod`/`chown` or reads to system files.
+- `ensure_user` no longer hands `/home` to the site user and restores
+  `root:root 0755` on servers affected by earlier releases.
+
+### Fixed
+- Generated database passwords are 32 characters again; the previous
+  generator produced 4–10 characters.
+- `backup export` fails and removes the partial archive when staging, manifest
+  or packaging fails instead of reporting success.
+- CI command coverage check no longer hard-codes the command count.
 
 ## 1.12.78 - 2026-08-03
 

@@ -477,10 +477,12 @@ ensure_defaults() {
     DB_NAME="simai_${PROJECT_NAME}"
   fi
   if [[ -z $DB_PASS ]]; then
-    DB_PASS=$(head -c 32 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 20 || true)
-    if [[ -z $DB_PASS ]]; then
-      DB_PASS="simai$(date +%s)"
-    fi
+    local chunk
+    while (( ${#DB_PASS} < 32 )); do
+      chunk=$(head -c 64 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9')
+      DB_PASS+="$chunk"
+    done
+    DB_PASS="${DB_PASS:0:32}"
   fi
   if [[ $ACTION == "clean" && $CONFIRM -ne 1 ]]; then
     fail "--confirm flag is required for clean operations"
@@ -677,7 +679,13 @@ ensure_user() {
     useradd -m -s /bin/bash "$SIMAI_USER"
   fi
   usermod -a -G www-data "$SIMAI_USER" || true
-  install -d -o "$SIMAI_USER" -g www-data "$(dirname "$SIMAI_HOME")" 2>/dev/null || true
+  # The parent of the home directory (usually /home) must stay root-owned;
+  # earlier releases handed it to SIMAI_USER, so repair that state here.
+  local home_parent
+  home_parent=$(dirname "$SIMAI_HOME")
+  if [[ "$home_parent" == /home && "$(stat -c '%U' "$home_parent" 2>/dev/null)" == "$SIMAI_USER" ]]; then
+    chown root:root "$home_parent" && chmod 0755 "$home_parent"
+  fi
   install -d -o "$SIMAI_USER" -g www-data "$SIMAI_HOME" 2>/dev/null || true
   install -d -o "$SIMAI_USER" -g www-data "$WWW_ROOT" 2>/dev/null || true
   chown "$SIMAI_USER":www-data "$SIMAI_HOME" "$WWW_ROOT" 2>/dev/null || true

@@ -111,8 +111,12 @@ backup_export_handler() {
 
   progress_step "Preparing bundle"
   local tmpdir
-  tmpdir=$(mktemp -d)
-  backup_stage_files "$tmpdir" files_src files_dst
+  tmpdir=$(mktemp -d) || return 1
+  backup_stage_files "$tmpdir" files_src files_dst || {
+    rm -rf "$tmpdir"
+    error "Failed to stage backup files"
+    return 1
+  }
 
   local enabled_marker="${tmpdir}/nginx/sites-enabled/${domain}.conf.symlink"
   mkdir -p "$(dirname "$enabled_marker")"
@@ -136,11 +140,20 @@ backup_export_handler() {
   progress_step "Writing manifest"
   local enabled_bool="false"
   [[ "$enabled_flag" == "yes" ]] && enabled_bool="true"
-  backup_write_manifest "$tmpdir" "$domain" "$slug" "$profile" "$php" "$public_dir" "$doc_root" "$enabled_bool"
+  backup_write_manifest "$tmpdir" "$domain" "$slug" "$profile" "$php" "$public_dir" "$doc_root" "$enabled_bool" || {
+    rm -rf "$tmpdir"
+    error "Failed to write backup manifest"
+    return 1
+  }
 
   progress_step "Packaging"
   mkdir -p "$out_dir"
-  backup_pack_archive "$tmpdir" "$out"
+  if ! backup_pack_archive "$tmpdir" "$out"; then
+    rm -rf "$tmpdir"
+    rm -f "$out"
+    error "Failed to write backup archive: ${out}"
+    return 1
+  fi
 
   progress_step "Cleaning up"
   rm -rf "$tmpdir"

@@ -4,8 +4,63 @@ observer_slug() {
   project_slug_from_domain "$1"
 }
 
+observer_base() {
+  printf '%s\n' "${SIMAI_OBSERVER_ROOT:-/var/lib/simai-env/runtime-observer}"
+}
+
 observer_root() {
-  printf '%s/%s\n' "${SIMAI_OBSERVER_ROOT:-/home/simai/runtime-observer}" "$(observer_slug "$1")"
+  printf '%s/%s\n' "$(observer_base)" "$(observer_slug "$1")"
+}
+
+# The observer runs as root from cron, so every directory it trusts must be
+# root-owned and not writable by site users (PHP-FPM runs as SIMAI_USER).
+observer_path_is_trusted() {
+  local path="$1" owner mode
+  [[ -e "$path" && ! -L "$path" ]] || return 1
+  owner=$(stat -c '%u' "$path" 2>/dev/null) || return 1
+  mode=$(stat -c '%a' "$path" 2>/dev/null) || return 1
+  [[ "$owner" == 0 ]] || return 1
+  (( (8#$mode & 8#022) == 0 ))
+}
+
+observer_assert_trusted_root() {
+  local root="$1" path
+  path="$root"
+  while [[ -n "$path" && "$path" != / ]]; do
+    if [[ -e "$path" || -L "$path" ]]; then
+      observer_path_is_trusted "$path" || {
+        error "Observer path is not root-owned or is writable by others: ${path}"
+        return 1
+      }
+    fi
+    path=$(dirname "$path")
+  done
+}
+
+observer_prepare_base() {
+  local base
+  base=$(observer_base)
+  install -d -m 0700 -o root -g root "$base" || return 1
+  observer_assert_trusted_root "$base"
+}
+
+observer_git() {
+  git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"
+}
+
+# Reads state/active.env without executing it. Sets SESSION_* variables.
+observer_read_session() {
+  local file="$1" key value
+  SESSION_ACTOR='' SESSION_STARTED_AT='' SESSION_BASE_COMMIT=''
+  [[ -f "$file" && ! -L "$file" ]] || return 1
+  while IFS='=' read -r key value; do
+    case "$key" in
+      SESSION_ACTOR) [[ "$value" =~ ^[A-Za-z0-9._@-]+$ ]] && SESSION_ACTOR="$value" ;;
+      SESSION_STARTED_AT) [[ "$value" =~ ^[0-9T:Z-]+$ ]] && SESSION_STARTED_AT="$value" ;;
+      SESSION_BASE_COMMIT) [[ "$value" =~ ^[0-9a-f]{40,64}$ ]] && SESSION_BASE_COMMIT="$value" ;;
+    esac
+  done <"$file"
+  [[ -n "$SESSION_ACTOR" && -n "$SESSION_BASE_COMMIT" ]]
 }
 
 observer_load_site() {
@@ -37,6 +92,7 @@ observer_require_tools() {
 
 observer_write_config() {
   local domain="$1" root="$2" project_root="$3"
+  install -d -m 0700 -o root -g root "$root" || return 1
   mkdir -p "${root}/state" "${root}/repo/files" "${root}/repo/database" "${root}/repo/evidence"
   cat >"${root}/state/config.env" <<EOF
 OBSERVER_DOMAIN=${domain}
@@ -52,7 +108,7 @@ observer_assert_no_secrets() {
   local forbidden
   forbidden=$(find "$files_root" -type f \( \
     -name '.env' -o -name '.env.*' -o -name '.settings.php' -o \
-    -name 'dbconn.php' -o -name '*.pem' -o -name '*.key' -o \
+    -name 'dbconn.php' -o -name 'wp-config.php' -o -name '*.pem' -o -name '*.key' -o \
     -name 'id_rsa' -o -name 'id_ed25519' \
   \) -print -quit)
   if [[ -n "$forbidden" ]]; then
@@ -74,11 +130,12 @@ observer_sync_files() {
     --exclude='/public/bitrix/stack_cache/' --exclude='/public/bitrix/backup/' \
     --exclude='/public/bitrix/php_interface/dbconn.php' \
     --exclude='/public/bitrix/.settings.php' \
+    --exclude='wp-config.php' \
     --exclude='/storage/logs/' --exclude='/var/' --exclude='/tmp/' \
     --exclude='*.log' --exclude='*.sql' --exclude='*.sql.gz' \
     --exclude='*.tar' --exclude='*.tar.gz' --exclude='*.zip' \
-    "${project_root}/" "${repo}/files/"
-  observer_assert_no_secrets "${repo}/files"
+    "${project_root}/" "${repo}/files/" || return 1
+  observer_assert_no_secrets "${repo}/files" || return 1
 
   {
     printf 'path\ttarget\tresolved\tgit_commit\n'
@@ -90,11 +147,11 @@ observer_sync_files() {
       if [[ -n "$resolved" ]]; then
         local candidate="$resolved"
         [[ -f "$candidate" ]] && candidate=$(dirname "$candidate")
-        commit=$(git -C "$candidate" rev-parse HEAD 2>/dev/null || printf '-')
+        commit=$(observer_git -C "$candidate" rev-parse HEAD 2>/dev/null || printf '-')
       fi
       printf '%s\t%s\t%s\t%s\n' "$rel" "$target" "$resolved" "$commit"
     done < <(find "$project_root" -type l -print0 | sort -z)
-  } >"${repo}/evidence/symlinks.tsv"
+  } >"${repo}/evidence/symlinks.tsv" || return 1
 }
 
 observer_db_env() {
@@ -128,7 +185,7 @@ observer_dump_table() {
 
 observer_sync_database() {
   local domain="$1" repo="$2"
-  observer_db_env "$domain"
+  observer_db_env "$domain" || return 1
   local db_dir="${repo}/database"
   rm -rf "$db_dir"
   mkdir -p "$db_dir/metadata" "$db_dir/camp"
@@ -191,9 +248,10 @@ observer_sync_database() {
 observer_snapshot_sync() {
   local domain="$1" root="$2"
   declare -A meta=()
-  observer_load_site "$domain" meta
-  observer_sync_files "${meta[root]}" "${root}/repo"
-  observer_sync_database "$domain" "${root}/repo"
+  observer_assert_trusted_root "$root" || return 1
+  observer_load_site "$domain" meta || return 1
+  observer_sync_files "${meta[root]}" "${root}/repo" || return 1
+  observer_sync_database "$domain" "${root}/repo" || return 1
   rm -f "${root}/repo/evidence/last_snapshot_at.txt"
   date -u +%Y-%m-%dT%H:%M:%SZ >"${root}/state/last_snapshot_at.txt"
 }
@@ -202,10 +260,12 @@ observer_actor() {
   local root="$1" requested="${2:-}"
   if [[ -n "$requested" ]]; then
     printf '%s\n' "$requested"
-  elif [[ -r "${root}/state/active.env" ]]; then
-    # shellcheck disable=SC1090
-    source "${root}/state/active.env"
-    printf '%s\n' "${SESSION_ACTOR:-unknown}"
+  elif [[ -e "${root}/state/active.env" ]]; then
+    if observer_read_session "${root}/state/active.env"; then
+      printf '%s\n' "$SESSION_ACTOR"
+    else
+      printf '%s\n' unknown
+    fi
   else
     printf '%s\n' unattributed
   fi
@@ -214,11 +274,11 @@ observer_actor() {
 observer_commit() {
   local root="$1" actor="$2" reason="$3"
   local repo="${root}/repo"
-  git -C "$repo" add -A
-  if git -C "$repo" diff --cached --quiet; then
+  observer_git -C "$repo" add -A || return 1
+  if observer_git -C "$repo" diff --cached --quiet; then
     return 0
   fi
-  git -C "$repo" -c user.name='SIMAI Runtime Observer' -c user.email='runtime-observer@localhost' \
+  observer_git -C "$repo" -c user.name='SIMAI Runtime Observer' -c user.email='runtime-observer@localhost' \
     commit -m "snapshot: ${reason}" -m "Actor: ${actor}" >/dev/null
 }
 
@@ -226,20 +286,21 @@ observer_init_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" schedule="${PARSED_ARGS[schedule]:-yes}"
   require_args domain || return 1
-  observer_require_tools
+  observer_require_tools || return 1
   declare -A meta=()
-  observer_load_site "$domain" meta
+  observer_load_site "$domain" meta || return 1
+  observer_prepare_base || return 1
   local root
   root=$(observer_root "$domain")
   [[ ! -e "$root" ]] || {
     error "Observer already exists: ${root}"
     return 1
   }
-  observer_write_config "$domain" "$root" "${meta[root]}"
-  git -C "${root}/repo" init -q
+  observer_write_config "$domain" "$root" "${meta[root]}" || return 1
+  observer_git -C "${root}/repo" init -q || return 1
   printf '%s\n' 'Private runtime evidence. Do not publish this repository.' >"${root}/repo/README"
-  observer_snapshot_sync "$domain" "$root"
-  observer_commit "$root" system baseline
+  observer_snapshot_sync "$domain" "$root" || return 1
+  observer_commit "$root" system baseline || return 1
   chmod -R go-rwx "$root"
   if [[ "${schedule,,}" == yes ]]; then
     local cron
@@ -258,19 +319,21 @@ observer_start_handler() {
   local root lock
   root=$(observer_root "$domain")
   [[ -d "${root}/repo/.git" ]] || { error "Observer is not initialized for ${domain}"; return 1; }
+  observer_assert_trusted_root "$root" || return 1
   lock="${root}/state/lock"
   exec 9>"$lock"; flock -n 9 || { error "Observer is busy"; return 1; }
   [[ ! -e "${root}/state/active.env" ]] || { error "A change session is already active"; return 1; }
-  observer_snapshot_sync "$domain" "$root"
-  observer_commit "$root" unattributed pre-session
-  cat >"${root}/state/active.env" <<EOF
+  observer_snapshot_sync "$domain" "$root" || return 1
+  observer_commit "$root" unattributed pre-session || return 1
+  (umask 077; cat >"${root}/state/active.env" <<EOF
 SESSION_ACTOR=${actor}
 SESSION_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-SESSION_BASE_COMMIT=$(git -C "${root}/repo" rev-parse HEAD)
+SESSION_BASE_COMMIT=$(observer_git -C "${root}/repo" rev-parse HEAD)
 SESSION_NOTE_B64=$(printf '%s' "$note" | base64 | tr -d '\n')
 EOF
+  ) || return 1
   chmod 0600 "${root}/state/active.env"
-  info "Change session started for ${actor}; base=$(git -C "${root}/repo" rev-parse --short HEAD)"
+  info "Change session started for ${actor}; base=$(observer_git -C "${root}/repo" rev-parse --short HEAD)"
 }
 
 observer_snapshot_handler() {
@@ -280,11 +343,12 @@ observer_snapshot_handler() {
   local root lock
   root=$(observer_root "$domain")
   [[ -d "${root}/repo/.git" ]] || { error "Observer is not initialized for ${domain}"; return 1; }
+  observer_assert_trusted_root "$root" || return 1
   lock="${root}/state/lock"; exec 9>"$lock"; flock -w 60 9 || { error "Observer is busy"; return 1; }
   actor=$(observer_actor "$root" "$actor")
-  observer_snapshot_sync "$domain" "$root"
-  observer_commit "$root" "$actor" "$reason"
-  info "Snapshot complete; head=$(git -C "${root}/repo" rev-parse --short HEAD), actor=${actor}"
+  observer_snapshot_sync "$domain" "$root" || return 1
+  observer_commit "$root" "$actor" "$reason" || return 1
+  info "Snapshot complete; head=$(observer_git -C "${root}/repo" rev-parse --short HEAD), actor=${actor}"
 }
 
 observer_status_handler() {
@@ -294,21 +358,20 @@ observer_status_handler() {
   local root lock
   root=$(observer_root "$domain")
   [[ -d "${root}/repo/.git" ]] || { error "Observer is not initialized for ${domain}"; return 1; }
+  observer_assert_trusted_root "$root" || return 1
   if [[ "${refresh,,}" == yes ]]; then
     lock="${root}/state/lock"; exec 9>"$lock"; flock -w 60 9 || { error "Observer is busy"; return 1; }
-    observer_snapshot_sync "$domain" "$root"
+    observer_snapshot_sync "$domain" "$root" || return 1
   fi
   local session='none' base='HEAD'
-  if [[ -r "${root}/state/active.env" ]]; then
-    # shellcheck disable=SC1090
-    source "${root}/state/active.env"
+  if [[ -e "${root}/state/active.env" ]] && observer_read_session "${root}/state/active.env"; then
     session="${SESSION_ACTOR} since ${SESSION_STARTED_AT}"
     base="${SESSION_BASE_COMMIT}"
   fi
-  print_kv_table "Observer|${root}" "Session|${session}" "HEAD|$(git -C "${root}/repo" rev-parse --short HEAD)"
-  git -C "${root}/repo" status --short
+  print_kv_table "Observer|${root}" "Session|${session}" "HEAD|$(observer_git -C "${root}/repo" rev-parse --short HEAD)"
+  observer_git -C "${root}/repo" status --short
   echo "Diff from session base:"
-  git -C "${root}/repo" diff --stat "$base" -- .
+  observer_git -C "${root}/repo" diff --stat "$base" -- .
 }
 
 observer_finish_handler() {
@@ -317,26 +380,26 @@ observer_finish_handler() {
   require_args domain || return 1
   local root lock
   root=$(observer_root "$domain")
-  [[ -r "${root}/state/active.env" ]] || { error "No active change session"; return 1; }
+  observer_assert_trusted_root "$root" || return 1
+  [[ -e "${root}/state/active.env" ]] || { error "No active change session"; return 1; }
   lock="${root}/state/lock"; exec 9>"$lock"; flock -w 60 9 || { error "Observer is busy"; return 1; }
-  # shellcheck disable=SC1090
-  source "${root}/state/active.env"
-  observer_snapshot_sync "$domain" "$root"
-  observer_commit "$root" "$SESSION_ACTOR" "session-finish ${note}"
+  observer_read_session "${root}/state/active.env" || { error "Active session file is invalid"; return 1; }
+  observer_snapshot_sync "$domain" "$root" || return 1
+  observer_commit "$root" "$SESSION_ACTOR" "session-finish ${note}" || return 1
   local head
-  head=$(git -C "${root}/repo" rev-parse HEAD)
+  head=$(observer_git -C "${root}/repo" rev-parse HEAD)
   {
     printf 'actor=%s\nstarted_at=%s\nfinished_at=%s\nbase=%s\nhead=%s\nnote=%s\n' \
       "$SESSION_ACTOR" "$SESSION_STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
       "$SESSION_BASE_COMMIT" "$head" "$note"
     printf '\nchanged_files:\n'
-    git -C "${root}/repo" diff --name-status "$SESSION_BASE_COMMIT" "$head"
+    observer_git -C "${root}/repo" diff --name-status "$SESSION_BASE_COMMIT" "$head"
   } >"${root}/repo/evidence/session-${head:0:12}.txt"
-  git -C "${root}/repo" add "evidence/session-${head:0:12}.txt"
-  git -C "${root}/repo" -c user.name='SIMAI Runtime Observer' -c user.email='runtime-observer@localhost' \
+  observer_git -C "${root}/repo" add "evidence/session-${head:0:12}.txt"
+  observer_git -C "${root}/repo" -c user.name='SIMAI Runtime Observer' -c user.email='runtime-observer@localhost' \
     commit -m "evidence: close session ${SESSION_ACTOR}" >/dev/null
   rm -f "${root}/state/active.env"
-  info "Change session closed; head=$(git -C "${root}/repo" rev-parse --short HEAD)"
+  info "Change session closed; head=$(observer_git -C "${root}/repo" rev-parse --short HEAD)"
 }
 
 observer_doctor_handler() {
@@ -346,10 +409,11 @@ observer_doctor_handler() {
   local root cron failed=0
   root=$(observer_root "$domain")
   cron="/etc/cron.d/simai-runtime-observer-$(observer_slug "$domain")"
+  if observer_assert_trusted_root "$root" 2>/dev/null; then echo 'PASS root-owned storage'; else echo "FAIL storage is writable by non-root users: ${root}"; failed=1; fi
   if [[ -d "${root}/repo/.git" ]]; then echo 'PASS repository'; else echo 'FAIL repository'; failed=1; fi
   if [[ -r "${root}/state/config.env" ]]; then echo 'PASS config'; else echo 'FAIL config'; failed=1; fi
   if [[ ! -e "${root}/repo/files/.env" ]]; then echo 'PASS secret exclusions'; else echo 'FAIL secret exclusions'; failed=1; fi
-  if git -C "${root}/repo" fsck --no-progress >/dev/null 2>&1; then echo 'PASS git fsck'; else echo 'FAIL git fsck'; failed=1; fi
+  if observer_git -C "${root}/repo" fsck --no-progress >/dev/null 2>&1; then echo 'PASS git fsck'; else echo 'FAIL git fsck'; failed=1; fi
   [[ -f "$cron" ]] && echo 'PASS schedule' || echo 'WARN schedule missing'
   return "$failed"
 }
