@@ -325,7 +325,7 @@ backup_data_restore_handler() {
     staging="${SITE_META[root]}.restore-$(date +%Y%m%d-%H%M%S)"
     install -d -m 0750 "$staging" || return 1
     tar --no-same-owner -xzf "${dir}/files.tar.gz" -C "$staging" || { error "File extraction failed"; return 1; }
-    chown -R "${SIMAI_USER}:www-data" "$staging" 2>/dev/null || true
+    chown -R "${SIMAI_USER}:${SIMAI_WEB_GROUP:-www-data}" "$staging" 2>/dev/null || true
     echo "Files extracted to ${staging}"
     echo "Review them, then swap directories during a maintenance window."
   fi

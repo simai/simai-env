@@ -407,7 +407,7 @@ self_sudo_admin_validate_login() {
     error "Invalid sudo admin login '${login}'. Use lowercase letters, numbers, and dashes only (3-32 chars, must start with a letter)."
     return 1
   fi
-  if [[ "$login" == "root" || "$login" == "$SIMAI_USER" ]]; then
+  if [[ "$login" == "root" || "$login" == "$SIMAI_BASE_USER" || "$login" == site-* ]]; then
     error "Login '${login}' is reserved; choose another name."
     return 1
   fi

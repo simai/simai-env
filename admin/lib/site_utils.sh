@@ -2,8 +2,12 @@
 set -euo pipefail
 
 SIMAI_USER=${SIMAI_USER:-simai}
-SIMAI_HOME=${SIMAI_HOME:-/home/${SIMAI_USER}}
-WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_USER}/www}
+# SIMAI_USER is switched to the site's own user while a site command runs;
+# SIMAI_BASE_USER always names the shared account that owns SIMAI_HOME.
+SIMAI_BASE_USER=${SIMAI_BASE_USER:-$SIMAI_USER}
+SIMAI_HOME=${SIMAI_HOME:-/home/${SIMAI_BASE_USER}}
+WWW_ROOT=${WWW_ROOT:-/home/${SIMAI_BASE_USER}/www}
+SIMAI_WEB_GROUP=${SIMAI_WEB_GROUP:-www-data}
 NGINX_TEMPLATE=${NGINX_TEMPLATE:-${SCRIPT_DIR}/templates/nginx-laravel.conf}
 NGINX_TEMPLATE_GENERIC=${NGINX_TEMPLATE_GENERIC:-${SCRIPT_DIR}/templates/nginx-generic.conf}
 NGINX_TEMPLATE_STATIC=${NGINX_TEMPLATE_STATIC:-${SCRIPT_DIR}/templates/nginx-static.conf}
@@ -223,6 +227,131 @@ site_path_is_allowed_root() {
   return 1
 }
 
+# ---- Per-site Unix users -------------------------------------------------
+# Each isolated site runs PHP, cron and queue workers as its own user; files
+# belong to <user>:<user> and nginx (www-data) is a member of that group.
+# The registry maps a project slug to its user; sites without an entry keep
+# running as SIMAI_BASE_USER (legacy shared mode).
+
+site_users_registry_dir() {
+  echo "/etc/simai-env/site-users"
+}
+
+site_isolation_enabled() {
+  [[ "${SIMAI_SITE_ISOLATION:-yes}" == "yes" ]]
+}
+
+site_user_name_for_project() {
+  local project="$1" name="site-${1}"
+  if (( ${#name} > 32 )); then
+    name="site-${project:0:17}-$(printf '%s' "$project" | sha256sum | cut -c1-8)"
+  fi
+  printf '%s\n' "$name"
+}
+
+# Prints the dedicated user of an isolated project, or fails for legacy sites.
+site_user_for_project() {
+  local project="$1" file user
+  [[ -n "$project" ]] && validate_project_slug "$project" 2>/dev/null || return 1
+  file="$(site_users_registry_dir)/${project}"
+  [[ -f "$file" && ! -L "$file" ]] || return 1
+  user=$(head -n1 "$file")
+  [[ "$user" =~ ^site-[a-z0-9-]{1,27}$ ]] || return 1
+  id -u "$user" >/dev/null 2>&1 || return 1
+  printf '%s\n' "$user"
+}
+
+site_effective_user() {
+  site_user_for_project "$1" 2>/dev/null || printf '%s\n' "$SIMAI_USER"
+}
+
+site_effective_group() {
+  site_user_for_project "$1" 2>/dev/null || printf '%s\n' "www-data"
+}
+
+site_project_for_domain() {
+  local domain="$1" cfg
+  cfg="/etc/nginx/sites-available/${domain}.conf"
+  [[ -f "$cfg" ]] || return 1
+  sed -n 's/^# simai-project: *//p' "$cfg" | head -n1
+}
+
+# Switches SIMAI_USER/SIMAI_WEB_GROUP for the current (sub)shell when the
+# command targets an isolated site. Called by the dispatcher.
+site_apply_user_context() {
+  local domain="" arg prev=""
+  for arg in "$@"; do
+    case "$prev" in --domain) domain="$arg" ;; esac
+    case "$arg" in --domain=*) domain="${arg#--domain=}" ;; esac
+    prev="$arg"
+  done
+  SIMAI_USER="$SIMAI_BASE_USER"
+  SIMAI_WEB_GROUP="www-data"
+  [[ -n "$domain" && "$domain" =~ ^[A-Za-z0-9.-]+$ ]] || return 0
+  local project user
+  project=$(site_project_for_domain "$domain" 2>/dev/null) || return 0
+  user=$(site_user_for_project "$project" 2>/dev/null) || return 0
+  SIMAI_USER="$user"
+  SIMAI_WEB_GROUP="$user"
+}
+
+# Parents of project directories need search (x) permission for site users,
+# without letting them list anything.
+site_prepare_isolated_parents() {
+  local dir
+  for dir in "$SIMAI_HOME" "$WWW_ROOT"; do
+    [[ -d "$dir" ]] && chmod o+x "$dir"
+  done
+  return 0
+}
+
+# opcache is shared by all pools of one PHP version; without these settings a
+# site could read cached scripts of another site.
+site_ensure_opcache_isolation() {
+  local php_version="$1" conf
+  [[ -d "/etc/php/${php_version}/fpm/conf.d" ]] || return 0
+  conf="/etc/php/${php_version}/fpm/conf.d/99-simai-isolation.ini"
+  grep -qs 'simai-isolation-v1' "$conf" && return 0
+  printf '; simai-isolation-v1 (managed by simai-env)\nopcache.validate_permission=1\nopcache.validate_root=1\n' >"$conf"
+  chmod 0644 "$conf"
+}
+
+site_user_create() {
+  local project="$1" user home registry
+  validate_project_slug "$project" || return 1
+  user=$(site_user_name_for_project "$project")
+  home="/var/lib/simai-env/site-homes/${user}"
+  if ! id -u "$user" >/dev/null 2>&1; then
+    useradd --user-group --no-create-home --home-dir "$home" --shell /usr/sbin/nologin "$user" || {
+      error "Failed to create site user ${user}"
+      return 1
+    }
+    passwd -l "$user" >/dev/null 2>&1 || true
+  fi
+  install -d -m 0755 -o root -g root /var/lib/simai-env/site-homes
+  install -d -m 0700 -o "$user" -g "$user" "$home" || return 1
+  # nginx reads static files through the site group.
+  usermod -a -G "$user" www-data || return 1
+  registry="$(site_users_registry_dir)"
+  install -d -m 0755 -o root -g root "$registry" || return 1
+  printf '%s\n' "$user" >"${registry}/${project}.tmp" && mv -f "${registry}/${project}.tmp" "${registry}/${project}" || return 1
+  printf '%s\n' "$user"
+}
+
+site_user_delete() {
+  local project="$1" user
+  user=$(site_user_for_project "$project" 2>/dev/null) || {
+    rm -f -- "$(site_users_registry_dir)/${project}"
+    return 0
+  }
+  pkill -KILL -u "$user" 2>/dev/null || true
+  gpasswd -d www-data "$user" >/dev/null 2>&1 || true
+  userdel "$user" >/dev/null 2>&1 || true
+  groupdel "$user" >/dev/null 2>&1 || true
+  rm -rf --one-file-system -- "/var/lib/simai-env/site-homes/${user:?}"
+  rm -f -- "$(site_users_registry_dir)/${project}"
+}
+
 site_best_effort_primary_ip() {
   local ip=""
   if command -v ip >/dev/null 2>&1; then
@@ -266,17 +395,18 @@ cron_site_render() {
 # simai-profile: ${profile}
 
 EOF
-  local php_bin
+  local php_bin run_user
   php_bin=$(resolve_php_bin "$php_version")
+  run_user=$(site_effective_user "$slug")
   case "$profile" in
     laravel)
-      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} artisan schedule:run >> /dev/null 2>&1"
+      echo "* * * * * ${run_user} cd ${project_path} && ${php_bin} artisan schedule:run >> /dev/null 2>&1"
       ;;
     wordpress)
-      echo "*/5 * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
+      echo "*/5 * * * * ${run_user} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
       ;;
     bitrix)
-      echo "* * * * * ${SIMAI_USER} cd ${project_path} && ${php_bin} -d short_open_tag=1 public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
+      echo "* * * * * ${run_user} cd ${project_path} && ${php_bin} -d short_open_tag=1 public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
       ;;
   esac
 }
@@ -663,21 +793,22 @@ detect_pool_for_project() {
 }
 
 ensure_user() {
-  if ! id -u "$SIMAI_USER" >/dev/null 2>&1; then
-    info "Creating user ${SIMAI_USER}"
-    useradd -m -s /bin/bash "$SIMAI_USER"
+  local base="$SIMAI_BASE_USER"
+  if ! id -u "$base" >/dev/null 2>&1; then
+    info "Creating user ${base}"
+    useradd -m -s /bin/bash "$base"
   fi
-  usermod -a -G www-data "$SIMAI_USER" || true
+  usermod -a -G www-data "$base" || true
   # The parent of the home directory (usually /home) must stay root-owned;
-  # earlier releases handed it to SIMAI_USER, so repair that state here.
+  # earlier releases handed it to the shared user, so repair that state here.
   local home_parent
   home_parent=$(dirname "$SIMAI_HOME")
-  if [[ "$home_parent" == /home && "$(stat -c '%U' "$home_parent" 2>/dev/null)" == "$SIMAI_USER" ]]; then
+  if [[ "$home_parent" == /home && "$(stat -c '%U' "$home_parent" 2>/dev/null)" == "$base" ]]; then
     chown root:root "$home_parent" && chmod 0755 "$home_parent"
   fi
-  install -d -o "$SIMAI_USER" -g www-data "$SIMAI_HOME" 2>/dev/null || true
-  install -d -o "$SIMAI_USER" -g www-data "$WWW_ROOT" 2>/dev/null || true
-  chown "$SIMAI_USER":www-data "$SIMAI_HOME" "$WWW_ROOT" 2>/dev/null || true
+  install -d -o "$base" -g www-data "$SIMAI_HOME" 2>/dev/null || true
+  install -d -o "$base" -g www-data "$WWW_ROOT" 2>/dev/null || true
+  chown "$base":www-data "$SIMAI_HOME" "$WWW_ROOT" 2>/dev/null || true
 }
 
 resolve_php_bin() {
@@ -733,7 +864,10 @@ laravel_queue_has_real_app() {
 }
 
 create_queue_unit() {
-  local project="$1" project_root="$2" php_version="$3" run_user="${4:-$SIMAI_USER}"
+  local project="$1" project_root="$2" php_version="$3" run_user="${4:-}"
+  [[ -z "$run_user" ]] && run_user=$(site_effective_user "$project")
+  local run_group
+  run_group=$(site_effective_group "$project")
   declare -g QUEUE_UNIT_RESULT="unknown"
   if ! validate_project_slug "$project"; then
     return 1
@@ -751,8 +885,8 @@ create_queue_unit() {
   unit=$(queue_unit_path "$project") || return 1
   php_bin=$(resolve_php_bin "$php_version")
   tmp=$(mktemp)
-  PROJECT_NAME="$project" PROJECT_ROOT="$project_root" PHP_BIN="$php_bin" USER_NAME="$run_user" \
-    perl -0pe 's/\{\{PROJECT_NAME\}\}/$ENV{PROJECT_NAME}/g; s/\{\{PROJECT_ROOT\}\}/$ENV{PROJECT_ROOT}/g; s/\{\{PHP_BIN\}\}/$ENV{PHP_BIN}/g; s/\{\{USER\}\}/$ENV{USER_NAME}/g' \
+  PROJECT_NAME="$project" PROJECT_ROOT="$project_root" PHP_BIN="$php_bin" USER_NAME="$run_user" GROUP_NAME="$run_group" \
+    perl -0pe 's/\{\{PROJECT_NAME\}\}/$ENV{PROJECT_NAME}/g; s/\{\{PROJECT_ROOT\}\}/$ENV{PROJECT_ROOT}/g; s/\{\{PHP_BIN\}\}/$ENV{PHP_BIN}/g; s/\{\{USER\}\}/$ENV{USER_NAME}/g; s/\{\{GROUP\}\}/$ENV{GROUP_NAME}/g' \
     "$template" >"$tmp"
   chmod 644 "$tmp"
   chown root:root "$tmp" 2>/dev/null || true
@@ -1047,12 +1181,16 @@ create_php_pool() {
   local pool_dir="/etc/php/${php_version}/fpm/pool.d"
   local pool_file="${pool_dir}/${project}.conf"
   mkdir -p "$pool_dir"
+  local pool_user pool_group
+  pool_user=$(site_effective_user "$project")
+  pool_group=$(site_effective_group "$project")
+  [[ "$pool_group" != "www-data" ]] && site_ensure_opcache_isolation "$php_version"
   cat >"$pool_file" <<EOF
 [${project}]
-user = ${SIMAI_USER}
-group = www-data
+user = ${pool_user}
+group = ${pool_group}
 listen = /run/php/php${php_version}-fpm-${project}.sock
-listen.owner = ${SIMAI_USER}
+listen.owner = ${pool_user}
 listen.group = www-data
 listen.mode = 0660
 pm = ${fpm_pm}
@@ -1159,7 +1297,7 @@ create_nginx_site() {
     return 1
   fi
   mkdir -p "$doc_root"
-  chown -R "$SIMAI_USER":www-data "$doc_root" 2>/dev/null || true
+  chown -R "$SIMAI_USER":"$SIMAI_WEB_GROUP" "$doc_root" 2>/dev/null || true
   local meta_block
   meta_block=$(site_nginx_metadata_render "$domain" "$slug" "$profile" "$project_path" "$project" "$php_version" "$ssl_meta" "" "$target" "$php_socket_project" "$template_id" "$public_dir" "$host_mode" "$wildcard_domain" "$frame_policy")
   local server_name_value
@@ -1425,7 +1563,9 @@ site_runtime_enable_cron() {
 
 ensure_project_permissions() {
   local project_path="$1"
-  chown -R "$SIMAI_USER":www-data "$project_path"
+  chown -R "$SIMAI_USER":"$SIMAI_WEB_GROUP" "$project_path"
+  # Isolated sites: other site users must not even enter the project root.
+  [[ "$SIMAI_WEB_GROUP" != "www-data" ]] && chmod o-rwx "$project_path"
   if [[ -d "$project_path/storage" || -d "$project_path/bootstrap/cache" ]]; then
     find "$project_path/storage" "$project_path/bootstrap/cache" -type d -print0 2>/dev/null | xargs -0 -r chmod 775 || true
   fi
@@ -2224,7 +2364,7 @@ laravel_prepare_env_file() {
       return 1
     fi
     chmod 0640 "$tmp"
-    chown "${SIMAI_USER}:www-data" "$tmp" 2>/dev/null || true
+    chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$tmp" 2>/dev/null || true
     mv -fT "$tmp" "$env_file" || { rm -f "$tmp"; return 1; }
   fi
 
@@ -2407,7 +2547,7 @@ wordpress_download_distribution_archive() {
   fi
   mv "$tmp" "$target"
   chmod 0644 "$target"
-  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$target" 2>/dev/null || true
   return 0
 }
 
@@ -2435,7 +2575,7 @@ wordpress_unpack_distribution_archive() {
     rm -rf "$tmpdir"
     return 1
   }
-  chown -R "${SIMAI_USER}:www-data" "$doc_root" 2>/dev/null || true
+  chown -R "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$doc_root" 2>/dev/null || true
   rm -rf "$tmpdir"
   return 0
 }
@@ -2566,7 +2706,7 @@ EOF
   fi
   mv "$tmp" "$config_file"
   chmod 0640 "$config_file"
-  chown "${SIMAI_USER}:www-data" "$config_file" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$config_file" 2>/dev/null || true
   return 0
 }
 
@@ -2979,7 +3119,7 @@ bitrix_download_distribution_archive() {
 
   mv "$tmp" "$target"
   chmod 0644 "$target"
-  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$target" 2>/dev/null || true
   return 0
 }
 
@@ -3013,7 +3153,7 @@ bitrix_unpack_distribution_archive() {
   fi
 
   tar -xzf "$archive" -C "$doc_root" || return 1
-  chown -R "${SIMAI_USER}:www-data" "$doc_root" 2>/dev/null || true
+  chown -R "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$doc_root" 2>/dev/null || true
   return 0
 }
 
@@ -3052,7 +3192,7 @@ bitrix_download_setup_script() {
 
   mv "$tmp" "$target"
   chmod 0644 "$target"
-  chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$target" 2>/dev/null || true
   return 0
 }
 
@@ -3080,7 +3220,7 @@ bitrix_download_restore_script() {
     if [[ -s "$tmp" ]] && grep -q "<\\?php" "$tmp"; then
       mv "$tmp" "$target"
       chmod 0644 "$target"
-      chown "${SIMAI_USER}:www-data" "$target" 2>/dev/null || true
+      chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$target" 2>/dev/null || true
       return 0
     fi
     : >"$tmp"
@@ -3224,7 +3364,7 @@ bitrix_prepare_restore_writable_paths() {
   )
   for dir in "${dirs[@]}"; do
     mkdir -p "$dir"
-    chown "${SIMAI_USER}:www-data" "$dir" 2>/dev/null || true
+    chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$dir" 2>/dev/null || true
     chmod 0775 "$dir" 2>/dev/null || true
   done
 }
@@ -3281,7 +3421,7 @@ bitrix_write_db_preseed_files() {
 
   mkdir -p "${bx_dir}/php_interface"
   chmod 0775 "${bx_dir}/php_interface" 2>/dev/null || true
-  chown "${SIMAI_USER}:www-data" "${bx_dir}/php_interface" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "${bx_dir}/php_interface" 2>/dev/null || true
 
   local tmp_settings tmp_dbconn="" tmp_after_connect
   tmp_settings=$(mktemp)
@@ -3363,7 +3503,7 @@ EOF
   local -a written_files=("$settings_file" "$after_connect_file")
   [[ "$write_dbconn" == "yes" ]] && written_files+=("$dbconn_file")
   chmod 0640 "${written_files[@]}"
-  chown "${SIMAI_USER}:www-data" "${written_files[@]}" 2>/dev/null || true
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "${written_files[@]}" 2>/dev/null || true
   return 0
 }
 

@@ -530,6 +530,7 @@ site_add_transaction_reset() {
   SITE_ADD_TX_DB_USER=""
   SITE_ADD_TX_ACCESS_CREATED=0
   SITE_ADD_TX_ACCESS_LOGIN=""
+  SITE_ADD_TX_SITE_USER_CREATED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT=""
@@ -559,6 +560,9 @@ site_add_transaction_rollback() {
     remove_project_files "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
     install -d -m "${SITE_ADD_TX_PATH_MODE:-0755}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
     chown "${SITE_ADD_TX_PATH_UID:-0}:${SITE_ADD_TX_PATH_GID:-0}" "$SITE_ADD_TX_PATH" >/dev/null 2>&1 || true
+  fi
+  if [[ "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
+    site_user_delete "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   fi
   rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env"
   rmdir -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}" >/dev/null 2>&1 || true
@@ -1001,6 +1005,17 @@ site_add_handler_impl() {
   ensure_user
   if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
     run_command profile init --mode all --force yes || return 1
+  fi
+  if [[ "${PROFILE_IS_ALIAS:-no}" != "yes" ]] && site_isolation_enabled; then
+    local site_user=""
+    site_user_for_project "$project" >/dev/null 2>&1 || SITE_ADD_TX_SITE_USER_CREATED=1
+    site_user=$(site_user_create "$project") || return 1
+    # From here on files, pool, cron and queue belong to the site's own user.
+    SIMAI_USER="$site_user"
+    # shellcheck disable=SC2034 # read by site_utils.sh helpers
+    SIMAI_WEB_GROUP="$site_user"
+    site_prepare_isolated_parents
+    info "Site runs as dedicated user ${site_user}"
   fi
 
   if [[ ! -d "$path" ]]; then
@@ -1656,6 +1671,14 @@ site_remove_handler() {
     else
       warn "Skipping file removal due to invalid path"
       removal_failed=1
+    fi
+  fi
+
+  if [[ "$is_alias" != "yes" ]] && site_user_for_project "$safe_project" >/dev/null 2>&1; then
+    if [[ $remove_files -eq 1 && $removal_failed -eq 0 ]]; then
+      site_user_delete "$safe_project" || warn "Failed to remove the site user of ${domain}"
+    else
+      warn "Site user $(site_user_for_project "$safe_project") is kept because the project files remain"
     fi
   fi
 

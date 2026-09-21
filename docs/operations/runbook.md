@@ -61,6 +61,21 @@ Remove SSL:
 /root/simai-env/simai-admin.sh ssl remove --domain <domain>
 ```
 
+## 3a) Site isolation rollout
+
+New sites run as their own user automatically. Migrate existing sites one by
+one, checking each before the next:
+
+```bash
+/root/simai-env/simai-admin.sh site list
+/root/simai-env/simai-admin.sh site isolate --domain <domain>
+/root/simai-env/simai-admin.sh site isolate --domain <domain> --confirm yes
+/root/simai-env/simai-admin.sh site doctor --domain <domain>
+```
+
+Take a `backup data` first. Before rolling out a new simai-env release with
+this change, run `bash testing/run-regression.sh full` against the test server.
+
 ## 4) Data backup (database + files)
 
 Enable a daily backup with a restore test on every new site:

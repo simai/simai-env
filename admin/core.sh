@@ -383,16 +383,24 @@ run_command() {
     local had_errexit=0
     [[ $- == *e* ]] && had_errexit=1
     set +e
-    ( set -e; "$handler" "$@" )
+    ( set -e; site_command_context "$@"; "$handler" "$@" )
     rc=$?
     (( had_errexit )) && set -e
-  elif ( "$handler" "$@" ); then
+  elif ( site_command_context "$@"; "$handler" "$@" ); then
     rc=0
   else
     rc=$?
   fi
   audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id"
   return $rc
+}
+
+# Runs each site-scoped command as that site's own user (see site_utils.sh).
+site_command_context() {
+  if declare -F site_apply_user_context >/dev/null; then
+    site_apply_user_context "$@" || true
+  fi
+  return 0
 }
 
 parse_kv_args() {

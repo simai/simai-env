@@ -213,7 +213,7 @@ site_doctor_handler() {
         [[ -z "$wp" ]] && continue
         local full="${root}/${wp}"
         if [[ ! -e "$full" ]]; then
-          doctor_add_result "FAIL" "fs" "Writable path" "Missing ${full}" "mkdir -p ${full} && chown -R ${SIMAI_USER}:www-data ${full}"
+          doctor_add_result "FAIL" "fs" "Writable path" "Missing ${full}" "mkdir -p ${full} && chown -R ${SIMAI_USER}:${SIMAI_WEB_GROUP:-www-data} ${full}"
           continue
         fi
         local perm=""
@@ -227,7 +227,7 @@ site_doctor_handler() {
         if (( writable_status == 0 )); then
           doctor_add_result "PASS" "fs" "Writable path" "${full}" ""
         else
-          doctor_add_result "FAIL" "fs" "Writable path" "Not writable by ${simai_user}: ${full}" "chown -R ${SIMAI_USER}:www-data ${full}; chmod u+w"
+          doctor_add_result "FAIL" "fs" "Writable path" "Not writable by ${simai_user}: ${full}" "chown -R ${SIMAI_USER}:${SIMAI_WEB_GROUP:-www-data} ${full}; chmod u+w"
         fi
         if [[ -n "$perm" && "${perm: -1}" =~ [2367] ]]; then
           doctor_add_result "WARN" "fs" "World-writable" "${full} mode ${perm}" "chmod o-w ${full}"

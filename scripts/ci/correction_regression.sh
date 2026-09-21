@@ -493,6 +493,45 @@ test_audit_p1_contracts() {
   grep -Fq -- '--cert-name "$domain"' "${ROOT_DIR}/admin/commands/ssl.sh" || fail "certbot lineage is not pinned"
 }
 
+test_site_isolation_contracts() {
+  local tmp
+  tmp=$(mktemp -d)
+  (
+    error() { :; }
+    validate_project_slug() { [[ "$1" =~ ^[a-z0-9-]+$ ]]; }
+    eval "$(extract_function site_user_name_for_project "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    eval "$(extract_function site_apply_user_context "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    local name long
+    name=$(site_user_name_for_project shop-example-com)
+    [[ "$name" == site-shop-example-com ]] || fail "unexpected site user name ${name}"
+    long=$(site_user_name_for_project very-long-project-slug-for-a-client-example-com)
+    [[ ${#long} -le 32 && "$long" =~ ^site-[a-z0-9-]+$ ]] || fail "site user name too long or invalid: ${long}"
+    [[ "$long" != "$(site_user_name_for_project very-long-project-slug-for-a-client-example-org)" ]] \
+      || fail "long project slugs collide on the same site user"
+
+    export SIMAI_BASE_USER=simai
+    site_project_for_domain() { [[ "$1" == iso.test ]] && echo iso-test; }
+    site_user_for_project() { [[ "$1" == iso-test ]] && echo site-iso-test; }
+    SIMAI_USER=stale SIMAI_WEB_GROUP=stale
+    site_apply_user_context site info --domain iso.test
+    [[ "$SIMAI_USER:$SIMAI_WEB_GROUP" == site-iso-test:site-iso-test ]] || fail "isolated site context not applied"
+    site_apply_user_context site info --domain=legacy.test
+    [[ "$SIMAI_USER:$SIMAI_WEB_GROUP" == simai:www-data ]] || fail "legacy site context not applied"
+    site_apply_user_context self status
+    [[ "$SIMAI_USER" == simai ]] || fail "commands without a domain must use the shared user"
+  )
+  rm -rf "$tmp"
+  grep -Fq 'pool_user=$(site_effective_user "$project")' "${ROOT_DIR}/admin/lib/site_utils.sh" \
+    || fail "PHP-FPM pool user is not resolved per site"
+  grep -Fq 'run_user=$(site_effective_user "$slug")' "${ROOT_DIR}/admin/lib/site_utils.sh" \
+    || fail "cron user is not resolved per site"
+  grep -Fq 'Group={{GROUP}}' "${ROOT_DIR}/systemd/laravel-queue.service" || fail "queue unit group is not per site"
+  grep -Fq 'site_command_context "$@"; "$handler" "$@"' "${ROOT_DIR}/admin/core.sh" \
+    || fail "dispatcher does not apply the site user context"
+  ! extract_function access_grant_global_acl "${ROOT_DIR}/admin/lib/access_utils.sh" | grep -Fq 'u:${SIMAI_USER}' \
+    || fail "global SFTP ACL grants the shared user on every site"
+}
+
 test_install_mode_contract
 test_site_metadata_cleanup
 test_command_option_validation
@@ -507,4 +546,5 @@ test_db_drop_failure_propagation
 test_updater_transaction
 test_audit_p0_security_contracts
 test_audit_p1_contracts
+test_site_isolation_contracts
 echo "[correction-regression] ok"

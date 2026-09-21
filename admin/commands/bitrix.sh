@@ -953,7 +953,7 @@ bitrix_ownership_scan_roots() {
     real=$(readlink -f "$target" 2>/dev/null || true)
     [[ -n "$real" && -e "$real" ]] || continue
     case "$real" in
-      "$doc_root"/*|/home/"${SIMAI_USER:-simai}"/git/*|/home/"${SIMAI_USER:-simai}"/www/*)
+      "$doc_root"/*|"${SIMAI_HOME}"/git/*|"${WWW_ROOT}"/*)
         printf '%s|%s\n' "$real" "linked"
         ;;
     esac
@@ -1005,8 +1005,8 @@ bitrix_ownership_handler() {
     status="ok"
     count_after="$count_before"
     if [[ "$apply" == "yes" && "$count_before" -gt 0 ]]; then
-      group="www-data"
-      [[ "$root" == /home/"${SIMAI_USER:-simai}"/git/* ]] && group="${SIMAI_USER:-simai}"
+      group="${SIMAI_WEB_GROUP:-www-data}"
+      [[ "$root" == "${SIMAI_HOME}"/git/* ]] && group="${SIMAI_USER:-simai}"
       if bitrix_ownership_fix_path "$root" "$group"; then
         count_after=$(bitrix_ownership_count_root_owned "$root")
         fixed_count=$((fixed_count + count_before - count_after))

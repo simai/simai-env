@@ -5,7 +5,7 @@ After=network.target mysql.service mariadb.service redis-server.service
 [Service]
 Type=simple
 User={{USER}}
-Group=www-data
+Group={{GROUP}}
 WorkingDirectory={{PROJECT_ROOT}}
 ExecStart={{PHP_BIN}} {{PROJECT_ROOT}}/artisan queue:work --tries=3 --sleep=3
 Restart=always

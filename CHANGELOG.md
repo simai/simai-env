@@ -3,6 +3,12 @@
 ## Unreleased
 
 ### Added
+- Per-site Unix users: every new site runs PHP-FPM, cron and queue workers as
+  its own `site-<slug>` user with `0750` project roots, so one compromised
+  site can no longer read or change another. `site isolate` migrates existing
+  sites (with rollback), `site remove` deletes the user with the files, SFTP
+  ACLs follow the site user, and opcache validates permissions.
+  `SIMAI_SITE_ISOLATION=no` keeps the old shared-user mode for new sites.
 - `backup data`, `data-verify`, `data-schedule` and `data-restore` back up the
   site database and files with retention, checksums, a scratch-database
   restore test, optional `age` encryption and rsync-over-SSH off-site copies.

@@ -80,6 +80,22 @@ Examples:
 - Create Bitrix and prepare fresh installer helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files setup`
 - Create Bitrix and prepare restore helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files restore`
 
+## isolate
+Move an existing site from the shared `simai` account to its own Unix user
+`site-<slug>`: project files, PHP-FPM pool, cron file, queue unit and SFTP
+ACLs. New sites are created isolated automatically.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site isolate --domain example.com
+sudo /root/simai-env/simai-admin.sh site isolate --domain example.com --confirm yes
+```
+
+Without `--confirm yes` only the plan is printed. The command reloads
+PHP-FPM, nginx and cron; any failure restores the previous owner, pool, cron
+and unit. Alias sites follow their target site. After migrating, run
+`site doctor` and open the site. Code that writes outside the project
+directory (for example to another site's folder) stops working by design.
+
 ## frame-policy
 
 Change the embedding policy of an existing managed site. The setting is stored

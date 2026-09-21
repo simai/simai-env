@@ -22,7 +22,7 @@ access_validate_login() {
     error "Invalid login '${login}'. Use lowercase letters, numbers, and dashes only (3-32 chars, must start with a letter)."
     return 1
   fi
-  if [[ "$login" == "root" || "$login" == "$SIMAI_USER" ]]; then
+  if [[ "$login" == "root" || "$login" == "$SIMAI_BASE_USER" || "$login" == site-* ]]; then
     error "Login '${login}' is reserved; choose another name."
     return 1
   fi
@@ -189,8 +189,19 @@ access_grant_traverse_acl() {
 access_grant_global_acl() {
   local login="$1"
   access_grant_traverse_acl "$login" "$WWW_ROOT"
-  setfacl -R -m "u:${login}:rwX" -m "u:${SIMAI_USER}:rwX" "$WWW_ROOT"
-  find "$WWW_ROOT" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX" -m "d:u:${SIMAI_USER}:rwX"
+  setfacl -R -m "u:${login}:rwX" "$WWW_ROOT"
+  find "$WWW_ROOT" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX"
+  # Files uploaded over SFTP must stay usable by each project's PHP user, and
+  # only by that user: isolated projects must not grant the shared account.
+  local project_dir owner
+  for project_dir in "$WWW_ROOT"/*/; do
+    project_dir="${project_dir%/}"
+    [[ -d "$project_dir" && ! -L "$project_dir" ]] || continue
+    owner=$(stat -c '%U' "$project_dir" 2>/dev/null) || continue
+    [[ "$owner" == "$SIMAI_BASE_USER" || "$owner" == site-* ]] || continue
+    setfacl -R -m "u:${owner}:rwX" "$project_dir"
+    find "$project_dir" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${owner}:rwX"
+  done
 }
 
 access_global_home() {

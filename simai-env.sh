@@ -961,7 +961,8 @@ configure_queue_service() {
   sed -e "s#{{PROJECT_NAME}}#${PROJECT_NAME}#g" \
       -e "s#{{PROJECT_ROOT}}#${PROJECT_PATH}#g" \
       -e "s#{{PHP_BIN}}#${PHP_BIN:-/usr/bin/php}#g" \
-      -e "s#{{USER}}#${SIMAI_USER}#g" "$QUEUE_TEMPLATE" > "$unit_path"
+      -e "s#{{USER}}#${SIMAI_USER}#g" \
+      -e "s#{{GROUP}}#www-data#g" "$QUEUE_TEMPLATE" > "$unit_path"
   os_svc_daemon_reload || true
   os_svc_enable_now "$unit_name" || warn "Failed to enable ${unit_name}"
 }
