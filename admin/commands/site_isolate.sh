@@ -152,7 +152,6 @@ site_isolate_handler() {
     return 1
   fi
   rm -rf -- "$backup_dir"
-  [[ "$from" != "$base" ]] && site_user_remove_account "$from"
   site_owner_unlink_site "$from" "$project"
   site_owner_link_site "$user" "$domain" "$root"
 
@@ -171,6 +170,14 @@ site_isolate_handler() {
   if [[ -n "$queue_unit" ]]; then
     os_svc_daemon_reload || true
     os_svc_is_active "$(basename "$queue_unit")" && { os_svc_restart "$(basename "$queue_unit")" || warn "Restart $(basename "$queue_unit") manually"; }
+  fi
+  # Only now: PHP-FPM workers and a Restart=always queue worker may still run
+  # as the previous per-site user until the reloads above take effect.
+  if [[ "$from" != "$base" ]]; then
+    local waited=0
+    while pgrep -u "$from" >/dev/null 2>&1 && (( waited < 20 )); do sleep 1; waited=$((waited + 1)); done
+    site_user_remove_account "$from"
+    id -u "$from" >/dev/null 2>&1 && warn "Previous user ${from} still exists (processes running); remove it later with: userdel ${from}"
   fi
   ui_result_table \
     "Domain|${domain}" \
