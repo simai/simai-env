@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- `self migrate` applies idempotent host migrations and runs after every
+  `self update`: restores `/home` ownership, installs logrotate, upgrades the
+  catch-all to port 443 (with `nginx -t` rollback), and moves observer storage
+  from `/home/simai/runtime-observer` to `/var/lib`, resetting its git config,
+  hooks and attribute files. It warns about pools still on the shared user.
 - Per-site Unix users: every new site runs PHP-FPM, cron and queue workers as
   its own `site-<slug>` user with `0750` project roots, so one compromised
   site can no longer read or change another. `site isolate` migrates existing

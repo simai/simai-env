@@ -286,6 +286,9 @@ self_update_handler() {
     progress_done "Update completed with smoke failures"
     return 1
   fi
+  # Host migrations must come from the freshly installed code, not from the
+  # handler already loaded in this process.
+  SIMAI_ADMIN_MENU=0 bash "${SCRIPT_DIR}/simai-admin.sh" self migrate || warn "Post-update host migrations reported problems"
   self_auto_update_check_now "yes" || true
   progress_done "Update completed"
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then

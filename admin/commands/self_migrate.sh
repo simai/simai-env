@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# Idempotent host migrations: brings servers installed by earlier releases in
+# line with the current layout. Safe to run repeatedly; self update runs it.
+
+self_migrate_observer_storage() {
+  local legacy="${SIMAI_HOME}/runtime-observer" base dir slug target
+  [[ -d "$legacy" && ! -L "$legacy" ]] || return 0
+  base=$(observer_base)
+  install -d -m 0700 -o root -g root "$base" || return 1
+  for dir in "$legacy"/*/; do
+    dir="${dir%/}"
+    [[ -d "$dir" && ! -L "$dir" ]] || continue
+    slug=$(basename "$dir")
+    target="${base}/${slug}"
+    if [[ -e "$target" ]]; then
+      warn "Observer storage ${target} already exists; leaving ${dir} for manual review"
+      continue
+    fi
+    mv "$dir" "$target" || return 1
+    chown -R root:root "$target"
+    chmod -R go-rwx "$target"
+    # The old location was reachable by site users: drop anything git could
+    # execute (config drivers, hooks, attribute files) and start clean.
+    if [[ -d "${target}/repo/.git" ]]; then
+      rm -rf -- "${target}/repo/.git/hooks" "${target}/repo/.git/info/attributes"
+      printf '[core]\n\trepositoryformatversion = 0\n\tfilemode = true\n\tbare = false\n\tlogallrefupdates = true\n' \
+        >"${target}/repo/.git/config"
+    fi
+    # Session state is re-validated by observer_read_session on next use.
+    info "Observer storage moved: ${dir} -> ${target}"
+    SELF_MIGRATE_CHANGES+=("observer ${slug} -> ${target}")
+  done
+  rmdir "$legacy" 2>/dev/null || true
+}
+
+self_migrate_catchall() {
+  local conf="/etc/nginx/sites-available/000-catchall.conf"
+  command -v nginx >/dev/null 2>&1 || return 0
+  grep -qs 'simai-catchall-v2' "$conf" && return 0
+  local backup=""
+  [[ -f "$conf" ]] && { backup=$(mktemp); cp -p "$conf" "$backup"; }
+  ensure_nginx_catchall
+  if nginx -t >>"$LOG_FILE" 2>&1; then
+    os_svc_reload nginx || true
+    grep -qs 'simai-catchall-v2' "$conf" && SELF_MIGRATE_CHANGES+=("catch-all answers 443")
+  elif [[ -n "$backup" ]]; then
+    cp -p "$backup" "$conf"
+    warn "nginx -t failed with the new catch-all; previous catch-all restored"
+  fi
+  [[ -n "$backup" ]] && rm -f -- "$backup"
+  return 0
+}
+
+self_migrate_home_owner() {
+  local parent owner
+  parent=$(dirname "$SIMAI_HOME")
+  owner=$(stat -c '%U' "$parent" 2>/dev/null) || return 0
+  [[ "$parent" == /home && "$owner" == "$SIMAI_BASE_USER" ]] || return 0
+  chown root:root "$parent" && chmod 0755 "$parent" && SELF_MIGRATE_CHANGES+=("/home owner restored to root")
+}
+
+self_migrate_handler() {
+  parse_kv_args "$@"
+  declare -ga SELF_MIGRATE_CHANGES=()
+  ui_header "SIMAI ENV · Host migrations"
+  self_migrate_home_owner || warn "Could not repair /home ownership"
+  ensure_simai_logrotate
+  self_migrate_observer_storage || warn "Observer storage migration failed"
+  self_migrate_catchall
+  if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
+    info "Host is up to date; nothing to migrate"
+  else
+    local change
+    for change in "${SELF_MIGRATE_CHANGES[@]}"; do info "Migrated: ${change}"; done
+  fi
+  local legacy=0 f
+  for f in /etc/php/*/fpm/pool.d/*.conf; do
+    [[ -f "$f" ]] && grep -q "^user = ${SIMAI_BASE_USER}\$" "$f" && legacy=$((legacy + 1))
+  done
+  if (( legacy > 0 )); then
+    warn "${legacy} PHP pool(s) still run as the shared ${SIMAI_BASE_USER} user; migrate them with: simai-admin.sh site isolate --domain <domain>"
+  fi
+  return 0
+}
+
+register_cmd "self" "migrate" "Apply idempotent host migrations after an update" "self_migrate_handler" "" "" "tier:advanced"
