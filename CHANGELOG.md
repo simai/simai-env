@@ -69,6 +69,12 @@
   backups keep the ten most recent archives.
 
 ### Fixed
+- Bitrix sites no longer lose `short_open_tag` (and the rest of the Bitrix PHP
+  baseline) after `site php-ini-set` / `site fix`: the baseline is written to
+  the profile ini block that those commands preserve. Bitrix CLI gets
+  `short_open_tag` from `/etc/php/<ver>/cli/conf.d/99-simai-bitrix.ini`
+  instead of a hand-edited `php.ini`. `self migrate` converts existing pools
+  and adds `-d short_open_tag=1` to old Bitrix cron lines.
 - `/etc/simai-env.conf` is replaced atomically and no longer gains a blank line
   on every write.
 - Generated database passwords are 32 characters again; the previous

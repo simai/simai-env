@@ -1169,6 +1169,33 @@ create_mysql_db_user() {
   mysql_root_exec "FLUSH PRIVILEGES;"
 }
 
+bitrix_profile_ini_block() {
+  cat <<'EOF'
+; simai-profile-ini-begin
+php_admin_flag[short_open_tag] = on
+php_admin_value[memory_limit] = 512M
+php_admin_value[max_input_vars] = 10000
+php_admin_value[max_execution_time] = 300
+php_admin_value[max_input_time] = 300
+php_admin_value[post_max_size] = 64M
+php_admin_value[upload_max_filesize] = 64M
+php_admin_value[opcache.validate_timestamps] = 1
+php_admin_value[opcache.revalidate_freq] = 0
+; simai-profile-ini-end
+EOF
+}
+
+# Bitrix CLI entry points (cron_events.php, agents, module scripts) use `<?`
+# tags; keep that in a managed conf.d file instead of editing php.ini.
+site_ensure_bitrix_cli_ini() {
+  local php_version="$1" conf
+  [[ -d "/etc/php/${php_version}/cli/conf.d" ]] || return 0
+  conf="/etc/php/${php_version}/cli/conf.d/99-simai-bitrix.ini"
+  grep -qs 'simai-bitrix-cli-v1' "$conf" && return 0
+  printf '; simai-bitrix-cli-v1 (managed by simai-env)\nshort_open_tag = On\n' >"$conf"
+  chmod 0644 "$conf"
+}
+
 create_php_pool() {
   local project="$1" php_version="$2" project_path="$3" profile_id="${4:-${PROFILE_ID:-}}"
   if ! validate_project_slug "$project"; then
@@ -1205,19 +1232,11 @@ php_admin_value[error_log] = /var/log/php${php_version}-fpm-${project}.log
 php_admin_flag[log_errors] = on
 EOF
   if [[ "$profile_id" == "bitrix" ]]; then
-    cat >>"$pool_file" <<'EOF'
-; simai-site-ini-begin
-php_admin_flag[short_open_tag] = on
-php_admin_value[memory_limit] = 512M
-php_admin_value[max_input_vars] = 10000
-php_admin_value[max_execution_time] = 300
-php_admin_value[max_input_time] = 300
-php_admin_value[post_max_size] = 64M
-php_admin_value[upload_max_filesize] = 64M
-php_admin_value[opcache.validate_timestamps] = 1
-php_admin_value[opcache.revalidate_freq] = 0
-; simai-site-ini-end
-EOF
+    # Profile baseline lives in its own block: `site php-ini set` rewrites only
+    # the site block, and php-fpm keeps the first value of a repeated key, so
+    # site overrides (written before this block) still win.
+    bitrix_profile_ini_block >>"$pool_file"
+    site_ensure_bitrix_cli_ini "$php_version"
   fi
   os_svc_reload_or_restart "php${php_version}-fpm" || true
 }

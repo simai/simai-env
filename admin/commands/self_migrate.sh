@@ -77,6 +77,43 @@ self_migrate_report_open_home_dirs() {
   return 0
 }
 
+# Bitrix pools created by earlier releases kept the profile baseline inside
+# the site ini block, so `site php-ini set` silently dropped short_open_tag.
+self_migrate_bitrix_runtime() {
+  local cfg domain project slug pool ver cron backup
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" ]] || continue
+    grep -q '^# simai-profile: bitrix$' "$cfg" || continue
+    domain=$(basename "$cfg" .conf)
+    project=$(sed -n 's/^# simai-php-socket-project: *//p' "$cfg" | head -n1)
+    [[ -n "$project" ]] || project=$(sed -n 's/^# simai-project: *//p' "$cfg" | head -n1)
+    slug=$(sed -n 's/^# simai-slug: *//p' "$cfg" | head -n1)
+    validate_project_slug "$project" 2>/dev/null || continue
+    for pool in /etc/php/*/fpm/pool.d/"${project}".conf; do
+      [[ -f "$pool" ]] || continue
+      ver=$(awk -F/ '{print $4}' <<<"$pool")
+      site_ensure_bitrix_cli_ini "$ver"
+      grep -q '; simai-profile-ini-begin' "$pool" && continue
+      backup=$(mktemp) && cp -p "$pool" "$backup"
+      bitrix_profile_ini_block >>"$pool"
+      if command -v "php-fpm${ver}" >/dev/null 2>&1 && ! "php-fpm${ver}" -t >>"$LOG_FILE" 2>&1; then
+        cp -p "$backup" "$pool"
+        warn "Could not add the Bitrix profile block to ${pool}; left unchanged"
+      else
+        os_svc_reload "php${ver}-fpm" >/dev/null 2>&1 || true
+        SELF_MIGRATE_CHANGES+=("${domain}: Bitrix PHP baseline moved to the profile block (php ${ver})")
+      fi
+      rm -f -- "$backup"
+    done
+    cron="/etc/cron.d/${slug:-$project}"
+    if [[ -f "$cron" ]] && grep -q 'cron_events\.php' "$cron" && ! grep -q 'short_open_tag=1.*cron_events\.php' "$cron"; then
+      sed -i -E 's#(/php[0-9.]*) (public/bitrix/modules/main/tools/cron_events\.php)#\1 -d short_open_tag=1 \2#' "$cron"
+      SELF_MIGRATE_CHANGES+=("${domain}: cron runs Bitrix agents with short_open_tag")
+    fi
+  done
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -85,6 +122,7 @@ self_migrate_handler() {
   ensure_simai_logrotate
   self_migrate_observer_storage || warn "Observer storage migration failed"
   self_migrate_catchall
+  self_migrate_bitrix_runtime
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"
   else

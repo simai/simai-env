@@ -526,6 +526,10 @@ test_site_isolation_contracts() {
   grep -Fq 'run_user=$(site_effective_user "$slug")' "${ROOT_DIR}/admin/lib/site_utils.sh" \
     || fail "cron user is not resolved per site"
   grep -Fq 'Group={{GROUP}}' "${ROOT_DIR}/systemd/laravel-queue.service" || fail "queue unit group is not per site"
+  extract_function bitrix_profile_ini_block "${ROOT_DIR}/admin/lib/site_utils.sh" | grep -Fq '; simai-profile-ini-begin' \
+    || fail "Bitrix baseline must live in the profile ini block (site php-ini changes rewrite the site block)"
+  ! extract_function create_php_pool "${ROOT_DIR}/admin/lib/site_utils.sh" | grep -Fq 'simai-site-ini-begin' \
+    || fail "create_php_pool writes profile settings into the site ini block"
   grep -Fq 'site_command_context "$@"; "$handler" "$@"' "${ROOT_DIR}/admin/core.sh" \
     || fail "dispatcher does not apply the site user context"
   ! extract_function access_grant_global_acl "${ROOT_DIR}/admin/lib/access_utils.sh" | grep -Fq 'u:${SIMAI_USER}' \
