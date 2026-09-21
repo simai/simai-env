@@ -42,6 +42,21 @@ sudo /root/simai-env/simai-admin.sh site isolate --domain old.example.com --owne
 `site isolate --owner` moves a site from `simai`, from its own `site-*` user
 (which is then deleted) or from another owner. `site remove` keeps the owner.
 
+## Shared module checkouts and deploy scripts
+
+Sites often symlink modules from checkouts such as `/home/simai/git/<repo>`.
+Give each checkout to the owner whose sites use it, keeping the paths, so the
+owner can deploy over SSH without sudo:
+
+```bash
+chown -R acme:acme /home/simai/git/<repo> /home/simai/backups/<repo>
+chmod 0751 /home/simai/backups        # enter known subdirectories, no listing
+git config --system --add safe.directory /home/simai/git/<repo>   # root/automation keep working
+```
+
+Checkouts must stay readable by others (`755`) if sites of other owners link
+to them. Note that the owner's sites can then modify that checkout too.
+
 Security note: the owner's shell and the owner's PHP share one account, so a
 compromised site can change files the owner's developers use (for example
 `~/.bashrc`). Give each client or project its own owner, and keep sites that
