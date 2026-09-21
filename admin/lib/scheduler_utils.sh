@@ -33,7 +33,8 @@ scheduler_scheduler_cmd() {
 scheduler_replace_managed_block() {
   local file="$1" begin="$2" end="$3" content="$4"
   local tmp
-  tmp=$(mktemp)
+  mkdir -p "$(dirname "$file")" || return 1
+  tmp=$(mktemp "${file}.XXXXXX") || return 1
   if [[ -f "$file" ]]; then
     awk -v begin="$begin" -v end="$end" '
       $0 == begin { skip=1; next }
@@ -41,16 +42,23 @@ scheduler_replace_managed_block() {
       !skip { print }
     ' "$file" >"$tmp"
   fi
+  local kept
+  kept=$(cat "$tmp")
   {
-    cat "$tmp"
-    [[ -s "$tmp" ]] && printf "\n"
+    # $(...) drops trailing newlines, so blank lines do not pile up per write.
+    [[ -n "$kept" ]] && printf "%s\n\n" "$kept"
     printf "%s\n" "$begin"
     printf "%s\n" "$content"
     printf "%s\n" "$end"
   } >"${tmp}.new"
-  install -m 0644 /dev/null "$file"
-  cat "${tmp}.new" >"$file"
-  rm -f "$tmp" "${tmp}.new"
+  # The config is sourced by every command; replace it atomically so a crash
+  # or full disk never leaves it empty or truncated.
+  chmod 0644 "${tmp}.new"
+  if ! mv -f "${tmp}.new" "$file"; then
+    rm -f "$tmp" "${tmp}.new"
+    return 1
+  fi
+  rm -f "$tmp"
 }
 
 scheduler_install_defaults() {

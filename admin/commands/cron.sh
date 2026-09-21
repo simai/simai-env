@@ -34,6 +34,15 @@ cron_add_handler() {
     return 1
   fi
   local user="${PARSED_ARGS[user]:-${SIMAI_USER:-simai}}"
+  local user_uid=""
+  if [[ ! "$user" =~ ^[a-z_][a-z0-9_-]*$ ]] || ! user_uid=$(id -u "$user" 2>/dev/null); then
+    error "Scheduler user ${user} does not exist."
+    return 1
+  fi
+  if [[ "$user" != "${SIMAI_USER:-simai}" ]] && (( user_uid < 1000 )); then
+    error "Scheduler must run as a regular site user, not ${user} (uid ${user_uid})."
+    return 1
+  fi
   local prev_user="${SIMAI_USER:-simai}"
   SIMAI_USER="$user"
   ui_header "SIMAI ENV · Enable Laravel scheduler"

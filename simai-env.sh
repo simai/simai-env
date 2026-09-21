@@ -20,7 +20,8 @@ DB_HOST="127.0.0.1"
 DB_PORT="3306"
 PHP_VERSION="8.2"
 MYSQL_FLAVOR="mysql"
-NODE_VERSION="20"
+NODE_VERSION="22"
+NODESOURCE_KEY_FPR="6F71F525282841EEDAF851B42F59B5F99B1BE0B4"
 RUN_MIGRATIONS=0
 RUN_OPTIMIZE=0
 REMOVE_FILES=0
@@ -64,7 +65,7 @@ Usage:
   simai-env.sh [install] --domain <domain> --project-name <project-slug> [options]
   simai-env.sh --existing --path <project-root> --domain <domain> [options]
   simai-env.sh clean --project-name <project-slug> --domain <domain> [clean options]
-  simai-env.sh bootstrap [--php 8.2] [--mysql mysql|percona] [--node-version 20] [--silent]
+  simai-env.sh bootstrap [--php 8.2] [--mysql mysql|percona] [--node-version 22] [--silent]
 
 Install options:
   --domain <fqdn>            Server name for nginx
@@ -78,7 +79,7 @@ Install options:
   --db-port <port>           Database port (default: 3306)
   --php <version>            PHP version (default: 8.2; installable versions depend on apt repositories)
   --mysql <mysql|percona>    MySQL implementation (default: mysql)
-  --node-version <N>         Node.js major version (default: 20)
+  --node-version <N>         Node.js major version (default: 22)
   --run-migrations           Run php artisan migrate --force
   --optimize                 Run artisan caches (config/route/view)
   --silent                   Minimize console output
@@ -384,6 +385,7 @@ parse_args() {
         ;;
       --node-version)
         NODE_VERSION="$2"
+        [[ "$NODE_VERSION" =~ ^[0-9]{2}$ ]] || fail "Invalid --node-version: ${NODE_VERSION} (expected a major version such as 22)"
         shift 2
         ;;
       --run-migrations)
@@ -603,9 +605,12 @@ install_mysql() {
   if [[ $MYSQL_FLAVOR == "percona" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/percona-release.list ]]; then
       info "Adding Percona repository"
-      run_long "Downloading Percona release package" curl -fsSL -o /tmp/percona-release.deb https://repo.percona.com/apt/percona-release_latest.generic_all.deb || fail "Cannot download Percona release package"
-        os_cmd_pkg_install_deb "/tmp/percona-release.deb"
+      local percona_tmp
+      percona_tmp=$(mktemp -d) || fail "Cannot create a temporary directory"
+      run_long "Downloading Percona release package" curl -fsSL -o "${percona_tmp}/percona-release.deb" https://repo.percona.com/apt/percona-release_latest.generic_all.deb || fail "Cannot download Percona release package"
+        os_cmd_pkg_install_deb "${percona_tmp}/percona-release.deb"
         run_long "Installing Percona release package" "${OS_CMD[@]}" || fail "Failed to install Percona release package"
+      rm -rf "$percona_tmp"
       run_long "Configuring Percona repo" percona-release setup ps80 -y || fail "Failed to configure Percona repo"
       APT_UPDATED=0
     fi
@@ -643,6 +648,40 @@ install_mail_transport() {
   os_svc_enable_now postfix || true
 }
 
+# Adds the NodeSource apt repository without running a remote script as root:
+# the signing key is pinned by fingerprint and the repo uses signed-by.
+add_nodesource_repo() {
+  local keyring="/etc/apt/keyrings/nodesource.gpg" tmpdir fpr
+  if ! command -v gpg >/dev/null 2>&1; then
+    apt_update_once
+    os_cmd_pkg_install gnupg
+    run_long "Installing gnupg" "${OS_CMD[@]}" || return 1
+  fi
+  tmpdir=$(mktemp -d) || return 1
+  if ! curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o "${tmpdir}/key.asc"; then
+    rm -rf "$tmpdir"
+    return 1
+  fi
+  fpr=$(gpg --show-keys --with-colons "${tmpdir}/key.asc" 2>/dev/null | awk -F: '/^fpr/ {print $10; exit}')
+  if [[ "$fpr" != "$NODESOURCE_KEY_FPR" ]]; then
+    rm -rf "$tmpdir"
+    error "NodeSource signing key fingerprint mismatch: ${fpr:-none}"
+    return 1
+  fi
+  install -d -m 0755 /etc/apt/keyrings
+  gpg --dearmor <"${tmpdir}/key.asc" >"${tmpdir}/nodesource.gpg" || { rm -rf "$tmpdir"; return 1; }
+  install -m 0644 "${tmpdir}/nodesource.gpg" "$keyring"
+  rm -rf "$tmpdir"
+  # Repos written by the upstream setup script use another keyring path;
+  # two different signed-by values for one repo make apt fail.
+  rm -f /etc/apt/sources.list.d/nodesource.sources /usr/share/keyrings/nodesource.gpg
+  printf 'deb [signed-by=%s] https://deb.nodesource.com/node_%s.x nodistro main\n' "$keyring" "$NODE_VERSION" \
+    >/etc/apt/sources.list.d/nodesource.list
+  printf 'Package: nodejs\nPin: origin deb.nodesource.com\nPin-Priority: 600\n' >/etc/apt/preferences.d/nodesource
+  APT_UPDATED=0
+  apt_update_once
+}
+
 install_node() {
   if command -v node >/dev/null 2>&1; then
     local current
@@ -652,7 +691,8 @@ install_node() {
       return
     fi
   fi
-  run_long "Adding NodeSource repo for Node.js ${NODE_VERSION}" bash -c "curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -" || fail "Failed to add NodeSource"
+  [[ "$NODE_VERSION" =~ ^[0-9]{2}$ ]] || fail "Invalid Node.js major version: ${NODE_VERSION}"
+  add_nodesource_repo || fail "Failed to add NodeSource"
   os_cmd_pkg_install nodejs
   run_long "Installing Node.js ${NODE_VERSION}" "${OS_CMD[@]}" || fail "Failed to install Node.js ${NODE_VERSION}"
 }

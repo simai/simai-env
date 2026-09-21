@@ -464,6 +464,35 @@ test_audit_p0_security_contracts() {
   rm -rf "$tmp"
 }
 
+test_audit_p1_contracts() {
+  (
+    error() { :; }
+    validate_domain() { [[ "$1" =~ ^[a-z0-9.-]+\.[a-z]+$ ]]; }
+    export WWW_ROOT=/home/simai/www
+    eval "$(extract_function site_validate_wildcard_domain "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    eval "$(extract_function site_path_is_allowed_root "${ROOT_DIR}/admin/lib/site_utils.sh")"
+    assert_success site_validate_wildcard_domain '*.example.com'
+    assert_failure site_validate_wildcard_domain 'example.com'
+    assert_failure site_validate_wildcard_domain '*.a.com;evil'
+    assert_success site_path_is_allowed_root /home/simai/www/a.com
+    assert_success site_path_is_allowed_root /var/www/site
+    assert_failure site_path_is_allowed_root /var
+    assert_failure site_path_is_allowed_root /home/simai/www
+    assert_failure site_path_is_allowed_root /home/simai/www/../../etc
+  )
+  local tmpl
+  for tmpl in "${ROOT_DIR}"/templates/nginx-*.conf; do
+    grep -Fq 'location ~* \.(?:sql|sql\.gz|bak|old|orig|swp|log)$' "$tmpl" || fail "${tmpl} does not deny dumps/logs"
+  done
+  grep -Fq 'location ~* ^/wp-content/uploads/.*\.php$' "${ROOT_DIR}/templates/nginx-wordpress.conf" \
+    || fail "WordPress template executes PHP from uploads"
+  grep -Fq '^/bitrix/(?:backup|' "${ROOT_DIR}/templates/nginx-bitrix.conf" || fail "Bitrix template serves /bitrix/backup"
+  grep -Fq 'listen 443 ssl default_server' "${ROOT_DIR}/admin/lib/site_utils.sh" || fail "HTTPS catch-all is missing"
+  ! grep -Fq 'deb.nodesource.com/setup_' "${ROOT_DIR}/simai-env.sh" || fail "NodeSource is installed via a remote script"
+  grep -Fq 'usermod -L -e 1' "${ROOT_DIR}/admin/commands/access.sh" || fail "access disable does not expire the account"
+  grep -Fq -- '--cert-name "$domain"' "${ROOT_DIR}/admin/commands/ssl.sh" || fail "certbot lineage is not pinned"
+}
+
 test_install_mode_contract
 test_site_metadata_cleanup
 test_command_option_validation
@@ -477,4 +506,5 @@ test_bitrix_restore_archive_integrity_gate
 test_db_drop_failure_propagation
 test_updater_transaction
 test_audit_p0_security_contracts
+test_audit_p1_contracts
 echo "[correction-regression] ok"

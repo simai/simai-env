@@ -578,7 +578,7 @@ ssl_issue_handler() {
   local -a cmd=()
   if [[ "$wildcard" == "yes" ]]; then
     if [[ "$dns_provider" == "manual" ]]; then
-      cmd=(certbot certonly --manual --preferred-challenges dns --manual-public-ip-logging-ok -d "$domain" -d "$wildcard_domain" --agree-tos -m "$email" --keep-until-expiring)
+      cmd=(certbot certonly --cert-name "$domain" --manual --preferred-challenges dns --manual-public-ip-logging-ok -d "$domain" -d "$wildcard_domain" --agree-tos -m "$email" --keep-until-expiring)
     else
       local plugin_flag credentials_flag pkg
       plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
@@ -588,10 +588,10 @@ ssl_issue_handler() {
         error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
         return 1
       fi
-      cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+      cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
     fi
   else
-    cmd=(certbot certonly --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+    cmd=(certbot certonly --cert-name "$domain" --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
   fi
   [[ "$staging" == "yes" ]] && cmd+=(--staging)
   progress_step "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})"
@@ -838,9 +838,9 @@ ssl_renew_handler() {
     local plugin_flag credentials_flag
     plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
     credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
-    renew_cmd=(certbot certonly "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" -d "$domain" -d "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}")
+    renew_cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" -d "$domain" -d "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}")
   else
-    renew_cmd=(certbot certonly --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
+    renew_cmd=(certbot certonly --cert-name "$domain" --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
   fi
   if ! run_long "Renewing certificate for ${domain}" "${renew_cmd[@]}"; then
     error "Renew failed for ${domain}; see ${LOG_FILE}"

@@ -565,7 +565,9 @@ bitrix_cache_clear_handler() {
   local cleared=0 missing=0 dir
   for dir in "${dirs[@]}"; do
     if [[ -d "$dir" ]]; then
-      find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + >/dev/null 2>&1 || true
+      # Runs as the site user: the site tree is writable by PHP, so a planted
+      # symlink must not let root delete files outside the site.
+      runuser -u "$SIMAI_USER" -- find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + >/dev/null 2>&1 || true
       cleared=$((cleared + 1))
     else
       missing=$((missing + 1))

@@ -652,6 +652,16 @@ site_add_handler_impl() {
     error "Site ${domain} already exists. Use site info/update actions for the existing site instead of site add."
     return 1
   fi
+  if ! site_path_is_allowed_root "$path"; then
+    error "Project path ${path} is outside ${WWW_ROOT}, /var/www and /srv."
+    echo "Set SIMAI_ALLOW_EXTERNAL_SITE_PATH=1 to attach a project from another location on purpose."
+    return 1
+  fi
+  local slug_owner=""
+  if slug_owner=$(site_project_slug_in_use "$project"); then
+    error "Project slug ${project} is already used by ${slug_owner}. Pass a different --project-name."
+    return 1
+  fi
   local existing_site_state_dir
   existing_site_state_dir="$(site_sites_config_dir)/${domain}"
   if [[ -d "$existing_site_state_dir" && -n "$(find "$existing_site_state_dir" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then

@@ -300,7 +300,7 @@ self_bootstrap_handler() {
   parse_kv_args "$@"
   local php="${PARSED_ARGS[php]:-8.2}"
   local mysql="${PARSED_ARGS[mysql]:-mysql}"
-  local node="${PARSED_ARGS[node-version]:-20}"
+  local node="${PARSED_ARGS[node-version]:-22}"
   info "Repair Environment: installs/repairs base packages and may reload services; sites are not removed."
   progress_init 4
   progress_step "Running bootstrap (php=${php}, mysql=${mysql}, node=${node})"

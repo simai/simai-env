@@ -101,7 +101,12 @@ if [[ -z "$TARGET_SHA" && "${SIMAI_UPDATE_ALLOW_UNRESOLVED_REF:-no}" != "yes" ]]
   echo "Install git/network access or set SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes to allow a ref tarball fallback." >&2
   exit 1
 fi
-TARBALL_URL="$(update_tarball_url "$REF" "$REPO_HTTP_URL")"
+if [[ -n "$TARGET_SHA" ]]; then
+  # Download exactly the commit that was resolved (and logged) above.
+  TARBALL_URL="${REPO_HTTP_URL}/archive/${TARGET_SHA}.tar.gz"
+else
+  TARBALL_URL="${REPO_HTTP_URL}/archive/${REF}.tar.gz"
+fi
 
 PREV_VERSION="(unknown)"
 if [[ -f "${INSTALL_DIR}/VERSION" ]]; then
@@ -120,6 +125,10 @@ if [[ -d "$INSTALL_DIR" ]]; then
     exit 1
   fi
   echo "Pre-update backup created: ${BACKUP_ARCHIVE}"
+  # Keep the ten most recent pre-update backups.
+  find "$UPDATE_BACKUP_ROOT" -maxdepth 1 -type f -name 'simai-env-preupdate-*.tar.gz' -printf '%T@ %p\n' \
+    | sort -rn | awk 'NR > 10 {sub(/^[^ ]+ /, ""); print}' \
+    | while IFS= read -r old_backup; do rm -f -- "$old_backup"; done
 fi
 
 echo "Staging simai-env update (ref: ${REF}) for ${INSTALL_DIR}..."

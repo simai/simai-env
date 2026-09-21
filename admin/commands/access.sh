@@ -403,7 +403,10 @@ access_disable_handler() {
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
     access_disable_mount_unit "$login" || true
   fi
-  usermod -L "$login"
+  # -L only locks the password; an expired account is also refused for SSH
+  # keys by PAM account checks. Existing sessions are closed as well.
+  usermod -L -e 1 "$login" || { error "Failed to lock ${login}"; return 1; }
+  pkill -KILL -u "$login" 2>/dev/null || true
   local now
   now=$(date +"%Y-%m-%dT%H:%M:%S")
   access_write_metadata "$login" \
@@ -447,7 +450,7 @@ access_enable_handler() {
       return 1
     fi
   fi
-  usermod -U "$login"
+  usermod -U -e "" "$login"
   local now
   now=$(date +"%Y-%m-%dT%H:%M:%S")
   access_write_metadata "$login" \

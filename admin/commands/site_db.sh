@@ -283,6 +283,15 @@ site_db_rotate_handler() {
     error "Profile ${SITE_META[profile]:-} does not use DB; rotation blocked."
     return 1
   fi
+  case "${SITE_META[profile]:-}" in
+    bitrix|wordpress)
+      # These profiles keep DB credentials in PHP config files that db-rotate
+      # does not rewrite; rotating would take the site down immediately.
+      error "db-rotate does not update ${SITE_META[profile]} configuration files; rotation blocked."
+      echo "Change the password in MySQL and in the site's DB config together during a maintenance window."
+      return 1
+      ;;
+  esac
 
   local db_name="" db_user="" db_charset="utf8mb4" db_coll="utf8mb4_unicode_ci"
   if read_env=$(read_site_db_env "$domain"); then
@@ -334,15 +343,20 @@ site_db_rotate_handler() {
   echo "DB_PASS=updated (hidden)"
   read_site_metadata "$domain" || return 1
   local project_root="${SITE_META[root]:-}"
-  if [[ -n "$project_root" && -d "$project_root" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
-    local export_choice
+  if [[ -z "$project_root" || ! -d "$project_root" ]]; then
+    warn "Project root not found; update the application DB password manually."
+    return 0
+  fi
+  local export_choice="yes"
+  if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     export_choice=$(select_from_list "Update project .env with the new password?" "yes" "yes" "no")
-    if [[ "$export_choice" == "yes" ]]; then
-      if site_db_export_to_env "$domain" "$project_root" ".env"; then
-        echo "Project .env updated: ${project_root}/.env"
-      else
-        warn "Password rotated, but failed to update ${project_root}/.env"
-      fi
+  fi
+  if [[ "$export_choice" == "yes" ]]; then
+    if site_db_export_to_env "$domain" "$project_root" ".env"; then
+      echo "Project .env updated: ${project_root}/.env"
+    else
+      error "Password rotated, but failed to update ${project_root}/.env; the application cannot connect until it is updated."
+      return 1
     fi
   fi
 }

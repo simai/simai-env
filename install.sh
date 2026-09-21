@@ -98,7 +98,17 @@ install_repo_is_allowed() {
 
 install_resolve_ref_sha() {
   local ref="$1" repo_url="$2" sha=""
-  command -v git >/dev/null 2>&1 || return 1
+  if ! command -v git >/dev/null 2>&1; then
+    # Minimal images have no git before bootstrap; ask the GitHub API instead.
+    local slug="${repo_url#https://github.com/}" short="${ref#refs/heads/}"
+    short="${short#refs/tags/}"
+    [[ "$slug" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || return 1
+    command -v curl >/dev/null 2>&1 || return 1
+    sha=$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/${slug}/commits/${short}" 2>/dev/null || true)
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\n' "$sha"
+    return 0
+  fi
   sha=$(git ls-remote "$repo_url" "$ref" 2>/dev/null | awk 'NR==1{print $1}')
   if [[ -z "$sha" && "$ref" == refs/tags/* ]]; then
     sha=$(git ls-remote "$repo_url" "${ref}^{}" 2>/dev/null | awk 'NR==1{print $1}')
@@ -199,6 +209,11 @@ if ! install_repo_is_allowed "$REPO_HTTP_URL"; then
   exit 1
 fi
 TARGET_SHA="$(install_resolve_ref_sha "$REF" "$REPO_HTTP_URL" 2>/dev/null || true)"
+if [[ -z "$TARGET_SHA" && "${SIMAI_INSTALL_ALLOW_UNRESOLVED_REF:-no}" != "yes" ]]; then
+  echo "Could not resolve ${REF} to a commit SHA for ${REPO_HTTP_URL}" >&2
+  echo "Check network access to github.com or set SIMAI_INSTALL_ALLOW_UNRESOLVED_REF=yes to allow a ref tarball fallback." >&2
+  exit 1
+fi
 if [[ -n "$TARGET_SHA" ]]; then
   TARBALL_URL="${REPO_HTTP_URL}/archive/${TARGET_SHA}.tar.gz"
 else
@@ -236,7 +251,7 @@ MENU_LAUNCHED=0
 if install_bootstrap_enabled; then
   echo "[1/3] Running bootstrap (packages and services)..."
   export DEBIAN_FRONTEND=noninteractive
-  if ! "${INSTALL_DIR}/simai-env.sh" bootstrap --php 8.2 --mysql percona --node-version 20 --silent; then
+  if ! "${INSTALL_DIR}/simai-env.sh" bootstrap --php 8.2 --mysql percona --node-version 22 --silent; then
     echo "Bootstrap failed. Check /var/log/simai-env.log for details." >&2
     exit 1
   fi
@@ -244,7 +259,7 @@ if install_bootstrap_enabled; then
   echo "[3/3] Bootstrap finished."
 else
   echo "Bootstrap skipped (SIMAI_INSTALL_MODE=${MODE}, SIMAI_INSTALL_NO_BOOTSTRAP=${NO_BOOT})."
-  echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 20"
+  echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 22"
 fi
 
 if install_profile_init_enabled; then

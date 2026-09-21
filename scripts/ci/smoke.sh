@@ -132,7 +132,7 @@ grep -q 'php${ver}-redis' admin/lib/php_utils.sh || fail "php install helper mus
 # 10) Nginx templates must deny dotfiles except ACME challenges
 for tmpl in templates/nginx-*.conf; do
   [[ -f "$tmpl" ]] || continue
-  grep -q 'location ~ \^/\\\.(?!well-known/)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
+  grep -Fq 'location ~ /\.(?!well-known/)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
 done
 
 # 11) self-update supply-chain guardrails must stay wired

@@ -187,6 +187,42 @@ site_default_wildcard_domain() {
   echo "*.${domain}"
 }
 
+# Wildcard hostnames end up in server_name and in sed replacements, so only
+# "*.<valid-domain>" is accepted.
+site_validate_wildcard_domain() {
+  local value="$1"
+  if [[ "$value" != "*."* ]]; then
+    error "Wildcard domain must start with '*.': ${value}"
+    return 1
+  fi
+  validate_domain "${value#\*.}" allow
+}
+
+# A new site must not reuse the pool, cron or queue unit of another site:
+# different domains (a-b.com / a.b.com) can map to the same project slug.
+site_project_slug_in_use() {
+  local project="$1" pool
+  for pool in /etc/php/*/fpm/pool.d/"${project}".conf; do
+    [[ -e "$pool" ]] && { printf '%s\n' "$pool"; return 0; }
+  done
+  [[ -e "/etc/cron.d/${project}" ]] && { printf '%s\n' "/etc/cron.d/${project}"; return 0; }
+  return 1
+}
+
+# Site roots get chown -R to the site user, so they must stay inside the
+# managed web roots unless the operator opts out explicitly.
+site_path_is_allowed_root() {
+  local path normalized
+  path="$1"
+  [[ "${SIMAI_ALLOW_EXTERNAL_SITE_PATH:-0}" == "1" ]] && return 0
+  normalized=$(realpath -m "$path" 2>/dev/null || printf '%s' "$path")
+  local base
+  for base in "$WWW_ROOT" /var/www /srv; do
+    [[ -n "$base" && "$normalized" == "${base%/}/"?* ]] && return 0
+  done
+  return 1
+}
+
 site_best_effort_primary_ip() {
   local ip=""
   if command -v ip >/dev/null 2>&1; then
@@ -1094,6 +1130,9 @@ create_nginx_site() {
   if [[ "$host_mode" == "wildcard" && -z "$wildcard_domain" ]]; then
     wildcard_domain="$(site_default_wildcard_domain "$domain")"
   fi
+  if [[ "$host_mode" == "wildcard" ]] && ! site_validate_wildcard_domain "$wildcard_domain"; then
+    return 1
+  fi
   case "$template_path" in
     *nginx-laravel.conf) template_id="laravel" ;;
     *nginx-generic.conf) template_id="generic" ;;
@@ -1462,20 +1501,64 @@ remove_nginx_site() {
   [[ -z "$backup" ]] || rm -f -- "$backup"
 }
 
-ensure_nginx_catchall() {
-  local catchall_avail="/etc/nginx/sites-available/000-catchall.conf"
-  local catchall_enabled="/etc/nginx/sites-enabled/000-catchall.conf"
-  if [[ -f "$catchall_avail" && -L "$catchall_enabled" ]]; then
-    return
+nginx_supports_ssl_reject_handshake() {
+  local version
+  version=$(nginx -v 2>&1 | sed -n 's#.*nginx/\([0-9.]*\).*#\1#p')
+  [[ -n "$version" ]] || return 1
+  [[ "$(printf '%s\n%s\n' 1.19.4 "$version" | sort -V | head -n1)" == 1.19.4 ]]
+}
+
+nginx_catchall_ssl_directives() {
+  if nginx_supports_ssl_reject_handshake; then
+    printf '    ssl_reject_handshake on;\n'
+    return 0
   fi
-  cat >"$catchall_avail" <<'EOF'
+  # nginx < 1.19.4 (Ubuntu 22.04) needs a certificate to answer TLS at all.
+  local dir="/etc/nginx/simai-catchall"
+  if [[ ! -s "${dir}/cert.pem" || ! -s "${dir}/key.pem" ]]; then
+    install -d -m 0700 -o root -g root "$dir" || return 1
+    openssl req -x509 -nodes -newkey rsa:2048 -days 3650 -subj "/CN=invalid" \
+      -keyout "${dir}/key.pem" -out "${dir}/cert.pem" >>"$LOG_FILE" 2>&1 || return 1
+    chmod 0600 "${dir}/key.pem"
+  fi
+  printf '    ssl_certificate %s/cert.pem;\n    ssl_certificate_key %s/key.pem;\n' "$dir" "$dir"
+}
+
+nginx_catchall_http_block() {
+  cat <<'EOF'
 server {
     listen 80 default_server;
     server_name _;
     return 444;
 }
 EOF
+}
+
+# Unknown Host headers and bare-IP requests are dropped on both ports, so the
+# first TLS site is never served for a foreign or missing Host.
+ensure_nginx_catchall() {
+  local catchall_avail="/etc/nginx/sites-available/000-catchall.conf"
+  local catchall_enabled="/etc/nginx/sites-enabled/000-catchall.conf"
+  if [[ -f "$catchall_avail" && -L "$catchall_enabled" ]] && grep -q 'simai-catchall-v2' "$catchall_avail"; then
+    return 0
+  fi
+  local ssl_directives=""
+  ssl_directives=$(nginx_catchall_ssl_directives 2>/dev/null) || ssl_directives=""
+  {
+    if [[ -n "$ssl_directives" ]]; then
+      printf '# simai-catchall-v2\n'
+    fi
+    nginx_catchall_http_block
+    if [[ -n "$ssl_directives" ]]; then
+      printf '\nserver {\n    listen 443 ssl default_server;\n    server_name _;\n%s\n    return 444;\n}\n' "$ssl_directives"
+    fi
+  } >"$catchall_avail"
   ln -sf "$catchall_avail" "$catchall_enabled"
+  if [[ -n "$ssl_directives" ]] && command -v nginx >/dev/null 2>&1 && ! nginx -t >>"$LOG_FILE" 2>&1; then
+    warn "HTTPS catch-all was rejected by nginx -t; keeping the HTTP-only catch-all"
+    nginx_catchall_http_block >"$catchall_avail"
+  fi
+  return 0
 }
 
 remove_php_pools() {

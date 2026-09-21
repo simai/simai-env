@@ -94,9 +94,18 @@ update_resolve_ref_sha() {
   repo_url="$(update_repo_http_url "${2:-}")"
   [[ -n "$ref" ]] || ref="$(update_ref_default)"
 
-  command -v git >/dev/null 2>&1 || return 1
-
   local sha=""
+  if ! command -v git >/dev/null 2>&1; then
+    # Minimal images have no git before bootstrap; ask the GitHub API instead.
+    local slug="${repo_url#https://github.com/}" short="${ref#refs/heads/}"
+    short="${short#refs/tags/}"
+    [[ "$slug" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || return 1
+    command -v curl >/dev/null 2>&1 || return 1
+    sha=$(curl -fsSL -H 'Accept: application/vnd.github.sha' "https://api.github.com/repos/${slug}/commits/${short}" 2>/dev/null || true)
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\n' "$sha"
+    return 0
+  fi
   sha=$(git ls-remote "$repo_url" "$ref" 2>/dev/null | awk 'NR==1{print $1}')
   if [[ -z "$sha" && "$ref" == refs/tags/* ]]; then
     sha=$(git ls-remote "$repo_url" "${ref}^{}" 2>/dev/null | awk 'NR==1{print $1}')

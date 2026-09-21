@@ -23,7 +23,38 @@
 - `ensure_user` no longer hands `/home` to the site user and restores
   `root:root 0755` on servers affected by earlier releases.
 
+- Nginx templates deny hidden files at any depth and `*.sql`, `*.log`, `*.bak`
+  style dumps; WordPress no longer executes PHP from `wp-content/uploads`;
+  Bitrix denies `/bitrix/backup`, `/bitrix/*_cache`, `/bitrix/tmp`,
+  `/local/php_interface` and `/local/logs`.
+- The catch-all now also answers port 443 (`ssl_reject_handshake` on nginx
+  1.19.4+, a self-signed certificate on Ubuntu 22.04), so unknown Host headers
+  never reach the first TLS site. It is upgraded on the next site change.
+- `site add` refuses project slugs already used by another site's PHP pool or
+  cron file, validates `--wildcard-domain`, and keeps project paths inside
+  `WWW_ROOT`, `/var/www` or `/srv` unless `SIMAI_ALLOW_EXTERNAL_SITE_PATH=1`.
+- `access disable` expires the account and closes sessions, so SSH keys stop
+  working too; `access enable` clears the expiry.
+- `cron add --user` only accepts the site user or regular users;
+  `bitrix cache-clear` deletes as the site user.
+- Node.js comes from the NodeSource apt repository with a fingerprint-pinned
+  key instead of a piped setup script; `--node-version` is validated.
+- Installer and updater resolve the target commit through the GitHub API when
+  git is missing; `install.sh` refuses unresolved refs unless
+  `SIMAI_INSTALL_ALLOW_UNRESOLVED_REF=yes`; `update.sh` downloads exactly the
+  resolved commit.
+
+### Changed
+- Default Node.js major version is 22 (Node 20 is end-of-life).
+- `site db-rotate` updates the project `.env` in CLI mode too and is blocked
+  for Bitrix and WordPress, whose PHP config files it does not rewrite.
+- Let's Encrypt certificates always use the domain as the certbot lineage name.
+- simai logs rotate weekly via `/etc/logrotate.d/simai-env`; pre-update
+  backups keep the ten most recent archives.
+
 ### Fixed
+- `/etc/simai-env.conf` is replaced atomically and no longer gains a blank line
+  on every write.
 - Generated database passwords are 32 characters again; the previous
   generator produced 4–10 characters.
 - `backup export` fails and removes the partial archive when staging, manifest

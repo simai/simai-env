@@ -476,6 +476,30 @@ ensure_audit_log() {
   touch "$AUDIT_LOG_FILE"
   chmod 640 "$AUDIT_LOG_FILE" 2>/dev/null || true
   chown root:root "$AUDIT_LOG_FILE" 2>/dev/null || true
+  [[ -f "$LOG_FILE" ]] && chmod 640 "$LOG_FILE" 2>/dev/null
+  ensure_simai_logrotate
+  return 0
+}
+
+# simai logs grow forever otherwise; they can hold paths and site names, so
+# rotated files keep 0640 root-only permissions.
+ensure_simai_logrotate() {
+  local conf="/etc/logrotate.d/simai-env"
+  [[ -d /etc/logrotate.d ]] || return 0
+  grep -qs 'simai-logrotate-v1' "$conf" && return 0
+  cat >"$conf" <<'EOF' || return 0
+# simai-logrotate-v1 (managed by simai-env)
+/var/log/simai-admin.log /var/log/simai-audit.log /var/log/simai-env.log /var/log/simai-scheduler.log {
+    weekly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
+EOF
+  chmod 0644 "$conf"
 }
 
 redact_by_key() {
