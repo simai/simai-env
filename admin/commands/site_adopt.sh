@@ -125,6 +125,10 @@ site_adopt_handler() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y "php${php}-pgsql" >>"$LOG_FILE" 2>&1 || true
   fi
 
+  if [[ "$create_db" == yes || "$reconcile" == yes ]] && [[ -n "$engine" ]]; then
+    db_engine_ensure_php_driver "$engine" "$php" || return 1
+  fi
+
   # 2. .env from the application's own template, never overwritten.
   if [[ ! -e "${path}/.env" && -f "${path}/.env.example" && ! -L "${path}/.env.example" ]]; then
     dd if="${path}/.env.example" of="${path}/.env" iflag=nofollow status=none 2>/dev/null || { error "Cannot copy .env.example"; return 1; }

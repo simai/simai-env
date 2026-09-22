@@ -94,6 +94,22 @@ site_resolve_db_engine() {
   return 1
 }
 
+# The site's PHP version needs the PDO driver of its database engine; PHP
+# versions installed after the database server do not get it automatically.
+db_engine_ensure_php_driver() {
+  local engine="$1" php_version="$2" ext pkg
+  [[ -n "$php_version" && "$php_version" != none ]] || return 0
+  command -v "php${php_version}" >/dev/null 2>&1 || return 0
+  if [[ "$engine" == pgsql ]]; then ext=pdo_pgsql pkg="php${php_version}-pgsql"; else ext=pdo_mysql pkg="php${php_version}-mysql"; fi
+  "php${php_version}" -m 2>/dev/null | grep -qx "$ext" && return 0
+  info "Installing ${pkg} for the site's database driver"
+  DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$LOG_FILE" 2>&1 || {
+    error "Could not install ${pkg}"
+    return 1
+  }
+  os_svc_reload_or_restart "php${php_version}-fpm" >/dev/null 2>&1 || true
+}
+
 db_engine_default_port() {
   [[ "$1" == pgsql ]] && echo 5432 || echo 3306
 }

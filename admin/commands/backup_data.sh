@@ -76,6 +76,15 @@ backup_data_archive_files() {
   while IFS= read -r pattern; do
     excludes+=("--exclude=${pattern}")
   done < <(backup_data_file_excludes "$profile")
+  # Release layout: keep only the release that is live.
+  if [[ -L "${root}/current" && -d "${root}/releases" ]]; then
+    local live release
+    live=$(basename "$(readlink "${root}/current")")
+    for release in "${root}"/releases/*/; do
+      release=$(basename "$release")
+      [[ "$release" == "$live" ]] || excludes+=("--exclude=./releases/${release}")
+    done
+  fi
   local rc=0
   tar -czf "$out" --warning=no-file-changed --warning=no-file-removed "${excludes[@]}" -C "$root" . 2>>"$LOG_FILE" || rc=$?
   # GNU tar exits 1 when files changed while being read on a live site.

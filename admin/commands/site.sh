@@ -1009,6 +1009,7 @@ site_add_handler_impl() {
       error "PostgreSQL is not installed. Install it first: simai-admin.sh db pgsql-install --confirm yes"
       return 1
     fi
+    db_engine_ensure_php_driver "$SITE_DB_ENGINE" "$php_version" || return 1
   fi
   ensure_user
   if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
