@@ -91,6 +91,13 @@ def main() -> int:
         if not isinstance(php, str) or not PHP_VERSION.fullmatch(php):
             fail("php must look like 8.4 or 8.4.1")
         emit("php_min", php)
+    extra_exts = manifest.get("php_extensions", [])
+    if not isinstance(extra_exts, list):
+        fail("php_extensions must be a list")
+    for ext in extra_exts:
+        if not isinstance(ext, str) or not re.fullmatch(r"[a-z0-9_]{1,40}", ext):
+            fail(f"invalid php extension {ext!r}")
+        emit("php_ext", ext)
     for key in sorted(require):
         if key.startswith("ext-"):
             ext = key[4:].lower()

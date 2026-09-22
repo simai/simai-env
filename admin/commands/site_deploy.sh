@@ -134,6 +134,8 @@ site_deploy_handler() {
   local domain="${PARSED_ARGS[domain]:-}" git_url="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}"
   local archive="${PARSED_ARGS[archive]:-}" sha256="${PARSED_ARGS[sha256]:-}" from="${PARSED_ARGS[from]:-}"
   local migrate="${PARSED_ARGS[migrate]:-}" keep="${PARSED_ARGS[keep]:-5}" confirm="${PARSED_ARGS[confirm]:-no}"
+  local build="${PARSED_ARGS[build]:-auto}"
+  [[ "$build" =~ ^(auto|yes|no)$ ]] || { error "--build must be auto, yes or no"; return 1; }
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
@@ -171,7 +173,7 @@ site_deploy_handler() {
     echo "Deploy plan for ${domain}:"
     deploy_layout_active "$root" || echo "  - first deploy: move the current code to releases/${release_id}-initial and serve ${root}/current"
     echo "  - fetch $([[ -n $git_url ]] && echo "${git_url} @ ${ref}" || [[ -n $archive ]] && echo "archive ${archive}" || echo "directory ${from}") into releases/<new> as ${user}"
-    echo "  - link shared .env and storage; composer install --no-dev; artisan package:discover"
+    echo "  - link shared .env and storage; composer install --no-dev unless the release ships vendor/ (--build ${build}); artisan package:discover"
     echo "  - migrate: ${migrate:-from .simai/app.json (default no)}"
     echo "  - switch current atomically, reload php${php}-fpm, artisan queue:restart; keep ${keep} releases"
     echo "Rerun with --confirm yes to apply."
@@ -227,11 +229,18 @@ site_deploy_handler() {
     mapfile -t missing < <(app_missing_packages "${APP_PACKAGES[@]}"; app_php_ext_packages "$php" "${APP_PHP_EXTS[@]}")
     [[ ${#missing[@]} -eq 0 ]] || failed="missing requirements: ${missing[*]} (run site adopt --domain ${domain} --confirm yes)"
   fi
+  # Prebuilt artifacts (vendor included, e.g. from a monorepo with path
+  # repositories) skip composer; --build yes forces it, --build no skips it.
+  if [[ "$build" == auto ]]; then
+    [[ -f "${release}/composer.json" && ! -f "${release}/vendor/autoload.php" ]] && build=yes || build=no
+  fi
   if [[ -z "$failed" && -f "${release}/composer.json" ]]; then
-    info "Building release as ${user}"
     find "${release}/bootstrap/cache" -maxdepth 1 -type f -name '*.php' -delete 2>/dev/null || true
-    deploy_run_as "$user" "$release" "$php_bin" "$(command -v composer)" install --no-dev --prefer-dist --no-interaction \
-      --no-scripts --optimize-autoloader >>"$LOG_FILE" 2>&1 || failed="composer install"
+    if [[ "$build" == yes ]]; then
+      info "Building release as ${user}"
+      deploy_run_as "$user" "$release" "$php_bin" "$(command -v composer)" install --no-dev --prefer-dist --no-interaction \
+        --no-scripts --optimize-autoloader >>"$LOG_FILE" 2>&1 || failed="composer install"
+    fi
     if [[ -z "$failed" && -f "${release}/artisan" ]]; then
       deploy_run_as "$user" "$release" "$php_bin" artisan package:discover >>"$LOG_FILE" 2>&1 || failed="package:discover"
     fi
@@ -307,6 +316,6 @@ site_deploy_status_handler() {
   ui_result_table "Domain|${domain}" "Source|$(deploy_state_get "$domain" SOURCE)" "Deployed at|$(deploy_state_get "$domain" DEPLOYED_AT)" "${rows[@]}"
 }
 
-register_cmd "site" "deploy" "Deploy a release (git ref, archive or directory) with atomic switch" "site_deploy_handler" "domain" "git= ref= archive= sha256= from= migrate= keep= confirm=" "tier:advanced"
+register_cmd "site" "deploy" "Deploy a release (git ref, archive or directory) with atomic switch" "site_deploy_handler" "domain" "git= ref= archive= sha256= from= migrate= keep= build= confirm=" "tier:advanced"
 register_cmd "site" "deploy-rollback" "Switch back to a previous release (code only)" "site_deploy_rollback_handler" "domain" "release= confirm=" "tier:advanced"
 register_cmd "site" "deploy-status" "Show releases of a site" "site_deploy_status_handler" "domain" "" "tier:advanced"

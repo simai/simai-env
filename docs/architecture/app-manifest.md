@@ -17,6 +17,7 @@ bound comes from `require.php` and PHP extensions from `ext-*` entries in
 | `php` | `"8.4"` or `"8.4.1"` | minimum PHP; overrides `composer.json` |
 | `db.engine` | `mysql` \| `pgsql` | database engine (profile must allow it) |
 | `db.version` | `"17"` | PostgreSQL major to install when missing (non-Ubuntu versions need `--pgdg yes`) |
+| `php_extensions` | list | PHP extensions not declared as `ext-*` in `composer.json` (`redis`, `pgsql`) |
 | `packages` | list | apt packages the application calls (`age`, `util-linux`, ...) |
 | `executables` | list | absolute paths that must exist after packages are installed |
 | `env` | object | non-secret production values: they override `.env.example` when adopt creates `.env`; later runs only fill keys that are still unset |
@@ -50,3 +51,12 @@ Laravel requires `--timeout` < `retry_after` of the queue connection, and
 the worker's `stop_timeout` should exceed the longest job so a stop during
 deploy does not kill it. Deploys use `artisan queue:restart`: workers finish
 their current job, exit and systemd starts them on the new release.
+
+## Monorepos and prebuilt artifacts
+
+When `composer.json` uses path repositories (`../../packages/...`) or the
+frontend must be built with Node, build a release artifact where the whole
+repository is available: `composer install --no-dev` and the asset build,
+then archive the application directory including `vendor/` and
+`public/build/`. `site adopt` and `site deploy` skip `composer install` when
+`vendor/autoload.php` is already present (`--build auto`, the default).
