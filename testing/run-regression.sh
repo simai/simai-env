@@ -40,9 +40,22 @@ _wp_db_name=""
 _wp_db_user=""
 _bitrix_db_name=""
 _bitrix_db_user=""
+_feat_domain=""
+_feat_db_name=""
+_feat_db_user=""
+_iso_domain=""
+_feat_owner=""
+
+# One multiplexed connection for the whole run: fewer handshakes, and no
+# burst of logins for fail2ban to throttle.
+SSH_CONTROL_PATH="/tmp/simai-rg-%C"  # unix socket paths are limited to ~104 bytes
+SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15
+  -o ControlMaster=auto -o "ControlPath=${SSH_CONTROL_PATH}" -o ControlPersist=120)
+# Interactive menu probes need their own TTY session, not the shared one.
+SSH_TTY_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ControlPath=none)
 
 remote() {
-  ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" "$@"
+  ssh "${SSH_OPTS[@]}" "$SSH_TARGET" "$@"
 }
 
 run_cmd() {
@@ -69,7 +82,7 @@ run_menu_case() {
   echo "[run] ${title}"
   local output=""
   output=$(
-    ssh -tt -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+    ssh -tt "${SSH_TTY_OPTS[@]}" "$SSH_TARGET" \
       "cd '${SIMAI_ROOT}' && SIMAI_MENU_BACKEND=text timeout 45 ./simai-admin.sh menu" \
       <<<"$payload" 2>&1 || true
   )
@@ -112,6 +125,13 @@ cleanup() {
   cleanup_one "${_test_domain:-}" "${_test_db_name:-}" "${_test_db_user:-}" || failed=1
   cleanup_one "${_wp_test_domain:-}" "${_wp_db_name:-}" "${_wp_db_user:-}" || failed=1
   cleanup_one "${_bitrix_test_domain:-}" "${_bitrix_db_name:-}" "${_bitrix_db_user:-}" || failed=1
+  cleanup_one "${_feat_domain:-}" "${_feat_db_name:-}" "${_feat_db_user:-}" || failed=1
+  cleanup_one "${_iso_domain:-}" || failed=1
+  if [[ -n "${_feat_owner:-}" ]]; then
+    echo "[cleanup] owner ${_feat_owner}"
+    remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh owner remove --name '${_feat_owner}' --confirm yes >/dev/null 2>&1 || true; rm -rf /root/simai-regression-backups" || failed=1
+    remote "! id '${_feat_owner}' >/dev/null 2>&1" || { echo "[fail] owner ${_feat_owner} remains" >&2; failed=1; }
+  fi
   return "$failed"
 }
 
@@ -194,7 +214,7 @@ run_backend() {
   echo "[run] backend whiptail probe"
   local output=""
   output=$(
-    ssh -tt -o BatchMode=yes -o StrictHostKeyChecking=accept-new "$SSH_TARGET" \
+    ssh -tt "${SSH_TTY_OPTS[@]}" "$SSH_TARGET" \
       "cd '${SIMAI_ROOT}' && SIMAI_MENU_BACKEND=whiptail timeout 8 ./simai-admin.sh menu" \
       <<<"" 2>&1 || true
   )
@@ -249,6 +269,34 @@ run_negative() {
   fi
 }
 
+# Site isolation, owners, data backups and host migrations.
+run_features() {
+  [[ "${ALLOW_DESTRUCTIVE_TESTS:-no}" == "yes" ]] || { echo "Set ALLOW_DESTRUCTIVE_TESTS=yes for feature tests" >&2; exit 1; }
+  [[ "${AUTO_CLEANUP_TEST_SITES:-no}" == "yes" ]] || { echo "Set AUTO_CLEANUP_TEST_SITES=yes for feature tests" >&2; exit 1; }
+  local suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}" stamp
+  stamp="$(date +%y%m%d-%H%M%S)"
+  _feat_owner="rt-${stamp}"
+  _feat_domain="t-feat-${stamp}${suffix}"
+  _iso_domain="t-iso-${stamp}${suffix}"
+  local feat_project="${_feat_domain//./-}" iso_project="${_iso_domain//./-}"
+
+  run_cmd "owner create" "./simai-admin.sh owner create --name '${_feat_owner}' >/dev/null"
+  run_cmd "site add (generic + db, owner)" "./simai-admin.sh site add --domain '${_feat_domain}' --profile generic --php 8.2 --db yes --owner '${_feat_owner}' >/dev/null"
+  read -r _feat_db_name _feat_db_user < <(capture_db_identity "${_feat_domain}")
+  run_cmd "owner site pool runs as owner" "grep -q '^user = ${_feat_owner}\$' /etc/php/8.2/fpm/pool.d/${feat_project}.conf"
+  run_cmd "site info shows owner" "./simai-admin.sh site info --domain '${_feat_domain}' 2>&1 | grep -A1 'Runs as' | grep -q '${_feat_owner}'"
+  run_cmd "site add (isolated, no owner)" "./simai-admin.sh site add --domain '${_iso_domain}' --profile generic --php 8.2 --db no >/dev/null"
+  run_cmd "isolated site has own user" "grep -q '^user = site-' /etc/php/8.2/fpm/pool.d/${iso_project}.conf && test \"\$(stat -c %a /home/simai/www/${_iso_domain})\" = 750"
+  run_cmd "sites of different users cannot read each other" "! sudo -u '${_feat_owner}' cat /home/simai/www/${_iso_domain}/public/index.php >/dev/null 2>&1"
+  run_cmd "backup data" "./simai-admin.sh backup data --domain '${_feat_domain}' --keep 1 --dest /root/simai-regression-backups >/dev/null"
+  run_cmd "backup data-verify with restore test" "./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_feat_domain}/2* | tail -1)\" --restore-test yes >/dev/null"
+  run_cmd_expect_fail "owner remove while it runs sites" "./simai-admin.sh owner remove --name '${_feat_owner}' --confirm yes"
+  run_cmd "self migrate is idempotent" "./simai-admin.sh self migrate >/tmp/simai-regression-migrate.log 2>&1 && grep -q 'nothing to migrate' /tmp/simai-regression-migrate.log"
+  run_cmd "catch-all rejects unknown host on 443" "! curl -sk --resolve regression-unknown.invalid:443:127.0.0.1 https://regression-unknown.invalid/ -o /dev/null --max-time 5"
+  run_cmd "site remove deletes the per-site user" "./simai-admin.sh site remove --domain '${_iso_domain}' --remove-files yes --confirm yes >/dev/null && ! getent passwd 'site-${iso_project}' >/dev/null"
+  _iso_domain=""
+}
+
 case "$MODE" in
   smoke)
     run_smoke
@@ -266,15 +314,19 @@ case "$MODE" in
   negative)
     run_negative
     ;;
+  features)
+    run_features
+    ;;
   full)
     run_smoke
     run_core
     run_menu
     run_backend
     run_negative
+    run_features
     ;;
   *)
-    echo "Usage: testing/run-regression.sh [smoke|core|menu|backend|negative|full]" >&2
+    echo "Usage: testing/run-regression.sh [smoke|core|menu|backend|negative|features|full]" >&2
     exit 1
     ;;
 esac

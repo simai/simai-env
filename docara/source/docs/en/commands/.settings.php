@@ -13,6 +13,7 @@ return array (
     'db' => 'Db',
     'laravel' => 'Laravel',
     'logs' => 'Logs',
+    'owner' => 'Owner',
     'php' => 'Php',
     'profile' => 'Profile',
     'queue' => 'Queue',

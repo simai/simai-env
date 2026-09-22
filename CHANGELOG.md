@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.13.0 - 2026-09-22
+
 ### Added
 - Owners (`owner create|add-key|list|remove`): accounts that run several sites,
   like users in hosting panels. `site add --owner` and
@@ -66,6 +68,9 @@
   resolved commit.
 
 ### Changed
+- `testing/run-regression.sh` has a `features` mode (owners, isolation, data
+  backups, host migrations, 443 catch-all) that `full` includes, and reuses
+  one SSH connection for the whole run.
 - Default Node.js major version is 22 (Node 20 is end-of-life).
 - `site db-rotate` updates the project `.env` in CLI mode too and is blocked
   for Bitrix and WordPress, whose PHP config files it does not rewrite.
