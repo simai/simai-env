@@ -963,7 +963,11 @@ create_queue_unit() {
   mv "$tmp" "$unit"
   os_svc_daemon_reload || true
 
-  if laravel_queue_has_real_app "$project_root"; then
+  if [[ "${SIMAI_DEFER_WORKER_START:-0}" == "1" ]]; then
+    # The caller (site adopt) starts workers once the application is configured.
+    info "Created queue unit ${unit_name}; start deferred until the application is configured"
+    QUEUE_UNIT_RESULT="created/deferred"
+  elif laravel_queue_has_real_app "$project_root"; then
     if os_svc_enable_now "$unit_name"; then
       info "Created and started queue unit ${unit_name}"
       QUEUE_UNIT_RESULT="created/started"

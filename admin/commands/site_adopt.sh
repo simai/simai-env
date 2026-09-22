@@ -142,7 +142,7 @@ site_adopt_handler() {
     local -a add_args=(--domain "$domain" --path "$path" --profile "$profile" --php "$php" --create-db "$create_db")
     [[ "$create_db" == yes ]] && add_args+=(--db-engine "$engine" --db-export yes)
     [[ -n "$owner" ]] && add_args+=(--owner "$owner")
-    SIMAI_ADMIN_MENU=0 run_command site add "${add_args[@]}" || { error "site add failed; nothing adopted"; return 1; }
+    SIMAI_ADMIN_MENU=0 SIMAI_DEFER_WORKER_START=1 run_command site add "${add_args[@]}" || { error "site add failed; nothing adopted"; return 1; }
     read_site_metadata "$domain" || return 1
   fi
   site_apply_user_context --domain "$domain"
@@ -193,6 +193,11 @@ site_adopt_handler() {
   # 6. Background processes declared by the application.
   if [[ ${#APP_WORKERS[@]} -gt 0 ]]; then
     app_write_workers "$project" "$path" "$php" yes || return 1
+  else
+    local unit
+    for unit in $(app_project_worker_units "$project"); do
+      os_svc_enable_now "$unit" >/dev/null 2>&1 || warn "Worker ${unit} did not start"
+    done
   fi
   if [[ "${APP_SCHEDULER:-}" == no ]]; then
     remove_cron_file "$project" >/dev/null 2>&1 || true

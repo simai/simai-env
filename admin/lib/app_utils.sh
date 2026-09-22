@@ -84,7 +84,7 @@ app_write_workers() {
   php_bin=$(resolve_php_bin "$php_version")
   user=$(site_effective_user "$project")
   group=$(site_effective_group "$project")
-  local -A wanted=()
+  local -A wanted=() changed=()
   local spec name args stop count i unit tmp
   for spec in "${APP_WORKERS[@]}"; do
     IFS='|' read -r name args stop count <<<"$spec"
@@ -99,6 +99,7 @@ app_write_workers() {
           s/\{\{ARGS\}\}/$ENV{ARGS}/g; s/\{\{STOP_TIMEOUT\}\}/$ENV{STOP_TIMEOUT}/g;
           s/\{\{USER\}\}/$ENV{USER_NAME}/g; s/\{\{GROUP\}\}/$ENV{GROUP_NAME}/g' "$template" >"$tmp"
       chmod 0644 "$tmp"
+      cmp -s "$tmp" "/etc/systemd/system/${unit}" || changed["$unit"]=1
       mv -f "$tmp" "/etc/systemd/system/${unit}"
     done
   done
@@ -111,7 +112,14 @@ app_write_workers() {
   os_svc_daemon_reload || true
   if [[ "$start" == yes ]]; then
     for unit in "${!wanted[@]}"; do
-      os_svc_enable_now "$unit" >/dev/null 2>&1 || warn "Worker ${unit} did not start; see: journalctl -u ${unit}"
+      if [[ -n "${changed[$unit]:-}" ]] && systemctl is-active --quiet "$unit"; then
+        # New definition for a running worker. --no-block: the stop waits for
+        # the current job (TimeoutStopSec may be days), not for this command.
+        systemctl restart --no-block "$unit" >/dev/null 2>&1 || warn "Restart ${unit} manually"
+        systemctl enable "$unit" >/dev/null 2>&1 || true
+      else
+        os_svc_enable_now "$unit" >/dev/null 2>&1 || warn "Worker ${unit} did not start; see: journalctl -u ${unit}"
+      fi
     done
   fi
 }

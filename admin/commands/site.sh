@@ -1167,8 +1167,15 @@ site_add_handler_impl() {
     if [[ -n "$db_pass" ]]; then
       DB_CREDS_PASS="$db_pass"
     fi
-    mysql_root_detect_cli || return 1
-    if db_exists "$DB_CREDS_NAME" || db_user_exists "$DB_CREDS_USER"; then
+    local db_taken=no
+    if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
+      pgsql_require || return 1
+      { pgsql_db_exists "$DB_CREDS_NAME" || pgsql_role_exists "$DB_CREDS_USER"; } && db_taken=yes
+    else
+      mysql_root_detect_cli || return 1
+      { db_exists "$DB_CREDS_NAME" || db_user_exists "$DB_CREDS_USER"; } && db_taken=yes
+    fi
+    if [[ "$db_taken" == yes ]]; then
       error "Database or database user already exists; refusing to modify resources not owned by this site creation"
       return 1
     fi
