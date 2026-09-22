@@ -90,7 +90,7 @@ site_adopt_handler() {
     echo "  database     : $([[ $create_db == yes ]] && echo "${engine}${APP_DB_VERSION:+ ${APP_DB_VERSION}}" || echo none)"
     echo "  runs as      : ${owner:-own site user}"
     echo "  .env         : $([[ -f ${path}/.env ]] && echo "keep existing" || echo "create from .env.example"); APP_KEY kept or generated once"
-    [[ ${#APP_ENV[@]} -gt 0 ]] && echo "  env defaults : ${APP_ENV[*]%%=*} (only where not set)"
+    [[ ${#APP_ENV[@]} -gt 0 ]] && echo "  manifest env : ${APP_ENV[*]%%=*} ($([[ -f ${path}/.env ]] && echo "only where not set" || echo "over .env.example values"))"
     echo "  build        : $([[ $build == yes ]] && echo "composer install --no-dev" || echo skip)"
     echo "  migrate      : ${migrate}"
     echo "  workers      : $([[ ${#APP_WORKERS[@]} -gt 0 ]] && printf '%s ' "${APP_WORKERS[@]%%|*}" || echo "profile default")"
@@ -130,9 +130,11 @@ site_adopt_handler() {
   fi
 
   # 2. .env from the application's own template, never overwritten.
+  local env_created=no
   if [[ ! -e "${path}/.env" && -f "${path}/.env.example" && ! -L "${path}/.env.example" ]]; then
     dd if="${path}/.env.example" of="${path}/.env" iflag=nofollow status=none 2>/dev/null || { error "Cannot copy .env.example"; return 1; }
     chmod 0640 "${path}/.env"
+    env_created=yes
   fi
 
   # 3. Site resources (nginx, PHP-FPM, user, database) without scaffolding.
@@ -147,10 +149,14 @@ site_adopt_handler() {
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}" run_user
   run_user=$(site_effective_user "$project")
 
-  # 4. Application env defaults (only keys that are not set yet).
+  # 4. Manifest env: the production contract. It overrides values copied from
+  # .env.example just now; later runs only fill keys that are still unset so
+  # changes made on the server survive.
   local pair
   for pair in "${APP_ENV[@]}"; do
-    adopt_env_is_empty "${path}/.env" "${pair%%=*}" && env_set_kv "${path}/.env" "${pair%%=*}" "${pair#*=}"
+    if [[ "$env_created" == yes ]] || adopt_env_is_empty "${path}/.env" "${pair%%=*}"; then
+      env_set_kv "${path}/.env" "${pair%%=*}" "${pair#*=}"
+    fi
   done
   chown "${run_user}:$(site_effective_group "$project")" "${path}/.env" 2>/dev/null || true
 
@@ -192,6 +198,13 @@ site_adopt_handler() {
     remove_cron_file "$project" >/dev/null 2>&1 || true
   elif [[ "${APP_SCHEDULER:-}" == yes && ! -f "$(cron_site_file_path "$project")" ]]; then
     cron_site_write "$domain" "$project" "$profile" "$path" "$php"
+  fi
+
+  if [[ ${#APP_FRAME_ANCESTORS[@]} -gt 0 ]]; then
+    local origins
+    origins=$(IFS=,; echo "${APP_FRAME_ANCESTORS[*]}")
+    SIMAI_ADMIN_MENU=0 run_command site frame-policy --domain "$domain" --mode "origins:${origins}" --confirm yes >/dev/null \
+      || warn "Frame policy from the manifest could not be applied"
   fi
 
   # 7. Record what was adopted.

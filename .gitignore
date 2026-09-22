@@ -20,3 +20,4 @@ source/
 
 # SIMAI project memory runtime logs
 source/logs/
+__pycache__/

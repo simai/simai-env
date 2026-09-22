@@ -72,3 +72,20 @@ Notes:
 
 ## Legacy db commands
 Legacy commands (`db create/drop/set-pass`) remain for backward compatibility but are deprecated. Prefer the site-scoped commands (`site db-create/db-drop/db-rotate/db-export`) which handle profile defaults, safe storage, and better confirmations.
+
+
+## PostgreSQL
+
+```bash
+sudo /root/simai-env/simai-admin.sh db pgsql-install --confirm yes                   # Ubuntu version (14 on 22.04, 16 on 24.04)
+sudo /root/simai-env/simai-admin.sh db pgsql-install --version 17 --pgdg yes --confirm yes
+sudo /root/simai-env/simai-admin.sh db pgsql-status
+sudo /root/simai-env/simai-admin.sh site add --domain D --profile laravel --create-db yes --db-engine pgsql
+```
+
+Versions outside the Ubuntu repository come from the PGDG repository with a
+fingerprint-pinned key (`signed-by`). The server listens on localhost. Each
+site gets a role that owns only its database; `PUBLIC` cannot connect to it.
+`db.env` records `DB_ENGINE`, and `site db-*`, `backup data` (`pg_dump`),
+doctor and the healthcheck follow the engine. Names starting with `pg_` are
+reserved by PostgreSQL and are prefixed with `site_` automatically.

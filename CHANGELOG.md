@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Added
+- PostgreSQL as a site database engine: `db pgsql-install` (Ubuntu or signed
+  PGDG), `site add --db-engine pgsql` for generic and Laravel sites, and
+  engine-aware `site db-*`, doctor, healthcheck and `backup data` (`pg_dump`).
+  Site roles own only their database; `PUBLIC` cannot connect.
+- Application manifest `.simai/app.json` (schema `simai-app/1`) plus
+  `composer.json` requirements: PHP version, extensions, OS packages,
+  executables, database engine, env values, scheduler, migrations, workers,
+  frame ancestors. Validated by `lib/app_manifest.py`.
+- `site adopt` attaches an existing application without scaffolding and
+  reconciles it on later runs; `site deploy`, `deploy-rollback`,
+  `deploy-status` provide release deployments with an atomic switch,
+  migrations before the switch and graceful `queue:restart`.
+- Workers declared by the application get their own systemd units with stop
+  timeouts, instance counts, `NoNewPrivileges` and `PrivateTmp`.
+- `site frame-policy --mode origins:<list>` sends
+  `frame-ancestors 'self' <origins>` instead of allowing every site.
+- AI-first discovery: `self describe`, `site describe`, `self commands` print
+  JSON without secrets; `AGENTS.md` is the agent guide and `self migrate`
+  links it as `/root/AGENTS.md`.
+
+### Fixed
+- Laravel env preparation no longer forces `DB_CONNECTION=mysql` or resets an
+  application's cache, session and queue drivers.
+- Sites get the PHP PDO driver of their database engine for their PHP
+  version, including PHP versions installed after the database server.
+- `site remove` cleans `app.env` and `deploy.env` site state.
+- The healthcheck no longer returns database driver error text.
+
 ## 1.13.0 - 2026-09-22
 
 ### Added

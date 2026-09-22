@@ -434,3 +434,16 @@ sudo /root/simai-env/simai-admin.sh self perf-apply --preset small --confirm yes
 - The regular `System` menu intentionally shows simple labels such as `Platform status`, `Optimization status`, `Optimization plan`, and `Automatic optimization`.
 - Scheduler internals and `Health review` remain in Advanced mode.
 - Shared scheduler config lives in `/etc/simai-env.conf`, but ordinary users usually do not need to edit it manually.
+
+
+## describe / commands
+Machine-readable discovery for operators and AI agents (JSON on stdout, no
+secrets):
+
+```bash
+sudo /root/simai-env/simai-admin.sh self describe
+sudo /root/simai-env/simai-admin.sh self commands
+```
+
+`self migrate` links `/root/AGENTS.md` to the agent guide shipped with
+simai-env unless that file already exists.

@@ -548,6 +548,40 @@ test_site_isolation_contracts() {
     || fail "global SFTP ACL grants the shared user on every site"
 }
 
+test_app_manifest_contracts() {
+  local tmp parser="${ROOT_DIR}/lib/app_manifest.py"
+  tmp=$(mktemp -d)
+  mkdir -p "${tmp}/ok/.simai" "${tmp}/bad/.simai"
+  printf '%s\n' '{"require": {"php": "^8.4.1", "ext-pdo_pgsql": "*", "ext-pcntl": "*"}}' >"${tmp}/ok/composer.json"
+  printf '%s\n' '{"schema":"simai-app/1","db":{"engine":"pgsql"},"packages":["age"],"env":{"QUEUE_CONNECTION":"database"},"workers":[{"name":"default","command":"queue:work database --timeout=90","stop_timeout":100}],"frame_ancestors":["https://*.bitrix24.ru"]}' >"${tmp}/ok/.simai/app.json"
+  local out
+  out=$(python3 "$parser" "${tmp}/ok") || fail "valid manifest rejected"
+  grep -q $'^php_min\t8.4.1$' <<<"$out" || fail "php lower bound not read from composer.json"
+  grep -q $'^php_ext\tpdo_pgsql$' <<<"$out" || fail "ext-* requirements not read from composer.json"
+  grep -q $'^worker\tdefault\tqueue:work database --timeout=90\t100\t1$' <<<"$out" || fail "worker record missing"
+  local bad
+  for bad in \
+    '{"env":{"DB_PASSWORD":"x"}}' \
+    '{"env":{"APP_KEY":"base64:x"}}' \
+    '{"workers":[{"command":"queue:work; rm -rf /"}]}' \
+    '{"workers":[{"command":"queue:work $(id)"}]}' \
+    '{"packages":["age; curl evil"]}' \
+    '{"executables":["/usr/bin/../../etc/shadow"]}' \
+    '{"frame_ancestors":["javascript:alert(1)"]}' \
+    '{"db":{"engine":"oracle"}}' \
+    '{"schema":"simai-app/9"}'; do
+    printf '%s\n' "$bad" >"${tmp}/bad/.simai/app.json"
+    if python3 "$parser" "${tmp}/bad" >/dev/null 2>&1; then
+      fail "unsafe manifest accepted: ${bad}"
+    fi
+  done
+  rm -rf "$tmp"
+  grep -Fq 'DB_KEYS = {"DB_ENGINE", "DB_NAME", "DB_USER", "DB_HOST", "DB_PORT"}' "${ROOT_DIR}/lib/host_describe.py" \
+    || fail "describe must filter db.env to non-secret keys"
+  ! grep -Eq 'DB_PASS|read_text\(\).*\.env' "${ROOT_DIR}/lib/host_describe.py" || fail "describe reads secrets"
+  grep -Fq 'frame-ancestors' "${ROOT_DIR}/admin/lib/site_utils.sh" || fail "frame-ancestors policy missing"
+}
+
 test_install_mode_contract
 test_site_metadata_cleanup
 test_command_option_validation
@@ -563,4 +597,5 @@ test_updater_transaction
 test_audit_p0_security_contracts
 test_audit_p1_contracts
 test_site_isolation_contracts
+test_app_manifest_contracts
 echo "[correction-regression] ok"

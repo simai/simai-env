@@ -24,6 +24,8 @@ Output includes:
 - install dir
 - OS and whether it is supported
 - nginx / mysql / redis service state
+- fail2ban service state and managed sshd jail presence
+- admin access mode (`simple-root-key-only`, `hardened-sudo-admin`, or custom)
 - php-fpm versions and CLI PHP
 - component versions
 - certbot timer state
@@ -55,7 +57,11 @@ Update the installed `simai-env` tree in place.
 
 Behavior:
 - resolves the configured update ref
-- downloads the exact target revision
+- downloads the exact target revision when `git` can resolve it to a commit SHA
+- refuses non-official update repositories by default; use `SIMAI_UPDATE_ALLOW_CUSTOM_REPO=yes` only for a GitHub fork you explicitly trust
+- refuses unresolved ref tarball fallback by default; use `SIMAI_UPDATE_ALLOW_UNRESOLVED_REF=yes` only when `git`/network SHA resolution is intentionally unavailable
+- validates archive paths and entry types before extracting the update payload
+- runs the updater from a temporary snapshot so the script is not overwritten while it is still executing
 - requires a successful pre-update backup in `/root/simai-backups/` when an installation already exists; backup failure aborts before changing the installed tree
 - prepares and validates an exact staged tree, then swaps it into place so files removed by a release cannot survive as stale residue
 - runs strict smoke checks before and after activation; a post-activation failure automatically restores the previous tree and returns a non-zero status
@@ -65,6 +71,109 @@ Behavior:
 Typical use:
 ```bash
 sudo /root/simai-env/simai-admin.sh self update
+```
+
+## supply-chain-doctor
+Run a read-only check of self-update/install supply-chain guardrails.
+
+Checks include:
+- configured update ref syntax
+- update repository allowlist state
+- `git` availability for SHA-pinned updates
+- whether the configured ref resolves to a commit SHA
+- whether custom-repo or unresolved-ref escape hatches are enabled
+- whether archive validation helpers are loaded
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self supply-chain-doctor
+```
+
+## admin-mode-status
+Show the current server administration access model.
+
+Output includes:
+- detected admin mode
+- effective root SSH policy
+- password and keyboard-interactive SSH policy
+- default sudo admin login and readiness
+- short role hints for `root`, `simai`, and managed Access users
+
+Typical modes:
+- `simple-root-key-only`: trusted owner/admin uses root through SSH keys; password login is disabled.
+- `hardened-sudo-admin`: non-root sudo admin is ready; root remains key-only break-glass.
+- `password-login-enabled`: SSH password login is still enabled.
+- `custom`: effective SSH settings do not match a managed profile.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self admin-mode-status
+```
+
+## sudo-admin-ensure
+Create or repair a non-root sudo admin user for operator login.
+
+Options:
+- `--login <login>` (default `simai-admin`)
+- `--copy-root-keys yes|no` (default `yes`) — copy `/root/.ssh/authorized_keys` when no explicit key file is provided.
+- `--authorized-keys-file <path>` — use a regular file with authorized SSH keys.
+- `--nopasswd yes|no` (default `yes`) — write a managed sudoers file with or without `NOPASSWD`.
+- `--confirm yes` — required because this modifies users, SSH keys, and sudoers.
+
+Behavior:
+- creates a normal shell user if missing
+- adds the user to the `sudo` group
+- installs SSH `authorized_keys` with `0700/0600` permissions
+- writes `/etc/sudoers.d/90-simai-admin-<login>`
+- validates sudoers with `visudo -cf`
+- validates `sshd -t` when sshd is available
+- does not disable root SSH; do that only after the new user login has been tested
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes
+ssh simai-admin@<server>
+sudo -n /root/simai-env/simai-admin.sh self sudo-admin-doctor --login simai-admin
+```
+
+## sudo-admin-doctor
+Read-only readiness check for a non-root sudo admin user.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-doctor --login simai-admin
+```
+
+## ssh-hardening-ensure
+Apply the recommended operational-safe SSH hardening profile.
+
+This profile is intentionally not the most restrictive possible model. It keeps
+root SSH available as a key-only break-glass path, disables password and
+keyboard-interactive SSH login, and keeps normal work on the non-root sudo admin
+account.
+
+Behavior:
+- writes `/etc/ssh/sshd_config.d/01-simai-hardening.conf`
+- sets `PermitRootLogin prohibit-password`
+- sets `PasswordAuthentication no`
+- sets `KbdInteractiveAuthentication no`
+- sets `PubkeyAuthentication yes`
+- validates `sshd -t`
+- reloads ssh/sshd if syntax is valid
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes
+ssh simai-admin@<server>
+sudo -n /root/simai-env/simai-admin.sh self ssh-hardening-ensure --confirm yes
+```
+
+## ssh-hardening-doctor
+Read-only check for the operational-safe SSH profile.
+
+Typical use:
+```bash
+sudo /root/simai-env/simai-admin.sh self ssh-hardening-doctor
 ```
 
 ## version
@@ -135,6 +244,8 @@ Options:
 
 Behavior:
 - installs/repairs base packages
+- installs/enables the managed fail2ban SSH jail (`/etc/fail2ban/jail.d/simai-sshd.local`)
+- installs the PHP Redis extension with the managed PHP stack so Laravel cache/session/queue setups have the expected extension available
 - refreshes shared platform services
 - installs `wp-cli` best-effort
 - initializes profile activation defaults
@@ -330,3 +441,16 @@ sudo /root/simai-env/simai-admin.sh self perf-apply --preset small --confirm yes
 - The regular `System` menu intentionally shows simple labels such as `Platform status`, `Optimization status`, `Optimization plan`, and `Automatic optimization`.
 - Scheduler internals and `Health review` remain in Advanced mode.
 - Shared scheduler config lives in `/etc/simai-env.conf`, but ordinary users usually do not need to edit it manually.
+
+
+## describe / commands
+Machine-readable discovery for operators and AI agents (JSON on stdout, no
+secrets):
+
+```bash
+sudo /root/simai-env/simai-admin.sh self describe
+sudo /root/simai-env/simai-admin.sh self commands
+```
+
+`self migrate` links `/root/AGENTS.md` to the agent guide shipped with
+simai-env unless that file already exists.

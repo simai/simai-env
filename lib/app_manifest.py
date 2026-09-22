@@ -28,7 +28,7 @@ ENV_VALUE = re.compile(r"^[^\n\r\t]{0,500}$")
 ARTISAN_ARGS = re.compile(r"^[a-z][a-z0-9:-]*( [A-Za-z0-9_=:.,/@-]+)*$")
 ORIGIN = re.compile(r"^(https?://(\*\.)?[a-z0-9.-]+(:[0-9]{1,5})?|'self')$")
 PHP_VERSION = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
-SECRET_KEY = re.compile(r"(PASS|SECRET|TOKEN|KEY)$")
+SECRET_KEY = re.compile(r"(PASS|PASSWORD|PASSWD|SECRET|TOKEN|PRIVATE|CREDENTIALS?|_KEY|^KEY)(_|$)")
 
 
 def fail(message: str) -> None:
@@ -112,6 +112,9 @@ def main() -> int:
             fail("db.version must be a major version such as 17")
         emit("db_version", version)
 
+    for field in ("packages", "executables", "frame_ancestors"):
+        if not isinstance(manifest.get(field, []), list):
+            fail(f"{field} must be a list")
     for item in manifest.get("packages", []):
         if not isinstance(item, str) or not PACKAGE.match(item):
             fail(f"invalid package name {item!r}")

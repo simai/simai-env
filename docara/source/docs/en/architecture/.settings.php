@@ -5,6 +5,7 @@ return array (
   'order' => 30,
   'menu' => 
   array (
+    'app-manifest' => 'App Manifest',
     'backup-format' => 'Backup Format',
     'cron' => 'Cron',
     'filesystem-layout' => 'Filesystem Layout',

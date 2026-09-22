@@ -80,6 +80,53 @@ Examples:
 - Create Bitrix and prepare fresh installer helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files setup`
 - Create Bitrix and prepare restore helper: `simai-admin.sh site add --domain example.com --profile bitrix --php 8.3 --create-db yes --bitrix-files restore`
 
+## adopt
+Attach an existing application directory as a site without scaffolding.
+Requirements come from `composer.json` and `.simai/app.json`
+(`docs/architecture/app-manifest.md`).
+
+```bash
+sudo /root/simai-env/simai-admin.sh site adopt --domain app.example.com --path /home/simai/www/app.example.com
+sudo /root/simai-env/simai-admin.sh site adopt --domain app.example.com --path /home/simai/www/app.example.com --confirm yes
+```
+
+Apply installs the required PHP version, extensions and packages (and
+PostgreSQL when declared), creates `.env` from `.env.example` only when it is
+missing, sets manifest `env` defaults only where unset, runs
+`composer install --no-dev` as the site user, generates `APP_KEY` once, runs
+migrations when requested (`--migrate yes` or `"migrate": true`) and writes
+the declared workers and scheduler. Options: `--profile`, `--php`, `--owner`,
+`--db-engine`, `--create-db`, `--migrate`, `--build yes|no|auto`,
+`--pgdg yes`. Running adopt again on the same domain reconciles.
+
+## deploy
+Deploy a release with an atomic switch.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git https://github.com/org/app.git --ref v1.4.0 --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --archive /root/app-1.4.0.tar.gz --sha256 <sum> --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --from /root/build/app --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy-rollback --domain D --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy-status --domain D
+```
+
+Layout: shared `.env` and `storage/` stay in the site root; code lives in
+`releases/<id>`; `current` points at the live release and nginx serves
+`current/<public>`. The first deploy keeps the adopted code as
+`releases/<id>-initial`. Each deploy fetches as the site user, runs
+`composer install --no-dev`, migrates before the switch, switches `current`,
+reloads PHP-FPM and runs `artisan queue:restart`. A failed build never touches
+the live release. `--keep` (default 5) limits stored releases. Rollback
+switches code only; database migrations are not reverted.
+
+## describe
+JSON for people and AI agents: layout, database engine (no secrets), user,
+release, workers, logs, validated manifest and ready-to-run commands.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site describe --domain D
+```
+
 ## isolate
 Move an existing site from the shared `simai` account to its own Unix user
 `site-<slug>`: project files, PHP-FPM pool, cron file, queue unit and SFTP

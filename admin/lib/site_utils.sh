@@ -138,12 +138,30 @@ site_host_mode_normalize() {
 
 site_frame_policy_normalize() {
   local mode="${1:-same-origin}"
+  if [[ "$mode" == origins:* || "$mode" == ORIGINS:* ]]; then
+    # origins:https://a.example,https://*.b.example -> only these may frame the site.
+    local list="${mode#*:}" origin out=""
+    list="${list//[[:space:]]/,}"
+    local IFS=','
+    for origin in $list; do
+      [[ -z "$origin" ]] && continue
+      origin="${origin,,}"
+      if [[ ! "$origin" =~ ^https?://(\*\.)?[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$ ]]; then
+        error "Invalid frame ancestor origin: ${origin} (use https://host or https://*.host)"
+        return 1
+      fi
+      out+="${out:+,}${origin}"
+    done
+    [[ -n "$out" ]] || { error "origins: needs at least one origin"; return 1; }
+    echo "origins:${out}"
+    return 0
+  fi
   mode=$(echo "$mode" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
   case "$mode" in
     same-origin|sameorigin) echo "same-origin" ;;
     any) echo "any" ;;
     *)
-      error "Unsupported frame policy: ${1}. Use: same-origin, any"
+      error "Unsupported frame policy: ${1}. Use: same-origin, any, origins:https://a.example,https://*.b.example"
       return 1
       ;;
   esac
@@ -170,6 +188,10 @@ site_frame_policy_render_file() {
         print "    # simai-frame-policy-start"
         if (mode == "any") {
           print "    add_header Content-Security-Policy \"frame-ancestors *\" always;"
+        } else if (index(mode, "origins:") == 1) {
+          list = substr(mode, 9)
+          gsub(/,/, " ", list)
+          print "    add_header Content-Security-Policy \"frame-ancestors '\''self'\'' " list "\" always;"
         } else {
           print "    add_header X-Frame-Options \"SAMEORIGIN\" always;"
         }

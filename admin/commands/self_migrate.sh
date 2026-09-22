@@ -114,6 +114,18 @@ self_migrate_bitrix_runtime() {
   return 0
 }
 
+# Agents that connect over SSH start in /root; point them at the guide.
+# An existing /root/AGENTS.md written by the operator is left alone.
+self_migrate_agent_guide() {
+  local guide="${SIMAI_ENV_ROOT}/AGENTS.md" link="/root/AGENTS.md"
+  [[ -f "$guide" && -d /root ]] || return 0
+  if [[ -L "$link" && "$(readlink "$link")" == "$guide" ]]; then
+    return 0
+  fi
+  [[ -e "$link" || -L "$link" ]] && return 0
+  ln -s "$guide" "$link" && SELF_MIGRATE_CHANGES+=("/root/AGENTS.md -> ${guide}")
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -123,6 +135,7 @@ self_migrate_handler() {
   self_migrate_observer_storage || warn "Observer storage migration failed"
   self_migrate_catchall
   self_migrate_bitrix_runtime
+  self_migrate_agent_guide
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"
   else
