@@ -19,6 +19,7 @@ source "${ADMIN_DIR}/lib/fix_utils.sh"
 source "${ADMIN_DIR}/lib/doctor_utils.sh"
 source "${ADMIN_DIR}/lib/db_utils.sh"
 source "${ADMIN_DIR}/lib/access_utils.sh"
+source "${ADMIN_DIR}/lib/db_pgsql_utils.sh"
 
 load_command_modules "${ADMIN_DIR}/commands"
 

@@ -1003,6 +1003,13 @@ site_add_handler_impl() {
       SITE_ADD_TX_PROFILE_ALLOWLIST_CONTENT="$(read_profiles_allowlist || true)"
     fi
   fi
+  if [[ "$create_db" == "yes" ]]; then
+    SITE_DB_ENGINE=$(site_resolve_db_engine "${PARSED_ARGS[db-engine]:-}") || return 1
+    if [[ "$SITE_DB_ENGINE" == pgsql ]] && ! pgsql_available; then
+      error "PostgreSQL is not installed. Install it first: simai-admin.sh db pgsql-install --confirm yes"
+      return 1
+    fi
+  fi
   ensure_user
   if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
     run_command profile init --mode all --force yes || return 1
@@ -1328,6 +1335,7 @@ site_add_handler_impl() {
     echo "DB user     : ${DB_CREDS_USER}"
     echo "DB password : hidden"
     echo "DB creds    : ${db_export_summary}"
+    echo "DB engine   : $(site_db_engine "$domain")"
   else
     echo "Database    : ${db_summary}"
   fi
@@ -2253,7 +2261,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

@@ -246,6 +246,8 @@ doctor_ext_to_apt_pkg() {
   local ver="$1" ext="$2"
   case "$ext" in
     pdo_mysql|mysqli) echo "php${ver}-mysql" ;;
+    pdo_pgsql|pgsql) echo "php${ver}-pgsql" ;;
+    pcntl|posix|sockets|ctype|fileinfo|tokenizer|sodium|hash|openssl|filter|session|pdo) echo "php${ver}-common" ;;
     curl) echo "php${ver}-curl" ;;
     mbstring) echo "php${ver}-mbstring" ;;
     xml|dom|simplexml|xmlreader|xmlwriter) echo "php${ver}-xml" ;;

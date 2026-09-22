@@ -26,6 +26,8 @@ PROFILE_PHP_INI_FORBIDDEN=()
 # Database
 PROFILE_REQUIRES_DB="required"
 PROFILE_DB_ENGINE="mysql"
+# Engines a site of this profile may use (site add --db-engine).
+PROFILE_DB_ENGINES_ALLOWED=("mysql" "pgsql")
 PROFILE_DB_CHARSET="utf8mb4"
 PROFILE_DB_COLLATION="utf8mb4_unicode_ci"
 PROFILE_DB_REQUIRED_PRIVILEGES=()

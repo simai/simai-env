@@ -54,6 +54,50 @@ db_default_privileges() {
   printf "%s\n" "SELECT" "INSERT" "UPDATE" "DELETE" "CREATE" "DROP" "INDEX" "ALTER" "CREATE TEMPORARY TABLES" "LOCK TABLES" "EXECUTE"
 }
 
+# Site database engine: mysql (default, also for db.env files written before
+# engines existed) or pgsql. SITE_DB_ENGINE overrides it while a site is being
+# created, before db.env exists.
+db_engine_normalize() {
+  case "${1,,}" in
+    ""|mysql|mariadb|percona) echo mysql ;;
+    pgsql|postgres|postgresql) echo pgsql ;;
+    *) return 1 ;;
+  esac
+}
+
+site_db_engine() {
+  local domain="$1" engine=""
+  if [[ -n "${SITE_DB_ENGINE:-}" ]]; then
+    db_engine_normalize "$SITE_DB_ENGINE"
+    return
+  fi
+  local entry
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == DB_ENGINE ]] && engine="${entry#*|}"
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  db_engine_normalize "$engine" || echo mysql
+}
+
+# Picks the engine for a new site: explicit option, else the profile default;
+# refuses engines the profile does not allow.
+site_resolve_db_engine() {
+  local requested="$1" engine allowed
+  engine=$(db_engine_normalize "${requested:-${PROFILE_DB_ENGINE:-mysql}}") || {
+    error "Unknown database engine: ${requested} (use mysql or pgsql)"
+    return 1
+  }
+  local -a engines=("${PROFILE_DB_ENGINES_ALLOWED[@]:-${PROFILE_DB_ENGINE:-mysql}}")
+  for allowed in "${engines[@]}"; do
+    [[ "$(db_engine_normalize "$allowed")" == "$engine" ]] && { echo "$engine"; return 0; }
+  done
+  error "Profile ${PROFILE_ID:-unknown} does not support database engine ${engine} (allowed: ${engines[*]})"
+  return 1
+}
+
+db_engine_default_port() {
+  [[ "$1" == pgsql ]] && echo 5432 || echo 3306
+}
+
 site_db_env_file() {
   local domain="$1"
   echo "$(site_sites_config_dir)/${domain}/db.env"
@@ -83,6 +127,11 @@ read_site_db_env() {
 write_site_db_env() {
   local domain="$1"
   local db_name="$2" db_user="$3" db_pass="$4" db_charset="$5" db_collation="$6"
+  local engine host port
+  engine=$(site_db_engine "$domain")
+  port=$(db_engine_default_port "$engine")
+  host=localhost
+  [[ "$engine" == pgsql ]] && host=127.0.0.1
   local dir
   dir="$(site_sites_config_dir)/${domain}"
   mkdir -p "$dir"
@@ -90,10 +139,12 @@ write_site_db_env() {
   local tmp
   tmp="$(mktemp)"
   cat >"$tmp" <<EOF
+DB_ENGINE=${engine}
 DB_NAME=${db_name}
 DB_USER=${db_user}
 DB_PASS=${db_pass}
-DB_HOST=localhost
+DB_HOST=${host}
+DB_PORT=${port}
 DB_CHARSET=${db_charset}
 DB_COLLATION=${db_collation}
 EOF
@@ -115,7 +166,8 @@ site_db_export_to_env() {
     error "db.env not found for ${domain} at ${db_env_file}"
     return 1
   fi
-  local db_name="" db_user="" db_pass="" db_host="localhost"
+  local db_name="" db_user="" db_pass="" db_host="localhost" db_port="" engine
+  engine=$(site_db_engine "$domain")
   while IFS= read -r entry; do
     [[ -z "$entry" ]] && continue
     local k="${entry%%|*}" v="${entry#*|}"
@@ -124,14 +176,18 @@ site_db_export_to_env() {
       DB_USER) db_user="$v" ;;
       DB_PASS) db_pass="$v" ;;
       DB_HOST) db_host="$v" ;;
+      DB_PORT) db_port="$v" ;;
     esac
   done < <(read_site_db_env "$domain")
   if [[ -z "$db_name" || -z "$db_user" || -z "$db_pass" ]]; then
     error "db.env missing required fields for ${domain}"
     return 1
   fi
+  [[ -n "$db_port" ]] || db_port=$(db_engine_default_port "$engine")
   local env_file="${project_dir}/${target}"
+  env_set_kv "$env_file" "DB_CONNECTION" "$engine" || return 1
   env_set_kv "$env_file" "DB_HOST" "$db_host"
+  env_set_kv "$env_file" "DB_PORT" "$db_port"
   env_set_kv "$env_file" "DB_DATABASE" "$db_name"
   env_set_kv "$env_file" "DB_USERNAME" "$db_user"
   env_set_kv "$env_file" "DB_PASSWORD" "$db_pass"
@@ -171,6 +227,11 @@ site_db_load_or_generate_creds() {
   fi
   DB_CREDS_NAME=$(normalize_db_identifier "$base" 48) || return 1
   DB_CREDS_USER=$(normalize_db_identifier "$base" 32) || return 1
+  # PostgreSQL reserves role names starting with pg_ (e.g. domain pg.example).
+  if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
+    [[ "$DB_CREDS_NAME" == pg_* ]] && DB_CREDS_NAME="site_${DB_CREDS_NAME}"
+    [[ "$DB_CREDS_USER" == pg_* ]] && DB_CREDS_USER="site_${DB_CREDS_USER:0:27}"
+  fi
   DB_CREDS_PASS=$(generate_password)
   return 0
 }
@@ -178,6 +239,11 @@ site_db_load_or_generate_creds() {
 site_db_apply_create() {
   local domain="$1" db_name="$2" db_user="$3" db_pass="$4" charset="$5" coll="$6"
   shift 6
+  if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
+    pgsql_site_create "$db_name" "$db_user" "$db_pass" || return 1
+    write_site_db_env "$domain" "$db_name" "$db_user" "$db_pass" "UTF8" ""
+    return 0
+  fi
   local privs=("$@")
   mysql_root_detect_cli || return 1
   local priv_str
@@ -230,6 +296,11 @@ site_db_apply_create() {
 site_db_apply_drop() {
   local domain="$1" db_name="$2" db_user="$3" remove_env="${4:-no}"
   local failed=0
+  if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
+    pgsql_site_drop "$db_name" "$db_user" || return 1
+    [[ "${remove_env,,}" == "yes" ]] && rm -f "$(site_db_env_file "$domain")"
+    return 0
+  fi
   mysql_root_detect_cli || return 1
   if [[ -n "$db_name" ]]; then
     if ! mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${db_name}\`"; then
@@ -251,6 +322,11 @@ site_db_apply_drop() {
 
 site_db_apply_rotate() {
   local domain="$1" db_name="$2" db_user="$3" new_pass="$4" charset="$5" coll="$6"
+  if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
+    pgsql_site_rotate "$db_user" "$new_pass" || return 1
+    write_site_db_env "$domain" "$db_name" "$db_user" "$new_pass" "$charset" "$coll"
+    return 0
+  fi
   mysql_root_detect_cli || return 1
   if ! mysql_root_exec_stdin "ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${new_pass}'"; then
     error "Failed to rotate password for ${db_user}"

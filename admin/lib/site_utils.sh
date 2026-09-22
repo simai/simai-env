@@ -1995,17 +1995,6 @@ install_healthcheck() {
   cp "$HEALTHCHECK_TEMPLATE" "$doc_root/healthcheck.php"
 }
 
-write_generic_env() {
-  local project_path="$1" db_name="$2" db_user="$3" db_pass="$4"
-  local env_file="${project_path}/.env"
-  env_set_kv "$env_file" "DB_CONNECTION" "mysql" || return 1
-  env_set_kv "$env_file" "DB_HOST" "127.0.0.1"
-  env_set_kv "$env_file" "DB_PORT" "3306"
-  env_set_kv "$env_file" "DB_DATABASE" "$db_name"
-  env_set_kv "$env_file" "DB_USERNAME" "$db_user"
-  env_set_kv "$env_file" "DB_PASSWORD" "$db_pass"
-}
-
 # Render canonical nginx metadata block (metadata v1).
 # shellcheck disable=SC2154,SC2034 # dynamic assoc keys populated for callers
 site_nginx_metadata_parse() {
@@ -2438,28 +2427,21 @@ laravel_prepare_env_file() {
   env_set_kv "$env_file" "APP_ENV" "production" || return 1
   env_set_kv "$env_file" "APP_DEBUG" "false"
   env_set_kv "$env_file" "APP_URL" "$(site_primary_url "$domain")"
-  env_set_kv "$env_file" "DB_CONNECTION" "mysql"
-  env_set_kv "$env_file" "DB_HOST" "127.0.0.1"
-  env_set_kv "$env_file" "DB_PORT" "3306"
-  env_set_kv "$env_file" "CACHE_STORE" "file"
-  env_set_kv "$env_file" "SESSION_DRIVER" "file"
-  env_set_kv "$env_file" "QUEUE_CONNECTION" "sync"
+  # Runtime drivers are defaults only: an application that already chose
+  # (for example QUEUE_CONNECTION=database) keeps its choice.
+  local key default
+  for key in CACHE_STORE:file SESSION_DRIVER:file QUEUE_CONNECTION:sync; do
+    default="${key#*:}"
+    key="${key%%:*}"
+    if [[ -z "$(laravel_env_get "$env_file" "$key" 2>/dev/null || true)" ]]; then
+      env_set_kv "$env_file" "$key" "$default"
+    fi
+  done
 
-  local entry
-  while IFS= read -r entry; do
-    [[ -z "$entry" ]] && continue
-    local k="${entry%%|*}" v="${entry#*|}"
-    case "$k" in
-      DB_NAME) env_set_kv "$env_file" "DB_DATABASE" "$v" ;;
-      DB_USER) env_set_kv "$env_file" "DB_USERNAME" "$v" ;;
-      DB_PASS) env_set_kv "$env_file" "DB_PASSWORD" "$v" ;;
-      DB_HOST)
-        if [[ -n "$v" ]]; then
-          env_set_kv "$env_file" "DB_HOST" "$v"
-        fi
-        ;;
-    esac
-  done < <(read_site_db_env "$domain" || true)
+  # Database settings follow the site's db.env (and its engine) when present.
+  if [[ -f "$(site_db_env_file "$domain")" ]]; then
+    site_db_export_to_env "$domain" "$root" "$(basename "$env_file")" || return 1
+  fi
 }
 
 laravel_db_state_probe() {

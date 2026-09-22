@@ -38,9 +38,22 @@ site_db_status_handler() {
     echo "db.env    : present"
     echo "DB_NAME   : ${db_name}"
     echo "DB_USER   : ${db_user}"
-    echo "DB_HOST   : localhost"
-    echo "DB_CHARSET: ${db_charset:-utf8mb4}"
-    echo "DB_COLL   : ${db_collation:-utf8mb4_unicode_ci}"
+    echo "DB_ENGINE : $(site_db_engine "$domain")"
+    if [[ "$(site_db_engine "$domain")" == mysql ]]; then
+      echo "DB_HOST   : localhost"
+      echo "DB_CHARSET: ${db_charset:-utf8mb4}"
+      echo "DB_COLL   : ${db_collation:-utf8mb4_unicode_ci}"
+    fi
+  fi
+  if [[ -n "$db_name" && "$(site_db_engine "$domain")" == pgsql ]]; then
+    pgsql_require || return 1
+    pgsql_db_exists "$db_name" && echo "Database  : exists" || echo "Database  : missing"
+    if [[ -n "$db_user" ]]; then
+      pgsql_role_exists "$db_user" && echo "Role      : exists" || echo "Role      : missing"
+      [[ "$(pgsql_query "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = $(pgsql_literal "$db_name")")" == "$db_user" ]] \
+        && echo "Owner     : ${db_user}" || echo "Owner     : not ${db_user}"
+    fi
+    return 0
   fi
   if [[ -n "$db_name" ]]; then
     if db_exists "$db_name"; then

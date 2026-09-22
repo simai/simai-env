@@ -4,6 +4,7 @@ $status = [
     'php_version' => PHP_VERSION,
     'extensions' => [
         'pdo_mysql' => extension_loaded('pdo_mysql'),
+        'pdo_pgsql' => extension_loaded('pdo_pgsql'),
         'mbstring' => extension_loaded('mbstring'),
         'curl' => extension_loaded('curl'),
     ],
@@ -38,15 +39,19 @@ if (file_exists($envPath)) {
     }
 }
 
+$dbDriver = getenv('DB_CONNECTION') === 'pgsql' ? 'pgsql' : 'mysql';
 $dbHost = getenv('DB_HOST') ?: '127.0.0.1';
-$dbPort = getenv('DB_PORT') ?: '3306';
+$dbPort = getenv('DB_PORT') ?: ($dbDriver === 'pgsql' ? '5432' : '3306');
+$status['db']['driver'] = $dbDriver;
 $dbName = getenv('DB_DATABASE') ?: null;
 $dbUser = getenv('DB_USERNAME') ?: null;
 $dbPass = getenv('DB_PASSWORD') ?: null;
 
 if ($dbName && $dbUser) {
     $status['db']['checked'] = true;
-    $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+    $dsn = $dbDriver === 'pgsql'
+        ? "pgsql:host={$dbHost};port={$dbPort};dbname={$dbName}"
+        : "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
     try {
         $pdo = new PDO($dsn, $dbUser, $dbPass, [
             PDO::ATTR_TIMEOUT => 3,
@@ -56,12 +61,13 @@ if ($dbName && $dbUser) {
         $status['db']['ok'] = true;
     } catch (Throwable $e) {
         $status['db']['ok'] = false;
-        $status['db']['error'] = $e->getMessage();
+        // Driver messages can contain host, user or path details.
+        $status['db']['error'] = 'connection failed';
     }
 }
 
 $dbOk = !$status['db']['checked'] || $status['db']['ok'] === true;
-$allOk = $status['extensions']['pdo_mysql'] && $dbOk;
+$allOk = $status['extensions']['pdo_' . $dbDriver] && $dbOk;
 
 http_response_code($allOk ? 200 : 500);
 header('Content-Type: application/json');

@@ -618,7 +618,24 @@ site_doctor_handler() {
   fi
 
 progress_step "DB checks"
-if [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
+if [[ "${PROFILE_REQUIRES_DB}" != "no" && "$(site_db_engine "$domain")" == pgsql ]]; then
+  doctor_add_result "PASS" "db" "Engine" "pgsql" ""
+  if pgsql_available && os_svc_is_active postgresql; then
+    doctor_add_result "PASS" "db" "PostgreSQL service" "Active ($(pgsql_query 'SHOW server_version' 2>/dev/null || echo '?'))" ""
+    local pg_public
+    pg_public=$(pgsql_public_listeners | paste -sd ', ' -)
+    if [[ -n "$pg_public" ]]; then
+      doctor_add_result "WARN" "db" "PostgreSQL network exposure" "Public listener(s): ${pg_public}" "Set listen_addresses = 'localhost' unless external access is required"
+    else
+      doctor_add_result "PASS" "db" "PostgreSQL network exposure" "Local-only" ""
+    fi
+  else
+    doctor_add_result "FAIL" "db" "PostgreSQL service" "Not installed or inactive" "simai-admin.sh db pgsql-install --confirm yes"
+  fi
+  if [[ -n "${php_version:-}" && "${php_version}" != "none" ]] && ! "php${php_version}" -m 2>/dev/null | grep -qx pdo_pgsql; then
+    doctor_add_result "FAIL" "db" "PHP pdo_pgsql" "Missing for PHP ${php_version}" "apt-get install php${php_version}-pgsql"
+  fi
+elif [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then
   if os_svc_is_active mysql || os_svc_is_active mariadb || os_svc_is_active percona || os_svc_is_active mysqld; then
     doctor_add_result "PASS" "db" "MySQL service" "Active" ""
     local mysql_public

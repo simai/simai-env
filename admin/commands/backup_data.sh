@@ -52,7 +52,11 @@ backup_data_file_excludes() {
 }
 
 backup_data_dump_db() {
-  local db_name="$1" out="$2"
+  local db_name="$1" out="$2" engine="${3:-mysql}"
+  if [[ "$engine" == pgsql ]]; then
+    pgsql_dump_gz "$db_name" "$out"
+    return
+  fi
   backup_data_dump_cli || return 1
   local rc=0
   if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
@@ -158,7 +162,7 @@ backup_data_handler() {
   local failed=""
   if [[ -n "$db_name" ]]; then
     info "Dumping database ${db_name}"
-    backup_data_dump_db "$db_name" "${dir}/db.sql.gz" || failed="database dump"
+    backup_data_dump_db "$db_name" "${dir}/db.sql.gz" "$(site_db_engine "$domain")" || failed="database dump"
   fi
   if [[ -z "$failed" && "${with_files,,}" == "yes" ]]; then
     info "Archiving ${root}"
@@ -171,6 +175,7 @@ backup_data_handler() {
       printf 'domain=%s\nprofile=%s\ncreated_at=%s\ndatabase=%s\nproject_root=%s\nsimai_env_version=%s\n' \
         "$domain" "$profile" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${db_name:-none}" "$root" \
         "$(cat "${SIMAI_ENV_ROOT}/VERSION" 2>/dev/null || echo unknown)"
+      printf 'db_engine=%s\n' "$([[ -n "$db_name" ]] && site_db_engine "$domain" || echo none)"
       printf 'encrypted=%s\n' "$([[ -n "$encrypt_to" ]] && echo age || echo no)"
     } >"${dir}/manifest.txt"
   fi
@@ -228,8 +233,23 @@ backup_data_verify_handler() {
   fi
   if [[ "${restore_test,,}" == "yes" ]]; then
     [[ -f "${dir}/db.sql.gz" ]] || { error "No plain db.sql.gz to test (encrypted or files-only backup)"; return 1; }
-    local scratch
+    local scratch engine
     scratch="simai_restore_check_$(date +%s)_$$"
+    engine=$(sed -n 's/^db_engine=//p' "${dir}/manifest.txt" 2>/dev/null | head -n1)
+    if [[ "$engine" == pgsql ]]; then
+      pgsql_require || return 1
+      pgsql_create_scratch "$scratch" || { error "Cannot create scratch database"; return 1; }
+      local prc=0 ptables=0
+      pgsql_restore_gz "$scratch" "${dir}/db.sql.gz" || prc=$?
+      ptables=$(pgsql_table_count "$scratch" || echo 0)
+      pgsql_drop_scratch "$scratch" || warn "Drop scratch database ${scratch} manually"
+      if (( prc != 0 )); then
+        error "Restore test failed: the dump does not import cleanly"
+        return 1
+      fi
+      echo "PASS restore test (${ptables} tables imported into a scratch database)"
+      return 0
+    fi
     mysql_root_exec_stdin "CREATE DATABASE \`${scratch}\` CHARACTER SET utf8mb4;" || { error "Cannot create scratch database"; return 1; }
     local rc=0 tables=0
     if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
@@ -305,11 +325,15 @@ backup_data_restore_handler() {
     db_validate_db_name "$db_name" || return 1
     local safety
     safety="$(dirname "$dir")/pre-restore-$(date +%Y%m%d-%H%M%S).sql.gz"
-    backup_data_dump_db "$db_name" "$safety" || { error "Safety dump failed; nothing restored"; return 1; }
+    local engine
+    engine=$(site_db_engine "$domain")
+    backup_data_dump_db "$db_name" "$safety" "$engine" || { error "Safety dump failed; nothing restored"; return 1; }
     chmod 0600 "$safety"
     info "Safety dump of current database: ${safety}"
     local rc=0
-    if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
+    if [[ "$engine" == pgsql ]]; then
+      pgsql_restore_gz "$db_name" "${dir}/db.sql.gz" || rc=$?
+    elif [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
       gzip -dc "${dir}/db.sql.gz" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$db_name" 2>>"$LOG_FILE" || rc=$?
     else
       gzip -dc "${dir}/db.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$db_name" 2>>"$LOG_FILE" || rc=$?
