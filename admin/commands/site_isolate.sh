@@ -130,7 +130,10 @@ site_isolate_handler() {
     site_isolate_rewrite_cron "$cron_file" "$from" "$user" || failed="cron file"
   fi
   if [[ -z "$failed" && -n "$queue_unit" ]]; then
-    sed -i -E -e "s/^User=.*/User=${user}/" -e "s/^Group=.*/Group=${user}/" "$queue_unit" || failed="queue unit"
+    local worker_unit
+    for worker_unit in $(app_project_worker_units "$project"); do
+      sed -i -E -e "s/^User=.*/User=${user}/" -e "s/^Group=.*/Group=${user}/" "/etc/systemd/system/${worker_unit}" || failed="queue unit"
+    done
   fi
 
   if [[ -n "$failed" ]]; then
@@ -169,7 +172,10 @@ site_isolate_handler() {
   [[ -f "$cron_file" ]] && reload_cron_daemon
   if [[ -n "$queue_unit" ]]; then
     os_svc_daemon_reload || true
-    os_svc_is_active "$(basename "$queue_unit")" && { os_svc_restart "$(basename "$queue_unit")" || warn "Restart $(basename "$queue_unit") manually"; }
+    local worker_unit
+    for worker_unit in $(app_project_worker_units "$project"); do
+      os_svc_is_active "$worker_unit" && { os_svc_restart "$worker_unit" || warn "Restart ${worker_unit} manually"; }
+    done
   fi
   # Only now: PHP-FPM workers and a Restart=always queue worker may still run
   # as the previous per-site user until the reloads above take effect.

@@ -1,0 +1,21 @@
+[Unit]
+Description=Worker {{WORKER}} for {{PROJECT_NAME}}
+After=network-online.target mysql.service postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{GROUP}}
+WorkingDirectory={{PROJECT_ROOT}}
+ExecStart={{PHP_BIN}} {{PROJECT_ROOT}}/artisan {{ARGS}}
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec={{STOP_TIMEOUT}}
+NoNewPrivileges=yes
+PrivateTmp=yes
+SyslogIdentifier=laravel-queue-{{PROJECT_NAME}}-{{WORKER}}
+
+[Install]
+WantedBy=multi-user.target

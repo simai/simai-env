@@ -1932,13 +1932,16 @@ remove_queue_unit() {
   if ! validate_project_slug "$project"; then
     return 1
   fi
-  local unit="/etc/systemd/system/laravel-queue-${project}.service"
-  if [[ -f "$unit" ]]; then
-    os_svc_disable_now "laravel-queue-${project}.service" || true
+  local unit removed=0
+  # Includes additional workers declared by the application manifest.
+  for unit in /etc/systemd/system/laravel-queue-"${project}".service /etc/systemd/system/laravel-queue-"${project}"-*.service; do
+    [[ -f "$unit" ]] || continue
+    os_svc_disable_now "$(basename "$unit")" || true
     rm -f "$unit"
-    os_svc_daemon_reload || true
-    info "Removed queue unit laravel-queue-${project}.service"
-  fi
+    removed=1
+    info "Removed queue unit $(basename "$unit")"
+  done
+  (( removed )) && os_svc_daemon_reload || true
 }
 
 remove_php_pool_version() {
