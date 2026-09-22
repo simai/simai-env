@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.14.0](v1.14.0.md) — PostgreSQL sites, application manifest, site adopt
+  and release deploys, frame ancestors, AI-first describe.
 - [v1.13.0](v1.13.0.md) — per-site users and owners, data backups, root
   escalation fixes, Bitrix short_open_tag fix and host migrations.
 - [v1.12.78](v1.12.78.md) — fail-closed integrity validation for every Bitrix

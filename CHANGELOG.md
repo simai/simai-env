@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.14.0 - 2026-09-22
+
 ### Added
 - PostgreSQL as a site database engine: `db pgsql-install` (Ubuntu or signed
   PGDG), `site add --db-engine pgsql` for generic and Laravel sites, and
