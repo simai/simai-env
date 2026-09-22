@@ -193,6 +193,11 @@ site_adopt_handler() {
   # 6. Background processes declared by the application.
   if [[ ${#APP_WORKERS[@]} -gt 0 ]]; then
     app_write_workers "$project" "$path" "$php" yes || return 1
+    # Workers already running keep their old command until they restart;
+    # queue:restart lets them finish the current job first.
+    if [[ -f "${path}/artisan" ]]; then
+      adopt_run_as "$run_user" "$path" "$php_bin" artisan queue:restart >>"$LOG_FILE" 2>&1 || true
+    fi
   else
     local unit
     for unit in $(app_project_worker_units "$project"); do
