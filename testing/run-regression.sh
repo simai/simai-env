@@ -44,6 +44,9 @@ _feat_domain=""
 _feat_db_name=""
 _feat_db_user=""
 _iso_domain=""
+_pg_domain=""
+_pg_db_name=""
+_pg_db_user=""
 _feat_owner=""
 
 # One multiplexed connection for the whole run: fewer handshakes, and no
@@ -127,6 +130,7 @@ cleanup() {
   cleanup_one "${_bitrix_test_domain:-}" "${_bitrix_db_name:-}" "${_bitrix_db_user:-}" || failed=1
   cleanup_one "${_feat_domain:-}" "${_feat_db_name:-}" "${_feat_db_user:-}" || failed=1
   cleanup_one "${_iso_domain:-}" || failed=1
+  cleanup_one "${_pg_domain:-}" || failed=1
   if [[ -n "${_feat_owner:-}" ]]; then
     echo "[cleanup] owner ${_feat_owner}"
     remote "cd '${SIMAI_ROOT}' && ./simai-admin.sh owner remove --name '${_feat_owner}' --confirm yes >/dev/null 2>&1 || true; rm -rf /root/simai-regression-backups" || failed=1
@@ -295,6 +299,18 @@ run_features() {
   run_cmd "catch-all rejects unknown host on 443" "! curl -sk --resolve regression-unknown.invalid:443:127.0.0.1 https://regression-unknown.invalid/ -o /dev/null --max-time 5"
   run_cmd "site remove deletes the per-site user" "./simai-admin.sh site remove --domain '${_iso_domain}' --remove-files yes --confirm yes >/dev/null && ! getent passwd 'site-${iso_project}' >/dev/null"
   _iso_domain=""
+
+  # PostgreSQL site lifecycle and machine-readable discovery.
+  _pg_domain="t-pg-${stamp}${suffix}"
+  run_cmd "db pgsql-install" "./simai-admin.sh db pgsql-install --confirm yes >/dev/null"
+  run_cmd "site add (generic + pgsql)" "./simai-admin.sh site add --domain '${_pg_domain}' --profile generic --php 8.2 --create-db yes --db-engine pgsql --db-export yes >/dev/null"
+  read -r _pg_db_name _pg_db_user < <(capture_db_identity "${_pg_domain}")
+  run_cmd "pgsql site .env points at PostgreSQL" "grep -q '^DB_CONNECTION=pgsql' /home/simai/www/${_pg_domain}/.env"
+  run_cmd "backup data (pgsql) with restore test" "./simai-admin.sh backup data --domain '${_pg_domain}' --keep 1 --dest /root/simai-regression-backups >/dev/null && ./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_pg_domain}/2* | tail -1)\" --restore-test yes >/dev/null"
+  run_cmd "self describe is valid JSON" "./simai-admin.sh self describe 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"schema\"]==\"simai-host/1\"'"
+  run_cmd "site describe has no DB password" "p=\$(sed -n 's/^DB_PASS=//p' /etc/simai-env/sites/${_pg_domain}/db.env); ./simai-admin.sh site describe --domain '${_pg_domain}' 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"database\"][\"engine\"]==\"pgsql\"' && ! ./simai-admin.sh site describe --domain '${_pg_domain}' 2>/dev/null | grep -qF \"\$p\""
+  run_cmd "site remove drops the pgsql database" "./simai-admin.sh site remove --domain '${_pg_domain}' --remove-files yes --drop-db yes --drop-db-user yes --confirm yes >/dev/null && [[ -z \$(runuser -u postgres -- psql -Atc \"SELECT 1 FROM pg_database WHERE datname='${_pg_db_name}'\") ]]"
+  _pg_domain=""
 }
 
 case "$MODE" in
