@@ -29,6 +29,9 @@ command_register_policy() {
   case "$key" in site:add|site:adopt|site:set-php) CMD_LOCK["$key"]=host ;; esac
   # lock:none: the handler takes the lock itself, only when it has work to do.
   [[ " $flags " == *" lock:none "* ]] && CMD_LOCK["$key"]=none
+  # plan:handler: the handler prints its own plan unless --confirm yes.
+  # shellcheck disable=SC2034 # read by run_command in core.sh
+  [[ " $flags " == *" plan:handler "* ]] && CMD_PLAN_HANDLER["$key"]=1
   CMD_VERIFICATION["$key"]='exit status; inspect the target with site describe/doctor or self describe'
 }
 

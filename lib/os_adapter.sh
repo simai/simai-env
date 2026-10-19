@@ -39,11 +39,22 @@ os_adapter_init() {
   return 1
 }
 
+# A freshly booted server runs unattended-upgrades and holds the dpkg lock
+# for minutes; wait for it instead of failing the install.
+os_apt_lock_wait_ensure() {
+  local conf=/etc/apt/apt.conf.d/90simai-lock-timeout
+  [[ -f "$conf" || ! -d /etc/apt/apt.conf.d || $EUID -ne 0 ]] && return 0
+  printf 'DPkg::Lock::Timeout "600";\n' >"$conf" 2>/dev/null || true
+  return 0
+}
+
 os_cmd_pkg_update() {
+  os_apt_lock_wait_ensure
   OS_CMD=(apt-get update -y)
 }
 
 os_cmd_pkg_install() {
+  os_apt_lock_wait_ensure
   OS_CMD=(DEBIAN_FRONTEND=noninteractive apt-get install -y "$@")
 }
 

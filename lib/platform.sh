@@ -23,7 +23,7 @@ platform_detect_os() {
 }
 
 platform_supported_matrix_string() {
-  echo "Ubuntu 22.04/24.04"
+  echo "Ubuntu 22.04/24.04/26.04"
 }
 
 platform_is_supported_os() {
@@ -31,9 +31,40 @@ platform_is_supported_os() {
     return 1
   fi
   case "${PLATFORM_OS_VERSION_ID:-}" in
-    "22.04"|"24.04") return 0 ;;
+    "22.04"|"24.04"|"26.04") return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# PHP version shipped by the Ubuntu release itself (no third-party repository).
+# shellcheck disable=SC2120 # optional codename argument; defaults to this host
+platform_native_php_version() {
+  case "${1:-${PLATFORM_OS_CODENAME:-}}" in
+    jammy) echo 8.1 ;;
+    noble) echo 8.3 ;;
+    resolute) echo 8.5 ;;
+    *) echo "" ;;
+  esac
+}
+
+# Whether the ondrej/php PPA publishes packages for this release. A new
+# Ubuntu release is covered some months after it ships.
+# shellcheck disable=SC2120 # optional codename argument; defaults to this host
+platform_ondrej_php_available() {
+  local codename="${1:-${PLATFORM_OS_CODENAME:-}}"
+  [[ -n "$codename" ]] || return 1
+  curl -fsS -o /dev/null --max-time 15 \
+    "https://ppa.launchpadcontent.net/ondrej/php/ubuntu/dists/${codename}/Release" 2>/dev/null
+}
+
+# Default PHP for a new host: 8.2 where the PPA provides it, otherwise the
+# release's own PHP.
+platform_default_php_version() {
+  if platform_ondrej_php_available; then
+    echo 8.2
+  else
+    platform_native_php_version
+  fi
 }
 
 platform_has_tty() {

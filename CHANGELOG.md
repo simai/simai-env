@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## 1.16.0 - 2026-10-20
+
+- Ubuntu 26.04 LTS is supported. PHP comes from the Ubuntu repository (8.5)
+  while the ondrej/php PPA has no packages for the release; other versions are
+  refused with a clear message instead of a failed PPA. PostgreSQL 18 is the
+  native version. CI and the container suite run on 26.04.
+- `bootstrap --php none --mysql none` (and `SIMAI_INSTALL_PHP` /
+  `SIMAI_INSTALL_DB` for `install.sh`) prepare hosts without PHP or MySQL.
+  The default PHP follows the release.
+- Profile `node`: long-running services behind nginx. `site add` allocates a
+  local port; `site deploy` builds with yarn/npm (plus a Python venv from the
+  manifest) as the site user, runs `simai-app-<project>.service` from
+  `current` with restart on failure and on boot, checks `health.path` and
+  returns to the previous release when it fails. `site service-restart`.
+  Manifest fields `node`, `python`, `shared`, `health`; `site describe`
+  reports the service.
+- `self swap-ensure`, `self firewall-ensure` (SSH port detected and verified
+  before the policy is enabled; the plan lists services that would become
+  unreachable; `--allow port/proto@source`), `self firewall-disable`.
+- `self settings` and `self setting-set` change allowlisted keys of
+  `/etc/simai-env.conf` (`SIMAI_SITE_ISOLATION=no` for one shared site
+  account, `SIMAI_LOCK_WAIT`, `SIMAI_BACKUP_OFFSITE`) instead of hand edits.
+- Registry flag `plan:handler`: `site deploy`, `deploy-rollback` and the new
+  host commands show their detailed plan without `--confirm yes` again.
+- `site remove` no longer keeps site metadata of deployed sites because of the
+  deploy lock file.
+- PHP 8.5 builds OPcache into the core: no `php8.5-opcache` package is
+  requested. Bootstrap installs `iproute2`; apt waits for the dpkg lock held by
+  unattended-upgrades after the first boot.
+- OS assessment for future support: `docs/development/os-support.md`
+  (Debian 12/13 next; RHEL family not close).
+
 - `self update` no longer requires `update.sh` to be executable; it already
   runs a private executable copy. After the update it continues from the new
   toolkit directory, so `self migrate` no longer starts from a deleted one.

@@ -1415,6 +1415,10 @@ create_nginx_site() {
     fi
   fi
 
+  if grep -q '{{APP_PORT}}' "$template_path" && [[ ! "${SITE_APP_PORT:-}" =~ ^[0-9]+$ ]]; then
+    error "nginx template ${template_path##*/} needs an application port"
+    return 1
+  fi
   {
     printf "%s\n" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${server_name_value}#g" \
@@ -1423,7 +1427,8 @@ create_nginx_site() {
       -e "s#{{ACME_ROOT}}#${acme_root}#g" \
       -e "s#{{PROJECT_NAME}}#${project}#g" \
       -e "s#{{PHP_VERSION}}#${php_version}#g" \
-      -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" "$template_path"
+      -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" \
+      -e "s#{{APP_PORT}}#${SITE_APP_PORT:-}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)

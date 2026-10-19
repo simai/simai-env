@@ -1,0 +1,25 @@
+[Unit]
+Description=Application service for {{PROJECT_NAME}}
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{USER}}
+Group={{GROUP}}
+WorkingDirectory={{PROJECT_ROOT}}/current
+EnvironmentFile={{PROJECT_ROOT}}/.env
+Environment=NODE_ENV=production
+Environment=PATH={{PROJECT_ROOT}}/current/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env -- {{START}}
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+SyslogIdentifier=simai-app-{{PROJECT_NAME}}
+
+[Install]
+WantedBy=multi-user.target

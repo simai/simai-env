@@ -7,7 +7,7 @@
   - After each command, menu shows status/output and waits for Enter before returning.
 - Managed file access now lives under `Access`; this batch covers global access to all projects under `WWW_ROOT` and project-scoped access with chroot isolation.
 
-Supported OS: Ubuntu 22.04/24.04. Run as root.
+Supported OS: Ubuntu 22.04/24.04/26.04. Run as root.
 
 ## Profiles
 - Registry-driven: defined in `profiles/*.profile.sh` (declarative `PROFILE_` variables only).

@@ -565,7 +565,7 @@ site_add_transaction_rollback() {
   if [[ ( "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 || "${SITE_ADD_TX_OWNER_ASSIGNED:-0}" -eq 1 ) && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
     site_user_delete "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   fi
-  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env"
+  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/service.env"
   rmdir -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}" >/dev/null 2>&1 || true
   if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED:-0}" -eq 1 ]]; then
     if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED:-0}" -eq 1 ]]; then
@@ -913,6 +913,7 @@ site_add_handler_impl() {
     if [[ "$enable_all_profiles_after_confirm" == "yes" ]]; then
       run_command profile init --mode all --force yes || return 1
     fi
+    SITE_APP_PORT=$(app_port_get "$target_domain")
     if ! create_nginx_site "$domain" "$project" "$target_path" "$php_version" "$alias_template" "alias" "$target_domain" "$target_socket_project" "" "" "" "no" "no" "$template_id" "$target_public_dir"; then
       error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
       return 1
@@ -1101,6 +1102,11 @@ site_add_handler_impl() {
   local ssl_redirect="no" ssl_hsts="no"
   local doc_root
   doc_root=$(site_compute_doc_root "$path" "$public_dir") || return 1
+  SITE_APP_PORT=""
+  if grep -q '{{APP_PORT}}' "$template_path"; then
+    SITE_APP_PORT=$(app_port_allocate "${PARSED_ARGS[app-port]:-}") || return 1
+    app_port_set "$domain" "$SITE_APP_PORT" || return 1
+  fi
   if ! create_nginx_site "$domain" "$project" "$path" "$php_version" "$template_path" "$profile" "" "$project" "" "" "" "$ssl_redirect" "$ssl_hsts" "" "$public_dir" "$host_mode" "$wildcard_domain" "$frame_policy"; then
     error "Failed to create nginx config for ${domain}; see /var/log/simai-admin.log"
     return 1
@@ -1337,6 +1343,10 @@ site_add_handler_impl() {
   echo "Cron file   : ${cron_summary}"
   if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
     echo "Queue unit  : ${queue_summary}"
+  fi
+  if [[ -n "${SITE_APP_PORT:-}" ]]; then
+    echo "Service     : $(app_service_unit_name "$project") on 127.0.0.1:${SITE_APP_PORT} (created by the first site deploy)"
+    echo "Deploy      : simai-admin.sh site deploy --domain ${domain} --git <url> --ref <tag> --confirm yes"
   fi
   if [[ "$create_db" == "yes" ]]; then
     echo "DB name     : ${DB_CREDS_NAME}"
@@ -1690,6 +1700,8 @@ site_remove_handler() {
     if [[ "${supports_queue}" == "yes" && "${requires_php}" != "no" ]]; then
       remove_queue_unit "$safe_project" && removed_queue=1 || removed_queue=0
     fi
+    # Application service of a node site (no-op for other profiles).
+    app_service_remove "$safe_project" || warn "Could not remove $(app_service_unit_name "$safe_project")"
   fi
 
   progress_step "Removing project files (if approved)"
@@ -2269,7 +2281,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine= app-port=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

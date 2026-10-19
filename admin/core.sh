@@ -22,7 +22,7 @@ declare -Ag CMD_REQUIRED=()
 declare -Ag CMD_OPTIONAL=()
 declare -Ag CMD_FLAGS=()
 # shellcheck disable=SC2034 # registry metadata consumed by worker.sh and describe.sh
-declare -Ag CMD_EFFECTS=() CMD_AUTHORIZATION=() CMD_CONFIRMATION=() CMD_LOCK=() CMD_VERIFICATION=() CMD_CONFIRM_EXEMPT=()
+declare -Ag CMD_EFFECTS=() CMD_AUTHORIZATION=() CMD_CONFIRMATION=() CMD_LOCK=() CMD_VERIFICATION=() CMD_CONFIRM_EXEMPT=() CMD_PLAN_HANDLER=()
 source "${SIMAI_ENV_ROOT}/admin/lib/execution.sh"
 
 ui_init
@@ -424,6 +424,12 @@ run_command() {
     else
       preview=yes
     fi
+  fi
+  # plan:handler commands print a detailed plan themselves and change nothing
+  # without --confirm yes; the handler runs in plan mode instead of the
+  # generic preview.
+  if [[ "$preview" == yes && -n "${CMD_PLAN_HANDLER[$key]:-}" && "$output" != json ]]; then
+    preview=no
   fi
   if [[ "$preview" == yes ]]; then
     if [[ "$output" == json ]]; then

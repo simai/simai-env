@@ -270,7 +270,8 @@ doctor_ext_to_apt_pkg() {
     gd) echo "php${ver}-gd" ;;
     intl) echo "php${ver}-intl" ;;
     bcmath) echo "php${ver}-bcmath" ;;
-    opcache) echo "php${ver}-opcache" ;;
+    # PHP 8.5 builds OPcache into the core; there is no separate package.
+    opcache) [[ "$(printf '%s\n8.5\n' "$ver" | sort -V | head -n1)" == 8.5 ]] && echo "php${ver}-common" || echo "php${ver}-opcache" ;;
     redis) echo "php${ver}-redis" ;;
     soap) echo "php${ver}-soap" ;;
     exif) echo "php${ver}-exif" ;;

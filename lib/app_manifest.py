@@ -10,6 +10,8 @@ Prints validated, tab-separated records for the shell (one per line):
   db_engine <mysql|pgsql> | db_version <major> | env <KEY> <value>
   scheduler <yes|no> | worker <name> <artisan args> <stop_timeout> <count>
   migrate <yes|no> | frame_ancestor <origin> | profile <id> | manifest <present|absent>
+  node_version <major> | start <command> | install <auto|yarn|npm|none> | build <command>
+  python_requirements <file> | shared <path> | health_path <path> | health_timeout <seconds>
 Exits 2 with a message on invalid input; nothing from the files reaches a
 shell unvalidated.
 """
@@ -26,6 +28,11 @@ EXE = re.compile(r"^/[A-Za-z0-9._/-]{1,200}$")
 ENV_KEY = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 ENV_VALUE = re.compile(r"^[^\n\r\t]{0,500}$")
 ARTISAN_ARGS = re.compile(r"^[a-z][a-z0-9:-]*( [A-Za-z0-9_=:.,/@-]+)*$")
+# A command for the service unit or the build: a bare executable name found on
+# PATH, then plain arguments (no shell syntax).
+COMMAND = re.compile(r"^[a-z][a-z0-9._-]{0,40}( [A-Za-z0-9_=:.,/@+-]{1,200}){0,20}$")
+REL_PATH = re.compile(r"^[A-Za-z0-9._-][A-Za-z0-9._/-]{0,200}$")
+HTTP_PATH = re.compile(r"^/[A-Za-z0-9._~/?=&%-]{0,200}$")
 ORIGIN = re.compile(r"^(https?://(\*\.)?[a-z0-9.-]+(:[0-9]{1,5})?|'self')$")
 PHP_VERSION = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
 SECRET_KEY = re.compile(r"(PASS|PASSWORD|PASSWD|SECRET|TOKEN|PRIVATE|CREDENTIALS?|_KEY|^KEY)(_|$)")
@@ -179,6 +186,59 @@ def main() -> int:
         if not isinstance(migrate, bool):
             fail("migrate must be true or false")
         emit("migrate", "yes" if migrate else "no")
+
+    node = manifest.get("node")
+    if node is not None:
+        if not isinstance(node, dict):
+            fail("node must be an object")
+        version = str(node.get("version", "22"))
+        if not re.fullmatch(r"[0-9]{2}", version):
+            fail("node.version must be a major version such as 22")
+        emit("node_version", version)
+        start = node.get("start")
+        if not isinstance(start, str) or not COMMAND.match(start):
+            fail("node.start must be a command such as 'node src/server.js' (no shell syntax)")
+        emit("start", start)
+        install = node.get("install", "auto")
+        if install not in ("auto", "yarn", "npm", "none"):
+            fail("node.install must be auto, yarn, npm or none")
+        emit("install", install)
+        build = node.get("build")
+        if build is not None:
+            if not isinstance(build, str) or not COMMAND.match(build):
+                fail("node.build must be a command such as 'npm run build' (no shell syntax)")
+            emit("build", build)
+
+    python = manifest.get("python")
+    if python is not None:
+        if not isinstance(python, dict):
+            fail("python must be an object")
+        req = python.get("requirements", "requirements.txt")
+        if not isinstance(req, str) or not REL_PATH.match(req) or ".." in req:
+            fail("python.requirements must be a relative file path")
+        emit("python_requirements", req)
+
+    shared = manifest.get("shared", [])
+    if not isinstance(shared, list):
+        fail("shared must be a list")
+    for item in shared:
+        if (not isinstance(item, str) or not REL_PATH.match(item) or ".." in item.split("/")
+                or item.rstrip("/") in (".env", ".git", "releases", "current", "storage")):
+            fail(f"invalid shared path {item!r}")
+        emit("shared", item.rstrip("/"))
+
+    health = manifest.get("health")
+    if health is not None:
+        if not isinstance(health, dict):
+            fail("health must be an object")
+        path = health.get("path", "/")
+        if not isinstance(path, str) or not HTTP_PATH.match(path):
+            fail("health.path must be an absolute URL path such as /health")
+        emit("health_path", path)
+        timeout = health.get("timeout", 120)
+        if not isinstance(timeout, int) or not 5 <= timeout <= 3600:
+            fail("health.timeout must be 5..3600 seconds")
+        emit("health_timeout", timeout)
 
     for origin in manifest.get("frame_ancestors", []):
         if not isinstance(origin, str) or not ORIGIN.match(origin):

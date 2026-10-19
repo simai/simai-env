@@ -98,6 +98,12 @@ def manifest_summary(root: Path) -> dict | None:
                 summary["workers"].append({"name": parts[1], "command": parts[2], "stop_timeout": int(parts[3]), "count": int(parts[4])})
             elif kind in ("scheduler", "migrate"):
                 summary[kind] = parts[1] == "yes"
+            elif kind in ("start", "install", "build", "node_version", "python_requirements", "health_path"):
+                summary[kind] = parts[1]
+            elif kind == "health_timeout":
+                summary[kind] = int(parts[1])
+            elif kind == "shared":
+                summary.setdefault("shared", []).append(parts[1])
         return summary
     return None
 
@@ -120,6 +126,12 @@ def describe_site(domain: str, detailed: bool) -> dict:
     for unit in sorted(UNITS.glob(f"laravel-queue-{project}*.service")):
         if unit.name == f"laravel-queue-{project}.service" or unit.name.startswith(f"laravel-queue-{project}-"):
             workers.append({"unit": unit.name, "state": active(unit.name)})
+    service_port = kv_file(STATE / "sites" / domain / "service.env").get("APP_PORT")
+    service = None
+    if service_port:
+        unit = f"simai-app-{project}.service"
+        service = {"unit": unit, "port": int(service_port), "listen": f"127.0.0.1:{service_port}",
+                   "state": active(unit) if (UNITS / unit).is_file() else "not deployed"}
     info = {
         "domain": domain,
         "profile": meta.get("profile"),
@@ -136,6 +148,7 @@ def describe_site(domain: str, detailed: bool) -> dict:
         "release": {"current": deploy.get("CURRENT"), "previous": deploy.get("PREVIOUS"),
                     "deployed_at": deploy.get("DEPLOYED_AT"), "source": deploy.get("SOURCE")} if deploy else None,
         "workers": workers,
+        "service": service,
         "scheduler": (Path("/etc/cron.d") / project).is_file(),
         "backup_schedule": (Path("/etc/cron.d") / f"simai-backup-{project}").is_file(),
         "adopted": kv_file(STATE / "sites" / domain / "app.env").get("ADOPTED_AT"),
@@ -149,6 +162,9 @@ def describe_site(domain: str, detailed: bool) -> dict:
             "app": str(root / "storage" / "logs"),
             "workers": [f"journalctl -u {w['unit']}" for w in workers],
         }
+        if service:
+            info["logs"]["service"] = f"journalctl -u {service['unit']}"
+            info["logs"].pop("php_fpm", None)
         info["how_to"] = {
             "inspect": f"{cli} site doctor --domain {domain}",
             "deploy": f"{cli} site deploy --domain {domain} --git <url> --ref <tag> --confirm yes",
@@ -159,6 +175,12 @@ def describe_site(domain: str, detailed: bool) -> dict:
             "verify_backup": f"{cli} backup data-verify --path <backup-dir> --restore-test yes --confirm yes",
             "run_artisan_as_site_user": f"sudo -u {runs_as or 'simai'} -H php{meta.get('php')} {root}/{'current/' if layout == 'releases' else ''}artisan <command>",
         }
+        if service:
+            info["how_to"].pop("run_artisan_as_site_user", None)
+            info["how_to"].pop("reconcile_requirements", None)
+            info["how_to"]["service_status"] = f"systemctl status {service['unit']}"
+            info["how_to"]["service_logs"] = f"journalctl -u {service['unit']} -n 100"
+            info["how_to"]["service_restart"] = f"{cli} site service-restart --domain {domain} --confirm yes"
         info["rules"] = [
             "Commands that change state print a plan unless --confirm yes is given; read the plan first.",
             "Do not edit nginx, PHP-FPM, cron or systemd files by hand; use simai-admin.sh so metadata stays consistent.",

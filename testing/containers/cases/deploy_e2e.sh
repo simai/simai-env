@@ -32,7 +32,7 @@ return new class extends Migration {
     public function down(): void { Schema::dropIfExists('widgets'); }
 };
 PHP
-bash ./simai-admin.sh site deploy --domain $D --from /root/src-v2 >/tmp/dp 2>&1; grep -q 'No handler was executed' /tmp/dp && ok "deploy previews without conversion" || bad "plan"
+bash ./simai-admin.sh site deploy --domain $D --from /root/src-v2 >/tmp/dp 2>&1; grep -q 'Deploy plan for' /tmp/dp && [[ ! -d $P/releases ]] && ok "deploy shows its plan without conversion" || bad "plan"
 cli site deploy --domain $D --from /root/src-v2 --confirm yes >/tmp/d1 2>&1 && ok "deploy v2" || { bad "deploy v2"; tail -20 /tmp/d1; grep -i error /var/log/simai-admin.log | tail -5; }
 [[ -L $P/current && -d $P/releases ]] && ok "release layout active" || bad "layout"
 ls $P/releases | grep -q -- '-initial$' && ok "adopted code kept as initial release" || bad "no initial release"

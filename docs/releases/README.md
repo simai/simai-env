@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.16.0](v1.16.0.md) — Ubuntu 26.04, profile node for long-running
+  services, swap/firewall/settings commands, detailed plans.
 - [v1.15.0](v1.15.0.md) — confirmation before changes, fail-fast handlers,
   locks, JSON results, Bitrix request budget and MySQL localization.
 - [v1.14.0](v1.14.0.md) — PostgreSQL sites, application manifest, site adopt

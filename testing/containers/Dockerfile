@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq systemd systemd-sysv nginx \
       php${PHP}-fpm php${PHP}-cli php${PHP}-mysql php${PHP}-curl php${PHP}-mbstring \
       php${PHP}-xml php${PHP}-zip php${PHP}-intl mysql-server acl cron sudo curl \
-      openssl rsync python3 python3-venv perl git whiptail certbot >/dev/null && apt-get clean
+      openssl rsync python3 python3-venv perl git whiptail certbot iproute2 >/dev/null && apt-get clean
 RUN python3 -m venv /opt/simai-test-python && /opt/simai-test-python/bin/pip install --disable-pip-version-check jsonschema==4.25.1 >/dev/null
 ENV PATH="/opt/simai-test-python/bin:${PATH}"
 RUN rm -f /etc/nginx/sites-enabled/default

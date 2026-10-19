@@ -6,6 +6,9 @@
 #   <root>/current -> releases/<id>  switched atomically; nginx serves current/<public>
 # Deploy builds and migrates before the switch, then reloads PHP-FPM and asks
 # Laravel workers to restart gracefully after their current job.
+# Service sites (profile node) build with npm/yarn (and a Python venv when the
+# manifest asks for one), restart simai-app-<project>.service after the switch
+# and return to the previous release when its health check fails.
 
 deploy_state_file() {
   echo "$(site_sites_config_dir)/$1/deploy.env"
@@ -82,19 +85,19 @@ deploy_switch_site_to_layout() {
 # First deploy of an in-place site: its code becomes release <ts>-initial so
 # a rollback to the pre-deploy state stays possible.
 deploy_init_layout() {
-  local root="$1" user="$2" group="$3" id="$4" entry name
+  local root="$1" user="$2" group="$3" id="$4" service="${5:-no}" entry name
   install -d -m 0750 -o "$user" -g "$group" "${root}/releases" "${root}/releases/${id}" || return 1
   shopt -s dotglob nullglob
   for entry in "${root}"/*; do
     name=$(basename "$entry")
     case "$name" in
-      releases|current|current.tmp|.env|storage|.simai-deploy.lock) continue ;;
+      releases|current|current.tmp|.env|storage|shared|.cache|.simai-deploy.lock) continue ;;
+      public) [[ "$service" == yes ]] && continue ;;
     esac
     mv -- "$entry" "${root}/releases/${id}/" || { shopt -u dotglob nullglob; return 1; }
   done
   shopt -u dotglob nullglob
-  [[ -f "${root}/releases/${id}/.simai/app.json" ]] || true
-  deploy_link_shared "$root" "${root}/releases/${id}" "$user" "$group"
+  [[ "$service" == yes ]] || deploy_link_shared "$root" "${root}/releases/${id}" "$user" "$group"
   ln -sfn "releases/${id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
 }
 
@@ -107,6 +110,102 @@ deploy_link_shared() {
   ln -sfn ../../storage "${release}/storage"
   [[ -e "${root}/.env" ]] && { rm -f -- "${release}/.env"; ln -sfn ../../.env "${release}/.env"; }
   chown -h "${user}:${group}" "${release}/storage" "${release}/.env" 2>/dev/null || true
+}
+
+# Paths the manifest lists in "shared" live in <root>/shared and survive
+# releases. The first release seeds them with its own copy.
+deploy_link_manifest_shared() {
+  local root="$1" release="$2" user="$3" group="$4" item target depth up
+  install -d -m 0750 -o "$user" -g "$group" "${root}/shared" || return 1
+  for item in "${APP_SHARED[@]}"; do
+    target="${root}/shared/${item}"
+    if [[ ! -e "$target" ]]; then
+      install -d -m 0750 -o "$user" -g "$group" "$(dirname "$target")" || return 1
+      if [[ -e "${release}/${item}" && ! -L "${release}/${item}" ]]; then
+        cp -a -- "${release}/${item}" "$target" || return 1
+      else
+        install -d -m 0750 -o "$user" -g "$group" "$target" || return 1
+      fi
+    fi
+    rm -rf --one-file-system -- "${release:?}/${item}"
+    install -d -m 0750 -o "$user" -g "$group" "$(dirname "${release}/${item}")" || return 1
+    depth=$(awk -F/ '{print NF}' <<<"$item")
+    up=$(printf '../%.0s' $(seq 1 $((depth + 1))))
+    ln -sfn "${up}shared/${item}" "${release}/${item}" || return 1
+    chown -h "${user}:${group}" "${release}/${item}" 2>/dev/null || true
+  done
+}
+
+# Installs dependencies and builds a service release as the site user.
+deploy_build_service() {
+  local root="$1" release="$2" user="$3" group="$4" install="${APP_INSTALL:-auto}"
+  install -d -m 0750 -o "$user" -g "$group" "${root}/.cache" "${root}/.cache/npm" "${root}/.cache/yarn" "${root}/.cache/pip" || return 1
+  local -a envs=("npm_config_cache=${root}/.cache/npm" "YARN_CACHE_FOLDER=${root}/.cache/yarn" "PIP_CACHE_DIR=${root}/.cache/pip" "npm_config_update_notifier=false")
+  if [[ "$install" == auto ]]; then
+    if [[ -f "${release}/yarn.lock" ]]; then install=yarn
+    elif [[ -f "${release}/package.json" ]]; then install=npm
+    else install=none
+    fi
+  fi
+  # Dev dependencies are needed only when the release builds itself.
+  local -a omit=()
+  case "$install" in
+    yarn)
+      [[ -n "$APP_BUILD" ]] || omit=(--production)
+      deploy_run_as "$user" "$release" env "${envs[@]}" npx --yes yarn@1.22.22 install --frozen-lockfile --non-interactive "${omit[@]}" >>"$LOG_FILE" 2>&1 || return 1
+      ;;
+    npm)
+      [[ -n "$APP_BUILD" ]] || omit=(--omit=dev)
+      if [[ -f "${release}/package-lock.json" ]]; then
+        deploy_run_as "$user" "$release" env "${envs[@]}" npm ci --no-audit --no-fund "${omit[@]}" >>"$LOG_FILE" 2>&1 || return 1
+      else
+        deploy_run_as "$user" "$release" env "${envs[@]}" npm install --no-audit --no-fund "${omit[@]}" >>"$LOG_FILE" 2>&1 || return 1
+      fi
+      ;;
+  esac
+  if [[ -n "$APP_PYTHON_REQUIREMENTS" ]]; then
+    [[ -f "${release}/${APP_PYTHON_REQUIREMENTS}" ]] || { error "${APP_PYTHON_REQUIREMENTS} not found in the release"; return 1; }
+    deploy_run_as "$user" "$release" env "${envs[@]}" python3 -m venv .venv >>"$LOG_FILE" 2>&1 || return 1
+    deploy_run_as "$user" "$release" env "${envs[@]}" .venv/bin/pip install --disable-pip-version-check --no-input -r "$APP_PYTHON_REQUIREMENTS" >>"$LOG_FILE" 2>&1 || return 1
+  fi
+  if [[ -n "$APP_BUILD" ]]; then
+    local -a build_cmd=()
+    read -r -a build_cmd <<<"$APP_BUILD"
+    deploy_run_as "$user" "$release" env "${envs[@]}" PATH="${release}/.venv/bin:/usr/local/bin:/usr/bin:/bin" "${build_cmd[@]}" >>"$LOG_FILE" 2>&1 || return 1
+  fi
+}
+
+# Switches a service site to a release, restarts the unit and waits for the
+# health check; returns to the previous release when it fails.
+deploy_activate_service() {
+  local domain="$1" root="$2" release_id="$3" project="$4" previous_link unit port
+  unit=$(app_service_unit_name "$project")
+  port=$(app_port_get "$domain")
+  previous_link=$(readlink "${root}/current")
+  ln -sfn "releases/${release_id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
+  app_service_write "$project" "$root" || return 1
+  systemctl restart "$unit" >/dev/null 2>&1 || true
+  info "Waiting for ${unit} on 127.0.0.1:${port}${APP_HEALTH_PATH:-/} (up to ${APP_HEALTH_TIMEOUT:-120} s)"
+  if app_health_wait "$port" "${APP_HEALTH_PATH:-/}" "${APP_HEALTH_TIMEOUT:-120}"; then
+    return 0
+  fi
+  error "${unit} did not pass its health check; see: journalctl -u ${unit} -n 50"
+  if [[ -n "$previous_link" && "$previous_link" != "releases/${release_id}" && -d "${root}/${previous_link}" ]]; then
+    ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
+    if [[ -f "${root}/${previous_link}/.simai/app.json" ]]; then
+      systemctl restart "$unit" >/dev/null 2>&1 || true
+      if app_health_wait "$port" "${APP_HEALTH_PATH:-/}" "${APP_HEALTH_TIMEOUT:-120}"; then
+        warn "Returned to ${previous_link}; it passes its health check"
+      else
+        warn "Returned to ${previous_link}, but it does not pass its health check either"
+      fi
+    else
+      # The first release replaced an empty site: nothing to run.
+      systemctl stop "$unit" >/dev/null 2>&1 || true
+      warn "Returned to ${previous_link} (no application); ${unit} stopped"
+    fi
+  fi
+  return 1
 }
 
 deploy_prune() {
@@ -135,6 +234,25 @@ deploy_activate() {
   fi
 }
 
+# Requirements, shared .env and build of a service release.
+deploy_service_release() {
+  local domain="$1" root="$2" release="$3" user="$4" group="$5" major
+  DEPLOY_SERVICE_FAILED=""
+  [[ -n "$APP_START" ]] || { DEPLOY_SERVICE_FAILED="manifest: node.start is required for a service site"; return 1; }
+  command -v node >/dev/null 2>&1 || { DEPLOY_SERVICE_FAILED="Node.js is not installed (simai-env.sh bootstrap installs it)"; return 1; }
+  major=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+  if [[ -n "$APP_NODE_VERSION" ]] && (( major < APP_NODE_VERSION )); then
+    DEPLOY_SERVICE_FAILED="Node.js ${major} is older than the release requires (${APP_NODE_VERSION})"; return 1
+  fi
+  if [[ -n "$APP_PYTHON_REQUIREMENTS" ]] && ! python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
+    DEPLOY_SERVICE_FAILED="missing requirements: python3-venv"; return 1
+  fi
+  app_service_env_ensure "$root" "$release" "$(app_port_get "$domain")" "$group" || { DEPLOY_SERVICE_FAILED="shared .env"; return 1; }
+  rm -f -- "${release}/.env"; ln -sfn ../../.env "${release}/.env"; chown -h "${user}:${group}" "${release}/.env" 2>/dev/null || true
+  info "Building release as ${user}"
+  deploy_build_service "$root" "$release" "$user" "$group" || { DEPLOY_SERVICE_FAILED="dependency install/build (see ${LOG_FILE})"; return 1; }
+}
+
 site_deploy_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" git_url="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}"
@@ -148,7 +266,9 @@ site_deploy_handler() {
   read_site_metadata "$domain" || return 1
   local root="${SITE_META[root]}" php="${SITE_META[php]}" profile="${SITE_META[profile]}"
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
-  [[ "$profile" != alias && "$php" != none ]] || { error "Deploy supports PHP application sites"; return 1; }
+  local service=no
+  [[ -n "$(app_port_get "$domain")" ]] && service=yes
+  [[ "$profile" != alias && ( "$php" != none || "$service" == yes ) ]] || { error "Deploy supports PHP application sites and service sites (profile node)"; return 1; }
   [[ "$keep" =~ ^[0-9]+$ ]] && (( keep >= 2 && keep <= 50 )) || { error "--keep must be 2..50"; return 1; }
   local sources=0
   [[ -n "$git_url" ]] && sources=$((sources + 1))
@@ -179,9 +299,16 @@ site_deploy_handler() {
     echo "Deploy plan for ${domain}:"
     deploy_layout_active "$root" || echo "  - first deploy: move the current code to releases/${release_id}-initial and serve ${root}/current"
     echo "  - fetch $([[ -n $git_url ]] && echo "${git_url} @ ${ref}" || [[ -n $archive ]] && echo "archive ${archive}" || echo "directory ${from}") into releases/<new> as ${user}"
-    echo "  - link shared .env and storage; composer install --no-dev unless the release ships vendor/ (--build ${build}); artisan package:discover"
-    echo "  - migrate: ${migrate:-from .simai/app.json (default no)}"
-    echo "  - switch current atomically, reload php${php}-fpm, artisan queue:restart; keep ${keep} releases"
+    if [[ "$service" == yes ]]; then
+      echo "  - read .simai/app.json (node.start required); link shared .env and the manifest's shared paths"
+      echo "  - install dependencies (yarn/npm), Python venv when the manifest lists requirements, optional build"
+      echo "  - switch current, (re)write and restart $(app_service_unit_name "$project") on 127.0.0.1:$(app_port_get "$domain")"
+      echo "  - wait for the health check; on failure return to the previous release; keep ${keep} releases"
+    else
+      echo "  - link shared .env and storage; composer install --no-dev unless the release ships vendor/ (--build ${build}); artisan package:discover"
+      echo "  - migrate: ${migrate:-from .simai/app.json (default no)}"
+      echo "  - switch current atomically, reload php${php}-fpm, artisan queue:restart; keep ${keep} releases"
+    fi
     echo "Rerun with --confirm yes to apply."
     return 0
   fi
@@ -192,8 +319,9 @@ site_deploy_handler() {
 
   if ! deploy_layout_active "$root"; then
     info "Converting ${root} to the release layout"
-    deploy_init_layout "$root" "$user" "$group" "${release_id}-initial" || { error "Could not create the release layout"; return 1; }
-    deploy_switch_site_to_layout "$domain" "$root" "$php" "$profile" "$project" || return 1
+    deploy_init_layout "$root" "$user" "$group" "${release_id}-initial" "$service" || { error "Could not create the release layout"; return 1; }
+    # nginx of a service site proxies to the unit and keeps public/ for ACME.
+    [[ "$service" == yes ]] || deploy_switch_site_to_layout "$domain" "$root" "$php" "$profile" "$project" || return 1
     deploy_state_set "$domain" CURRENT "${release_id}-initial"
     sleep 1
     release_id="$(date -u +%Y%m%d%H%M%S)"
@@ -220,19 +348,23 @@ site_deploy_handler() {
     rsync -a --delete --exclude=.git --exclude=/.env --exclude=/storage "${from%/}/" "${release}/" >>"$LOG_FILE" 2>&1 \
       && chown -R "${user}:${group}" "$release" || failed="copy"
   fi
-  [[ -z "$failed" ]] && { deploy_link_shared "$root" "$release" "$user" "$group" || failed="shared links"; }
+  [[ -z "$failed" && "$service" != yes ]] && { deploy_link_shared "$root" "$release" "$user" "$group" || failed="shared links"; }
 
-  local php_bin
-  php_bin=$(resolve_php_bin "$php")
+  local php_bin=""
+  [[ "$php" != none ]] && php_bin=$(resolve_php_bin "$php")
   if [[ -z "$failed" ]]; then
     app_manifest_load "$release" || failed="manifest"
   fi
-  if [[ -z "$failed" && -n "$APP_PHP_MIN" ]] && ! "$php_bin" -r "exit(version_compare(PHP_VERSION, '${APP_PHP_MIN}', '>=') ? 0 : 1);"; then
+  [[ -z "$failed" && ${#APP_SHARED[@]} -gt 0 ]] && { deploy_link_manifest_shared "$root" "$release" "$user" "$group" || failed="shared paths"; }
+  if [[ -z "$failed" && "$service" == yes ]]; then
+    deploy_service_release "$domain" "$root" "$release" "$user" "$group" || failed="${DEPLOY_SERVICE_FAILED:-service build}"
+  fi
+  if [[ -z "$failed" && -n "$APP_PHP_MIN" && -n "$php_bin" ]] && ! "$php_bin" -r "exit(version_compare(PHP_VERSION, '${APP_PHP_MIN}', '>=') ? 0 : 1);"; then
     failed="PHP ${php} is older than the release requires (${APP_PHP_MIN}); run site adopt --confirm yes first"
   fi
   if [[ -z "$failed" ]]; then
     local -a missing=()
-    mapfile -t missing < <(app_missing_packages "${APP_PACKAGES[@]}"; app_php_ext_packages "$php" "${APP_PHP_EXTS[@]}")
+    mapfile -t missing < <(app_missing_packages "${APP_PACKAGES[@]}"; [[ -z "$php_bin" ]] || app_php_ext_packages "$php" "${APP_PHP_EXTS[@]}")
     [[ ${#missing[@]} -eq 0 ]] || failed="missing requirements: ${missing[*]} (run site adopt --domain ${domain} --confirm yes)"
   fi
   # Prebuilt artifacts (vendor included, e.g. from a monorepo with path
@@ -240,7 +372,7 @@ site_deploy_handler() {
   if [[ "$build" == auto ]]; then
     [[ -f "${release}/composer.json" && ! -f "${release}/vendor/autoload.php" ]] && build=yes || build=no
   fi
-  if [[ -z "$failed" && -f "${release}/composer.json" ]]; then
+  if [[ -z "$failed" && -n "$php_bin" && -f "${release}/composer.json" ]]; then
     find "${release}/bootstrap/cache" -maxdepth 1 -type f -name '*.php' -delete 2>/dev/null || true
     if [[ "$build" == yes ]]; then
       info "Building release as ${user}"
@@ -252,7 +384,7 @@ site_deploy_handler() {
     fi
   fi
   [[ -n "$migrate" ]] || migrate="${APP_MIGRATE:-no}"
-  if [[ -z "$failed" && "$migrate" == yes && -f "${release}/artisan" ]]; then
+  if [[ -z "$failed" && -n "$php_bin" && "$migrate" == yes && -f "${release}/artisan" ]]; then
     info "Migrating (before the switch)"
     deploy_run_as "$user" "$release" "$php_bin" artisan migrate --force >>"$LOG_FILE" 2>&1 || failed="migrations"
   fi
@@ -263,7 +395,17 @@ site_deploy_handler() {
   fi
 
   DEPLOY_PREVIOUS=$(basename "$(readlink "${root}/current")")
-  deploy_activate "$domain" "$root" "$php" "$release_id" "$user" || { error "Switch failed"; return 1; }
+  if [[ "$service" == yes ]]; then
+    if ! deploy_activate_service "$domain" "$root" "$release_id" "$project"; then
+      # Kept for inspection under a name that rollback never picks.
+      mv -T -- "$release" "${release}-failed" 2>/dev/null || true
+      deploy_state_set "$domain" FAILED "${release_id}-failed"
+      error "Deploy of ${domain} failed at: health check. The release is kept as releases/${release_id}-failed for inspection"
+      return 1
+    fi
+  else
+    deploy_activate "$domain" "$root" "$php" "$release_id" "$user" || { error "Switch failed"; return 1; }
+  fi
   if [[ ${#APP_WORKERS[@]} -gt 0 ]]; then
     app_write_workers "$project" "${root}/current" "$php" yes || warn "Worker units could not be updated"
   fi
@@ -290,14 +432,19 @@ site_deploy_rollback_handler() {
   deploy_layout_active "$root" || { error "${domain} has no releases"; return 1; }
   local current
   current=$(basename "$(readlink "${root}/current")")
-  [[ -n "$to" ]] || to=$(find "${root}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r | grep -vx "$current" | head -n1)
+  [[ -n "$to" ]] || to=$(find "${root}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r | grep -vx "$current" | grep -v -- '-failed$' | head -n1)
   [[ -n "$to" && "$to" =~ ^[0-9]{14}(-[A-Za-z0-9._-]+)?$ && -d "${root}/releases/${to}" ]] || { error "No release to roll back to"; return 1; }
   if [[ "${confirm,,}" != yes ]]; then
     echo "Rollback plan: ${current} -> ${to} (code only; database migrations are not reverted)"
     echo "Rerun with --confirm yes to apply."
     return 0
   fi
-  deploy_activate "$domain" "$root" "$php" "$to" "$(site_effective_user "$project")" || return 1
+  if [[ -n "$(app_port_get "$domain")" ]]; then
+    app_manifest_load "${root}/releases/${to}" || return 1
+    deploy_activate_service "$domain" "$root" "$to" "$project" || return 1
+  else
+    deploy_activate "$domain" "$root" "$php" "$to" "$(site_effective_user "$project")" || return 1
+  fi
   deploy_state_set "$domain" PREVIOUS "$current"
   deploy_state_set "$domain" CURRENT "$to"
   ui_result_table "Domain|${domain}" "Current|${to}" "Was|${current}" "Database|unchanged"
@@ -322,6 +469,27 @@ site_deploy_status_handler() {
   ui_result_table "Domain|${domain}" "Source|$(redact_by_key source "$(deploy_state_get "$domain" SOURCE)")" "Deployed at|$(deploy_state_get "$domain" DEPLOYED_AT)" "${rows[@]}"
 }
 
-register_cmd "site" "deploy" "Deploy a release (git ref, archive or directory) with atomic switch" "site_deploy_handler" "domain" "git= ref= archive= sha256= from= migrate= keep= build= confirm=" "tier:advanced"
-register_cmd "site" "deploy-rollback" "Switch back to a previous release (code only)" "site_deploy_rollback_handler" "domain" "release= confirm=" "tier:advanced"
+site_service_restart_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}"
+  require_args "domain" || return 1
+  require_site_exists "$domain" || return 1
+  read_site_metadata "$domain" || return 1
+  local root="${SITE_META[root]}" project="${SITE_META[project]}" port unit
+  port=$(app_port_get "$domain")
+  [[ -n "$port" ]] || { error "${domain} has no application service"; return 1; }
+  unit=$(app_service_unit_name "$project")
+  [[ -f "/etc/systemd/system/${unit}" ]] || { error "${unit} does not exist yet; deploy a release first"; return 1; }
+  app_manifest_load "${root}/current" || return 1
+  systemctl restart "$unit" || { error "Restart of ${unit} failed; see: journalctl -u ${unit} -n 50"; return 1; }
+  if ! app_health_wait "$port" "${APP_HEALTH_PATH:-/}" "${APP_HEALTH_TIMEOUT:-120}"; then
+    error "${unit} restarted but did not pass its health check; see: journalctl -u ${unit} -n 50"
+    return 1
+  fi
+  ui_result_table "Domain|${domain}" "Service|${unit}" "Health|127.0.0.1:${port}${APP_HEALTH_PATH:-/} OK"
+}
+
+register_cmd "site" "service-restart" "Restart the application service of a node site and wait for its health check" "site_service_restart_handler" "domain" "" "tier:advanced"
+register_cmd "site" "deploy" "Deploy a release (git ref, archive or directory) with atomic switch" "site_deploy_handler" "domain" "git= ref= archive= sha256= from= migrate= keep= build= confirm=" "tier:advanced plan:handler"
+register_cmd "site" "deploy-rollback" "Switch back to a previous release (code only)" "site_deploy_rollback_handler" "domain" "release= confirm=" "tier:advanced plan:handler"
 register_cmd "site" "deploy-status" "Show releases of a site" "site_deploy_status_handler" "domain" "" "tier:advanced effects:read"

@@ -117,8 +117,8 @@ php_install_handler() {
       error "Will install packages: ${missing_pkgs[*]}. Re-run with --confirm yes to proceed."
       return 1
     fi
-    progress_step "Ensuring ondrej/php repository"
-    if ! ensure_ondrej_php_repo; then
+    progress_step "Ensuring a repository for PHP ${php_version}"
+    if ! ensure_ondrej_php_repo "$php_version"; then
       return 1
     fi
     progress_step "Updating apt indexes"

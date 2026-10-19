@@ -146,6 +146,7 @@ pgsql_ubuntu_major() {
   case "$codename" in
     jammy) echo 14 ;;
     noble) echo 16 ;;
+    resolute) echo 18 ;;
     *) echo "" ;;
   esac
 }

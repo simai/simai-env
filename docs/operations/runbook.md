@@ -1,6 +1,6 @@
 # Operator Runbook (Daily Ops)
 
-This runbook targets day-to-day server operations for simai-env on Ubuntu 22.04/24.04.
+This runbook targets day-to-day server operations for simai-env on Ubuntu 22.04/24.04/26.04.
 
 For a compact command checklist, see `docs/operations/daily-ops-quickstart.md`.
 

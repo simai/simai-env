@@ -119,6 +119,26 @@ reloads PHP-FPM and runs `artisan queue:restart`. A failed build never touches
 the live release. `--keep` (default 5) limits stored releases. Rollback
 switches code only; database migrations are not reverted.
 
+Without `--confirm yes`, `deploy` and `deploy-rollback` print their detailed
+plan and change nothing.
+
+### Node.js services (profile `node`)
+
+```bash
+sudo /root/simai-env/simai-admin.sh profile enable --id node --confirm yes
+sudo /root/simai-env/simai-admin.sh site add --domain D --profile node --confirm yes   # optional --app-port 3189
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git https://github.com/org/service.git --ref v1.0.0 --confirm yes
+sudo /root/simai-env/simai-admin.sh site service-restart --domain D --confirm yes
+journalctl -u simai-app-<project> -n 100
+```
+
+The site gets a local port and an nginx proxy; the release describes the
+service in `.simai/app.json` (`node.start`, dependencies, Python
+requirements, shared paths, health check). Deploy builds as the site user,
+runs `simai-app-<project>.service` from `current` (restarted on failure and
+on boot) and returns to the previous release when the health check fails.
+Details: `docs/architecture/app-manifest.md`.
+
 ## describe
 JSON for people and AI agents: layout, database engine (no secrets), user,
 release, workers, logs, validated manifest and ready-to-run commands.

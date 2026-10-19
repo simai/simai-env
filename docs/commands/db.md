@@ -70,7 +70,7 @@ Legacy commands (`db create/drop/set-pass`) remain for backward compatibility bu
 ## PostgreSQL
 
 ```bash
-sudo /root/simai-env/simai-admin.sh db pgsql-install --confirm yes                   # Ubuntu version (14 on 22.04, 16 on 24.04)
+sudo /root/simai-env/simai-admin.sh db pgsql-install --confirm yes                   # Ubuntu version (14 on 22.04, 16 on 24.04, 18 on 26.04)
 sudo /root/simai-env/simai-admin.sh db pgsql-install --version 17 --pgdg yes --confirm yes
 sudo /root/simai-env/simai-admin.sh db pgsql-status
 sudo /root/simai-env/simai-admin.sh site add --domain D --profile laravel --create-db yes --db-engine pgsql

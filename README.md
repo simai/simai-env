@@ -1,6 +1,6 @@
 # simai-env
 
-Minimal two-step setup for PHP projects on Ubuntu 22.04/24.04. No demo sites are created automatically.
+Minimal two-step setup for PHP projects and Node.js services on Ubuntu 22.04/24.04/26.04. No demo sites are created automatically.
 
 ## Quick start (run as root)
 1) Install scripts and base packages (auto-opens menu on interactive terminals):
@@ -25,9 +25,18 @@ Scripts only (no bootstrap during install):
 curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo env SIMAI_INSTALL_MODE=scripts bash
 ```
 
+Node.js-only host (no PHP and no MySQL), for example a service behind nginx:
+```bash
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo env SIMAI_INSTALL_PHP=none SIMAI_INSTALL_DB=none bash
+```
+
+On Ubuntu 26.04 PHP comes from the Ubuntu repository (8.5) until the
+ondrej/php PPA publishes packages for it; other versions are refused with a
+clear message.
+
 ## Notes
 - User/project defaults: user `simai`, home `/home/simai`, projects `/home/simai/www/<domain>/` (slug used for IDs: pool/cron/socket/logs).
-- Profiles: generic, laravel, static, alias (set via admin CLI).
+- Profiles: generic, laravel, static, alias; optional wordpress, bitrix and node (`profile enable --id node`; long-running service, see `docs/architecture/app-manifest.md`).
 - Healthcheck endpoints are local-only by default.
 - Reserved domains (RFC 2606) are blocked unless explicitly allowed.
 - Do not put credentials directly into reusable shell snippets or documentation;

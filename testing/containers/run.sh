@@ -14,7 +14,7 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 UBUNTU=24.04
 PHP=8.3
 NAME="simai-env-e2e-$(date +%s)-$$"
-DEFAULT_CASES=(p0_tests p1_tests upgrade_e2e dispatch_e2e config_e2e menu_e2e nginx_tests backup_tests migrate_e2e iso_e2e lara_e2e sftp_e2e owner_e2e moveq_e2e sot_e2e pg_e2e adopt_e2e deploy_e2e)
+DEFAULT_CASES=(p0_tests p1_tests upgrade_e2e dispatch_e2e config_e2e menu_e2e nginx_tests backup_tests migrate_e2e iso_e2e lara_e2e sftp_e2e owner_e2e moveq_e2e sot_e2e pg_e2e adopt_e2e deploy_e2e node_e2e host_e2e)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,6 +25,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 [[ "$UBUNTU" == 22.04 ]] && PHP=8.1
+[[ "$UBUNTU" == 26.04 ]] && PHP=8.5
 cases=("$@")
 [[ ${#cases[@]} -eq 0 ]] && cases=("${DEFAULT_CASES[@]}")
 [[ "${cases[0]}" == all ]] && cases=("${DEFAULT_CASES[@]}")
@@ -85,7 +86,10 @@ for case_name in "${cases[@]}"; do
     continue
   fi
   # Cases are written for PHP 8.3; 22.04 ships 8.1 as its default version.
-  docker exec "$NAME" bash -c 'sed "$1" "$2" > /case.sh' _ "s/8\\.3/${PHP}/g" "$script"
+  # 26.04 has only its own PHP 8.5 until ondrej/php covers it, so the
+  # "newer PHP" cases (8.4) use 8.5 there.
+  newer=8.4; [[ "$UBUNTU" == 26.04 ]] && newer=8.5
+  docker exec "$NAME" bash -c 'sed -e "$1" -e "$2" "$3" > /case.sh' _ "s/8\\.3/${PHP}/g" "s/8\\.4/${newer}/g" "$script"
   echo "[e2e] ${case_name}"
   out="${artifact_dir}/${case_name}.log"
   docker exec "$NAME" rm -f /tmp/simai-test-executions.jsonl

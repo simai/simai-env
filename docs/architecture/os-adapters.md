@@ -9,7 +9,7 @@ Coverage:
 
 Current state:
 - Only Ubuntu adapter is implemented (`lib/os_adapter.sh` + `lib/os/ubuntu.sh`).
-- OS support matrix is unchanged: Ubuntu 22.04/24.04, enforced by `lib/platform.sh`.
+- OS support matrix is unchanged: Ubuntu 22.04/24.04/26.04, enforced by `lib/platform.sh`.
 
 Extending:
 - Add a new adapter file under `lib/os/` (e.g., `lib/os/debian.sh`) and expand `os_adapter_init` to source it when `PLATFORM_OS_ID` matches.

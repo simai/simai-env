@@ -18,7 +18,7 @@ DB_USER="simai"
 DB_PASS=""
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
-PHP_VERSION="8.2"
+PHP_VERSION=""
 MYSQL_FLAVOR="mysql"
 NODE_VERSION="22"
 NODESOURCE_KEY_FPR="6F71F525282841EEDAF851B42F59B5F99B1BE0B4"
@@ -65,7 +65,7 @@ Usage:
   simai-env.sh [install] --domain <domain> --project-name <project-slug> [options]
   simai-env.sh --existing --path <project-root> --domain <domain> [options]
   simai-env.sh clean --project-name <project-slug> --domain <domain> [clean options]
-  simai-env.sh bootstrap [--php 8.2] [--mysql mysql|percona] [--node-version 22] [--silent]
+  simai-env.sh bootstrap [--php 8.2|none] [--mysql mysql|percona|none] [--node-version 22] [--silent]
 
 Install options:
   --domain <fqdn>            Server name for nginx
@@ -77,8 +77,9 @@ Install options:
   --db-pass <pass>           Database password (generated if empty)
   --db-host <host>           Database host (default: 127.0.0.1)
   --db-port <port>           Database port (default: 3306)
-  --php <version>            PHP version (default: 8.2; installable versions depend on apt repositories)
-  --mysql <mysql|percona>    MySQL implementation (default: mysql)
+  --php <version|none>       PHP version (default: 8.2 where ondrej/php covers the release,
+                             otherwise the release's own PHP); none skips PHP and Composer
+  --mysql <mysql|percona|none>  MySQL implementation (default: mysql); none skips it
   --node-version <N>         Node.js major version (default: 22)
   --run-migrations           Run php artisan migrate --force
   --optimize                 Run artisan caches (config/route/view)
@@ -381,6 +382,7 @@ parse_args() {
         ;;
       --mysql)
         MYSQL_FLAVOR="$2"
+        [[ "$MYSQL_FLAVOR" =~ ^(mysql|percona|none)$ ]] || fail "Invalid --mysql: ${MYSQL_FLAVOR} (expected mysql, percona or none)"
         shift 2
         ;;
       --node-version)
@@ -454,6 +456,7 @@ ensure_defaults() {
   if [[ $ACTION == "bootstrap" ]]; then
     return 0
   fi
+  [[ -n $PHP_VERSION ]] || PHP_VERSION="8.2"
   if [[ -z $PROJECT_NAME && -n $PROJECT_PATH ]]; then
     PROJECT_NAME=$(basename "$PROJECT_PATH")
   fi
@@ -505,7 +508,7 @@ install_packages() {
   apt_update_once
   os_cmd_pkg_install \
     software-properties-common ca-certificates curl gnupg lsb-release sudo cron acl \
-    git unzip htop rsyslog logrotate certbot fail2ban
+    git unzip htop rsyslog logrotate certbot fail2ban iproute2
   run_long "Installing base utilities" "${OS_CMD[@]}" || fail "Failed to install base utilities"
   os_svc_enable_now cron || true
   if command -v systemctl >/dev/null 2>&1; then
@@ -544,8 +547,13 @@ EOF
 }
 
 install_php_stack() {
+  [[ "$PHP_VERSION" == none ]] && { info "PHP skipped (--php none)"; return 0; }
   apt_update_once
-  if ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q ondrej; then
+  if [[ "$PHP_VERSION" == "$(platform_native_php_version)" ]]; then
+    info "Using PHP ${PHP_VERSION} from the Ubuntu repository"
+  elif ! platform_ondrej_php_available; then
+    fail "PHP ${PHP_VERSION} needs ondrej/php, which has no packages for ${PLATFORM_OS_CODENAME} yet; use --php $(platform_native_php_version)"
+  elif ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q ondrej; then
     info "Adding ondrej/php PPA"
     os_cmd_pkg_add_ppa "ppa:ondrej/php"
     if ! run_long "Adding ondrej/php" "${OS_CMD[@]}"; then
@@ -557,8 +565,10 @@ install_php_stack() {
   local pkgs=(
     "php${PHP_VERSION}" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-mbstring"
     "php${PHP_VERSION}-intl" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" "php${PHP_VERSION}-xml"
-    "php${PHP_VERSION}-gd" "php${PHP_VERSION}-imagick" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-opcache" "php${PHP_VERSION}-redis"
+    "php${PHP_VERSION}-gd" "php${PHP_VERSION}-imagick" "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-redis"
   )
+  # PHP 8.5 builds OPcache into the core; earlier versions package it.
+  [[ "$(printf '%s\n8.5\n' "$PHP_VERSION" | sort -V | head -n1)" == 8.5 ]] || pkgs+=("php${PHP_VERSION}-opcache")
   os_cmd_pkg_install "${pkgs[@]}"
   if ! run_long "Installing PHP ${PHP_VERSION} stack" "${OS_CMD[@]}"; then
     fail "Failed to install PHP ${PHP_VERSION}"
@@ -601,6 +611,7 @@ EOF
 }
 
 install_mysql() {
+  [[ "$MYSQL_FLAVOR" == none ]] && { info "Database server skipped (--mysql none)"; return 0; }
   apt_update_once
   if [[ $MYSQL_FLAVOR == "percona" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/percona-release.list ]]; then
@@ -698,6 +709,7 @@ install_node() {
 }
 
 install_composer() {
+  [[ "$PHP_VERSION" == none ]] && return 0
   if command -v composer >/dev/null 2>&1; then
     info "Composer already installed"
     return
@@ -1089,6 +1101,8 @@ bootstrap_flow() {
   progress_step "Installing base utilities"
   install_packages
   configure_fail2ban_sshd
+  [[ -n "$PHP_VERSION" ]] || PHP_VERSION=$(platform_default_php_version)
+  [[ -n "$PHP_VERSION" ]] || fail "No default PHP for ${PLATFORM_OS_PRETTY}; pass --php <version> or --php none"
   progress_step "Installing PHP ${PHP_VERSION}"
   install_php_stack
   progress_step "Installing nginx"

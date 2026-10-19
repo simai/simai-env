@@ -22,7 +22,8 @@ add b1.test --owner beta
 add solo.test
 grep -q '^user = acme' /etc/php/8.3/fpm/pool.d/a1-test.conf && grep -q '^user = acme' /etc/php/8.3/fpm/pool.d/a2-test.conf && ok "both acme sites run as acme" || bad "acme pools"
 [[ -L /home/acme/sites/a1.test ]] && ok "~/sites link for owner" || bad "no sites link"
-cli site info --domain a1.test 2>/dev/null | grep -q 'Runs as.*acme' && ok "site info shows owner" || bad "site info"
+cli site info --domain a1.test >/tmp/info.a1 2>&1
+grep -q 'Runs as.*acme' /tmp/info.a1 && ok "site info shows owner" || { bad "site info"; grep -iE "runs as|error|warn" /tmp/info.a1 | head -5; }
 
 probe='<?php foreach (explode(",", $_GET["f"]) as $f) echo $f, "=", (@file_get_contents($f)===false?"DENIED":"READ"), "\n";'
 for s in a1 a2 b1 solo; do d=/home/simai/www/$s.test; printf '%s' "$probe" >$d/public/p.php; echo s >$d/secret.txt; o=$(stat -c %U $d); chown $o:$o $d/public/p.php $d/secret.txt; done

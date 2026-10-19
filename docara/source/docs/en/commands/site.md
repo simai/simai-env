@@ -430,3 +430,21 @@ Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
   wins, site overrides are kept). For Bitrix sites it also aligns the request
   budget to 300 seconds in nginx, PHP-FPM and PHP. Every file is backed up
   first and restored if validation or reload fails.
+
+## Node.js services (profile `node`)
+
+```bash
+sudo /root/simai-env/simai-admin.sh profile enable --id node --confirm yes
+sudo /root/simai-env/simai-admin.sh site add --domain D --profile node --confirm yes   # optional --app-port 3189
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git https://github.com/org/service.git --ref v1.0.0 --confirm yes
+sudo /root/simai-env/simai-admin.sh site service-restart --domain D --confirm yes
+journalctl -u simai-app-<project> -n 100
+```
+
+The site gets a local port and an nginx proxy; the release describes the
+service in `.simai/app.json` (`node.start`, dependencies, Python
+requirements, shared paths, health check). Deploy builds as the site user,
+runs `simai-app-<project>.service` from `current` (restarted on failure and
+on boot) and returns to the previous release when the health check fails.
+Details: `docs/architecture/app-manifest.md`.
+

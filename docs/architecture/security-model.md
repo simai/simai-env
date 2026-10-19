@@ -1,6 +1,6 @@
 # Security Model
 
-- OS scope: Ubuntu 22.04/24.04 only.
+- OS scope: Ubuntu 22.04/24.04/26.04 only.
 - Web root: always `<project-root>/public`; catch-all default_server returns 444.
 - Least privilege:
   - shared account `simai` owns `/home/simai` and runs legacy sites

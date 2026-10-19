@@ -66,11 +66,11 @@ read_os_release() {
 }
 
 supported_matrix_string() {
-  echo "Ubuntu 22.04 LTS, Ubuntu 24.04 LTS"
+  echo "Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Ubuntu 26.04 LTS"
 }
 
 is_supported_os() {
-  [[ "$OS_ID" == "ubuntu" && ( "$OS_VERSION_ID" == "22.04" || "$OS_VERSION_ID" == "24.04" ) ]]
+  [[ "$OS_ID" == "ubuntu" && ( "$OS_VERSION_ID" == "22.04" || "$OS_VERSION_ID" == "24.04" || "$OS_VERSION_ID" == "26.04" ) ]]
 }
 
 install_ref_is_valid() {
@@ -251,7 +251,13 @@ MENU_LAUNCHED=0
 if install_bootstrap_enabled; then
   echo "[1/3] Running bootstrap (packages and services)..."
   export DEBIAN_FRONTEND=noninteractive
-  if ! "${INSTALL_DIR}/simai-env.sh" bootstrap --php 8.2 --mysql percona --node-version 22 --silent; then
+  # SIMAI_INSTALL_PHP / SIMAI_INSTALL_DB: a version or "none" for hosts that
+  # run no PHP or MySQL (for example a Node-only service host).
+  install_db="${SIMAI_INSTALL_DB:-}"
+  [[ -n "$install_db" ]] || install_db=percona
+  bootstrap_args=(--mysql "$install_db" --node-version "${SIMAI_INSTALL_NODE:-22}" --silent)
+  [[ -n "${SIMAI_INSTALL_PHP:-}" ]] && bootstrap_args+=(--php "$SIMAI_INSTALL_PHP")
+  if ! "${INSTALL_DIR}/simai-env.sh" bootstrap "${bootstrap_args[@]}"; then
     echo "Bootstrap failed. Check /var/log/simai-env.log for details." >&2
     exit 1
   fi
@@ -259,7 +265,7 @@ if install_bootstrap_enabled; then
   echo "[3/3] Bootstrap finished."
 else
   echo "Bootstrap skipped (SIMAI_INSTALL_MODE=${MODE}, SIMAI_INSTALL_NO_BOOTSTRAP=${NO_BOOT})."
-  echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --php 8.2 --mysql percona --node-version 22"
+  echo "You can run it later: sudo ${INSTALL_DIR}/simai-env.sh bootstrap --mysql percona --node-version 22"
 fi
 
 if install_profile_init_enabled; then

@@ -1,6 +1,6 @@
 # Architecture Overview
 
-simai-env is a bash-based installer and admin toolkit for hosting PHP sites on Ubuntu (22.04/24.04).
+simai-env is a bash-based installer and admin toolkit for hosting PHP sites on Ubuntu (22.04/24.04/26.04).
 
 - Installer (`simai-env.sh`): bootstraps base stack (nginx, PHP-FPM, MySQL/Percona, redis, Node.js, certbot, composer), creates sites, and supports cleanup. No demo sites are created automatically.
 - Admin CLI (`simai-admin.sh`): registry-driven commands with an interactive menu and audit logging.

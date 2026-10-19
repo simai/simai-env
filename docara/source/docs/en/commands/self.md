@@ -435,6 +435,50 @@ Typical use:
 sudo /root/simai-env/simai-admin.sh self perf-apply --preset small --confirm yes
 ```
 
+## swap-status / swap-ensure
+
+```bash
+sudo /root/simai-env/simai-admin.sh self swap-status
+sudo /root/simai-env/simai-admin.sh self swap-ensure --size 2G                 # plan
+sudo /root/simai-env/simai-admin.sh self swap-ensure --size 2G --confirm yes
+```
+
+Creates `/swapfile` (keeping 2 GB of disk free), enables it, adds it to
+`/etc/fstab` and sets `vm.swappiness` (default 10) in
+`/etc/sysctl.d/60-simai-swap.conf`. Existing swap is respected: no second
+file is added. Repeated runs change nothing.
+
+## firewall-status / firewall-ensure / firewall-disable
+
+```bash
+sudo /root/simai-env/simai-admin.sh self firewall-ensure                        # plan
+sudo /root/simai-env/simai-admin.sh self firewall-ensure --allow '10050/tcp@192.0.2.10' --confirm yes
+sudo /root/simai-env/simai-admin.sh self firewall-disable --confirm yes         # rollback
+```
+
+ufw with incoming traffic denied except SSH, 80 and 443. SSH ports come from
+`sshd -T` and the ports sshd listens on (22 when neither can be read); the
+SSH rule is added and checked before the policy is enabled. The plan lists
+listening services that would become unreachable, such as a monitoring agent;
+keep one with `--allow <port>/<tcp|udp>@<source-ip[/cidr]>`.
+
+## settings / setting-set
+
+```bash
+sudo /root/simai-env/simai-admin.sh self settings
+sudo /root/simai-env/simai-admin.sh self setting-set --key SIMAI_SITE_ISOLATION --value no --confirm yes
+```
+
+`/etc/simai-env.conf` is read by every command, so only these keys can be set,
+with validated values, inside one managed block (a backup of the file is kept
+next to it):
+
+- `SIMAI_SITE_ISOLATION` — `yes` (default): each new site gets its own system
+  user; `no`: new sites run as the shared `simai` account (one account for all
+  products). Existing sites keep their user.
+- `SIMAI_LOCK_WAIT` — seconds automation waits for a busy lock.
+- `SIMAI_BACKUP_OFFSITE` — `user@host:/path` for off-site backup copies.
+
 ## Notes
 - The regular `System` menu intentionally shows simple labels such as `Platform status`, `Optimization status`, `Optimization plan`, and `Automatic optimization`.
 - Scheduler internals and `Health review` remain in Advanced mode.

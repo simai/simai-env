@@ -4,7 +4,7 @@ This runbook describes a practical production workflow for WordPress sites on `s
 
 ## 1) Preconditions
 
-- OS: Ubuntu 22.04/24.04.
+- OS: Ubuntu 22.04/24.04/26.04.
 - Domain points to server IP.
 - TLS email is ready for Let's Encrypt.
 - You have backup/restore path for project files and DB.

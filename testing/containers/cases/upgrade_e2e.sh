@@ -8,6 +8,10 @@ fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
 OLD_REF="previous release (/opt/simai-baseline, exported by run.sh)"
 
 [[ -f /opt/simai-baseline/simai-admin.sh ]] || { echo "FAIL baseline toolkit missing in /opt/simai-baseline"; exit 1; }
+# There is no upgrade path from a release that did not support this OS.
+if ! bash -c 'source /opt/simai-baseline/lib/platform.sh; platform_detect_os; platform_is_supported_os'; then
+  echo "PASS skipped: the baseline does not support $(. /etc/os-release; echo "$PRETTY_NAME")"; echo "failures=0"; exit 0
+fi
 rm -rf /root/simai-env && cp -a /opt/simai-baseline /root/simai-env
 chmod +x /root/simai-env/*.sh
 cd /root/simai-env
