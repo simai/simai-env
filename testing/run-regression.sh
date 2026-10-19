@@ -204,9 +204,9 @@ run_core() {
 }
 
 run_menu() {
-  run_menu_case "menu site info cancel" $'1\n3\n0\n\n0\n0\n' "---- done (site info), exit=89 ----"
-  run_menu_case "menu ssl status cancel" $'2\n2\n0\n\n0\n0\n' "---- done (ssl status), exit=89 ----"
-  run_menu_case "menu site remove cancel" $'1\n10\n0\n\n0\n0\n' "---- done (site remove), exit=89 ----"
+  run_menu_case "menu site info cancel" $'1\n3\n0\n\n0\n0\n' "---- done (site info), command_exit=not_started ----"
+  run_menu_case "menu ssl status cancel" $'2\n2\n0\n\n0\n0\n' "---- done (ssl status), command_exit=not_started ----"
+  run_menu_case "menu site remove cancel" $'1\n10\n0\n\n0\n0\n' "---- done (site remove), command_exit=not_started ----"
   run_menu_case "menu backup inspect cancel" $'8\n2\n0\n\n0\n0\n' "---- done (backup inspect), command_exit=not_started ----"
   run_menu_case "menu access pre-dispatch cancel" $'5\n3\n0\n\n0\n0\n' "---- done (access create-project), command_exit=not_started ----"
 }
