@@ -2190,6 +2190,7 @@ ensure_certbot_reload_hook() {
   install -d -m 0755 "$dir" || return 1
   printf '#!/bin/sh\n# simai-env: load renewed certificates.\nnginx -t -q && systemctl reload nginx\n' >"$hook" || return 1
   chmod 0755 "$hook"
+  # shellcheck disable=SC2034 # read by self_migrate_certbot_hook
   SITE_CERTBOT_HOOK_CREATED=1
 }
 
