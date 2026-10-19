@@ -31,6 +31,11 @@
 - PHP 8.5 builds OPcache into the core: no `php8.5-opcache` package is
   requested. Bootstrap installs `iproute2`; apt waits for the dpkg lock held by
   unattended-upgrades after the first boot.
+- Handlers that start `simai-admin.sh` again now dispatch: the worker no
+  longer passes `SIMAI_SOURCE_ONLY` to child processes. Since 1.15.0 the
+  `self migrate` that `self update` runs did nothing; run
+  `simai-admin.sh self migrate --confirm yes` once after updating to 1.16.0
+  if the host was updated by 1.15.x.
 - A confirmed deploy of a service site installs the apt packages its manifest
   declares (and `python3-venv` for Python requirements): service sites have no
   `site adopt` step. The deploy source is recorded on one line again.

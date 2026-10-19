@@ -22,6 +22,10 @@ register_cmd fixture write 'mutation injection' fixture_write '' 'domain='
 register_cmd fixture hold 'lock injection' fixture_hold '' 'domain='
 register_cmd fixture nested 'nested lock injection' fixture_nested '' 'domain='
 register_cmd fixture secret 'secret output injection' fixture_secret '' '' 'effects:read'
+fixture_cli() { rm -f /tmp/dispatch-cli; SIMAI_ADMIN_MENU=0 bash ./simai-admin.sh fixture mark --confirm yes; }
+fixture_mark() { touch /tmp/dispatch-cli; }
+register_cmd fixture cli 'nested CLI invocation' fixture_cli '' ''
+register_cmd fixture mark 'nested CLI target' fixture_mark '' ''
 EOF
 if cli fixture fail >/tmp/fail.out 2>&1; then bad 'failed step returned success'; else ok 'failure survives conditional caller'; fi
 [[ ! -e /tmp/dispatch-continued ]] && ok 'later step never ran' || bad 'handler continued'
@@ -51,6 +55,8 @@ sleep 1
 rc=0; cli fixture write --domain lock.test --confirm yes >/tmp/nested-busy.out 2>&1 || rc=$?
 [[ $rc -eq 75 ]] && ok 'nested operation preserves external lock' || bad 'nested lock'
 wait "$holder" && ok 'nested operation completed without deadlock' || { bad 'nested failed'; tail /tmp/nested.out; }
+cli fixture cli --confirm yes >/tmp/cli.out 2>&1
+[[ -e /tmp/dispatch-cli ]] && ok 'handler can run simai-admin.sh again (self update -> self migrate)' || { bad 'nested CLI did not dispatch'; tail -5 /tmp/cli.out; }
 cli fixture secret --output json >/tmp/secret.json 2>/tmp/secret.err
 ! grep -q 'fixture-secret' /tmp/secret.json /tmp/secret.err && ok 'handler text is absent from JSON and stderr' || bad 'JSON leaked handler output'
 cli self commands >/tmp/commands.json 2>/tmp/commands.err

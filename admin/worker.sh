@@ -3,6 +3,9 @@
 set -euo pipefail
 export SIMAI_SOURCE_ONLY=1
 source "$(dirname "${BASH_SOURCE[0]}")/../simai-admin.sh"
+# Only this interpreter loads definitions without dispatching. Handlers that
+# start simai-admin.sh again (self update -> self migrate) must dispatch.
+unset SIMAI_SOURCE_ONLY
 section="$1"; name="$2"; shift 2
 key="${section}:${name}"
 handler="${CMD_HANDLERS[$key]:-}"

@@ -440,8 +440,10 @@ site_deploy_handler() {
   deploy_prune "$root" "$keep"
 
   local http_code
-  http_code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${domain}" http://127.0.0.1/ --max-time 20 || echo 000)
-  ui_result_table "Domain|${domain}" "Release|${release_id}" "Previous|${DEPLOY_PREVIOUS}" "Migrated|${migrate}" "Local HTTP|${http_code}"
+  local probe=/
+  [[ "$service" == yes ]] && probe="${APP_HEALTH_PATH:-/}"
+  http_code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${domain}" "http://127.0.0.1${probe}" --max-time 20 || echo 000)
+  ui_result_table "Domain|${domain}" "Release|${release_id}" "Previous|${DEPLOY_PREVIOUS}" "Migrated|${migrate}" "Local HTTP ${probe}|${http_code}"
   ui_next_steps
   ui_kv "Roll back" "simai-admin.sh site deploy-rollback --domain ${domain} --confirm yes"
 }
