@@ -32,6 +32,7 @@ self_migrate_observer_storage() {
     SELF_MIGRATE_CHANGES+=("observer ${slug} -> ${target}")
   done
   rmdir "$legacy" 2>/dev/null || true
+  return 0
 }
 
 self_migrate_catchall() {
@@ -57,7 +58,11 @@ self_migrate_home_owner() {
   parent=$(dirname "$SIMAI_HOME")
   owner=$(stat -c '%U' "$parent" 2>/dev/null) || return 0
   [[ "$parent" == /home && "$owner" == "$SIMAI_BASE_USER" ]] || return 0
-  chown root:root "$parent" && chmod 0755 "$parent" && SELF_MIGRATE_CHANGES+=("/home owner restored to root")
+  if chown root:root "$parent" && chmod 0755 "$parent"; then
+    SELF_MIGRATE_CHANGES+=("/home owner restored to root")
+  else
+    warn "Could not restore root ownership of ${parent}"
+  fi
 }
 
 # Site users can read anything world-readable under the shared home. Report
@@ -123,7 +128,21 @@ self_migrate_agent_guide() {
     return 0
   fi
   [[ -e "$link" || -L "$link" ]] && return 0
-  ln -s "$guide" "$link" && SELF_MIGRATE_CHANGES+=("/root/AGENTS.md -> ${guide}")
+  if ln -s "$guide" "$link"; then
+    SELF_MIGRATE_CHANGES+=("/root/AGENTS.md -> ${guide}")
+  else
+    warn "Could not link ${link}"
+  fi
+}
+
+self_migrate_confirmed_schedules() {
+  local file changed
+  for file in /etc/cron.d/simai-scheduler /etc/cron.d/simai-runtime-observer-* /etc/cron.d/simai-backup-*; do
+    [[ -f "$file" ]] || continue
+    changed=$(python3 "${SIMAI_ENV_ROOT}/lib/cron_confirm.py" "$file") || return 1
+    [[ -z "$changed" ]] || SELF_MIGRATE_CHANGES+=("${changed}: explicit confirmation; original cron retained in private recovery storage")
+  done
+  return 0
 }
 
 self_migrate_handler() {
@@ -136,6 +155,7 @@ self_migrate_handler() {
   self_migrate_catchall
   self_migrate_bitrix_runtime
   self_migrate_agent_guide
+  self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"
   else
@@ -153,4 +173,7 @@ self_migrate_handler() {
   return 0
 }
 
-register_cmd "self" "migrate" "Apply idempotent host migrations after an update" "self_migrate_handler" "" "" "tier:advanced"
+# confirm:none: toolkits up to 1.14.x run `self migrate` after `self update`
+# without --confirm; requiring it would leave managed cron unconfirmed and
+# silently stop scheduled backups, observer snapshots and further updates.
+register_cmd "self" "migrate" "Apply idempotent host migrations after an update" "self_migrate_handler" "" "" "tier:advanced confirm:none"

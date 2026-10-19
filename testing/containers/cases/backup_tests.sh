@@ -11,7 +11,7 @@ id simai >/dev/null 2>&1 || useradd -m simai
 fails=0
 ok() { echo "PASS $*"; }
 bad() { echo "FAIL $*"; fails=$((fails + 1)); }
-cli() { bash ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then bash ./simai-admin.sh "$@"; return; fi; done; bash ./simai-admin.sh "$@" --confirm yes; }
 
 D=shop.example.com
 root=/home/simai/www/$D
@@ -51,7 +51,7 @@ n=$(find /var/backups/simai/$D -mindepth 1 -maxdepth 1 -type d | wc -l)
 # 4. Restore
 good=$(ls -1d /var/backups/simai/$D/2* | tail -1)
 mysql -uroot -e "DELETE FROM shop.orders; INSERT INTO shop.orders VALUES (9,9);"
-cli backup data-restore --domain $D --path "$good" >/tmp/plan 2>&1; grep -q "Rerun with --confirm yes" /tmp/plan && ok "restore without confirm is a plan" || bad "restore plan"
+bash ./simai-admin.sh backup data-restore --domain $D --path "$good" >/tmp/plan 2>&1; grep -q "Rerun with --confirm yes" /tmp/plan && ok "restore without confirm is a plan" || bad "restore plan"
 [[ "$(mysql -uroot -N -e 'SELECT COUNT(*) FROM shop.orders')" == 1 ]] && ok "plan changed nothing" || bad "plan modified DB"
 cli backup data-restore --domain $D --path "$good" --confirm yes >/tmp/r 2>&1 || { bad "restore rc"; cat /tmp/r; }
 [[ "$(mysql -uroot -N -e 'SELECT SUM(total) FROM shop.orders')" == 350 ]] && ok "database restored" || bad "restored data wrong"

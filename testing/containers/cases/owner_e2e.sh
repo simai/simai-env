@@ -6,7 +6,7 @@ command -v sshd >/dev/null || { apt-get update -qq >/dev/null; apt-get install -
 systemctl start ssh
 rm -rf /root/simai-env && cp -r /src /root/simai-env && chmod +x /root/simai-env/*.sh; cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
-cli() { ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then ./simai-admin.sh "$@"; return; fi; done; ./simai-admin.sh "$@" --confirm yes; }
 http() { curl -s -H "Host: $1" "http://127.0.0.1$2"; }
 
 ssh-keygen -q -t ed25519 -N '' -f /root/k1; ssh-keygen -q -t ed25519 -N '' -f /root/k2

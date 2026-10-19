@@ -4,7 +4,7 @@ set -uo pipefail
 cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
 command -v sshd >/dev/null || { apt-get install -y -qq openssh-server >/dev/null 2>&1; systemctl start ssh; }
-./simai-admin.sh access create-project --domain alpha.test --login alphadev --password 'Xy7-test-pass-123' >/tmp/acc 2>&1 || { bad "access create-project"; tail -20 /tmp/acc; }
+./simai-admin.sh access create-project --domain alpha.test --login alphadev --password 'Xy7-test-pass-123' --confirm yes >/tmp/acc 2>&1 || { bad "access create-project"; tail -20 /tmp/acc; }
 A=/home/simai/www/alpha.test
 getfacl -p "$A" 2>/dev/null | grep -q '^user:site-alpha-test:rwx' && ok "ACL grants site user" || { bad "ACL"; getfacl -p "$A"; }
 getfacl -p "$A" 2>/dev/null | grep -q '^user:simai:' && bad "ACL still grants shared simai" || ok "no ACL for shared simai"

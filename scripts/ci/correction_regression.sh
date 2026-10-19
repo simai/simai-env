@@ -67,7 +67,7 @@ test_site_metadata_cleanup() {
 
 test_command_option_validation() {
   local core="${ROOT_DIR}/admin/core.sh"
-  grep -Fq 'validate_command_options "$section" "$name" "$@" || return 1' "$core" \
+  grep -Fq 'if ! validate_command_options "$section" "$name" "${command_args[@]}"; then' "$core" \
     || fail "command dispatch does not validate options"
   grep -Fq 'Unknown option for ${section} ${name}: --${option}' "$core" \
     || fail "unknown-option error contract is missing"
@@ -542,7 +542,7 @@ test_site_isolation_contracts() {
     || fail "Bitrix baseline must live in the profile ini block (site php-ini changes rewrite the site block)"
   ! extract_function create_php_pool "${ROOT_DIR}/admin/lib/site_utils.sh" | grep -Fq 'simai-site-ini-begin' \
     || fail "create_php_pool writes profile settings into the site ini block"
-  grep -Fq 'site_command_context "$@"; "$handler" "$@"' "${ROOT_DIR}/admin/core.sh" \
+  grep -Fq 'site_command_context "$@"' "${ROOT_DIR}/admin/worker.sh" \
     || fail "dispatcher does not apply the site user context"
   ! extract_function access_grant_global_acl "${ROOT_DIR}/admin/lib/access_utils.sh" | grep -Fq 'u:${SIMAI_USER}' \
     || fail "global SFTP ACL grants the shared user on every site"

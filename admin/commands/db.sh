@@ -197,9 +197,9 @@ db_status_handler() {
     local cfg="/etc/mysql/mysql.conf.d/mysqld.cnf"
     if [[ -f "$cfg" ]]; then
       local val
-      val=$(grep -E '^[[:space:]]*port[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]')
+      val=$(grep -E '^[[:space:]]*port[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]' || true)
       [[ -n "$val" ]] && port="$val"
-      val=$(grep -E '^[[:space:]]*datadir[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]')
+      val=$(grep -E '^[[:space:]]*datadir[[:space:]]*=' "$cfg" | tail -n1 | awk -F= '{print $2}' | tr -d '[:space:]' || true)
       [[ -n "$val" ]] && datadir="$val"
     fi
   fi
@@ -266,5 +266,5 @@ db_list_handler() {
 register_cmd "db" "create" "Legacy: Create database and user (use 'site db-create')" "db_create_handler" "name user pass" "" "menu:hidden"
 register_cmd "db" "drop" "Legacy: Drop database (use 'site db-drop')" "db_drop_handler" "name" "drop-user=0 user= confirm=" "menu:hidden"
 register_cmd "db" "set-pass" "Legacy: Change DB user password (use 'site db-rotate')" "db_pass_handler" "user pass" "" "menu:hidden"
-register_cmd "db" "status" "Show MySQL/Percona service status" "db_status_handler" "" ""
-register_cmd "db" "list" "List databases" "db_list_handler" "" ""
+register_cmd "db" "status" "Show MySQL/Percona service status" "db_status_handler" "" "" "effects:read"
+register_cmd "db" "list" "List databases" "db_list_handler" "" "" "effects:read"

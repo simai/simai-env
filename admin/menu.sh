@@ -154,6 +154,7 @@ actsellistbox=black,cyan
     fi
     echo
     echo "Result: ${section} ${cmd}"
+    [[ -z "${SIMAI_MENU_TARGET:-}" ]] || echo "Target: ${SIMAI_MENU_TARGET}"
     echo "Status: ${status}"
     if [[ "$streamed" == "yes" ]]; then
       if [[ -s "$output_file" ]]; then
@@ -472,6 +473,7 @@ actsellistbox=black,cyan
   menu_command_needs_confirmation() {
     local section="$1" cmd="$2"
     shift 2
+    [[ "$(command_effect "$section:$cmd" "$@")" != read ]] || return 1
     local flags
     flags="$(get_command_flags "$section" "$cmd")"
     if [[ " ${flags} " == *" menu:confirm "* ]]; then
@@ -518,8 +520,12 @@ actsellistbox=black,cyan
     desc="$(get_command_desc "$section" "$cmd")"
     [[ -z "$desc" ]] && desc="${section} ${cmd}"
     scope="$(menu_command_scope "$@")"
+    local owner=''
+    if [[ "$scope" != 'platform scope' ]] && declare -F read_site_metadata >/dev/null && read_site_metadata "$scope" 2>/dev/null; then
+      owner=$(site_effective_user "${SITE_META[project]:-$(project_slug_from_domain "$scope")}")
+    fi
     choice=$(select_from_list \
-      $'Confirm managed-state change\nAction: '"${desc}"$'\nTarget: '"${scope}" \
+      $'Confirm managed-state change\nAction: '"${desc}"$'\nTarget: '"${scope}"$'\nApplication account: '"${owner:-not applicable}"$'\nAdministrator: root' \
       "no" \
       "no" \
       "yes")
@@ -534,6 +540,14 @@ actsellistbox=black,cyan
     local required
     required="$(get_required_opts "$section" "$cmd")"
     local -a args=("$@")
+    local available
+    available=" $(get_required_opts "$section" "$cmd") $(get_optional_opts "$section" "$cmd") "
+    if [[ "$available" == *' domain='* || "$available" == *' domain '* ]] && [[ "$section:$cmd" != site:add ]] && ! menu_args_has_key domain "${args[@]}"; then
+      local selected
+      selected=$(menu_prompt_required_arg "$section" "$cmd" domain) || true
+      if [[ -z "$selected" ]]; then menu_cancel_before_command "$section" "$cmd"; return 0; fi
+      args+=(--domain "$selected")
+    fi
     if [[ -n "$required" ]]; then
       local key val
       for key in $required; do
@@ -548,11 +562,14 @@ actsellistbox=black,cyan
         args+=("--$key" "$val")
       done
     fi
-    if menu_command_needs_confirmation "$section" "$cmd" "${args[@]}"; then
+    export SIMAI_MENU_TARGET
+    SIMAI_MENU_TARGET=$(menu_command_scope "${args[@]}")
+    if [[ "$(command_effect "$section:$cmd" "${args[@]}")" != read && "$section:$cmd" != site:add ]] || menu_command_needs_confirmation "$section" "$cmd" "${args[@]}"; then
       if ! menu_confirm_command "$section" "$cmd" "${args[@]}"; then
         menu_cancel_before_command "$section" "$cmd"
         return 0
       fi
+      if ! menu_args_has_key confirm "${args[@]}"; then args+=(--confirm yes); fi
     fi
     local out_file
     out_file="$(mktemp)"
@@ -626,6 +643,7 @@ actsellistbox=black,cyan
           "9|Change site PHP"
           "10|Remove site"
           "20|Automatic optimization..."
+          "21|Normalize PHP/nginx profile settings"
           "0|Back"
         )
       fi
@@ -643,6 +661,7 @@ actsellistbox=black,cyan
         9) run_menu_command site set-php ;;
         10) run_menu_command site remove ;;
         20) [[ $show_advanced -eq 1 ]] && site_automation_menu || menu_invalid_choice ;;
+        21) [[ $show_advanced -eq 1 ]] && run_menu_command site config-normalize || menu_invalid_choice ;;
         0) break ;;
         "") continue ;;
         "__invalid__") menu_invalid_choice ;;
@@ -715,7 +734,7 @@ actsellistbox=black,cyan
         "0|Back"
       )
       if [[ $show_advanced -eq 1 ]]; then
-        items=("1|List databases" "2|Database server status" "3|Prepare site database" "4|Write DB credentials to project .env" "5|Rotate database password" "20|Remove database for site" "0|Back")
+        items=("1|List databases" "2|Database server status" "3|Prepare site database" "4|Write DB credentials to project .env" "5|Rotate database password" "20|Remove database for site" "21|Review database network exposure" "0|Back")
       fi
       local ch=""
       ch=$(menu_choose_key "Database" "Enter choice" "" "${items[@]}")
@@ -725,6 +744,7 @@ actsellistbox=black,cyan
         3) run_menu_command site db-create ;;
         4) run_menu_command site db-export ;;
         5) run_menu_command site db-rotate ;;
+        21) [[ $show_advanced -eq 1 ]] && run_menu_command db network-plan || menu_invalid_choice ;;
         20)
           if [[ $show_advanced -eq 1 ]]; then
             run_menu_command site db-drop
@@ -1089,6 +1109,8 @@ actsellistbox=black,cyan
         "5|Automation scheduler status"
         "6|Health review status"
         "7|Site review status"
+        "8|Environment description for AI (JSON)"
+        "9|AI capability catalog (JSON)"
         "0|Back"
       )
       local ch=""
@@ -1101,6 +1123,8 @@ actsellistbox=black,cyan
         5) run_menu_command self scheduler-status ;;
         6) run_menu_command self health-review-status ;;
         7) run_menu_command self site-review-status ;;
+        8) run_menu_command self describe ;;
+        9) run_menu_command self ai-catalog ;;
         0) break ;;
         "") continue ;;
         *) menu_invalid_choice ;;

@@ -109,16 +109,16 @@ app_write_workers() {
       rm -f -- "/etc/systemd/system/${unit}"
     fi
   done
-  os_svc_daemon_reload || true
+  os_svc_daemon_reload || return 1
   if [[ "$start" == yes ]]; then
     for unit in "${!wanted[@]}"; do
       if [[ -n "${changed[$unit]:-}" ]] && systemctl is-active --quiet "$unit"; then
         # New definition for a running worker. --no-block: the stop waits for
         # the current job (TimeoutStopSec may be days), not for this command.
-        systemctl restart --no-block "$unit" >/dev/null 2>&1 || warn "Restart ${unit} manually"
-        systemctl enable "$unit" >/dev/null 2>&1 || true
+        systemctl restart --no-block "$unit" >/dev/null 2>&1 || { error "Worker restart failed: ${unit}"; return 1; }
+        systemctl enable "$unit" >/dev/null 2>&1 || return 1
       else
-        os_svc_enable_now "$unit" >/dev/null 2>&1 || warn "Worker ${unit} did not start; see: journalctl -u ${unit}"
+        os_svc_enable_now "$unit" >/dev/null 2>&1 || { error "Worker ${unit} did not start; see: journalctl -u ${unit}"; return 1; }
       fi
     done
   fi

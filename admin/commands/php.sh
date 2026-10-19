@@ -178,6 +178,6 @@ php_install_handler() {
   echo "Next steps  : To switch a site, run: simai-admin.sh site set-php --domain <domain> --php ${php_version}"
 }
 
-register_cmd "php" "list" "List installed PHP versions and FPM status" "php_list_handler" "" ""
+register_cmd "php" "list" "List installed PHP versions and FPM status" "php_list_handler" "" "" "effects:read"
 register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "" "php=" "menu:confirm"
 register_cmd "php" "install" "Install a PHP version (FPM/CLI + base extensions)" "php_install_handler" "" "php= include-common= confirm=" "menu:internal-confirm"

@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+## 1.15.0 - 2026-10-19
+
+- Mutating CLI commands preview unless `--confirm yes` is supplied; `--dry-run`
+  and `--dry_run` override confirmation. Review scripts/cron on update.
+- Handlers execute in an independent fail-fast Bash interpreter. Site mutations
+  share a protected lock; host mutations exclude concurrent site mutations.
+- `--output json` returns a secret-free `simai-command-result/1` envelope.
+  Command discovery includes effects, authorization, confirmation and verification;
+  `self ai-catalog` generates the read-only AI First 1.0.0 pilot.
+- Bitrix nginx/PHP/FPM request budget is 300 seconds in every performance mode.
+  Managed pool writes remove duplicate keys; `site config-normalize` repairs
+  existing pools explicitly while preserving site overrides.
+- Observer status reads the existing snapshot by default; explicit refreshes
+  require confirmation. Newly generated observer/backup/scheduler cron includes it.
+- Version and auto-update status read cached state unless `--refresh yes` is
+  explicitly requested and confirmed.
+- Site diagnostics now handles expected probe failures explicitly under strict
+  execution and provides named checks/counts in JSON without raw config values.
+- First adoption starts new application workers without an immediate redundant
+  queue restart; existing workers still restart gracefully. Worker start/reload
+  failures propagate instead of being reported as successful adoption.
+- Host migration preserves existing managed cron jobs by adding confirmation
+  atomically after a verified private recovery copy.
+- `db network-plan` inspects exposure and prepares restriction/rollback.
+- Keep the admin entrypoint executable in source-based toolkit bundles.
+- Container tests freeze code and preserve case logs and execution receipts.
+  Static coverage no longer labels textual references as runtime proof.
+- `self migrate` no longer requires `--confirm`: hosts on 1.14.x run it
+  through the old `self update` handler without the flag, which left managed
+  cron unconfirmed so scheduled backups, observer snapshots and further
+  auto-updates silently did nothing. `upgrade_e2e` covers this path.
+- The scheduler takes the host lock only when a job is due; commands without a
+  terminal wait for a held lock (`SIMAI_LOCK_WAIT`, default 600 s) instead of
+  failing as busy.
+- Fixed strict-mode aborts in `self perf-status`, `laravel status`/`perf-*`,
+  `bitrix status`/`cron-status`, `wp status`, `db status` and `site doctor`;
+  `scripts/ci/errexit_lint.py` now blocks these patterns in CI.
+- `install.sh` confirms the initial `profile init`; `site set-php` takes the
+  host lock because it may install PHP; `db network-localize` checks the
+  effective bind address and site `DB_HOST` values before restarting MySQL;
+  rollback traps continue after a failed step; `--dry-run` reaches handlers
+  that print their own detailed plan.
+- `testing/run-regression.sh` confirms its mutating calls; container snapshots
+  no longer fail on macOS pipes. `db network-*` and `site config-normalize`
+  are documented.
+
 ## 1.14.0 - 2026-09-22
 
 ### Added

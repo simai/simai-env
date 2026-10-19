@@ -38,9 +38,12 @@ def command_rows(root: Path) -> list[dict[str, object]]:
     for key, meta in sorted(registrations.items()):
         flags = str(meta["flags"]).split()
         surface = "hidden_legacy" if "menu:hidden" in flags else ("menu" if key in menu_keys else "cli_only")
-        coverage = (["runtime_execution"] if key in runtime_keys else []) + ["dispatcher_harness"]
-        if key not in runtime_keys:
-            coverage.append("not_run_runtime")
+        # References describe planned coverage; only a current execution receipt
+        # may establish that a runtime scenario passed.
+        coverage = ["static_registration"]
+        if key in runtime_keys:
+            coverage.append("runtime_scenario_declared")
+        coverage += ["dispatcher_scenario_declared", "runtime_not_verified"]
         rows.append({"command": key, "surface": surface, "coverage": coverage, **meta})
     return rows
 
@@ -53,7 +56,7 @@ def main() -> int:
     args = parser.parse_args()
     root = args.root.resolve()
     rows = command_rows(root)
-    report = {"schema": "simai-env-command-coverage-v1", "total": len(rows), "classified": len(rows), "unclassified": 0, "surface_totals": {name: sum(row["surface"] == name for row in rows) for name in ("menu", "cli_only", "hidden_legacy")}, "rows": rows}
+    report = {"schema": "simai-env-command-coverage-v2", "evidence_kind": "static_inventory", "runtime_verified": 0, "total": len(rows), "classified": len(rows), "unclassified": 0, "surface_totals": {name: sum(row["surface"] == name for row in rows) for name in ("menu", "cli_only", "hidden_legacy")}, "rows": rows}
     if args.check and (not rows or report["classified"] != report["total"]):
         return 1
     payload = json.dumps(report, indent=2, sort_keys=True) + "\n"

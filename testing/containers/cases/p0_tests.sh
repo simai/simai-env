@@ -95,7 +95,7 @@ out=$(SIMAI_STRICT_HANDLERS=1 bash /tmp/strict.sh)
 [[ "$out" == "rc=1" ]] && ok "strict mode aborts handler" || bad "strict output: $out"
 out=$(bash /tmp/strict.sh | tr '\n' ' ')
 [[ "$out" == "reached rc=0 " ]] && ok "default mode unchanged" || bad "default output: $out"
-grep -q 'if \[\[ "\${SIMAI_STRICT_HANDLERS:-0}" == "1" \]\]' admin/core.sh && ok "core.sh uses the tested strict pattern" || bad "core.sh pattern differs"
+grep -q 'admin/worker.sh' admin/core.sh && ok "dispatcher uses an independent interpreter" || bad "worker missing"
 
 echo "failures=${fails}"
 exit "$fails"

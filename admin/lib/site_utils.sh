@@ -535,7 +535,7 @@ cron_legacy_detect_marked() {
     IFS="|" read -r fmt_id begin_re end_re <<<"$fmt"
     local begin_line=0 end_line=0 nr=0
     while IFS= read -r line; do
-      ((nr++))
+      nr=$(( nr + 1 ))
       if [[ $begin_line -eq 0 && $line =~ $begin_re ]]; then
         begin_line=$nr
         continue
@@ -728,7 +728,11 @@ apply_site_php_ini_overrides_to_pool() {
   fi
 
   local profile_block=""
-  profile_block=$(awk '/; simai-profile-ini-begin/{flag=1}flag{print}/; simai-profile-ini-end/{flag=0}' "$pool_file")
+  if grep -qs '^# simai-profile: bitrix$' "/etc/nginx/sites-available/${domain}.conf"; then
+    profile_block=$(bitrix_profile_ini_block)
+  else
+    profile_block=$(awk '/; simai-profile-ini-begin/{flag=1}flag{print}/; simai-profile-ini-end/{flag=0}' "$pool_file")
+  fi
 
   local base_content
   base_content=$(sed '/; simai-profile-ini-begin/,/; simai-profile-ini-end/d;/; simai-site-ini-begin/,/; simai-site-ini-end/d' "$pool_file")
@@ -744,6 +748,8 @@ apply_site_php_ini_overrides_to_pool() {
     new_content+="$profile_block"
     [[ "${new_content: -1}" != $'\n' ]] && new_content+=$'\n'
   fi
+
+  new_content=$(printf '%s\n' "$new_content" | python3 "${SIMAI_ENV_ROOT}/lib/fpm_normalize.py")
 
   local current_content
   current_content=$(cat "$pool_file")
@@ -1281,6 +1287,8 @@ create_php_pool() {
   local fpm_max_requests="${SIMAI_PERF_FPM_MAX_REQUESTS:-500}"
   local pool_dir="/etc/php/${php_version}/fpm/pool.d"
   local pool_file="${pool_dir}/${project}.conf"
+  local request_timeout=120s
+  [[ "$profile_id" == bitrix ]] && request_timeout=300s
   mkdir -p "$pool_dir"
   local pool_user pool_group
   pool_user=$(site_effective_user "$project")
@@ -1298,7 +1306,7 @@ pm = ${fpm_pm}
 pm.max_children = ${fpm_max_children}
 pm.process_idle_timeout = ${fpm_idle_timeout}
 pm.max_requests = ${fpm_max_requests}
-request_terminate_timeout = 120s
+request_terminate_timeout = ${request_timeout}
 chdir = ${project_path}
 clear_env = yes
 security.limit_extensions = .php

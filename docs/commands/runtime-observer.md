@@ -70,6 +70,10 @@ During the work:
 sudo /root/simai-env/simai-admin.sh observer status --domain rim1.ru
 ```
 
+Status reads the existing snapshot without synchronization by default. To
+refresh, preview `observer status --domain rim1.ru --refresh yes`, then repeat
+with `--confirm yes`. Observer mutations require confirmation outside the menu.
+
 After smoke testing:
 
 ```bash

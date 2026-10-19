@@ -10,13 +10,15 @@ printf 'server {\n    listen 80 default_server;\n    server_name _;\n    return 
 ln -sf /etc/nginx/sites-available/000-catchall.conf /etc/nginx/sites-enabled/000-catchall.conf
 systemctl reload nginx
 L=/home/simai/runtime-observer/rim1-ru/repo
+rm -rf /home/simai/runtime-observer/x
 mkdir -p "$L/.git/hooks" "$L/.git/info" /home/simai/runtime-observer/rim1-ru/state
 git -C "$L" init -q 2>/dev/null || true
 printf '#!/bin/sh\ntouch /tmp/pwned-hook\n' >"$L/.git/hooks/pre-commit"; chmod +x "$L/.git/hooks/pre-commit"
 printf '[filter "x"]\n\tclean = touch /tmp/pwned-filter\n' >>"$L/.git/config"
 echo '* filter=x' >"$L/.git/info/attributes"
 chown -R root:root /home/simai/runtime-observer
-bash ./simai-admin.sh self migrate >/tmp/m 2>&1 || { bad "self migrate rc"; tail /tmp/m; }
+printf '*/5 * * * * root /root/simai-env/simai-admin.sh observer snapshot --domain rim1.ru >/dev/null 2>&1\n' >/etc/cron.d/simai-runtime-observer-rim1-ru
+bash ./simai-admin.sh self migrate --confirm yes >/tmp/m 2>&1 || { bad "self migrate rc"; tail /tmp/m; }
 [[ "$(stat -c %U /home)" == root ]] && ok "/home owner repaired" || bad "/home owner"
 T=/var/lib/simai-env/runtime-observer/rim1-ru
 [[ -d "$T/repo/.git" && ! -e /home/simai/runtime-observer ]] && ok "observer storage moved" || bad "observer not moved"
@@ -27,5 +29,7 @@ touch "$T/repo/f"; git -C "$T/repo" add -A 2>/dev/null; git -C "$T/repo" -c user
 grep -q simai-catchall-v2 /etc/nginx/sites-available/000-catchall.conf && ok "catch-all upgraded" || bad "catch-all not upgraded"
 curl -sk --resolve evil.example:443:127.0.0.1 https://evil.example/ -o /dev/null --max-time 5; [[ $? -ne 0 ]] && ok "443 unknown host dropped" || bad "443 served"
 [[ -f /etc/logrotate.d/simai-env ]] && ok "logrotate installed" || bad "logrotate"
-bash ./simai-admin.sh self migrate 2>&1 | grep -q "nothing to migrate" && ok "second run is a no-op" || bad "not idempotent"
+grep -q -- '--confirm yes' /etc/cron.d/simai-runtime-observer-rim1-ru && ok 'managed observer cron confirmation migrated' || bad 'cron confirmation'
+bash ./simai-admin.sh self migrate --confirm yes >/tmp/migrate-second.out 2>&1
+grep -q "nothing to migrate" /tmp/migrate-second.out && ok "second run is a no-op" || { bad "not idempotent"; tail /tmp/migrate-second.out; }
 echo "failures=$fails"; exit $fails

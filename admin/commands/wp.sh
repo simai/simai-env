@@ -14,6 +14,7 @@ wp_cron_markers() {
   grep -Eq "^# simai-domain: ${domain}$" "$cron_file" && WP_CRON_DOMAIN_MATCH="yes"
   grep -Eq "^# simai-slug: ${slug}$" "$cron_file" && WP_CRON_SLUG_MATCH="yes"
   grep -Eq "wp-cron\\.php" "$cron_file" && WP_CRON_ENTRY_MATCH="yes"
+  return 0
 }
 
 wp_prepare_site() {
@@ -670,11 +671,11 @@ wp_finalize_handler() {
   ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
 }
 
-register_cmd "wp" "status" "Show WordPress status" "wp_status_handler" "domain" ""
-register_cmd "wp" "cron-status" "Show WordPress scheduler status" "wp_cron_status_handler" "domain" ""
+register_cmd "wp" "status" "Show WordPress status" "wp_status_handler" "domain" "" "effects:read"
+register_cmd "wp" "cron-status" "Show WordPress scheduler status" "wp_cron_status_handler" "domain" "" "effects:read"
 register_cmd "wp" "cron-sync" "Write/rewrite WordPress scheduler file" "wp_cron_sync_handler" "domain" "" "menu:confirm"
 register_cmd "wp" "cache-clear" "Flush WordPress object cache (wp-cli)" "wp_cache_clear_handler" "domain" "" "menu:confirm"
-register_cmd "wp" "perf-status" "Show WordPress optimization status" "wp_perf_status_handler" "" "domain="
+register_cmd "wp" "perf-status" "Show WordPress optimization status" "wp_perf_status_handler" "" "domain=" "effects:read"
 register_cmd "wp" "perf-apply" "Apply WordPress optimization baseline" "wp_perf_apply_handler" "" "domain= mode= confirm="
 register_cmd "wp" "installer-ready" "Prepare WordPress installer files (core + config + wp-cli)" "wp_installer_ready_handler" "domain" "overwrite= archive= archive-overwrite= unpack= config-overwrite= cli-install=" "menu:confirm"
 register_cmd "wp" "finalize" "Complete WordPress post-install baseline" "wp_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging= mode=" "menu:confirm"

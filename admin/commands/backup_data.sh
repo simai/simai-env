@@ -220,7 +220,7 @@ backup_data_handler() {
     "Kept|last ${keep}" \
     "Off-site|${offsite_state}"
   ui_next_steps
-  ui_kv "Verify" "simai-admin.sh backup data-verify --path ${dir} --restore-test yes"
+  ui_kv "Verify" "simai-admin.sh backup data-verify --path ${dir} --restore-test yes --confirm yes"
 }
 
 backup_data_verify_handler() {
@@ -301,7 +301,7 @@ backup_data_schedule_handler() {
   local hh="${BASH_REMATCH[1]#0}" mm="${BASH_REMATCH[2]#0}"
   {
     printf '# simai-managed backup domain=%s\n' "$domain"
-    printf '%s %s * * * root %q backup data --domain %q --keep %q --dest %q >>%s 2>&1\n' \
+    printf '%s %s * * * root %q backup data --domain %q --keep %q --dest %q --confirm yes >>%s 2>&1\n' \
       "${mm:-0}" "${hh:-0}" "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" "$keep" "$dest" "$BACKUP_DATA_LOG"
   } >"${cron}.tmp" && chmod 0644 "${cron}.tmp" && mv -f "${cron}.tmp" "$cron" || return 1
   ui_result_table "Domain|${domain}" "Schedule|daily at ${at}" "Keep|${keep}" "Destination|${dest}" "Log|${BACKUP_DATA_LOG}"
@@ -365,6 +365,6 @@ backup_data_restore_handler() {
 }
 
 register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to=" "tier:advanced"
-register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "path" "restore-test=" "tier:advanced"
+register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "path" "restore-test=" "tier:advanced effects:read"
 register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest=" "tier:advanced"
 register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain path" "confirm=" "tier:advanced"

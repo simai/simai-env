@@ -4,6 +4,9 @@ set -euo pipefail
 echo "[ci] bash syntax check"
 bash scripts/ci/bash_syntax.sh
 
+echo "[ci] errexit lint (handlers run under set -euo pipefail)"
+/usr/bin/python3 scripts/ci/errexit_lint.py
+
 echo "[ci] shellcheck"
 bash scripts/ci/shellcheck.sh
 

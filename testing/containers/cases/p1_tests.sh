@@ -9,13 +9,16 @@ ok() { echo "PASS $*"; }
 bad() { echo "FAIL $*"; fails=$((fails + 1)); }
 
 # 1. SHA resolution without git (fresh minimal image).
-command -v git >/dev/null && bad "git unexpectedly present" || true
+# Exercise the no-git branch with a deterministic API SHA fixture.
+command() { if [[ "${1:-}" == -v && "${2:-}" == git ]]; then return 1; fi; builtin command "$@"; }
+curl() { [[ "${*: -1}" == 'https://api.github.com/repos/simai/simai-env/commits/main' ]] || return 1; printf '0123456789012345678901234567890123456789'; }
 source lib/update_channel.sh
 sha=$(update_resolve_ref_sha refs/heads/main https://github.com/simai/simai-env)
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]] && ok "resolves main via API without git ($sha)" || bad "no SHA without git: '$sha'"
 eval "$(awk '/^install_resolve_ref_sha\(\) \{/,/^\}/' install.sh)"
 sha2=$(install_resolve_ref_sha refs/heads/main https://github.com/simai/simai-env)
 [[ "$sha2" == "$sha" ]] && ok "install.sh resolver agrees" || bad "install resolver: '$sha2'"
+unset -f command curl
 install_resolve_ref_sha refs/heads/main 'https://github.com/x/y;id' >/dev/null && bad "accepted bad slug" || ok "rejects malformed repo slug"
 
 # 2. Node via pinned NodeSource repo (no remote script).

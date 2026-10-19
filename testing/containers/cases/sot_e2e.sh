@@ -4,7 +4,7 @@ set -uo pipefail
 rm -rf /root/simai-env && cp -r /src /root/simai-env && chmod +x /root/simai-env/*.sh; cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
 D=bx.test; P=/home/simai/www/$D
-./simai-admin.sh site add --domain $D --profile bitrix --php 8.3 --create-db yes >/tmp/a 2>&1 || { bad "bitrix site add"; tail -15 /tmp/a; }
+./simai-admin.sh site add --domain $D --profile bitrix --php 8.3 --create-db yes --confirm yes >/tmp/a 2>&1 || { bad "bitrix site add"; tail -15 /tmp/a; }
 pool=/etc/php/8.3/fpm/pool.d/bx-test.conf
 grep -q '; simai-profile-ini-begin' $pool && ok "new pool has profile block" || bad "no profile block"
 [[ -f /etc/php/8.3/cli/conf.d/99-simai-bitrix.ini && "$(php8.3 -r 'echo ini_get("short_open_tag");')" == 1 ]] && ok "CLI short_open_tag on via conf.d" || bad "CLI short tag"
@@ -23,10 +23,11 @@ rm -f /etc/php/8.3/cli/conf.d/99-simai-bitrix.ini
 sed -i 's/ -d short_open_tag=1//' /etc/cron.d/bx-test
 systemctl reload php8.3-fpm; sleep 1
 [[ "$(h)" == *short=* && "$(h)" != *"short=1"* || "$(h)" == "<?"* ]] && ok "legacy layout reproduces the bug: $(h | head -c 40)" || echo "INFO legacy output: $(h | head -c 60)"
-./simai-admin.sh self migrate >/tmp/m 2>&1; grep Migrated /tmp/m | sed 's/^/  /'
+./simai-admin.sh self migrate --confirm yes >/tmp/m 2>&1; grep Migrated /tmp/m | sed 's/^/  /'
 sleep 1
 [[ "$(h)" == "mem=128M short=1" ]] && ok "after self migrate: short tag back, site override kept ($(h))" || bad "after migrate: $(h)"
 grep -q 'short_open_tag=1.*cron_events' /etc/cron.d/bx-test && ok "cron flag restored" || bad "cron flag"
 [[ -f /etc/php/8.3/cli/conf.d/99-simai-bitrix.ini ]] && ok "CLI conf restored" || bad "CLI conf"
-./simai-admin.sh self migrate 2>&1 | grep -q "nothing to migrate" && ok "migrate idempotent" || bad "migrate not idempotent"
+./simai-admin.sh self migrate --confirm yes >/tmp/sot-second.out 2>&1
+grep -q "nothing to migrate" /tmp/sot-second.out && ok "migrate idempotent" || { bad "migrate not idempotent"; tail /tmp/sot-second.out; }
 echo "failures=$fails"; exit $fails

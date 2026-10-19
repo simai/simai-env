@@ -425,3 +425,8 @@ Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
   non-zero on FAIL.
 - **drift**: `simai-admin.sh site drift --domain <domain> [--fix yes]`  
   Checks metadata/cron drift; `--fix yes` can migrate marked legacy cron blocks to `/etc/cron.d/<slug>` (safe markers only). Does not auto-fix metadata/DB/files/SSL.
+- **config-normalize**: `simai-admin.sh site config-normalize --domain <domain> --confirm yes`  
+  Removes duplicate directives from the site PHP-FPM pool (the last value
+  wins, site overrides are kept). For Bitrix sites it also aligns the request
+  budget to 300 seconds in nginx, PHP-FPM and PHP. Every file is backed up
+  first and restored if validation or reload fails.

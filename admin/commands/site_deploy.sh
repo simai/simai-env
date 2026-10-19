@@ -122,8 +122,14 @@ deploy_prune() {
 
 deploy_activate() {
   local domain="$1" root="$2" php="$3" release_id="$4" user="$5"
+  local previous_link
+  previous_link=$(readlink "${root}/current")
   ln -sfn "releases/${release_id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
-  os_svc_reload "php${php}-fpm" >/dev/null 2>&1 || os_svc_reload_or_restart "php${php}-fpm" >/dev/null 2>&1 || true
+  os_svc_reload "php${php}-fpm" >/dev/null 2>&1 || os_svc_reload_or_restart "php${php}-fpm" >/dev/null 2>&1 || {
+    ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || error 'Could not restore the previous release link'
+    error "PHP-FPM activation failed for ${domain}; previous link restoration attempted; inspect deploy-status before retry"
+    return 1
+  }
   if [[ -f "${root}/current/artisan" ]]; then
     deploy_run_as "$user" "${root}/current" "$(resolve_php_bin "$php")" artisan queue:restart >>"$LOG_FILE" 2>&1 || true
   fi
@@ -264,7 +270,7 @@ site_deploy_handler() {
   deploy_state_set "$domain" PREVIOUS "$DEPLOY_PREVIOUS"
   deploy_state_set "$domain" CURRENT "$release_id"
   deploy_state_set "$domain" DEPLOYED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  deploy_state_set "$domain" SOURCE "$([[ -n $git_url ]] && echo "git ${git_url} ${ref} ${release_ref:-}" || [[ -n $archive ]] && echo "archive $(basename "$archive")" || echo "dir ${from}")"
+  deploy_state_set "$domain" SOURCE "$([[ -n $git_url ]] && echo "git $(redact_by_key git "$git_url") ${ref} ${release_ref:-}" || [[ -n $archive ]] && echo "archive $(basename "$archive")" || echo "dir ${from}")"
   deploy_prune "$root" "$keep"
 
   local http_code
@@ -313,9 +319,9 @@ site_deploy_status_handler() {
   while IFS= read -r name; do
     rows+=("${name}|$([[ $name == "$current" ]] && echo current || echo available)")
   done < <(find "${root}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r)
-  ui_result_table "Domain|${domain}" "Source|$(deploy_state_get "$domain" SOURCE)" "Deployed at|$(deploy_state_get "$domain" DEPLOYED_AT)" "${rows[@]}"
+  ui_result_table "Domain|${domain}" "Source|$(redact_by_key source "$(deploy_state_get "$domain" SOURCE)")" "Deployed at|$(deploy_state_get "$domain" DEPLOYED_AT)" "${rows[@]}"
 }
 
 register_cmd "site" "deploy" "Deploy a release (git ref, archive or directory) with atomic switch" "site_deploy_handler" "domain" "git= ref= archive= sha256= from= migrate= keep= build= confirm=" "tier:advanced"
 register_cmd "site" "deploy-rollback" "Switch back to a previous release (code only)" "site_deploy_rollback_handler" "domain" "release= confirm=" "tier:advanced"
-register_cmd "site" "deploy-status" "Show releases of a site" "site_deploy_status_handler" "domain" "" "tier:advanced"
+register_cmd "site" "deploy-status" "Show releases of a site" "site_deploy_status_handler" "domain" "" "tier:advanced effects:read"

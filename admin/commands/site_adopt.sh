@@ -192,16 +192,20 @@ site_adopt_handler() {
 
   # 6. Background processes declared by the application.
   if [[ ${#APP_WORKERS[@]} -gt 0 ]]; then
+    local existing_worker had_running_workers=no
+    for existing_worker in $(app_project_worker_units "$project"); do
+      if os_svc_is_active "$existing_worker"; then had_running_workers=yes; fi
+    done
     app_write_workers "$project" "$path" "$php" yes || return 1
     # Workers already running keep their old command until they restart;
     # queue:restart lets them finish the current job first.
-    if [[ -f "${path}/artisan" ]]; then
-      adopt_run_as "$run_user" "$path" "$php_bin" artisan queue:restart >>"$LOG_FILE" 2>&1 || true
+    if [[ "$had_running_workers" == yes && -f "${path}/artisan" ]]; then
+      adopt_run_as "$run_user" "$path" "$php_bin" artisan queue:restart >>"$LOG_FILE" 2>&1 || { error 'Graceful worker restart failed'; return 1; }
     fi
   else
     local unit
     for unit in $(app_project_worker_units "$project"); do
-      os_svc_enable_now "$unit" >/dev/null 2>&1 || warn "Worker ${unit} did not start"
+      os_svc_enable_now "$unit" >/dev/null 2>&1 || { error "Worker ${unit} did not start"; return 1; }
     done
   fi
   if [[ "${APP_SCHEDULER:-}" == no ]]; then

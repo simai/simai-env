@@ -29,8 +29,9 @@ doctor_nginx_location_is_local_only() {
     opens=$(printf '%s' "$line" | tr -cd '{' | wc -c | tr -d '[:space:]')
     closes=$(printf '%s' "$line" | tr -cd '}' | wc -c | tr -d '[:space:]')
     if [[ $opens -gt 0 || $closes -gt 0 ]]; then
-      ((depth+=opens))
-      ((depth-=closes))
+      # $((...)) instead of ((...)): the latter returns 1 when the result is 0,
+      # which aborts the handler under errexit.
+      depth=$((depth + opens - closes))
       if [[ $opens -gt 0 ]]; then
         started=1
       fi
@@ -344,8 +345,8 @@ site_doctor_handler() {
   if [[ -f "$avail" ]]; then
     if [[ "${PROFILE_HEALTHCHECK_ENABLED:-no}" == "yes" ]]; then
       if [[ "${PROFILE_HEALTHCHECK_MODE:-php}" == "php" ]]; then
-        doctor_nginx_location_is_local_only "$avail" "/healthcheck.php"
-        local hc_rc=$?
+        local hc_rc=0
+        doctor_nginx_location_is_local_only "$avail" "/healthcheck.php" || hc_rc=$?
         if [[ $hc_rc -eq 0 ]]; then
           doctor_add_result "PASS" "nginx" "Healthcheck location" "php mode (local-only)" ""
         elif [[ $hc_rc -eq 2 ]]; then
@@ -357,8 +358,8 @@ site_doctor_handler() {
           doctor_add_result "WARN" "fs" "Healthcheck file" "Missing ${root}/${PROFILE_PUBLIC_DIR}/healthcheck.php" "Reinstall healthcheck via site add"
         fi
       else
-        doctor_nginx_location_is_local_only "$avail" "/healthcheck"
-        local hc_rc=$?
+        local hc_rc=0
+        doctor_nginx_location_is_local_only "$avail" "/healthcheck" || hc_rc=$?
         if [[ $hc_rc -eq 0 ]]; then
           doctor_add_result "PASS" "nginx" "Healthcheck location" "nginx mode (local-only)" ""
         elif [[ $hc_rc -eq 2 ]]; then
@@ -740,8 +741,8 @@ fi
             if [[ -f "$target_avail" ]]; then
               if [[ "${PROFILE_HEALTHCHECK_ENABLED:-no}" == "yes" ]]; then
                 if [[ "${PROFILE_HEALTHCHECK_MODE:-php}" == "php" ]]; then
-                  doctor_nginx_location_is_local_only "$target_avail" "/healthcheck.php"
-                  local target_hc_rc=$?
+                  local target_hc_rc=0
+                  doctor_nginx_location_is_local_only "$target_avail" "/healthcheck.php" || target_hc_rc=$?
                   if [[ $target_hc_rc -eq 0 ]]; then
                     doctor_add_result "PASS" "nginx" "target: Healthcheck location" "php mode (local-only)" ""
                   elif [[ $target_hc_rc -eq 2 ]]; then
@@ -753,8 +754,8 @@ fi
                     doctor_add_result "WARN" "fs" "target: Healthcheck file" "Missing ${target_root}/${PROFILE_PUBLIC_DIR}/healthcheck.php" "Reinstall healthcheck via site add"
                   fi
                 else
-                  doctor_nginx_location_is_local_only "$target_avail" "/healthcheck"
-                  local target_hc_rc=$?
+                  local target_hc_rc=0
+                  doctor_nginx_location_is_local_only "$target_avail" "/healthcheck" || target_hc_rc=$?
                   if [[ $target_hc_rc -eq 0 ]]; then
                     doctor_add_result "PASS" "nginx" "target: Healthcheck location" "nginx mode (local-only)" ""
                   elif [[ $target_hc_rc -eq 2 ]]; then
@@ -814,4 +815,4 @@ fi
   return $?
 }
 
-register_cmd "site" "doctor" "Diagnose site against its profile contract (read-only)" "site_doctor_handler" "" "domain= strict=no include-target=yes"
+register_cmd "site" "doctor" "Diagnose site against its profile contract (read-only)" "site_doctor_handler" "" "domain= strict=no include-target=yes" "effects:read"

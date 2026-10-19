@@ -155,8 +155,8 @@ def describe_site(domain: str, detailed: bool) -> dict:
             "deploy_archive": f"{cli} site deploy --domain {domain} --archive <file.tar.gz> --sha256 <sum> --confirm yes",
             "rollback": f"{cli} site deploy-rollback --domain {domain} --confirm yes",
             "reconcile_requirements": f"{cli} site adopt --domain {domain} --confirm yes",
-            "backup": f"{cli} backup data --domain {domain}",
-            "verify_backup": f"{cli} backup data-verify --path <backup-dir> --restore-test yes",
+            "backup": f"{cli} backup data --domain {domain} --confirm yes",
+            "verify_backup": f"{cli} backup data-verify --path <backup-dir> --restore-test yes --confirm yes",
             "run_artisan_as_site_user": f"sudo -u {runs_as or 'simai'} -H php{meta.get('php')} {root}/{'current/' if layout == 'releases' else ''}artisan <command>",
         }
         info["rules"] = [

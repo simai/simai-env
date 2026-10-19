@@ -5,7 +5,7 @@ set -uo pipefail
 export COMPOSER_ALLOW_SUPERUSER=1
 cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
-cli() { ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then ./simai-admin.sh "$@"; return; fi; done; ./simai-admin.sh "$@" --confirm yes; }
 D=app.test; P=/home/simai/www/$D
 page() { curl -s -H "Host: $D" "http://127.0.0.1/${1:-}"; }
 key0=$(grep '^APP_KEY=' $P/.env)
@@ -32,7 +32,7 @@ return new class extends Migration {
     public function down(): void { Schema::dropIfExists('widgets'); }
 };
 PHP
-cli site deploy --domain $D --from /root/src-v2 >/tmp/dp 2>&1; grep -q "first deploy" /tmp/dp && ok "deploy plan mentions layout conversion" || bad "plan"
+bash ./simai-admin.sh site deploy --domain $D --from /root/src-v2 >/tmp/dp 2>&1; grep -q 'No handler was executed' /tmp/dp && ok "deploy previews without conversion" || bad "plan"
 cli site deploy --domain $D --from /root/src-v2 --confirm yes >/tmp/d1 2>&1 && ok "deploy v2" || { bad "deploy v2"; tail -20 /tmp/d1; grep -i error /var/log/simai-admin.log | tail -5; }
 [[ -L $P/current && -d $P/releases ]] && ok "release layout active" || bad "layout"
 ls $P/releases | grep -q -- '-initial$' && ok "adopted code kept as initial release" || bad "no initial release"

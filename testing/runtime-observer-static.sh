@@ -7,7 +7,7 @@ bash -n "${ROOT_DIR}/admin/commands/runtime_observer.sh"
 
 expected=(init start snapshot status finish doctor)
 for command in "${expected[@]}"; do
-  grep -Eq "^register_cmd observer ${command} " "${ROOT_DIR}/admin/commands/runtime_observer.sh" || {
+  grep -Eq "^register_cmd (observer|\"observer\") (${command}|\"${command}\") " "${ROOT_DIR}/admin/commands/runtime_observer.sh" || {
     echo "Missing observer command registration: ${command}" >&2
     exit 1
   }

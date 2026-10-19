@@ -21,6 +21,9 @@ declare -Ag CMD_DESCRIPTIONS=()
 declare -Ag CMD_REQUIRED=()
 declare -Ag CMD_OPTIONAL=()
 declare -Ag CMD_FLAGS=()
+# shellcheck disable=SC2034 # registry metadata consumed by worker.sh and describe.sh
+declare -Ag CMD_EFFECTS=() CMD_AUTHORIZATION=() CMD_CONFIRMATION=() CMD_LOCK=() CMD_VERIFICATION=() CMD_CONFIRM_EXEMPT=()
+source "${SIMAI_ENV_ROOT}/admin/lib/execution.sh"
 
 ui_init
 
@@ -92,7 +95,7 @@ select_from_list() {
   local i=1
   for opt in "${options[@]}"; do
     echo "  [$i] $opt" >&2
-    ((i++))
+    i=$((i + 1))
   done
   echo "  [0] Cancel" >&2
   if [[ -n "$default" ]]; then
@@ -276,6 +279,7 @@ register_cmd() {
   CMD_REQUIRED["$key"]="${required:-}"
   CMD_OPTIONAL["$key"]="${optional:-}"
   CMD_FLAGS["$key"]="${flags:-}"
+  command_register_policy "$key"
 }
 
 get_command_flags() {
@@ -329,8 +333,9 @@ validate_command_options() {
   local section="$1" name="$2"
   shift 2
   local key="${section}:${name}"
-  local allowed=" ${CMD_REQUIRED[$key]:-} ${CMD_OPTIONAL[$key]:-} "
+  local allowed=" ${CMD_REQUIRED[$key]:-} ${CMD_OPTIONAL[$key]:-} confirm= dry-run= dry_run= output= "
   local arg option token
+  local -A seen=()
   while [[ $# -gt 0 ]]; do
     arg="$1"
     shift
@@ -340,6 +345,19 @@ validate_command_options() {
     fi
     option="${arg#--}"
     option="${option%%=*}"
+    if [[ ! "$option" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]; then
+      error 'Invalid option name'
+      return 1
+    fi
+    if [[ -n "${seen[$option]:-}" ]]; then
+      error "Duplicate option: --${option}"
+      return 1
+    fi
+    seen["$option"]=1
+    if [[ "$option" == confirm && "$arg" != *=* && ( $# -eq 0 || "$1" == --* ) ]]; then
+      error '--confirm requires an explicit yes or no value'
+      return 1
+    fi
     local found=0
     for token in $allowed; do
       token="${token%%=*}"
@@ -363,42 +381,95 @@ run_command() {
   shift 2
   local key="${section}:${name}"
   local handler="${CMD_HANDLERS[$key]:-}"
-  if [[ -z $handler ]]; then
-    error "Unknown command: ${section} ${name}"
-    return 1
-  fi
-  validate_command_options "$section" "$name" "$@" || return 1
-  ensure_audit_log
+  local -a command_args=()
+  local output=human arg
+  while (( $# )); do
+    arg="$1"; shift
+    case "$arg" in
+      --output=*) output="${arg#*=}" ;;
+      --output) output="${1:-}"; (( $# )) && shift ;;
+      *) command_args+=("$arg") ;;
+    esac
+  done
+  [[ "$output" == human || "$output" == json ]] || { error '--output must be human or json'; return 2; }
+  local target effect rc=0 result_status=success
   local corr_id
   corr_id=$(uuidgen 2>/dev/null || date +"%Y%m%d%H%M%S%N")
+  target=$(command_arg domain "${command_args[@]}")
+  if [[ -z $handler ]]; then
+    error "Unknown command: ${section} ${name}"
+    [[ "$output" != json ]] || command_result invalid 2 "$key" "$target" "$corr_id" unknown ''
+    return 2
+  fi
+  effect=$(command_effect "$key" "${command_args[@]}")
+  if ! validate_command_options "$section" "$name" "${command_args[@]}"; then
+    [[ "$output" != json ]] || command_result invalid 2 "$key" "$target" "$corr_id" "$effect" ''
+    return 2
+  fi
+  if [[ "$effect" != read && "${SIMAI_OPERATION_ACTIVE:-0}" == 1 && -z "$(command_arg confirm "${command_args[@]}")" ]]; then
+    command_args+=(--confirm yes)
+  fi
+  local preview=no
+  # The effect is resolved per call (observer status --refresh yes writes), so
+  # only an explicit confirm:none registration skips the preview.
+  if [[ "$effect" != read && -z "${CMD_CONFIRM_EXEMPT[$key]:-}" && "${SIMAI_ADMIN_MENU:-0}" != 1 ]] \
+    && ! command_arg_yes confirm "${command_args[@]}"; then
+    preview=yes
+  fi
+  if command_arg_yes dry-run "${command_args[@]}" || command_arg_yes dry_run "${command_args[@]}"; then
+    # Commands that declare their own dry-run (site remove, site db-*) show a
+    # detailed plan from the handler; others get the generic preview.
+    if [[ " ${CMD_OPTIONAL[$key]:-} " == *" dry-run="* || " ${CMD_OPTIONAL[$key]:-} " == *" dry_run="* ]]; then
+      preview=no
+    else
+      preview=yes
+    fi
+  fi
+  if [[ "$preview" == yes ]]; then
+    if [[ "$output" == json ]]; then
+      command_result planned 0 "$key" "$target" "$corr_id" "$effect" ''
+    else
+      command_preview "$key" "$target" "${command_args[@]}"
+    fi
+    return 0
+  fi
+  ensure_audit_log || return 1
   local caller="${SUDO_USER:-${USER:-root}}"
   local args_redacted
-  args_redacted=$(redact_args "$@")
-  audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id"
+  args_redacted=$(redact_args "${command_args[@]}")
+  audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id" || return 1
   info "Running command ${section} ${name} (corr_id=${corr_id})"
-  local rc=0
-  if [[ "${SIMAI_STRICT_HANDLERS:-0}" == "1" ]]; then
-    # Strict mode: a failing step aborts the handler. Calling the subshell
-    # inside `if` would silently disable errexit, so run it as a plain command.
-    local had_errexit=0
-    [[ $- == *e* ]] && had_errexit=1
-    set +e
-    ( set -e; site_command_context "$@"; "$handler" "$@" )
-    rc=$?
-    (( had_errexit )) && set -e
-  elif ( site_command_context "$@"; "$handler" "$@" ); then
-    rc=0
+  local captured=''
+  if [[ "$output" == json ]]; then
+    captured=$(mktemp)
+    chmod 0600 "$captured"
+    if SIMAI_COMMAND_OUTPUT=json bash "${SIMAI_ENV_ROOT}/admin/worker.sh" "$section" "$name" "${command_args[@]}" >"$captured" 2>/dev/null; then rc=0; else rc=$?; fi
   else
-    rc=$?
+    if SIMAI_COMMAND_OUTPUT=human bash "${SIMAI_ENV_ROOT}/admin/worker.sh" "$section" "$name" "${command_args[@]}"; then rc=0; else rc=$?; fi
   fi
-  audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id"
+  case "$rc" in
+    0|88) result_status=success ;;
+    89) result_status=cancelled ;;
+    75) result_status=busy ;;
+    *) result_status=failed ;;
+  esac
+  if [[ "$output" == json ]]; then
+    local result_rc=0
+    command_result "$result_status" "$rc" "$key" "$target" "$corr_id" "$effect" "$captured" || result_rc=$?
+    [[ "$rc" -ne 0 ]] || rc=$result_rc
+    rm -f "$captured"
+  fi
+  audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id" || return 1
+  if [[ -n "${SIMAI_EXECUTION_RECEIPT:-}" ]]; then
+    python3 "${SIMAI_ENV_ROOT}/lib/command_contract.py" record "$SIMAI_EXECUTION_RECEIPT" "$key" "$rc" "$corr_id"
+  fi
   return $rc
 }
 
 # Runs each site-scoped command as that site's own user (see site_utils.sh).
 site_command_context() {
   if declare -F site_apply_user_context >/dev/null; then
-    site_apply_user_context "$@" || true
+    site_apply_user_context "$@" || return 1
   fi
   return 0
 }
@@ -515,7 +586,7 @@ redact_by_key() {
   if [[ "$key" =~ (pass|password|secret|token|key|cert|value) ]]; then
     echo "***"
   else
-    echo "$value"
+    printf '%s\n' "$value" | sed -E 's#(https?://)[^/[:space:]]*@#\1***@#g'
   fi
 }
 
@@ -550,6 +621,6 @@ audit_log() {
   local phase="$1" user="$2" section="$3" cmd="$4" args="$5" exit_code="${6:-}" corr_id="${7:-}"
   local ts
   ts=$(date +"%Y-%m-%dT%H:%M:%S%z")
-  ensure_audit_log
+  ensure_audit_log || return 1
   echo "${ts} user=${user} section=${section} cmd=${cmd} phase=${phase} exit=${exit_code:-n/a} corr_id=${corr_id:-n/a} args=\"${args}\"" >>"$AUDIT_LOG_FILE"
 }

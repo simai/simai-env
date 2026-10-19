@@ -1,0 +1,14 @@
+{
+  "standard": "AI First",
+  "version": "1.0.0",
+  "tag": "v1.0.0",
+  "commit": "8ed3d48efdb2435f1dd4142ab3339b00f5340fb1",
+  "repository": "https://github.com/zabarov/ai-first",
+  "files": {
+    "ai-first-1.0.0-manifest.schema.json": "4f69e5d5332ff8c128a3e797d1f020289028c49c42f245deb5012c449685281d"
+  },
+  "role": "publisher",
+  "profiles": ["core", "capability"],
+  "transport": "explicit offline files beside commands.json",
+  "limits": ["external contract binding is not automated execution", "initial capabilities are read-only"]
+}

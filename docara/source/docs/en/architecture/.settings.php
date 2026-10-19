@@ -7,6 +7,7 @@ return array (
   array (
     'app-manifest' => 'App Manifest',
     'backup-format' => 'Backup Format',
+    'command-execution' => 'Command Execution',
     'cron' => 'Cron',
     'filesystem-layout' => 'Filesystem Layout',
     'glossary' => 'Glossary',

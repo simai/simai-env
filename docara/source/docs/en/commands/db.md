@@ -89,3 +89,20 @@ site gets a role that owns only its database; `PUBLIC` cannot connect to it.
 `db.env` records `DB_ENGINE`, and `site db-*`, `backup data` (`pg_dump`),
 doctor and the healthcheck follow the engine. Names starting with `pg_` are
 reserved by PostgreSQL and are prefixed with `site_` automatically.
+
+## MySQL network exposure
+
+```bash
+sudo /root/simai-env/simai-admin.sh db network-plan
+sudo /root/simai-env/simai-admin.sh db network-localize --ack-no-external yes            # preview
+sudo /root/simai-env/simai-admin.sh db network-localize --ack-no-external yes --confirm yes
+```
+
+`network-plan` is read-only: it shows the effective bind addresses, listeners,
+remote connections and the restriction/rollback plan. `network-localize` binds
+the classic and X protocol listeners to `127.0.0.1`. It refuses when a site
+`db.env` points at a non-local database host, backs up the configuration,
+checks the effective values (`my_print_defaults mysqld`) before restarting,
+and restores the backup if MySQL does not come back. Confirm with the owners
+that no external client (BI, replication, remote admin) needs MySQL before
+running it. Procedure: `docs/operations/env-safety-rollout.md`.

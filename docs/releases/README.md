@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.15.0](v1.15.0.md) — confirmation before changes, fail-fast handlers,
+  locks, JSON results, Bitrix request budget and MySQL localization.
 - [v1.14.0](v1.14.0.md) — PostgreSQL sites, application manifest, site adopt
   and release deploys, frame ancestors, AI-first describe.
 - [v1.13.0](v1.13.0.md) — per-site users and owners, data backups, root

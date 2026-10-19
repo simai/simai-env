@@ -305,7 +305,7 @@ observer_init_handler() {
   if [[ "${schedule,,}" == yes ]]; then
     local cron
     cron="/etc/cron.d/simai-runtime-observer-$(observer_slug "$domain")"
-    printf '*/5 * * * * root %q observer snapshot --domain %q >/dev/null 2>&1\n' "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" >"$cron"
+    printf '*/5 * * * * root %q observer snapshot --domain %q --confirm yes >/dev/null 2>&1\n' "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" >"$cron"
     chmod 0644 "$cron"
   fi
   info "Runtime observer initialized at ${root}"
@@ -353,7 +353,7 @@ observer_snapshot_handler() {
 
 observer_status_handler() {
   parse_kv_args "$@"
-  local domain="${PARSED_ARGS[domain]:-}" refresh="${PARSED_ARGS[refresh]:-yes}"
+  local domain="${PARSED_ARGS[domain]:-}" refresh="${PARSED_ARGS[refresh]:-no}"
   require_args domain || return 1
   local root lock
   root=$(observer_root "$domain")
@@ -368,10 +368,16 @@ observer_status_handler() {
     session="${SESSION_ACTOR} since ${SESSION_STARTED_AT}"
     base="${SESSION_BASE_COMMIT}"
   fi
+  # Git diff can refresh the index even when no snapshot is requested. Work
+  # against an ephemeral copy so observation never writes the shadow repository.
+  OBSERVER_STATUS_INDEX=$(mktemp)
+  trap 'rm -f "$OBSERVER_STATUS_INDEX" "${OBSERVER_STATUS_INDEX}.lock"' EXIT
+  cp "${root}/repo/.git/index" "$OBSERVER_STATUS_INDEX"
+  export GIT_INDEX_FILE="$OBSERVER_STATUS_INDEX" GIT_OPTIONAL_LOCKS=0
   print_kv_table "Observer|${root}" "Session|${session}" "HEAD|$(observer_git -C "${root}/repo" rev-parse --short HEAD)"
-  observer_git -C "${root}/repo" status --short
+  GIT_OPTIONAL_LOCKS=0 observer_git -C "${root}/repo" status --short
   echo "Diff from session base:"
-  observer_git -C "${root}/repo" diff --stat "$base" -- .
+  GIT_OPTIONAL_LOCKS=0 observer_git -C "${root}/repo" diff --no-ext-diff --no-textconv --stat "$base" -- .
 }
 
 observer_finish_handler() {
@@ -421,6 +427,6 @@ observer_doctor_handler() {
 register_cmd observer init 'Initialize private file and Bitrix DB shadow repository' observer_init_handler domain 'schedule=yes' 'tier:advanced'
 register_cmd observer start 'Start an attributed developer change session' observer_start_handler 'domain actor' 'note=' 'tier:advanced'
 register_cmd observer snapshot 'Capture and commit the current runtime state' observer_snapshot_handler domain 'actor= reason=periodic' 'tier:advanced menu:hidden'
-register_cmd observer status 'Show changes from the active session baseline' observer_status_handler domain 'refresh=yes' 'tier:advanced'
+register_cmd "observer" "status" "Show changes from the active session baseline" "observer_status_handler" "domain" "refresh=no" "tier:advanced effects:read"
 register_cmd observer finish 'Finish a change session and write evidence' observer_finish_handler domain 'note=completed' 'tier:advanced'
-register_cmd observer doctor 'Validate observer repository and schedule' observer_doctor_handler domain '' 'tier:advanced'
+register_cmd "observer" "doctor" "Validate observer repository and schedule" "observer_doctor_handler" "domain" "" "tier:advanced effects:read"

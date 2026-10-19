@@ -20,6 +20,9 @@ containers and internet access (packages, Composer, Laravel).
 | --- | --- |
 | `p0_tests` | password generation, `.env` symlink refusal, jail removal with a live bind mount, observer storage trust, strict-handler pattern |
 | `p1_tests` | update ref resolution without git, NodeSource keyring, site path and wildcard validation, managed config writes, logrotate |
+| `dispatch_e2e` | actual fail-fast dispatcher, preview guard, concurrent/nested locks, secret-free JSON, pinned AI First contracts |
+| `config_e2e` | Bitrix timeout modes, duplicate removal, override reset, normalize idempotency and read-only observation |
+| `menu_e2e` | text/whiptail render and cancel under a controlling PTY; wizard cancellation creates no resources |
 | `nginx_tests` | every nginx template plus the HTTP/HTTPS catch-all against real nginx |
 | `backup_tests` | `backup data`, verify with restore test, retention, restore, `age` encryption, schedule |
 | `migrate_e2e` | `self migrate`: `/home` owner, observer relocation and sanitising, catch-all upgrade, idempotency |
@@ -35,3 +38,7 @@ containers and internet access (packages, Composer, Laravel).
 
 `deploy_e2e` reuses the site created by `adopt_e2e`, so run them in that order
 (the default list does).
+
+Runs use a frozen code snapshot without operator secrets or Git history. Logs
+and JSON receipts are retained under `source/output/<container-name>/` with the
+candidate digest, Ubuntu version, assertions/skips and actual command exits.

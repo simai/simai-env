@@ -85,8 +85,8 @@ logs_nginx_handler() {
   logs_tail_file "$file" "$lines"
 }
 
-register_cmd "logs" "admin" "Tail simai-admin log" "logs_admin_handler" "" "lines=${LOGS_DEFAULT_LINES}"
-register_cmd "logs" "env" "Tail installer log" "logs_env_handler" "" "lines=${LOGS_DEFAULT_LINES}"
-register_cmd "logs" "audit" "Tail audit log" "logs_audit_handler" "" "lines=${LOGS_DEFAULT_LINES}"
-register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=${LOGS_DEFAULT_LINES}"
-register_cmd "logs" "letsencrypt" "Tail Let's Encrypt log" "logs_letsencrypt_handler" "" "lines=${LOGS_DEFAULT_LINES}"
+register_cmd "logs" "admin" "Tail simai-admin log" "logs_admin_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
+register_cmd "logs" "env" "Tail installer log" "logs_env_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
+register_cmd "logs" "audit" "Tail audit log" "logs_audit_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
+register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=\${LOGS_DEFAULT_LINES}" "effects:read"
+register_cmd "logs" "letsencrypt" "Tail Let's Encrypt log" "logs_letsencrypt_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"

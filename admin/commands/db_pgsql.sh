@@ -44,4 +44,4 @@ db_pgsql_status_handler() {
 }
 
 register_cmd "db" "pgsql-install" "Install PostgreSQL (Ubuntu or signed PGDG repository) and php-pgsql" "db_pgsql_install_handler" "" "version= pgdg= confirm=" "tier:advanced"
-register_cmd "db" "pgsql-status" "Show PostgreSQL server state" "db_pgsql_status_handler" "" "" "tier:advanced"
+register_cmd "db" "pgsql-status" "Show PostgreSQL server state" "db_pgsql_status_handler" "" "" "tier:advanced effects:read"

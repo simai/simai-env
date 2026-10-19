@@ -1095,5 +1095,5 @@ register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_
 register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect= hsts="
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
 register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert= confirm="
-register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain="
-register_cmd "ssl" "list" "List SSL status for sites" "ssl_list_handler" "" ""
+register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain=" "effects:read"
+register_cmd "ssl" "list" "List SSL status for sites" "ssl_list_handler" "" "" "effects:read"

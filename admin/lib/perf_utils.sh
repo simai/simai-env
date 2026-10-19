@@ -19,6 +19,7 @@ perf_detect_resources() {
   [[ -z "${PERF_MEM_MB:-}" ]] && PERF_MEM_MB=0
   [[ -z "${PERF_MEM_AVAILABLE_MB:-}" ]] && PERF_MEM_AVAILABLE_MB=0
   [[ -z "${PERF_SWAP_MB:-}" ]] && PERF_SWAP_MB=0
+  return 0
 }
 
 perf_recommended_preset() {
@@ -936,7 +937,7 @@ site_perf_mode_defaults() {
         "pm.max_children|2" \
         "pm.process_idle_timeout|5s" \
         "pm.max_requests|200" \
-        "request_terminate_timeout|60s"
+        "request_terminate_timeout|$([[ "$profile" == bitrix ]] && echo 300s || echo 60s)"
       ;;
     safe)
       printf "%s\n" \
@@ -945,7 +946,7 @@ site_perf_mode_defaults() {
         "pm.max_children|${safe_children}" \
         "pm.process_idle_timeout|10s" \
         "pm.max_requests|${safe_requests}" \
-        "request_terminate_timeout|120s"
+        "request_terminate_timeout|$([[ "$profile" == bitrix ]] && echo 300s || echo 120s)"
       ;;
     balanced)
       local req_timeout="180s"
@@ -1003,7 +1004,11 @@ apply_site_perf_settings_to_pool() {
   local site_ini_block=""
   site_ini_block=$(awk '/; simai-site-ini-begin/{flag=1}flag{print}/; simai-site-ini-end/{flag=0}' "$pool_file")
   local profile_block=""
-  profile_block=$(awk '/; simai-profile-ini-begin/{flag=1}flag{print}/; simai-profile-ini-end/{flag=0}' "$pool_file")
+  if grep -qs '^# simai-profile: bitrix$' "/etc/nginx/sites-available/${domain}.conf"; then
+    profile_block=$(bitrix_profile_ini_block)
+  else
+    profile_block=$(awk '/; simai-profile-ini-begin/{flag=1}flag{print}/; simai-profile-ini-end/{flag=0}' "$pool_file")
+  fi
   local base_content
   base_content=$(sed '/; simai-profile-ini-begin/,/; simai-profile-ini-end/d;/; simai-site-ini-begin/,/; simai-site-ini-end/d;/; simai-site-perf-begin/,/; simai-site-perf-end/d' "$pool_file")
 
@@ -1022,6 +1027,8 @@ apply_site_perf_settings_to_pool() {
     new_content+="$profile_block"
     [[ "${new_content: -1}" != $'\n' ]] && new_content+=$'\n'
   fi
+
+  new_content=$(printf '%s\n' "$new_content" | python3 "${SIMAI_ENV_ROOT}/lib/fpm_normalize.py")
 
   local current_content
   current_content=$(cat "$pool_file")

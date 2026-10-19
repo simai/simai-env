@@ -95,4 +95,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${SIMAI_SOURCE_ONLY:-0}" != 1 ]]; then
+  main "$@"
+fi

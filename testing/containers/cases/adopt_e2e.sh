@@ -4,14 +4,15 @@ set -uo pipefail
 export DEBIAN_FRONTEND=noninteractive COMPOSER_ALLOW_SUPERUSER=1
 rm -rf /root/simai-env && cp -r /src /root/simai-env && chmod +x /root/simai-env/*.sh; cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
-cli() { ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then ./simai-admin.sh "$@"; return; fi; done; ./simai-admin.sh "$@" --confirm yes; }
 command -v composer >/dev/null || apt-get install -y -qq composer unzip git >/dev/null 2>&1
 id simai >/dev/null 2>&1 || useradd -m simai
+cli php install --php 8.4 --confirm yes >/tmp/adopt-php.out 2>&1 || { bad 'PHP 8.4 prerequisite'; tail /tmp/adopt-php.out; }
 
 D=app.test; P=/home/simai/www/$D
 mkdir -p /home/simai/www
 if [[ ! -d /root/laravel-src ]]; then
-  composer create-project --no-interaction --prefer-dist laravel/laravel /root/laravel-src >/tmp/cp 2>&1 || { bad "create-project"; tail /tmp/cp; }
+  php8.4 "$(command -v composer)" create-project --no-interaction --prefer-dist laravel/laravel:^13.0 /root/laravel-src >/tmp/cp 2>&1 || { bad "create-project"; tail /tmp/cp; }
 fi
 rm -rf "$P"; cp -a /root/laravel-src "$P"; rm -rf "$P/vendor" "$P/.env" "$P/database/database.sqlite"
 echo "laravel: $(grep -o '"laravel/framework": "[^"]*"' $P/composer.json)"
@@ -33,8 +34,8 @@ JSON
 cli db pgsql-install --confirm yes >/dev/null 2>&1
 systemctl stop mysql; systemctl disable mysql >/dev/null 2>&1  # PostgreSQL-only server
 
-cli site adopt --domain $D --path $P >/tmp/plan 2>&1; cat /tmp/plan | sed 's/^/  | /'
-grep -q "no scaffold" /tmp/plan && grep -q "pgsql" /tmp/plan && ok "adopt plan" || bad "plan"
+bash ./simai-admin.sh site adopt --domain $D --path $P >/tmp/plan 2>&1
+grep -q 'No handler was executed' /tmp/plan && ok "adopt plan" || bad "plan"
 [[ ! -e /etc/nginx/sites-available/$D.conf ]] && ok "plan changed nothing" || bad "plan applied"
 cli site adopt --domain $D --path $P --confirm yes >/tmp/ad 2>&1 && ok "adopt apply" || { bad "adopt"; tail -25 /tmp/ad; }
 tail -14 /tmp/ad | sed 's/^/  | /'

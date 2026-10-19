@@ -554,7 +554,7 @@ access_add_key_handler() {
     return 1
   fi
   local pubkey
-  pubkey=$(grep -E '^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)) ' "$key_file" | head -n 1)
+  pubkey=$(grep -E '^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)) ' "$key_file" | head -n 1 || true)
   if [[ -z "$pubkey" ]]; then
     error "No valid SSH public key found in ${key_file}"
     return 1
@@ -594,9 +594,9 @@ access_add_key_handler() {
     "Auth mode|${auth_mode}"
 }
 
-register_cmd "access" "list" "List managed file accesses" "access_list_handler" "" "scope= domain=" ""
-register_cmd "access" "show" "Show access details" "access_show_handler" "login" "" ""
-register_cmd "access" "doctor" "Check managed access security baseline" "access_doctor_handler" "" "strict=no" ""
+register_cmd "access" "list" "List managed file accesses" "access_list_handler" "" "scope= domain=" "effects:read"
+register_cmd "access" "show" "Show access details" "access_show_handler" "login" "" "effects:read"
+register_cmd "access" "doctor" "Check managed access security baseline" "access_doctor_handler" "" "strict=no" "effects:read"
 register_cmd "access" "create-global" "Create global SFTP access" "access_create_global_handler" "login" "password=" "menu:internal-confirm"
 register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password=" "menu:internal-confirm"
 register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" "menu:internal-confirm"

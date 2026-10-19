@@ -9,6 +9,8 @@ This directory contains architecture, development, and command reference docs fo
 - Admin usage map: see `docs/admin.md` and `docs/commands/`.
 - File access management: `docs/commands/access.md`.
 - Runtime change observer: `docs/commands/runtime-observer.md`.
+- Command execution and AI contracts: `docs/architecture/command-execution.md`.
+- Execution safety rollout: `docs/operations/env-safety-rollout.md`.
 - Site owners (several sites per account): `docs/commands/owner.md`.
 - WordPress ops reference: `docs/commands/wp.md`.
 - Bitrix ops reference: `docs/commands/bitrix.md`.

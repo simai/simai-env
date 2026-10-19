@@ -48,7 +48,11 @@ openssl req -x509 -nodes -newkey rsa:2048 -days 2 -subj /CN=generic.test -keyout
 sed -i 's#    listen 80;#    listen 80;\n    listen 443 ssl;\n    ssl_certificate /etc/nginx/g.crt;\n    ssl_certificate_key /etc/nginx/g.key;#' /etc/nginx/sites-enabled/generic.conf
 
 nginx -t >/tmp/t 2>&1 && ok "nginx -t passes with all templates" || { bad "nginx -t"; cat /tmp/t; }
-nginx
+systemctl reload nginx
+for _ in {1..50}; do
+  curl -fs --max-time 2 -H 'Host: generic.test' http://127.0.0.1/index.html >/dev/null 2>&1 && break
+  sleep 0.1
+done
 
 code() { curl -s -o /dev/null -w '%{http_code}' -H "Host: $1" "http://127.0.0.1$2"; }
 expect() { local got; got=$(code "$1" "$2"); [[ "$got" == "$3" ]] && ok "$1$2 -> $got" || bad "$1$2 -> $got (want $3)"; }

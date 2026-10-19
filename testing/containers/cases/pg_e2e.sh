@@ -4,7 +4,7 @@ set -uo pipefail
 PHPV="${PHPV:-8.3}"
 rm -rf /root/simai-env && cp -r /src /root/simai-env && chmod +x /root/simai-env/*.sh; cd /root/simai-env
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
-cli() { ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then ./simai-admin.sh "$@"; return; fi; done; ./simai-admin.sh "$@" --confirm yes; }
 
 cli db pgsql-install --confirm yes >/tmp/pi 2>&1 && ok "db pgsql-install" || { bad "pgsql-install"; tail -8 /tmp/pi; }
 cli db pgsql-status 2>&1 | grep -q "localhost only" && ok "postgres local-only" || bad "pgsql-status"

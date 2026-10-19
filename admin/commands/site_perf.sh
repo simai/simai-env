@@ -472,11 +472,11 @@ site_auto_optimize_reset_handler() {
     "Effective state|$(site_auto_optimize_effective_enabled "$domain")"
 }
 
-register_cmd "site" "perf-status" "Show per-site performance/runtime governance" "site_perf_status_handler" "" "domain="
+register_cmd "site" "perf-status" "Show per-site performance/runtime governance" "site_perf_status_handler" "" "domain=" "effects:read"
 register_cmd "site" "perf-tune" "Apply per-site FPM governance mode" "site_perf_tune_handler" "" "domain= mode= confirm="
-register_cmd "site" "usage-status" "Show user-facing site usage class" "site_usage_status_handler" "" "domain="
+register_cmd "site" "usage-status" "Show user-facing site usage class" "site_usage_status_handler" "" "domain=" "effects:read"
 register_cmd "site" "usage-set" "Set user-facing site usage class" "site_usage_set_handler" "" "domain= class= usage= confirm=" "menu:internal-confirm"
-register_cmd "site" "auto-optimize-status" "Show per-site automatic optimization status" "site_auto_optimize_status_handler" "" "domain="
+register_cmd "site" "auto-optimize-status" "Show per-site automatic optimization status" "site_auto_optimize_status_handler" "" "domain=" "effects:read"
 register_cmd "site" "auto-optimize-enable" "Enable automatic optimization for one site" "site_auto_optimize_enable_handler" "" "domain= confirm=" "menu:internal-confirm"
 register_cmd "site" "auto-optimize-disable" "Disable automatic optimization for one site" "site_auto_optimize_disable_handler" "" "domain= confirm=" "menu:internal-confirm"
 register_cmd "site" "auto-optimize-reset" "Reset site automatic optimization to inherit" "site_auto_optimize_reset_handler" "" "domain= confirm=" "menu:internal-confirm"

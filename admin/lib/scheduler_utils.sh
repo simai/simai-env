@@ -27,7 +27,7 @@ scheduler_cron_file() {
 
 scheduler_scheduler_cmd() {
   local root="${SIMAI_ENV_ROOT:-${SCRIPT_DIR:-/root/simai-env}}"
-  echo "${root}/simai-admin.sh self scheduler"
+  echo "${root}/simai-admin.sh self scheduler --confirm yes"
 }
 
 scheduler_replace_managed_block() {
@@ -778,10 +778,19 @@ scheduler_run_job() {
 
 scheduler_tick() {
   install -d "$(scheduler_state_dir)" "$(scheduler_jobs_state_dir)" "$(dirname "$(scheduler_log_file)")"
-  local any_due=0 failures=0 job
+  local any_due=0 failures=0 job locked=0
   while IFS= read -r job; do
     [[ -z "$job" ]] && continue
     if scheduler_job_is_due "$job"; then
+      # The host lock is taken only when there is work, so the every-minute
+      # tick does not collide with scheduled backups or manual commands.
+      if (( locked == 0 )); then
+        if ! SIMAI_LOCK_WAIT=0 command_lock ''; then
+          ui_info "Scheduler: host busy; due jobs run on a later tick"
+          return 0
+        fi
+        locked=1
+      fi
       any_due=1
       if ! scheduler_run_job "$job"; then
         failures=$((failures + 1))

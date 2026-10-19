@@ -16,6 +16,7 @@ bitrix_cron_markers() {
   grep -Eq "^# simai-slug: ${slug}$" "$cron_file" && BX_CRON_SLUG_MATCH="yes"
   grep -Eq "cron_events\\.php" "$cron_file" && BX_CRON_ENTRY_MATCH="yes"
   grep -Eq "short_open_tag=1.*cron_events\\.php" "$cron_file" && BX_CRON_SHORT_OPEN_TAG_MATCH="yes"
+  return 0
 }
 
 bitrix_prepare_site() {
@@ -1353,10 +1354,10 @@ bitrix_finalize_handler() {
   ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
 }
 
-register_cmd "bitrix" "status" "Show Bitrix status" "bitrix_status_handler" "domain" ""
-register_cmd "bitrix" "cron-status" "Show Bitrix scheduler status" "bitrix_cron_status_handler" "domain" ""
+register_cmd "bitrix" "status" "Show Bitrix status" "bitrix_status_handler" "domain" "" "effects:read"
+register_cmd "bitrix" "cron-status" "Show Bitrix scheduler status" "bitrix_cron_status_handler" "domain" "" "effects:read"
 register_cmd "bitrix" "cron-sync" "Write/rewrite Bitrix scheduler file" "bitrix_cron_sync_handler" "domain" "" "menu:confirm"
-register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bitrix_agents_status_handler" "domain" ""
+register_cmd "bitrix" "agents-status" "Show Bitrix agents-over-cron status" "bitrix_agents_status_handler" "domain" "" "effects:read"
 register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline" "bitrix_agents_sync_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" "" "menu:confirm"
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install=" "menu:confirm"
@@ -1364,6 +1365,6 @@ register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db pres
 register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive=" "menu:confirm"
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended=" "menu:confirm menu:bulk"
 register_cmd "bitrix" "ownership" "Check/repair Bitrix file ownership drift" "bitrix_ownership_handler" "domain" "apply= confirm="
-register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" ""
+register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" "" "effects:read"
 register_cmd "bitrix" "perf-apply" "Apply Bitrix optimization baseline" "bitrix_perf_apply_handler" "domain" "mode= confirm= include-recommended="
 register_cmd "bitrix" "finalize" "Finalize Bitrix post-install baseline" "bitrix_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging=" "menu:confirm"

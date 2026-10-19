@@ -150,7 +150,8 @@ trap cleanup_on_exit EXIT
 
 run_smoke() {
   if [[ "${TEST_SYNC_UPDATE:-no}" == "yes" ]]; then
-    run_cmd "self update (sync test host)" "SIMAI_UPDATE_SMOKE_STRICT=yes ./simai-admin.sh self update >/dev/null"
+    # Toolkits up to 1.14.x reject --confirm; newer ones preview without it.
+    run_cmd "self update (sync test host)" "confirm=''; [[ -f admin/lib/execution.sh ]] && confirm='--confirm yes'; SIMAI_UPDATE_SMOKE_STRICT=yes ./simai-admin.sh self update \${confirm} >/dev/null"
   fi
   run_cmd "self status" "./simai-admin.sh self status >/dev/null"
   run_cmd "self platform-status" "./simai-admin.sh self platform-status >/dev/null"
@@ -168,14 +169,14 @@ run_core() {
   stamp="$(date +%y%m%d-%H%M%S)"
   _test_domain="t-core-${stamp}${suffix}"
 
-  run_cmd "site add (generic + db)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db yes >/dev/null"
+  run_cmd "site add (generic + db)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db yes --confirm yes >/dev/null"
   read -r _test_db_name _test_db_user < <(capture_db_identity "${_test_domain}")
   run_cmd "site info" "./simai-admin.sh site info --domain '${_test_domain}' >/dev/null"
   run_cmd "site db-status" "./simai-admin.sh site db-status --domain '${_test_domain}' >/dev/null"
   run_cmd "site db-export" "./simai-admin.sh site db-export --domain '${_test_domain}' --confirm yes >/dev/null"
   run_cmd "site db-rotate" "./simai-admin.sh site db-rotate --domain '${_test_domain}' --confirm yes >/dev/null"
   local backup_file="/root/simai-backups/${_test_domain}-regression.tar.gz"
-  run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_file}' >/dev/null"
+  run_cmd "backup export" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_file}' --confirm yes >/dev/null"
   run_cmd "backup inspect" "./simai-admin.sh backup inspect --file '${backup_file}' >/dev/null"
   run_cmd "backup import plan" "./simai-admin.sh backup import --file '${backup_file}' --apply no >/dev/null"
 
@@ -183,23 +184,23 @@ run_core() {
   local wp_stamp
   wp_stamp="$(date +%y%m%d-%H%M%S)"
   _wp_test_domain="t-wp-${wp_stamp}${wp_suffix}"
-  run_cmd "site add (wordpress + db)" "./simai-admin.sh site add --domain '${_wp_test_domain}' --profile wordpress --php 8.2 --db yes >/dev/null"
+  run_cmd "site add (wordpress + db)" "./simai-admin.sh site add --domain '${_wp_test_domain}' --profile wordpress --php 8.2 --db yes --confirm yes >/dev/null"
   read -r _wp_db_name _wp_db_user < <(capture_db_identity "${_wp_test_domain}")
   run_cmd "wp status" "./simai-admin.sh wp status --domain '${_wp_test_domain}' >/dev/null"
   run_cmd "wp cron-status" "./simai-admin.sh wp cron-status --domain '${_wp_test_domain}' >/dev/null"
-  run_cmd "wp cron-sync" "./simai-admin.sh wp cron-sync --domain '${_wp_test_domain}' >/dev/null"
+  run_cmd "wp cron-sync" "./simai-admin.sh wp cron-sync --domain '${_wp_test_domain}' --confirm yes >/dev/null"
 
   local bx_suffix="${TEST_WILDCARD_SUFFIX:-.env.sf8.ru}"
   local bx_stamp
   bx_stamp="$(date +%y%m%d-%H%M%S)"
   _bitrix_test_domain="t-bitrix-${bx_stamp}${bx_suffix}"
-  run_cmd "site add (bitrix + db)" "./simai-admin.sh site add --domain '${_bitrix_test_domain}' --profile bitrix --php 8.2 --db yes >/dev/null"
+  run_cmd "site add (bitrix + db)" "./simai-admin.sh site add --domain '${_bitrix_test_domain}' --profile bitrix --php 8.2 --db yes --confirm yes >/dev/null"
   read -r _bitrix_db_name _bitrix_db_user < <(capture_db_identity "${_bitrix_test_domain}")
   run_cmd "bitrix status" "./simai-admin.sh bitrix status --domain '${_bitrix_test_domain}' >/dev/null"
   run_cmd "bitrix cron-status" "./simai-admin.sh bitrix cron-status --domain '${_bitrix_test_domain}' >/dev/null"
-  run_cmd "bitrix cron-sync" "./simai-admin.sh bitrix cron-sync --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix cron-sync" "./simai-admin.sh bitrix cron-sync --domain '${_bitrix_test_domain}' --confirm yes >/dev/null"
   run_cmd "bitrix agents-status" "./simai-admin.sh bitrix agents-status --domain '${_bitrix_test_domain}' >/dev/null"
-  run_cmd "bitrix agents-sync plan" "./simai-admin.sh bitrix agents-sync --domain '${_bitrix_test_domain}' >/dev/null"
+  run_cmd "bitrix agents-sync plan" "./simai-admin.sh bitrix agents-sync --domain '${_bitrix_test_domain}' --confirm yes >/dev/null"
 }
 
 run_menu() {
@@ -246,7 +247,7 @@ run_negative() {
     local stamp
     stamp="$(date +%y%m%d-%H%M%S)"
     _test_domain="t-neg-${stamp}${suffix}"
-    run_cmd "site add (negative fixture)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db no >/dev/null"
+    run_cmd "site add (negative fixture)" "./simai-admin.sh site add --domain '${_test_domain}' --profile generic --php 8.2 --db no --confirm yes >/dev/null"
   fi
 
   local backup_base="/root/simai-backups/${_test_domain}-negative-base.tar.gz"
@@ -254,7 +255,7 @@ run_negative() {
   local backup_phpnone="/root/simai-backups/${_test_domain}-negative-phpnone.tar.gz"
   local tmp_unknown="/tmp/simai-neg-unknown-${_test_domain}"
   local tmp_phpnone="/tmp/simai-neg-phpnone-${_test_domain}"
-  run_cmd "backup export (negative fixture)" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_base}' >/dev/null"
+  run_cmd "backup export (negative fixture)" "./simai-admin.sh backup export --domain '${_test_domain}' --out '${backup_base}' --confirm yes >/dev/null"
   run_cmd "prepare backup (unknown profile)" "rm -rf '${tmp_unknown}' && mkdir -p '${tmp_unknown}' && tar -xzf '${backup_base}' -C '${tmp_unknown}' && python3 -c \"import json; p='${tmp_unknown}/manifest.json'; d=json.load(open(p)); d['profile']='missing-profile'; open(p,'w').write(json.dumps(d,ensure_ascii=False,indent=2)+'\\\\n')\" && tar -czf '${backup_unknown}' -C '${tmp_unknown}' ."
   run_cmd "prepare backup (php none mismatch)" "rm -rf '${tmp_phpnone}' && mkdir -p '${tmp_phpnone}' && tar -xzf '${backup_base}' -C '${tmp_phpnone}' && python3 -c \"import json; p='${tmp_phpnone}/manifest.json'; d=json.load(open(p)); d['profile']='generic'; d['php']='none'; open(p,'w').write(json.dumps(d,ensure_ascii=False,indent=2)+'\\\\n')\" && tar -czf '${backup_phpnone}' -C '${tmp_phpnone}' ."
 
@@ -266,10 +267,10 @@ run_negative() {
     run_cmd_expect_fail "bitrix agents-status on non-bitrix profile" "./simai-admin.sh bitrix agents-status --domain '${_test_domain}'"
   fi
   run_cmd_expect_fail "backup inspect missing file" "./simai-admin.sh backup inspect --file /root/simai-backups/does-not-exist-zzz.tar.gz"
-  run_cmd_expect_fail "backup import apply unknown profile" "./simai-admin.sh backup import --file '${backup_unknown}' --apply yes --enable no --reload no"
-  run_cmd_expect_fail "backup import apply php none mismatch" "./simai-admin.sh backup import --file '${backup_phpnone}' --apply yes --enable no --reload no"
+  run_cmd_expect_fail "backup import apply unknown profile" "./simai-admin.sh backup import --file '${backup_unknown}' --apply yes --enable no --reload no --confirm yes"
+  run_cmd_expect_fail "backup import apply php none mismatch" "./simai-admin.sh backup import --file '${backup_phpnone}' --apply yes --enable no --reload no --confirm yes"
   if [[ -n "${_test_domain:-}" ]]; then
-    run_cmd_expect_fail "ssl install broken cert path" "./simai-admin.sh ssl install --domain '${_test_domain}' --cert /root/test-certs/does-not-exist.crt --key /root/test-certs/does-not-exist.key"
+    run_cmd_expect_fail "ssl install broken cert path" "./simai-admin.sh ssl install --domain '${_test_domain}' --cert /root/test-certs/does-not-exist.crt --key /root/test-certs/does-not-exist.key --confirm yes"
   fi
 }
 
@@ -284,18 +285,18 @@ run_features() {
   _iso_domain="t-iso-${stamp}${suffix}"
   local feat_project="${_feat_domain//./-}" iso_project="${_iso_domain//./-}"
 
-  run_cmd "owner create" "./simai-admin.sh owner create --name '${_feat_owner}' >/dev/null"
-  run_cmd "site add (generic + db, owner)" "./simai-admin.sh site add --domain '${_feat_domain}' --profile generic --php 8.2 --db yes --owner '${_feat_owner}' >/dev/null"
+  run_cmd "owner create" "./simai-admin.sh owner create --name '${_feat_owner}' --confirm yes >/dev/null"
+  run_cmd "site add (generic + db, owner)" "./simai-admin.sh site add --domain '${_feat_domain}' --profile generic --php 8.2 --db yes --owner '${_feat_owner}' --confirm yes >/dev/null"
   read -r _feat_db_name _feat_db_user < <(capture_db_identity "${_feat_domain}")
   run_cmd "owner site pool runs as owner" "grep -q '^user = ${_feat_owner}\$' /etc/php/8.2/fpm/pool.d/${feat_project}.conf"
   run_cmd "site info shows owner" "./simai-admin.sh site info --domain '${_feat_domain}' 2>&1 | grep -A1 'Runs as' | grep -q '${_feat_owner}'"
-  run_cmd "site add (isolated, no owner)" "./simai-admin.sh site add --domain '${_iso_domain}' --profile generic --php 8.2 --db no >/dev/null"
+  run_cmd "site add (isolated, no owner)" "./simai-admin.sh site add --domain '${_iso_domain}' --profile generic --php 8.2 --db no --confirm yes >/dev/null"
   run_cmd "isolated site has own user" "grep -q '^user = site-' /etc/php/8.2/fpm/pool.d/${iso_project}.conf && test \"\$(stat -c %a /home/simai/www/${_iso_domain})\" = 750"
   run_cmd "sites of different users cannot read each other" "! sudo -u '${_feat_owner}' cat /home/simai/www/${_iso_domain}/public/index.php >/dev/null 2>&1"
-  run_cmd "backup data" "./simai-admin.sh backup data --domain '${_feat_domain}' --keep 1 --dest /root/simai-regression-backups >/dev/null"
-  run_cmd "backup data-verify with restore test" "./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_feat_domain}/2* | tail -1)\" --restore-test yes >/dev/null"
+  run_cmd "backup data" "./simai-admin.sh backup data --domain '${_feat_domain}' --keep 1 --dest /root/simai-regression-backups --confirm yes >/dev/null"
+  run_cmd "backup data-verify with restore test" "./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_feat_domain}/2* | tail -1)\" --restore-test yes --confirm yes >/dev/null"
   run_cmd_expect_fail "owner remove while it runs sites" "./simai-admin.sh owner remove --name '${_feat_owner}' --confirm yes"
-  run_cmd "self migrate is idempotent" "./simai-admin.sh self migrate >/tmp/simai-regression-migrate.log 2>&1 && grep -q 'nothing to migrate' /tmp/simai-regression-migrate.log"
+  run_cmd "self migrate is idempotent" "./simai-admin.sh self migrate --confirm yes >/tmp/simai-regression-migrate.log 2>&1 && grep -q 'nothing to migrate' /tmp/simai-regression-migrate.log"
   run_cmd "catch-all rejects unknown host on 443" "! curl -sk --resolve regression-unknown.invalid:443:127.0.0.1 https://regression-unknown.invalid/ -o /dev/null --max-time 5"
   run_cmd "site remove deletes the per-site user" "./simai-admin.sh site remove --domain '${_iso_domain}' --remove-files yes --confirm yes >/dev/null && ! getent passwd 'site-${iso_project}' >/dev/null"
   _iso_domain=""
@@ -303,10 +304,10 @@ run_features() {
   # PostgreSQL site lifecycle and machine-readable discovery.
   _pg_domain="t-pg-${stamp}${suffix}"
   run_cmd "db pgsql-install" "./simai-admin.sh db pgsql-install --confirm yes >/dev/null"
-  run_cmd "site add (generic + pgsql)" "./simai-admin.sh site add --domain '${_pg_domain}' --profile generic --php 8.2 --create-db yes --db-engine pgsql --db-export yes >/dev/null"
+  run_cmd "site add (generic + pgsql)" "./simai-admin.sh site add --domain '${_pg_domain}' --profile generic --php 8.2 --create-db yes --db-engine pgsql --db-export yes --confirm yes >/dev/null"
   read -r _pg_db_name _pg_db_user < <(capture_db_identity "${_pg_domain}")
   run_cmd "pgsql site .env points at PostgreSQL" "grep -q '^DB_CONNECTION=pgsql' /home/simai/www/${_pg_domain}/.env"
-  run_cmd "backup data (pgsql) with restore test" "./simai-admin.sh backup data --domain '${_pg_domain}' --keep 1 --dest /root/simai-regression-backups >/dev/null && ./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_pg_domain}/2* | tail -1)\" --restore-test yes >/dev/null"
+  run_cmd "backup data (pgsql) with restore test" "./simai-admin.sh backup data --domain '${_pg_domain}' --keep 1 --dest /root/simai-regression-backups --confirm yes >/dev/null && ./simai-admin.sh backup data-verify --path \"\$(ls -1d /root/simai-regression-backups/${_pg_domain}/2* | tail -1)\" --restore-test yes --confirm yes >/dev/null"
   run_cmd "self describe is valid JSON" "./simai-admin.sh self describe 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"schema\"]==\"simai-host/1\"'"
   run_cmd "site describe has no DB password" "p=\$(sed -n 's/^DB_PASS=//p' /etc/simai-env/sites/${_pg_domain}/db.env); ./simai-admin.sh site describe --domain '${_pg_domain}' 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d[\"database\"][\"engine\"]==\"pgsql\"' && ! ./simai-admin.sh site describe --domain '${_pg_domain}' 2>/dev/null | grep -qF \"\$p\""
   run_cmd "site remove drops the pgsql database" "./simai-admin.sh site remove --domain '${_pg_domain}' --remove-files yes --drop-db yes --drop-db-user yes --confirm yes >/dev/null && [[ -z \$(runuser -u postgres -- psql -Atc \"SELECT 1 FROM pg_database WHERE datname='${_pg_db_name}'\") ]]"

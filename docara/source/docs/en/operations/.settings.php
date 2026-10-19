@@ -7,6 +7,7 @@ return array (
   array (
     'bitrix-production-runbook' => 'Bitrix Production Runbook',
     'daily-ops-quickstart' => 'Daily Ops Quickstart',
+    'env-safety-rollout' => 'Env Safety Rollout',
     'laravel-production-runbook' => 'Laravel Production Runbook',
     'production-readiness' => 'Production Readiness',
     'profile-ops-matrix' => 'Profile Ops Matrix',

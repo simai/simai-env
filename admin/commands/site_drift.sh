@@ -121,7 +121,7 @@ site_drift_handler() {
   fi
 
   local steps=0
-  [[ "$legacy_state" == "marked" ]] && ((steps++))
+  [[ "$legacy_state" == "marked" ]] && steps=$(( steps + 1 ))
   ((steps==0)) && { info "No fixes needed"; return 0; }
   progress_init "$steps"
   if [[ "$legacy_state" == "marked" ]]; then
@@ -155,4 +155,4 @@ site_drift_handler() {
   progress_done "Drift fixes completed"
 }
 
-register_cmd "site" "drift" "Check site metadata/cron drift (plan/apply)" "site_drift_handler" "domain" "fix=no" "tier:advanced"
+register_cmd "site" "drift" "Check site metadata/cron drift (plan/apply)" "site_drift_handler" "domain" "fix=no" "tier:advanced effects:read"

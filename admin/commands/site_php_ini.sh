@@ -260,5 +260,5 @@ site_php_ini_apply_handler() {
 
 register_cmd "site" "php-ini-set" "Set per-site PHP ini override (stored; optional apply)" "site_php_ini_set_handler" "domain name value" "apply=no confirm=" "tier:advanced"
 register_cmd "site" "php-ini-unset" "Remove per-site PHP ini override" "site_php_ini_unset_handler" "domain name" "apply=no confirm=" "tier:advanced"
-register_cmd "site" "php-ini-list" "List per-site PHP ini overrides" "site_php_ini_list_handler" "domain" "" "tier:advanced"
+register_cmd "site" "php-ini-list" "List per-site PHP ini overrides" "site_php_ini_list_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "site" "php-ini-apply" "Apply stored per-site PHP ini overrides to current pool" "site_php_ini_apply_handler" "domain" "confirm=" "tier:advanced"

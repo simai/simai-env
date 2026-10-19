@@ -187,6 +187,6 @@ queue_logs_handler() {
   ui_kv "Restart worker" "simai-admin.sh queue restart --domain ${domain}"
 }
 
-register_cmd "queue" "status" "Show Laravel worker status (laravel-only)" "queue_status_handler" "domain" ""
+register_cmd "queue" "status" "Show Laravel worker status (laravel-only)" "queue_status_handler" "domain" "" "effects:read"
 register_cmd "queue" "restart" "Restart Laravel worker (laravel-only)" "queue_restart_handler" "domain" "" "menu:confirm"
-register_cmd "queue" "logs" "Tail Laravel worker logs (laravel-only)" "queue_logs_handler" "domain" "lines=100"
+register_cmd "queue" "logs" "Tail Laravel worker logs (laravel-only)" "queue_logs_handler" "domain" "lines=100" "effects:read"

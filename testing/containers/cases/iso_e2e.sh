@@ -7,7 +7,7 @@ cd /root/simai-env
 fails=0
 ok() { echo "PASS $*"; }
 bad() { echo "FAIL $*"; fails=$((fails + 1)); }
-cli() { ./simai-admin.sh "$@"; }
+cli() { local arg; for arg; do if [[ "$arg" == --confirm || "$arg" == --confirm=* ]]; then ./simai-admin.sh "$@"; return; fi; done; ./simai-admin.sh "$@" --confirm yes; }
 http() { curl -s -H "Host: $1" "http://127.0.0.1$2"; }
 
 add_site() {
@@ -54,7 +54,7 @@ cli site php-ini set --domain alpha.test --name memory_limit --value 256M >/tmp/
 grep -q '^user = site-alpha-test' /etc/php/8.3/fpm/pool.d/alpha-test.conf && ok "pool user survives php-ini change" || bad "pool user reset by php-ini"
 
 # Migrate legacy.
-cli site isolate --domain legacy.test >/tmp/plan 2>&1; grep -q 'Rerun with --confirm yes' /tmp/plan && ok "isolate prints plan" || bad "isolate plan"
+bash ./simai-admin.sh site isolate --domain legacy.test >/tmp/plan 2>&1; grep -q 'Rerun with --confirm yes' /tmp/plan && ok "isolate prints plan" || bad "isolate plan"
 cli site isolate --domain legacy.test --confirm yes >/tmp/iso 2>&1 && ok "site isolate legacy.test" || { bad "isolate"; tail -20 /tmp/iso; }
 sleep 1
 out=$(http legacy.test "/probe.php?f=$L/secret.txt,$A/secret.txt")

@@ -273,7 +273,7 @@ if install_profile_init_enabled; then
       fi
       if [[ $has_simai -eq 0 ]]; then
         echo "Initializing profile activation (core profiles enabled by default)..."
-        if ! "${INSTALL_DIR}/simai-admin.sh" profile init --mode core; then
+        if ! "${INSTALL_DIR}/simai-admin.sh" profile init --mode core --confirm yes; then
           echo "WARNING: Profile activation init failed. You can run later:"
           echo "  sudo ${INSTALL_DIR}/simai-admin.sh profile init --mode core"
         fi

@@ -161,5 +161,5 @@ owner_remove_handler() {
 
 register_cmd "owner" "create" "Create an owner account that can run several sites" "owner_create_handler" "name" "pubkey-file=" "tier:advanced"
 register_cmd "owner" "add-key" "Allow an SSH public key to log in as an owner" "owner_add_key_handler" "name pubkey-file" "" "tier:advanced"
-register_cmd "owner" "list" "List owners, their SSH keys and projects" "owner_list_handler" "" "" "tier:advanced"
+register_cmd "owner" "list" "List owners, their SSH keys and projects" "owner_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "owner" "remove" "Remove an owner that has no sites" "owner_remove_handler" "name" "confirm=" "tier:advanced"

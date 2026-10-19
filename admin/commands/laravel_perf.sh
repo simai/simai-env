@@ -83,6 +83,7 @@ laravel_state_summary() {
   LARAVEL_ENV_FILE="$(laravel_env_file_path "$LARAVEL_PERF_ROOT")"
   LARAVEL_APP_URL=$(laravel_env_get "$LARAVEL_ENV_FILE" "APP_URL" 2>/dev/null || true)
   [[ -z "$LARAVEL_APP_URL" ]] && LARAVEL_APP_URL="$(site_primary_url "$LARAVEL_PERF_DOMAIN")"
+  return 0
 }
 
 laravel_queue_status_summary() {
@@ -561,8 +562,8 @@ laravel_perf_apply_handler() {
   ui_kv "Review Laravel status" "simai-admin.sh laravel perf-status --domain ${domain}"
 }
 
-register_cmd "laravel" "status" "Show Laravel status" "laravel_status_handler" "domain" ""
+register_cmd "laravel" "status" "Show Laravel status" "laravel_status_handler" "domain" "" "effects:read"
 register_cmd "laravel" "app-ready" "Bootstrap Laravel application (composer scaffold + env)" "laravel_app_ready_handler" "domain" "" "menu:confirm"
 register_cmd "laravel" "finalize" "Complete Laravel post-bootstrap baseline" "laravel_finalize_handler" "domain" "confirm= ssl= email= redirect= hsts= staging= mode= migrate=" "menu:confirm"
-register_cmd "laravel" "perf-status" "Show Laravel optimization status" "laravel_perf_status_handler" "" "domain="
+register_cmd "laravel" "perf-status" "Show Laravel optimization status" "laravel_perf_status_handler" "" "domain=" "effects:read"
 register_cmd "laravel" "perf-apply" "Apply Laravel optimization baseline" "laravel_perf_apply_handler" "" "domain= mode= confirm="

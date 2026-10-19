@@ -31,7 +31,7 @@ JSON goes to stdout, logs to stderr. None of these outputs contain secrets.
   `sudo -u <runs_as> -H php<ver> <root>/current/artisan <command>`
   (`<root>/artisan` for sites without releases). `site describe` prints the
   exact command.
-- Take `simai-admin.sh backup data --domain <domain>` before migrations,
+- Take `simai-admin.sh backup data --domain <domain> --confirm yes` before migrations,
   restores or isolation changes.
 
 ## Where things are
@@ -59,7 +59,7 @@ JSON goes to stdout, logs to stderr. None of these outputs contain secrets.
 | Move a site to its own user | `site isolate --domain D --confirm yes` |
 | PostgreSQL | `db pgsql-install --confirm yes`; `site add ... --db-engine pgsql` |
 | Health | `site doctor --domain D`, `self status` |
-| Backup / restore | `backup data --domain D`; `backup data-verify --path P --restore-test yes`; `backup data-restore` |
+| Backup / restore | `backup data --domain D --confirm yes`; `backup data-verify --path P --restore-test yes --confirm yes`; `backup data-restore` |
 
 ## Application manifest (`.simai/app.json`)
 

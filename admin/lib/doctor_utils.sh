@@ -35,14 +35,29 @@ doctor_add_result() {
 }
 
 doctor_print_report() {
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    local i
+    for i in "${!DOCTOR_STATUS[@]}"; do
+      printf '%s\t%s\t%s\n' "${DOCTOR_STATUS[$i]}" "${DOCTOR_AREA[$i]}" "${DOCTOR_TITLE[$i]}"
+    done | python3 -c '
+import json,sys
+checks=[]; summary={s:0 for s in ("PASS","WARN","FAIL","SKIP")}
+for i,line in enumerate(sys.stdin):
+    level,area,title=line.rstrip("\n").split("\t",2)
+    if level not in summary: raise SystemExit("invalid diagnostic status")
+    summary[level]+=1
+    checks.append({"id":i+1,"status":level,"area":area,"title":title})
+print(json.dumps({"schema":"simai-site-diagnostics/1","status":"FAIL" if summary["FAIL"] else "WARN" if summary["WARN"] else "PASS","summary":summary,"checks":checks},indent=2))'
+    return 0
+  fi
   local pass=0 warn=0 fail=0 skip=0
   local i
   for i in "${DOCTOR_STATUS[@]}"; do
     case "$i" in
-      PASS) ((pass++)) ;;
-      WARN) ((warn++)) ;;
-      FAIL) ((fail++)) ;;
-      SKIP) ((skip++)) ;;
+      PASS) pass=$((pass + 1)) ;;
+      WARN) warn=$((warn + 1)) ;;
+      FAIL) fail=$((fail + 1)) ;;
+      SKIP) skip=$((skip + 1)) ;;
     esac
   done
   local sep="+-------+------+\n"

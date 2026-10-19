@@ -47,9 +47,9 @@ profile_print_summary() {
   local i
   for i in "${profile_validate_results_status[@]}"; do
     case "$i" in
-      PASS) ((pass++)) ;;
-      WARN) ((warn++)) ;;
-      FAIL) ((fail++)) ;;
+      PASS) pass=$(( pass + 1 )) ;;
+      WARN) warn=$(( warn + 1 )) ;;
+      FAIL) fail=$(( fail + 1 )) ;;
     esac
   done
   local total=${#profile_validate_results_status[@]}
@@ -303,7 +303,7 @@ profile_validate_handler() {
   profile_print_summary
 }
 
-register_cmd "profile" "validate" "Validate profile files (read-only lint)" "profile_validate_handler" "" "id= all=yes"
+register_cmd "profile" "validate" "Validate profile files (read-only lint)" "profile_validate_handler" "" "id= all=yes" "effects:read"
 
 profile_list_handler() {
   parse_kv_args "$@"
@@ -398,7 +398,7 @@ profile_used_by_handler() {
   local pid
   for pid in "${!profile_to_domains[@]}"; do
     local count=0
-    for _ in ${profile_to_domains[$pid]}; do ((count++)); done
+    for _ in ${profile_to_domains[$pid]}; do count=$(( count + 1 )); done
     printf "| %-10s | %-5s |\n" "$pid" "$count"
   done
   printf "%s\n" "$border"
@@ -525,9 +525,9 @@ profile_init_handler() {
   info "Profiles allowlist initialized (${mode}) at $(profiles_enabled_file)"
 }
 
-register_cmd "profile" "list" "List profiles and activation status" "profile_list_handler" "" "all=no"
-register_cmd "profile" "used-by" "Show profile usage summary" "profile_used_by_handler" "" "id="
-register_cmd "profile" "used-by-one" "Show sites using a specific profile" "profile_used_by_handler" "id" ""
+register_cmd "profile" "list" "List profiles and activation status" "profile_list_handler" "" "all=no" "effects:read"
+register_cmd "profile" "used-by" "Show profile usage summary" "profile_used_by_handler" "" "id=" "effects:read"
+register_cmd "profile" "used-by-one" "Show sites using a specific profile" "profile_used_by_handler" "id" "" "effects:read"
 register_cmd "profile" "enable" "Enable a profile" "profile_enable_handler" "id" "" "menu:internal-confirm"
 register_cmd "profile" "disable" "Disable a profile" "profile_disable_handler" "id" "force=no" "menu:internal-confirm"
 register_cmd "profile" "init" "Initialize profile activation allowlist" "profile_init_handler" "" "mode=core force=no" "menu:confirm"
