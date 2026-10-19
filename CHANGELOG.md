@@ -31,6 +31,9 @@
 - PHP 8.5 builds OPcache into the core: no `php8.5-opcache` package is
   requested. Bootstrap installs `iproute2`; apt waits for the dpkg lock held by
   unattended-upgrades after the first boot.
+- A confirmed deploy of a service site installs the apt packages its manifest
+  declares (and `python3-venv` for Python requirements): service sites have no
+  `site adopt` step. The deploy source is recorded on one line again.
 - OS assessment for future support: `docs/development/os-support.md`
   (Debian 12/13 next; RHEL family not close).
 

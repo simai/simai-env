@@ -28,6 +28,18 @@ deploy_state_set() {
   chmod 0640 "$tmp" && mv -f "$tmp" "$file"
 }
 
+# One line describing the release source (git, archive or directory).
+deploy_source_label() {
+  local git_url="$1" ref="$2" archive="$3" from="$4"
+  if [[ -n "$git_url" ]]; then
+    printf 'git %s @ %s\n' "$git_url" "${ref% }"
+  elif [[ -n "$archive" ]]; then
+    printf 'archive %s\n' "$(basename "$archive")"
+  else
+    printf 'dir %s\n' "$from"
+  fi
+}
+
 deploy_layout_active() {
   [[ -L "${1}/current" && -d "${1}/releases" ]]
 }
@@ -244,6 +256,18 @@ deploy_service_release() {
   if [[ -n "$APP_NODE_VERSION" ]] && (( major < APP_NODE_VERSION )); then
     DEPLOY_SERVICE_FAILED="Node.js ${major} is older than the release requires (${APP_NODE_VERSION})"; return 1
   fi
+  # Service sites have no adopt step: the confirmed deploy installs the apt
+  # packages the manifest declares (and python3-venv for Python requirements).
+  local -a wanted=("${APP_PACKAGES[@]}") missing=()
+  [[ -n "$APP_PYTHON_REQUIREMENTS" ]] && wanted+=(python3-venv)
+  [[ ${#wanted[@]} -gt 0 ]] && mapfile -t missing < <(app_missing_packages "${wanted[@]}")
+  if [[ ${#missing[@]} -gt 0 && -n "${missing[0]}" ]]; then
+    info "Installing requirements: ${missing[*]}"
+    os_cmd_pkg_update
+    run_long "Updating apt indexes" "${OS_CMD[@]}" || { DEPLOY_SERVICE_FAILED="apt-get update"; return 1; }
+    os_cmd_pkg_install "${missing[@]}"
+    run_long "Installing ${missing[*]}" "${OS_CMD[@]}" || { DEPLOY_SERVICE_FAILED="missing requirements: ${missing[*]}"; return 1; }
+  fi
   if [[ -n "$APP_PYTHON_REQUIREMENTS" ]] && ! python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
     DEPLOY_SERVICE_FAILED="missing requirements: python3-venv"; return 1
   fi
@@ -298,7 +322,7 @@ site_deploy_handler() {
   if [[ "${confirm,,}" != yes ]]; then
     echo "Deploy plan for ${domain}:"
     deploy_layout_active "$root" || echo "  - first deploy: move the current code to releases/${release_id}-initial and serve ${root}/current"
-    echo "  - fetch $([[ -n $git_url ]] && echo "${git_url} @ ${ref}" || [[ -n $archive ]] && echo "archive ${archive}" || echo "directory ${from}") into releases/<new> as ${user}"
+    echo "  - fetch $(deploy_source_label "$(redact_by_key git "$git_url")" "$ref" "$archive" "$from") into releases/<new> as ${user}"
     if [[ "$service" == yes ]]; then
       echo "  - read .simai/app.json (node.start required); link shared .env and the manifest's shared paths"
       echo "  - install dependencies (yarn/npm), Python venv when the manifest lists requirements, optional build"
@@ -362,7 +386,7 @@ site_deploy_handler() {
   if [[ -z "$failed" && -n "$APP_PHP_MIN" && -n "$php_bin" ]] && ! "$php_bin" -r "exit(version_compare(PHP_VERSION, '${APP_PHP_MIN}', '>=') ? 0 : 1);"; then
     failed="PHP ${php} is older than the release requires (${APP_PHP_MIN}); run site adopt --confirm yes first"
   fi
-  if [[ -z "$failed" ]]; then
+  if [[ -z "$failed" && "$service" != yes ]]; then
     local -a missing=()
     mapfile -t missing < <(app_missing_packages "${APP_PACKAGES[@]}"; [[ -z "$php_bin" ]] || app_php_ext_packages "$php" "${APP_PHP_EXTS[@]}")
     [[ ${#missing[@]} -eq 0 ]] || failed="missing requirements: ${missing[*]} (run site adopt --domain ${domain} --confirm yes)"
@@ -412,7 +436,7 @@ site_deploy_handler() {
   deploy_state_set "$domain" PREVIOUS "$DEPLOY_PREVIOUS"
   deploy_state_set "$domain" CURRENT "$release_id"
   deploy_state_set "$domain" DEPLOYED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  deploy_state_set "$domain" SOURCE "$([[ -n $git_url ]] && echo "git $(redact_by_key git "$git_url") ${ref} ${release_ref:-}" || [[ -n $archive ]] && echo "archive $(basename "$archive")" || echo "dir ${from}")"
+  deploy_state_set "$domain" SOURCE "$(deploy_source_label "$(redact_by_key git "$git_url")" "${ref} ${release_ref:-}" "$archive" "$from")"
   deploy_prune "$root" "$keep"
 
   local http_code

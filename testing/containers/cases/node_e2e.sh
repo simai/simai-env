@@ -12,6 +12,7 @@ cli() { ./simai-admin.sh "$@"; }
 D=svc.test; P=/home/simai/www/$D
 page() { curl -s --max-time 5 -H "Host: $D" "http://127.0.0.1${1:-/}"; }
 
+apt-get remove -y -qq tree >/dev/null 2>&1
 if ! command -v node >/dev/null 2>&1; then
   apt-get install -y -qq nodejs npm >/dev/null 2>&1 || { echo "FAIL nodejs install"; exit 1; }
 fi
@@ -39,6 +40,7 @@ JS
 {"schema": "simai-app/1", "profile": "node",
  "node": {"version": "18", "start": "node server.js"},
  "python": {"requirements": "requirements.txt"},
+ "packages": ["tree"],
  "shared": ["cache"], "health": {"path": "/health", "timeout": 30}}
 JSON
   [[ "${2:-}" == broken ]] && touch "$dir/BROKEN"
@@ -67,6 +69,8 @@ read -r e_port e_host e_greet e_uid <<<"$(page /env)"
 initial=("$P"/releases/*-initial)
 [[ -d $P/public && -d "${initial[0]}" && ! -e "${initial[0]}/public" ]] && ok "public/ stays outside releases for ACME" || bad "public moved"
 systemctl is-enabled --quiet simai-app-svc-test && ok "service enabled for reboot" || bad "not enabled"
+command -v tree >/dev/null && ok "deploy installed the packages the manifest declares" || bad "manifest package not installed"
+grep -q '^git .*@ ' /etc/simai-env/sites/$D/deploy.env 2>/dev/null || grep -q '^SOURCE=dir /root/node-v1$' /etc/simai-env/sites/$D/deploy.env && ok "deploy source recorded on one line" || bad "source: $(grep SOURCE /etc/simai-env/sites/$D/deploy.env)"
 
 mk_app v2
 cli site deploy --domain $D --from /root/node-v2 --confirm yes >/tmp/n-d2 2>&1 && [[ "$(page)" == release-v2 ]] && ok "deploy v2" || { bad "deploy v2"; tail -10 /tmp/n-d2; }

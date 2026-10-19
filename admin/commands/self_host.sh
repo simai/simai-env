@@ -102,6 +102,8 @@ self_firewall_blocked_listeners() {
     local port="${addr##*:}" host="${addr%:*}"
     case "$host" in 127.*|"[::1]"|::1|"[::ffff:127."*) continue ;; esac
     [[ "$open" == *" ${port}/${proto} "* ]] && continue
+    # DHCP clients: ufw's base rules accept their replies.
+    [[ "${port}/${proto}" == 68/udp || "${port}/${proto}" == 546/udp ]] && continue
     printf '%s/%s %s\n' "$port" "$proto" "$(sed -E 's/.*\(\("([^"]+)".*/\1/' <<<"$procs")"
   done | sort -u
 }
@@ -136,7 +138,7 @@ self_firewall_ensure_handler() {
   if [[ "${confirm,,}" != yes ]]; then
     echo "Firewall plan (ufw):"
     echo "  - deny incoming, allow outgoing"
-    echo "  - allow SSH ($(printf '%s ' "${ssh_ports[@]}")), HTTP 80 and HTTPS 443 from anywhere"
+    echo "  - allow SSH (${ssh_ports[*]}), HTTP 80 and HTTPS 443 from anywhere"
     for p in "${extra[@]}"; do echo "  - allow ${p%%@*} from ${p#*@}"; done
     if [[ ${#blocked[@]} -gt 0 ]]; then
       echo "  - these listening services become unreachable from outside:"
