@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 1.16.1 - 2026-10-20
+
+- `ssl install`, `ssl letsencrypt`, `ssl renew` and `ssl remove` work on node
+  sites: the nginx template id `node` is known and every re-render keeps the
+  site's service port. `node_e2e` covers TLS (HTTPS to the service,
+  `X-Forwarded-Proto: https`, HTTP redirect).
+- The custom certificate bundle no longer duplicates intermediates when the
+  certificate is already a fullchain or a chain from an earlier attempt is
+  still stored.
+
 ## 1.16.0 - 2026-10-20
 
 - Ubuntu 26.04 LTS is supported. PHP comes from the Ubuntu repository (8.5)

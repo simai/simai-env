@@ -746,7 +746,21 @@ ssl_install_custom_handler() {
   # build fullchain
   progress_step "Building fullchain bundle"
   if [[ -f "$raw_chain_dst" && -s "$raw_chain_dst" ]]; then
-    cat "$raw_cert_dst" "$raw_chain_dst" >"$cert_dst"
+    # A fullchain certificate already holds the intermediates: append only
+    # chain certificates that are not in it yet.
+    python3 - "$raw_cert_dst" "$raw_chain_dst" >"$cert_dst" <<'PY' || return 1
+import re, sys
+pem = re.compile(r"-----BEGIN CERTIFICATE-----[^-]+-----END CERTIFICATE-----")
+cert = open(sys.argv[1]).read()
+have = {" ".join(b.split()) for b in pem.findall(cert)}
+out = cert if cert.endswith("\n") else cert + "\n"
+for block in pem.findall(open(sys.argv[2]).read()):
+    key = " ".join(block.split())
+    if key not in have:
+        have.add(key)
+        out += block + "\n"
+sys.stdout.write(out)
+PY
   else
     cp -f "$raw_cert_dst" "$cert_dst"
   fi

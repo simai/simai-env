@@ -28,6 +28,7 @@ const broken = fs.existsSync(__dirname + '/BROKEN');
 fs.appendFileSync(__dirname + '/cache/starts.log', '$1\n');
 http.createServer((q, r) => {
   if (q.url === '/health') { r.statusCode = broken ? 500 : 200; return r.end('ok'); }
+  if (q.url === '/proto') return r.end(String(q.headers['x-forwarded-proto']));
   if (q.url === '/env') return r.end([process.env.PORT, process.env.HOST, process.env.GREETING, process.getuid()].join(' '));
   r.end('release-$1');
 }).listen(process.env.PORT, process.env.HOST);
@@ -95,6 +96,21 @@ assert s["unit"] == "simai-app-svc-test.service" and s["port"] == int(sys.argv[1
 assert d["manifest"]["start"] == "node server.js" and d["manifest"]["shared"] == ["cache"], d["manifest"]
 assert "service_logs" in d["how_to"], d["how_to"]
 PY
+
+# TLS on a node site: ssl install re-renders the node template with its port.
+C=/root/svc-tls; rm -rf $C; mkdir -p $C
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=Test CA" -keyout $C/ca.key -out $C/ca.pem >/dev/null 2>&1
+openssl req -newkey rsa:2048 -nodes -subj "/CN=$D" -keyout $C/key.pem -out $C/leaf.csr >/dev/null 2>&1
+printf 'subjectAltName=DNS:%s\n' "$D" >$C/ext
+openssl x509 -req -in $C/leaf.csr -CA $C/ca.pem -CAkey $C/ca.key -CAcreateserial -days 2 -extfile $C/ext -out $C/leaf.pem >/dev/null 2>&1
+cat $C/leaf.pem $C/ca.pem >$C/fullchain.pem
+cli ssl install --domain $D --cert $C/fullchain.pem --key $C/key.pem --chain $C/ca.pem --redirect yes --confirm yes >/tmp/n-ssl 2>&1 \
+  && ok "ssl install on a node site" || { bad "ssl install"; grep -iE "error|warn" /tmp/n-ssl | head -5; }
+[[ $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) -eq 2 ]] && ok "fullchain plus --chain is not duplicated" || bad "bundle has $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) certificates"
+grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/sites-available/$D.conf && ok "proxy port kept after the SSL re-render" || bad "proxy lost"
+[[ "$(curl -s --max-time 5 --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/health)" == ok ]] && ok "HTTPS reaches the service" || bad "https health"
+[[ "$(curl -s --max-time 5 --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/proto)" == https ]] && ok "service sees X-Forwarded-Proto https" || bad "proto $(curl -s --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/proto)"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/health)" == 301 ]] && ok "HTTP redirects to HTTPS" || bad "no redirect"
 
 cli site remove --domain $D --remove-files yes --confirm yes >/tmp/n-rm 2>&1 && ok "site remove" || { bad "site remove"; grep -iE "warn|error" /tmp/n-rm | head -10; ls -la $P 2>&1 | head; }
 [[ ! -f /etc/systemd/system/simai-app-svc-test.service && ! -f /etc/simai-env/sites/$D/service.env ]] && ok "service unit and port record removed" || bad "leftovers"

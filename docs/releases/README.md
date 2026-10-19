@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.16.1](v1.16.1.md) — TLS on node sites, no duplicated intermediates.
 - [v1.16.0](v1.16.0.md) — Ubuntu 26.04, profile node for long-running
   services, swap/firewall/settings commands, detailed plans.
 - [v1.15.0](v1.15.0.md) — confirmation before changes, fail-fast handlers,

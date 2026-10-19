@@ -1415,9 +1415,16 @@ create_nginx_site() {
     fi
   fi
 
-  if grep -q '{{APP_PORT}}' "$template_path" && [[ ! "${SITE_APP_PORT:-}" =~ ^[0-9]+$ ]]; then
-    error "nginx template ${template_path##*/} needs an application port"
-    return 1
+  # Service sites: the port recorded for the site (or for an alias target)
+  # unless the caller (site add) passes a new one in SITE_APP_PORT.
+  local app_port="${SITE_APP_PORT:-}"
+  if grep -q '{{APP_PORT}}' "$template_path"; then
+    [[ -n "$app_port" ]] || app_port=$(app_port_get "$domain")
+    [[ -n "$app_port" || -z "$target" ]] || app_port=$(app_port_get "$target")
+    if [[ ! "$app_port" =~ ^[0-9]+$ ]]; then
+      error "nginx template ${template_path##*/} needs an application port"
+      return 1
+    fi
   fi
   {
     printf "%s\n" "$meta_block"
@@ -1428,7 +1435,7 @@ create_nginx_site() {
       -e "s#{{PROJECT_NAME}}#${project}#g" \
       -e "s#{{PHP_VERSION}}#${php_version}#g" \
       -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" \
-      -e "s#{{APP_PORT}}#${SITE_APP_PORT:-}#g" "$template_path"
+      -e "s#{{APP_PORT}}#${app_port}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)
@@ -2156,6 +2163,7 @@ site_nginx_template_path_for_id() {
     alias) echo "${SCRIPT_DIR}/templates/nginx-alias.conf" ;;
     wordpress) echo "${SCRIPT_DIR}/templates/nginx-wordpress.conf" ;;
     bitrix) echo "${SCRIPT_DIR}/templates/nginx-bitrix.conf" ;;
+    node) echo "${SCRIPT_DIR}/templates/nginx-node.conf" ;;
     *)
       error "Unsupported nginx template id: ${template_id:-<empty>}"
       return 1
