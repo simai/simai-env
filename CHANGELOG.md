@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.16.2 - 2026-10-20
+
+- Let's Encrypt renewals reload nginx whichever path renews: certbot's own
+  `certbot.timer` renewed without a reload, so nginx could keep serving the
+  old certificate. A deploy hook in `/etc/letsencrypt/renewal-hooks/deploy/`
+  is installed with every certificate and by `self migrate` on existing hosts.
+
 ## 1.16.1 - 2026-10-20
 
 - `ssl install`, `ssl letsencrypt`, `ssl renew` and `ssl remove` work on node

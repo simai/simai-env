@@ -2180,10 +2180,24 @@ ensure_ssl_dir() {
   echo "$dir"
 }
 
+# certbot renews from two places: this cron (with its own --deploy-hook) and
+# the distribution's certbot.timer (without one). A deploy hook in
+# renewal-hooks reloads nginx after every renewal, whichever ran it.
+ensure_certbot_reload_hook() {
+  local dir=/etc/letsencrypt/renewal-hooks/deploy hook
+  hook="${dir}/simai-reload-nginx"
+  [[ -x "$hook" ]] && return 0
+  install -d -m 0755 "$dir" || return 1
+  printf '#!/bin/sh\n# simai-env: load renewed certificates.\nnginx -t -q && systemctl reload nginx\n' >"$hook" || return 1
+  chmod 0755 "$hook"
+  SITE_CERTBOT_HOOK_CREATED=1
+}
+
 ensure_certbot_cron() {
   local cron_file="/etc/cron.d/simai-certbot"
+  ensure_certbot_reload_hook || warn "Could not install the certbot nginx reload hook"
   if [[ -f "$cron_file" ]]; then
-    return
+    return 0
   fi
   cat >"$cron_file" <<'EOF'
 SHELL=/bin/bash

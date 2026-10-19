@@ -145,6 +145,18 @@ self_migrate_confirmed_schedules() {
   return 0
 }
 
+# Hosts with Let's Encrypt certificates from earlier releases: renewals by
+# certbot.timer did not reload nginx.
+self_migrate_certbot_hook() {
+  [[ -d /etc/letsencrypt/live ]] || return 0
+  SITE_CERTBOT_HOOK_CREATED=0
+  ensure_certbot_reload_hook || { warn "Could not install the certbot nginx reload hook"; return 0; }
+  if [[ "$SITE_CERTBOT_HOOK_CREATED" == 1 ]]; then
+    SELF_MIGRATE_CHANGES+=("certbot reloads nginx after every renewal")
+  fi
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -155,6 +167,7 @@ self_migrate_handler() {
   self_migrate_catchall
   self_migrate_bitrix_runtime
   self_migrate_agent_guide
+  self_migrate_certbot_hook
   self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"

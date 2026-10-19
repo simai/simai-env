@@ -74,4 +74,11 @@ cli site add --domain shared.test --profile static --confirm yes >/tmp/h-add 2>&
 [[ "$(stat -c %U /home/simai/www/shared.test 2>/dev/null)" == simai ]] && ! getent passwd site-shared-test >/dev/null && ok "new site runs as the shared simai account" || { bad "shared account"; grep -i "runs as" /tmp/h-add; }
 cli site remove --domain shared.test --remove-files yes --confirm yes >/dev/null 2>&1
 cli self setting-set --key SIMAI_SITE_ISOLATION --value yes --confirm yes >/dev/null 2>&1
+# certbot renewals by certbot.timer must reload nginx too.
+mkdir -p /etc/letsencrypt/live
+cli self migrate --confirm yes >/tmp/h-mig 2>&1
+hook=/etc/letsencrypt/renewal-hooks/deploy/simai-reload-nginx
+[[ -x $hook ]] && grep -q "reload nginx" $hook && grep -q "certbot reloads nginx" /tmp/h-mig && ok "migrate installs the certbot reload hook" || { bad "certbot hook"; tail -5 /tmp/h-mig; }
+sh $hook && ok "reload hook runs" || bad "reload hook failed"
+cli self migrate --confirm yes 2>&1 | grep -q "certbot reloads nginx" && bad "hook migration not idempotent" || ok "hook migration is idempotent"
 echo "failures=$fails"; exit $fails

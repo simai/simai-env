@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.16.2](v1.16.2.md) — certificate renewals always reload nginx.
 - [v1.16.1](v1.16.1.md) — TLS on node sites, no duplicated intermediates.
 - [v1.16.0](v1.16.0.md) — Ubuntu 26.04, profile node for long-running
   services, swap/firewall/settings commands, detailed plans.
