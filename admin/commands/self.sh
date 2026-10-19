@@ -263,8 +263,8 @@ self_post_update_smoke() {
 
 self_update_handler() {
   local updater="${SCRIPT_DIR}/update.sh"
-  if [[ ! -x "$updater" ]]; then
-    error "Updater not found or not executable at ${updater}"
+  if [[ ! -f "$updater" ]]; then
+    error "Updater not found at ${updater}"
     return 1
   fi
   info "Running updater ${updater}"
@@ -283,6 +283,9 @@ self_update_handler() {
     return 1
   fi
   rm -rf "$updater_tmp"
+  # The updater replaced the toolkit directory; leave the deleted one so the
+  # smoke check and nested commands do not start from a missing directory.
+  cd "${SCRIPT_DIR}" || cd / || true
   local smoke_strict="${SIMAI_UPDATE_SMOKE_STRICT:-yes}"
   if ! self_post_update_smoke "${SCRIPT_DIR}" "$smoke_strict"; then
     progress_done "Update completed with smoke failures"

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `self update` no longer requires `update.sh` to be executable; it already
+  runs a private executable copy. After the update it continues from the new
+  toolkit directory, so `self migrate` no longer starts from a deleted one.
+
 ## 1.15.0 - 2026-10-19
 
 - Mutating CLI commands preview unless `--confirm yes` is supplied; `--dry-run`
