@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/binding-descriptor/v1",
+  "type": "object",
+  "required": ["id", "owner_namespace", "provider", "provider_revision", "capabilities", "smart", "presentations", "owned_props", "output_schema", "source", "sha256"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]+$"},
+    "owner_namespace": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "provider_revision": {"type": "string", "minLength": 1},
+    "capabilities": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "smart": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "presentations": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "owned_props": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "output_schema": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+\\.schema\\.json$"},
+    "source": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-reference.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "reference_id", "source_plan_id", "subject", "target", "artifact_sha256", "page_html_sha256", "scenarios"],
+  "properties": {
+    "schema": {"const": "docara.qa_reference.v2"},
+    "reference_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_plan_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "subject": {"type": "string", "minLength": 1},
+    "target": {"$ref": "qa-target.schema.json"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "page_html_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "screenshot", "screenshot_sha256"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "screenshot": {"type": "string", "pattern": "^screenshots/[a-zA-Z0-9._-]+\\.png$"},
+          "screenshot_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/redirects/v1",
+    "title": "Docara portable redirects",
+    "type": "object",
+    "required": ["schema", "version", "redirects"],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.redirects.v1"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "redirects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*$"
+                    },
+                    "to": {
+                        "type": "string",
+                        "pattern": "^(?:[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*)?$"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}

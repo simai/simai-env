@@ -1,0 +1,109 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.ru/docara/capabilities.schema.json",
+    "title": "Docara capabilities",
+    "type": "object",
+    "required": ["schema", "docara", "ai_contract", "commands", "schemas", "operation_types", "tracking", "receipts", "lifecycle", "provenance", "contract_sha256"],
+    "properties": {
+        "schema": {"const": "docara.capabilities.v1"},
+        "docara": {
+            "type": "object",
+            "required": ["version", "revision"],
+            "properties": {
+                "version": {"type": "string", "minLength": 1},
+                "revision": {"type": ["string", "null"]}
+            },
+            "additionalProperties": false
+        },
+        "ai_contract": {
+            "type": "object",
+            "required": ["schema", "version", "product_major", "skill_contract", "compatibility", "fallback", "sha256"],
+            "properties": {
+                "schema": {"const": "docara.ai_contract.v1"},
+                "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+                "product_major": {"type": "integer", "minimum": 1},
+                "skill_contract": {"type": "string", "minLength": 1},
+                "compatibility": {"type": "string", "minLength": 1},
+                "fallback": {"type": "string", "minLength": 1},
+                "sha256": {"$ref": "#/$defs/sha256"}
+            },
+            "additionalProperties": false
+        },
+        "commands": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "aliases", "description", "arguments", "options"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "aliases": {"type": "array", "items": {"type": "string"}},
+                    "description": {"type": "string"},
+                    "arguments": {"type": "array", "items": {"$ref": "#/$defs/input"}},
+                    "options": {"type": "array", "items": {"$ref": "#/$defs/option"}}
+                },
+                "additionalProperties": false
+            }
+        },
+        "schemas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["name", "id", "sha256"],
+                "properties": {
+                    "name": {"type": "string", "pattern": "^[a-z0-9.-]+\\.schema\\.json$"},
+                    "id": {"type": ["string", "null"]},
+                    "sha256": {"$ref": "#/$defs/sha256"}
+                },
+                "additionalProperties": false
+            }
+        },
+        "operation_types": {
+            "type": "object",
+            "additionalProperties": {"type": "array", "items": {"type": "string"}}
+        },
+        "tracking": {"type": "array", "items": {"type": "string"}},
+        "receipts": {"type": "array", "items": {"type": "string"}},
+        "lifecycle": {
+            "type": "object",
+            "required": ["engine_update", "project_upgrade", "rollback", "network_during_build", "network_during_explicit_upgrade"],
+            "additionalProperties": {"type": "boolean"}
+        },
+        "provenance": {
+            "type": "object",
+            "required": ["package", "ai_contract", "schema_root", "command_registry"],
+            "additionalProperties": {"type": "string", "minLength": 1}
+        },
+        "contract_sha256": {"$ref": "#/$defs/sha256"}
+    },
+    "$defs": {
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "input": {
+            "type": "object",
+            "required": ["name", "required", "array", "description", "default"],
+            "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "required": {"type": "boolean"},
+                "array": {"type": "boolean"},
+                "description": {"type": "string"},
+                "default": {}
+            },
+            "additionalProperties": false
+        },
+        "option": {
+            "type": "object",
+            "required": ["name", "shortcut", "accepts_value", "value_required", "value_optional", "array", "description", "default"],
+            "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "shortcut": {"type": ["string", "null"]},
+                "accepts_value": {"type": "boolean"},
+                "value_required": {"type": "boolean"},
+                "value_optional": {"type": "boolean"},
+                "array": {"type": "boolean"},
+                "description": {"type": "string"},
+                "default": {}
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

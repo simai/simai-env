@@ -1,0 +1,33 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://docara.simai.io/schemas/component-source-metadata.schema.json",
+    "type": "object",
+    "required": ["schema", "version", "repository", "release", "entries", "content_sha256"],
+    "properties": {
+        "schema": {"const": "docara.component_source_metadata.v1"},
+        "version": {"const": 1},
+        "repository": {"type": "string", "minLength": 1},
+        "release": {"$ref": "#/$defs/release"},
+        "entries": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["source_ref", "source_sha256", "release", "source_url", "history_url", "history_exact"],
+                "properties": {
+                    "source_ref": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"},
+                    "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                    "release": {"$ref": "#/$defs/release"},
+                    "source_url": {"type": ["string", "null"]},
+                    "history_url": {"type": ["string", "null"]},
+                    "history_exact": {"type": "boolean"}
+                },
+                "additionalProperties": false
+            }
+        },
+        "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "release": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"}
+    }
+}

@@ -1,0 +1,411 @@
+{
+    "engine_files": {
+        "dependency-lock.json": "9994e7ae848a23eefa80608910c93f464c54bfd914b7483fbe44d964525b61a5",
+        "framework-lock.json": "290fad86fa71dcc878e173c6884c45768205eedf5f7216efedf93b12380b4e52",
+        "package-revision.json": "bd322d50fe4ae5ff20cd6c3a255a9695700ad3e55ef024042e2253976e74e676",
+        "schemas/authoring.schema.json": "521d33ba765ef41098ab13fd8b94c09c1a93148a234126d51b1bccb0307f9b10",
+        "schemas/binding-branding-props.schema.json": "930bbfdbd0dbe714d3d57b75c6eaa3791ac5bf12e6087d64d5334f40989a2b24",
+        "schemas/binding-descriptor.schema.json": "93b32c03babadb340c22571049092e57ac66774454392e16f559d85638cc134f",
+        "schemas/binding-navigation-props.schema.json": "be59c3270504705b577f2cd0c940d28cfd07c1ea47ccc1824028d20ffcb249a6",
+        "schemas/binding-outline-props.schema.json": "81c0dbdeab6dde52bd5d5a6428726e8c505362b8f8aadd6394e6ec82d8856ea0",
+        "schemas/capabilities.schema.json": "e0da6b342e71d9a5700b9ba21402286634ef2ba2320858eae4c4f85c7f6651e6",
+        "schemas/component-call.schema.json": "e6328ef33fa187fdc92259dbdc45ccc44af8d79a46cf5d0126e5c511d38466f4",
+        "schemas/component-catalog-entry.schema.json": "77d685e0d6e7933b14384fa35ec541b1dac51ae8a19daeedb777eba92090a833",
+        "schemas/component-source-metadata.schema.json": "e96361140c1fe2d7e4702757c4789205600f7c125cf13bd53dba04a640140958",
+        "schemas/declarative-block.schema.json": "db50096a67fd94c70885e554dfc400ebc81f59cc244f424577b188a5d9c14a5d",
+        "schemas/declarative-layout.schema.json": "a2c8e2a4beb300496410e49f231a5975b9619fc994bd20dca48f1905dfeac4de",
+        "schemas/declarative-section.schema.json": "1072ce45bb6e298e7d29c421a08c1d8b5702c0a0e1db26eb6664ce5578535a34",
+        "schemas/declarative-smart-view.schema.json": "bdfbfc364fe66bf7557cb6c41339572f7a915267eed2e2bcc6e3c11eeb44bd85",
+        "schemas/declarative-view-tree.schema.json": "49a3f1b95eabafccee0f36da03e7245664ef05f1d9f8866bbb90a53429c871bf",
+        "schemas/design-atlas.schema.json": "ea91706776e0ef533720abb60e5d8b62987ff85c3f7b4a90e1ce50c91807e636",
+        "schemas/documentation-lock.schema.json": "98b3bb34c7b8d9bc5d5c055f5127190444cb01176ddac612822bf1f13cb0c0b4",
+        "schemas/documentation-source.schema.json": "8178f2369939f85fe6655d2f5a6de98c7301a9bdeef54cf51dedaf00fe919d94",
+        "schemas/documentation-status.schema.json": "29ea5ea1d3ed3018915a48074a3c74bd1cd03099c12282e74f3a573b8fa26a51",
+        "schemas/effective-component-catalog.schema.json": "6df4e4801dd2c0d897a6437a5ea9d4fabf852714ea0e97516dd7829c4c738b44",
+        "schemas/framework-lock.schema.json": "dd912d4158bba1829d34040c98f9043d9d6acbcfed1493bf08cd8d5667beb2b3",
+        "schemas/lang.schema.json": "4702a2c696157f2cae9653a4e2bee2c2a37aa8fb8e3cd26c6f60e91b39458dc1",
+        "schemas/locale-route-receipt.schema.json": "d53423c27ada694f54328f6bf1ed7d0958ddf7a96fa811f5c967247bc2fa1ee7",
+        "schemas/operation-result.schema.json": "1a9156fd3f6a0ddb12bf8bd42a60c003aaa46c27ffbcb85d708496d4fdb2c85c",
+        "schemas/page.schema.json": "c46db707b815752dad056ae26f198bcfb60974134db596e29bddaf8e6fa00188",
+        "schemas/performance-receipt.schema.json": "65302525cdb3ae7e8941bdd6d3da56128d58de1e8069841c6c8c8c41beed7f5b",
+        "schemas/presentation.schema.json": "f3a5895f700c9f5b7427195270da5ebf60645ce1293d28ac8999f8f49f6af44c",
+        "schemas/qa-plan-draft.schema.json": "27c1e4c0024dccf8d1a55374c0c1f06592fbe916421f45e140d176cf7c412c5c",
+        "schemas/qa-plan.schema.json": "f76070a19af860858499cafebc6153e9add1b0bc975263ca83ecec09d0eacec9",
+        "schemas/qa-reference-draft.schema.json": "87dcd5d5e5509a10f56fb97192500addc566d62dd4bd938a28582e6f05f22154",
+        "schemas/qa-reference-identity.schema.json": "d7bcfb61be7ba8b506866dfd78f10ec72264035e6183f6d62d1ae59ec221385c",
+        "schemas/qa-reference.schema.json": "3df54a1803cc8b7a9991ced0875f4e3608a59576b5d9e36d921ef8bae8dd0886",
+        "schemas/qa-report.schema.json": "e9bd28665000e57e2491a2c073c321630866515b95d0774bd7c81dfca99319a0",
+        "schemas/qa-target.schema.json": "5913f7d1deeddc22adbb9f7958c8f952b67907821f90bfba3ce886890f629089",
+        "schemas/redirect-receipt.schema.json": "965fe3c4f94c5ce4c14ce6b88e6a894ff83d7bd2241c304a3d6b74257133988a",
+        "schemas/redirects.schema.json": "eeff1b296f7a75bfd45f8abe2f2e0621e2979e46ff8798fdefb5454d8dccd764",
+        "schemas/release-artifact-manifest.schema.json": "2f785f9431b73e2023a9aa7e13dc74b7451a3303da7c4fa67982f4bce855284c",
+        "schemas/scaffold-plan.schema.json": "265d9c80ff664635bb3213f0b8b213fe58a945dfb8fce3072f83c16c9faecf66",
+        "schemas/search-index.schema.json": "f6d24084bd7e45cea16c915df3f84ed7081d03cc5562a9c5869724569ef95428",
+        "schemas/section.schema.json": "12c97635d17c41e0c5290fe2b8dabdf3fdd1d1ebf52a5171d4431172d7410cd6",
+        "schemas/site.schema.json": "4102551d3cb05b336bb50843a6e47d91f5d10dbe35eb0ffb1da14d76482f0602",
+        "schemas/smart.manifest.schema.json": "9d65a9b3d63567ef8a12dd43f5c3e24913e2659105b088778dc50476a9578037",
+        "schemas/smart.preset.schema.json": "d2307c3fcafe6cf6349d16e4084471a2959af72df58fa648020991b719098ee3",
+        "schemas/smart.view.schema.json": "22471684bb6c1606633cb5e266acfd48e73bdb5f03b1e0a57dafd309229927de",
+        "schemas/translation-lock.schema.json": "b3ba1ea8d0076f70f6c092b3f73487084287e061caacff61a2f5166c17e7de54",
+        "schemas/translation-status.schema.json": "3ac68f01b570a3d2879527ca0ba49838110191d2c0b52b185135b67b0c686f25",
+        "schemas/typed-component-definition.schema.json": "e405177c7f1f0893c6b29668e7fd7cd129f4ff8941ad7d10688617d017989666",
+        "schemas/upgrade-journal.schema.json": "ec6bb14b53a2f9d79ac1a636cd0f3e35240e8f4bbf1075926fd92e6d70a4b649",
+        "schemas/upgrade-plan.schema.json": "971d0b4cd3c7d46fb8f12d856a53ab867677ecc4c10f4beaac03e1e990fded83",
+        "schemas/upgrade-result.schema.json": "2b4b3ca4f592f6f45687a93b234fd6234a52a934cd25601c307a69a1d320754a",
+        "update-contract.json": "e5ccbf6e38b5e9658b9c7e431e88324a0c22ee0d0ea252ed97a43546f9d9682a"
+    },
+    "engine_root": ".docara/engine",
+    "owners": {
+        "engine": [
+            ".docara/engine/**"
+        ],
+        "generated": [
+            "build/**",
+            "build_*/**",
+            ".docara-preview/**",
+            "var/cache/**",
+            ".docara/update-plan.json",
+            ".docara/rollbacks/**"
+        ],
+        "project": [
+            "content/**",
+            "assets/**",
+            "design/**",
+            "smart/**",
+            "docara.json",
+            "redirects.json",
+            "simai-framework.lock.json",
+            "snippets/**"
+        ]
+    },
+    "policy": {
+        "dirty_engine_file": "fail_closed",
+        "project_owned_overwrite": "forbidden",
+        "symlink": "fail_closed",
+        "unknown_engine_file": "fail_closed"
+    },
+    "schema": "docara.project_ownership.v1",
+    "starter_project_files": {
+        "assets/docara-mark.svg": {
+            "owner": "project",
+            "sha256": "10781f8fb31318e8807a215ec002ec1f8033227bf8678300e3dc63a7e3c1aebc"
+        },
+        "assets/favicon.ico": {
+            "owner": "project",
+            "sha256": "9bcd7305a24235227b13096694eca338fddc72731a948bdf7a8a6d6a0958afda"
+        },
+        "content/ru/assets/docara-mark.svg": {
+            "owner": "project",
+            "sha256": "10781f8fb31318e8807a215ec002ec1f8033227bf8678300e3dc63a7e3c1aebc"
+        },
+        "content/ru/components.md": {
+            "owner": "project",
+            "sha256": "807523b7f95af977e27e4770567058b9f821d356152ba1e2b6331c18ee5f1f9e"
+        },
+        "content/ru/components/alert.md": {
+            "owner": "project",
+            "sha256": "fac2ef8c6b1db814489e95690ac2e7d2990b27e418f9111f286b279904b8e5ac"
+        },
+        "content/ru/components/backlinks.md": {
+            "owner": "project",
+            "sha256": "168f1f042dd6ecb7fdee55a615637a73088e5854be2a4e2b95b678990272dd87"
+        },
+        "content/ru/components/badge.md": {
+            "owner": "project",
+            "sha256": "e490652875357f06228b62eee11873e67077d0232f6553ba8c1d91f9a943605b"
+        },
+        "content/ru/components/banner.md": {
+            "owner": "project",
+            "sha256": "f840fbfa9d4464964259e93c9c58b8447d8afc6910728de446c7167471273bee"
+        },
+        "content/ru/components/button.md": {
+            "owner": "project",
+            "sha256": "a24fcba76b68d9f36c671abc0ea599c0bb12b4f6f3cf15c1d3a07114143fbcf5"
+        },
+        "content/ru/components/card.md": {
+            "owner": "project",
+            "sha256": "e3db9b3a948673687217d35e3787721ad5291985eca0a0fc6c03e3d7c46337b3"
+        },
+        "content/ru/components/catalog/section.json": {
+            "owner": "project",
+            "sha256": "525918adb4166a00864bc55949c8823c9de045ef47e2a4fb9fad7508c5c968ed"
+        },
+        "content/ru/components/code-from-file.md": {
+            "owner": "project",
+            "sha256": "a48c7bb3bacdceae043baaf57a2e701468d73d6f068fb1d946bc4221681c175d"
+        },
+        "content/ru/components/code.md": {
+            "owner": "project",
+            "sha256": "680ca4f496367c0d1a6cf82b21ed4c5c205ff4feb6c5003142bec5c31f26d5f4"
+        },
+        "content/ru/components/details.md": {
+            "owner": "project",
+            "sha256": "7c856f1e9f6a36c3b9586ec0635f5022e8197e392dda93cc737c2184c79d0984"
+        },
+        "content/ru/components/diagram.md": {
+            "owner": "project",
+            "sha256": "6c4bdf4aec7b14563098d40a14d55644109086d4fe5f3a941fe68ea325fe78c2"
+        },
+        "content/ru/components/download.md": {
+            "owner": "project",
+            "sha256": "030b4047d608a7424de5bb78b3d74075e4b4c2c8bde11c0ed5e64014776404e3"
+        },
+        "content/ru/components/embed.md": {
+            "owner": "project",
+            "sha256": "38d3b574e93e40a287ce1c566245b9a99c5623971b1e29c8545b10646f9400ab"
+        },
+        "content/ru/components/example.md": {
+            "owner": "project",
+            "sha256": "1f0886393ebdef7408549d8eb4b3b02e6b44d21fe3882882a5b163b47d5270fa"
+        },
+        "content/ru/components/figure.md": {
+            "owner": "project",
+            "sha256": "34333853674d59295824d63ff22963b3dc592efc8c8833f753ec98d8c208d3b7"
+        },
+        "content/ru/components/footnotes-and-sources.md": {
+            "owner": "project",
+            "sha256": "558b4b888e27905da0991075afa42106ce46ed6219e9249f38944a90011a76b8"
+        },
+        "content/ru/components/grid.md": {
+            "owner": "project",
+            "sha256": "0c9eb2161c6083a97abd5d0193be6adc422cbac2de74ebcf6a25ac348e56e1fe"
+        },
+        "content/ru/components/headings-and-text.md": {
+            "owner": "project",
+            "sha256": "5428f1748198f467692eedec444fdfc5262d24301d2ff7c882f58ede4f7ff0dc"
+        },
+        "content/ru/components/hero.md": {
+            "owner": "project",
+            "sha256": "1758cbef85b85b3ae6ea186e0c745c80ee5702bf9df10140f38a49bacf7d983d"
+        },
+        "content/ru/components/html.md": {
+            "owner": "project",
+            "sha256": "cce7d519f0493ebc2a5c85393963c73deda0def7ab94e53eeec9fe48ed66c2d0"
+        },
+        "content/ru/components/icon.md": {
+            "owner": "project",
+            "sha256": "6f33a817008e7ca64b2e08a52bce534772096aa4fab0ecb2370fb2cdcd001705"
+        },
+        "content/ru/components/kbd.md": {
+            "owner": "project",
+            "sha256": "63d7e8407ca512aa2c8dffd02a27bbef2331c3b8c366b208e49a671b3aa096d8"
+        },
+        "content/ru/components/links-and-images.md": {
+            "owner": "project",
+            "sha256": "38fe25930d015fdef27874704b1d8b31b90ed0d778cac5aa481a47e10d11b77b"
+        },
+        "content/ru/components/lists-and-quotes.md": {
+            "owner": "project",
+            "sha256": "f35afe98b3e1732a202e78e4c53423637b52a920486296a2a773d84452d16924"
+        },
+        "content/ru/components/logos.md": {
+            "owner": "project",
+            "sha256": "bcecbe11bf88cb1c7ecd1ba87b6b6bd7b5103dbce2226e6f9a8ff7c6d7a800bb"
+        },
+        "content/ru/components/math.md": {
+            "owner": "project",
+            "sha256": "7ab8ea86248051bc1d00224e11347715d675b5d1cd311e572de9e4e1efab4d9e"
+        },
+        "content/ru/components/media.md": {
+            "owner": "project",
+            "sha256": "17c9170339cc0bc95beefc59513295bbbc87b138abdd7347145fa1f06dc40749"
+        },
+        "content/ru/components/section.json": {
+            "owner": "project",
+            "sha256": "c7e8da67a2912d7a2f4e8773d48df3b91df4ce117db04b73bae772e72b6495b8"
+        },
+        "content/ru/components/steps.md": {
+            "owner": "project",
+            "sha256": "1c1178b6e30e31aaaaf9b6b91d75ac80ec3a76bdb613522db1919a0b95f4d567"
+        },
+        "content/ru/components/table.md": {
+            "owner": "project",
+            "sha256": "2a36e4582a1042c4d3bf7cac8507bdee4bc6161546fd0671a2abe3a4aa324fc4"
+        },
+        "content/ru/components/tabs.md": {
+            "owner": "project",
+            "sha256": "ba7c65f1984a8fdb06890bbc1b8470746796f4f73892410754de234aa34b900f"
+        },
+        "content/ru/components/tree.md": {
+            "owner": "project",
+            "sha256": "b54451cde051d2364774520a56d6d235a42c644e5c48d6bc6764afe786d36c51"
+        },
+        "content/ru/guides/getting-started.md": {
+            "owner": "project",
+            "sha256": "1121f7953b093b7e447ee61fb4d1d9ca1629701de964a7b10cc3de44908fbd2a"
+        },
+        "content/ru/guides/getting-started.page.json": {
+            "owner": "project",
+            "sha256": "9857f78b7243d1d833a351efa34843c51f5ac8296d47a8b0dcd8f12c3c152032"
+        },
+        "content/ru/guides/index.md": {
+            "owner": "project",
+            "sha256": "d00a05f6eff5aa2597ce163dc7599653b0306fadafd6f143b588050dcfb4c086"
+        },
+        "content/ru/guides/platform/configuration/index.md": {
+            "owner": "project",
+            "sha256": "963346c274444c00c07648a4e9cc735ea5dbbf1d5357e05a83a54ea91754f168"
+        },
+        "content/ru/guides/platform/configuration/layout.md": {
+            "owner": "project",
+            "sha256": "6c54e7ef9dfb74ded48414834fce6e86764e7939f1c419ec84bfa877627276bc"
+        },
+        "content/ru/guides/platform/configuration/section.json": {
+            "owner": "project",
+            "sha256": "2b7f90a6f21b6bd3766fd1412d85bfa7123348ea57717802dfdf50dc3ff8d8e7"
+        },
+        "content/ru/guides/platform/index.md": {
+            "owner": "project",
+            "sha256": "5d317a33f5fa13d600f423ad8cc030a92bad480bfab2d7b410db6cd9c332fe3c"
+        },
+        "content/ru/guides/platform/section.json": {
+            "owner": "project",
+            "sha256": "2b237e68b885982a24938762dbb32e110858de9b801da75f6f5e52afa23ec0fa"
+        },
+        "content/ru/guides/section.json": {
+            "owner": "project",
+            "sha256": "3b3b065a6d5496e2df2af0c6cd9d6b99813d429c60aa48ec40732e4dfd5fb583"
+        },
+        "content/ru/index.md": {
+            "owner": "project",
+            "sha256": "4ddd239cd4aa0ac95373cd558e95e6f3c37be90da64cc02471604f157c3582e3"
+        },
+        "content/ru/index.page.json": {
+            "owner": "project",
+            "sha256": "0a93f856ce75b989edbbdf5608fca6a1028dd7d8c5e0b4282c6039bde1e04c8d"
+        },
+        "content/ru/landing.md": {
+            "owner": "project",
+            "sha256": "75fef37ed7d57ef9349ecedeeb87fef3f709c1aa708b394430110f9d67a9ff42"
+        },
+        "content/ru/landing.page.json": {
+            "owner": "project",
+            "sha256": "8092ee0cac90bcdcc66f02939dd488114d87a5d959c637c679a4c8d394fad65b"
+        },
+        "content/ru/lang.json": {
+            "owner": "project",
+            "sha256": "563d7980a0aa29910be658d8447cd118a0701e185f8e5adb311ee87fd5ae46e2"
+        },
+        "content/ru/project-demos.md": {
+            "owner": "project",
+            "sha256": "eefbcd9af9e41c899fd015c07787d686544ce01acfea03a055aa358604f40b1e"
+        },
+        "content/ru/project-demos.page.json": {
+            "owner": "project",
+            "sha256": "1cb0d44fadd994bdc7e129322e70b45e00febb4a35d50f2a8967ca157b73092a"
+        },
+        "content/ru/section.json": {
+            "owner": "project",
+            "sha256": "fae11bf41d67ad0ddc6bccfccb52a704bf120d5cf8f14244939f5c0079bab361"
+        },
+        "contracts/generated/documentation-source.json": {
+            "owner": "project",
+            "sha256": "c25424ee1fb5308fd53b3c2c4ecf062a6161b2ed44329a6477f1cf7b5d19ae4d"
+        },
+        "contracts/generated/framework-contract-registry.json": {
+            "owner": "project",
+            "sha256": "fb53ea724d1f6ae18aae8328155cb3fbb7bc383b447ade65d332db037080849d"
+        },
+        "design/blocks/project.footer-smart.json": {
+            "owner": "project",
+            "sha256": "b6d3359c61c16ef59cb83f029344c3a4beef63dfcb5d8eb944c1493cdcdd7efb"
+        },
+        "design/sections/project.footer.json": {
+            "owner": "project",
+            "sha256": "0bf5f141fc5d7579f1f74896b4ae18e78b5ec0046febcdc9d4f14bed55507786"
+        },
+        "design/views/section.project.footer.json": {
+            "owner": "project",
+            "sha256": "80ca8bcad4865b607db90dbf10b8a6f29a371a706fcdeb19422e3803afdb0532"
+        },
+        "docara.json": {
+            "owner": "project",
+            "sha256": "a2e484767a9e34ff40a5c86b3f6a147fcd8142e4cc3fd6b2e11708f16a758d98"
+        },
+        "redirects.json": {
+            "owner": "project",
+            "sha256": "42cf60d5c57db21f5d52d207f35e2fa8be20b14baf48eeabdaed921fbdfd6480"
+        },
+        "simai-framework.lock.json": {
+            "owner": "project",
+            "sha256": "1715e419438b7ba9f249615d410115af45d06d0dc69c66daddcb951f047a2e42"
+        },
+        "smart/project.footer-links/assets/footer-links.css": {
+            "owner": "project",
+            "sha256": "967fb6f14307fa9c14aeff0ed2379fc673351ce13fea6ace33f6a815942b2b0e"
+        },
+        "smart/project.footer-links/manifest.json": {
+            "owner": "project",
+            "sha256": "ed26c1a37feb8531bfa724edd06ae8da42615186175f7368c9fed7d0f4aac000"
+        },
+        "smart/project.footer-links/template/default.php": {
+            "owner": "project",
+            "sha256": "c52b9633a867d5c3592afd632bfff03346f3d7643f39ff778e7d8cbe3605d863"
+        },
+        "smart/project.footer-links/view/default.json": {
+            "owner": "project",
+            "sha256": "3435d5db110cca1a0073e90079cbad5551211e768a288a8a3367624625fd8e08"
+        },
+        "smart/project.install-builder/assets/install-builder.css": {
+            "owner": "project",
+            "sha256": "2fdcf90fcc00d344d58dcb51159080e3cc349c50322a39e7327230d5d7d3cc21"
+        },
+        "smart/project.install-builder/assets/install-builder.js": {
+            "owner": "project",
+            "sha256": "aa8a2a2abaff96b45c64b2c1d125eb1be0f50eb2724542b5778bbe98176bf260"
+        },
+        "smart/project.install-builder/manifest.json": {
+            "owner": "project",
+            "sha256": "8f4f1c0890d554d52526eca39b40aafda39262161f0be39f0de22374a854041a"
+        },
+        "smart/project.install-builder/template/default.php": {
+            "owner": "project",
+            "sha256": "e479bc42ac7c14d8890da2b278384f2a248d54c5438ae2c7ae88651781ea3d6f"
+        },
+        "smart/project.install-builder/view/default.json": {
+            "owner": "project",
+            "sha256": "f9fa81af753938b0e462dfb8b0ee7dda6b2ce664f92d86d85ef3763747e56947"
+        },
+        "smart/project.notice/assets/notice.css": {
+            "owner": "project",
+            "sha256": "147925cc708d0163a48025a44f0429d0ff9fa38cd20fce435026025458a200d3"
+        },
+        "smart/project.notice/manifest.json": {
+            "owner": "project",
+            "sha256": "1655e500cdd9f89119493594ad4a2983640ee198f9960cfb7c1a7545113df43b"
+        },
+        "smart/project.notice/template/default.php": {
+            "owner": "project",
+            "sha256": "73cea338f2716ffa06792e1d508d72d633dfa7b1b82bc1f9b42a5c2546087ce2"
+        },
+        "smart/project.notice/view/default.json": {
+            "owner": "project",
+            "sha256": "4a6f7a197c60bc7f2eae12682c073072f9a3883bc3a13dc66b85a56eaba85f95"
+        },
+        "smart/project.product-configurator/assets/product-configurator.css": {
+            "owner": "project",
+            "sha256": "5699e85dd278893bd1b1f1b77d0c94583a996729588dd5ce257ae50abc260211"
+        },
+        "smart/project.product-configurator/assets/product-configurator.js": {
+            "owner": "project",
+            "sha256": "a42ea328d44acf86f4ea784c8b75df48431f2963ddacec2fe973da8bb967fbd6"
+        },
+        "smart/project.product-configurator/manifest.json": {
+            "owner": "project",
+            "sha256": "d29819070067490ec64d9ebb09a0c334872e9143b376317901b8d55a8a96d250"
+        },
+        "smart/project.product-configurator/template/default.php": {
+            "owner": "project",
+            "sha256": "34270fcb8ff20bd2a05aa427ef8e9433fa92ac34994a74a4095370f0f9819825"
+        },
+        "smart/project.product-configurator/view/default.json": {
+            "owner": "project",
+            "sha256": "b7fdf8ba75512bc20b9bf9be12b0cdaffa86a2150368859b4d1320c17a4978d7"
+        },
+        "snippets/install.php": {
+            "owner": "project",
+            "sha256": "bd87baa30057f43687df6380761ca91f2ba43c6e3ff5287b245f41a2b3e97241"
+        }
+    },
+    "version": 1
+}

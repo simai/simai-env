@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Profile Workflows
 description: Profile Workflows
 ---
@@ -19,12 +17,12 @@ Sites -> Create site
 
 | Profile | Use For | Continue In |
 |---|---|---|
-| `generic` | Simple PHP site without CMS-specific automation. | [Generic PHP](generic/README.md) |
-| `static` | Static HTML/files, no PHP, no DB, no cron. | [Static](static/README.md) |
-| `alias` | Extra domain pointing to an existing site. | [Alias](alias/README.md) |
-| `laravel` | Laravel project with Composer, `.env`, scheduler, and queue worker. | [Laravel](laravel/README.md) |
-| `wordpress` | WordPress site with WP-CLI, installer readiness, cron, and cache actions. | [WordPress](wordpress/README.md) |
-| `bitrix` | 1C-Bitrix site with Bitrix nginx routing, PHP baseline, cron agents, cache, restore, and ownership checks. | [Bitrix](bitrix/README.md) |
+| `generic` | Simple PHP site without CMS-specific automation. | [Generic PHP](../generic/) |
+| `static` | Static HTML/files, no PHP, no DB, no cron. | [Static](../static/) |
+| `alias` | Extra domain pointing to an existing site. | [Alias](../alias/) |
+| `laravel` | Laravel project with Composer, `.env`, scheduler, and queue worker. | [Laravel](../laravel/) |
+| `wordpress` | WordPress site with WP-CLI, installer readiness, cron, and cache actions. | [WordPress](../wordpress/) |
+| `bitrix` | 1C-Bitrix site with Bitrix nginx routing, PHP baseline, cron agents, cache, restore, and ownership checks. | [Bitrix](../bitrix/) |
 
 ## What Site Creation Does
 
@@ -59,9 +57,9 @@ Applications -> Bitrix
 
 ## Profile-Specific Next Steps
 
-- For plain PHP deployment, use [Generic PHP](generic/README.md).
-- For static files, use [Static](static/README.md).
-- For domain aliases, use [Alias](alias/README.md).
-- For Laravel, use [Laravel](laravel/README.md).
-- For WordPress, use [WordPress](wordpress/README.md).
-- For Bitrix, use [Bitrix](bitrix/README.md).
+- For plain PHP deployment, use [Generic PHP](../generic/).
+- For static files, use [Static](../static/).
+- For domain aliases, use [Alias](../alias/).
+- For Laravel, use [Laravel](../laravel/).
+- For WordPress, use [WordPress](../wordpress/).
+- For Bitrix, use [Bitrix](../bitrix/).

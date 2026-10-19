@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/page/v1",
+    "title": "Docara portable page sidecar",
+    "type": "object",
+    "required": ["schema"],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.page.v1"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "preset": {
+            "type": "string",
+            "enum": ["docs", "landing"]
+        },
+        "title": {
+            "type": "string",
+            "minLength": 1
+        },
+        "description": {
+            "type": "string"
+        },
+        "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*$"
+        },
+        "locale": {
+            "type": "string",
+            "format": "docara-bcp47"
+        },
+        "branding": {
+            "$ref": "presentation.schema.json#/$defs/branding"
+        },
+        "layout": {
+            "$ref": "presentation.schema.json#/$defs/layout"
+        },
+        "settings": {
+            "$ref": "presentation.schema.json#/$defs/settings"
+        },
+        "examples": {
+            "$ref": "presentation.schema.json#/$defs/examples"
+        },
+        "code": {
+            "$ref": "presentation.schema.json#/$defs/code"
+        },
+        "navigation": {
+            "$ref": "presentation.schema.json#/$defs/navigation"
+        },
+        "header_navigation": {
+            "$ref": "presentation.schema.json#/$defs/header_navigation"
+        },
+        "search": {
+            "$ref": "presentation.schema.json#/$defs/search"
+        },
+        "reading": {
+            "$ref": "presentation.schema.json#/$defs/reading"
+        }
+    },
+    "additionalProperties": false
+}

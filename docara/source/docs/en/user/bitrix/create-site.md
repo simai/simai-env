@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Create Site
 description: Create Site
 ---
@@ -66,7 +64,7 @@ Serve all first-level subdomains too? -> yes
 
 Use wildcard mode for multi-domain/subdomain Bitrix projects when application code expects requests from hosts such as `camp.example.ru`, `test.example.ru`, or `b24.example.ru` to reach the same project root.
 
-For wildcard HTTPS, continue with [SSL](ssl.md).
+For wildcard HTTPS, continue with [SSL](../ssl/).
 
 ## Activity Class
 
@@ -98,7 +96,7 @@ Database setup for this site -> continue-without-db
 
 Then connect or restore the database through the matching migration flow. Do not recreate a database that already contains production data.
 
-See [Database](database.md).
+See [Database](../database/).
 
 ## SSL Choice During Creation
 
@@ -110,7 +108,7 @@ For a wildcard/subdomain site, it is often clearer to answer `no` during creatio
 SSL -> Issue Let's Encrypt
 ```
 
-See [SSL](ssl.md).
+See [SSL](../ssl/).
 
 ## What The Environment Creates
 
@@ -134,7 +132,7 @@ Site creation does not finish:
 - final PHP/cron/cache baseline after installation
 - switching Bitrix agents from web hits to cron
 
-After site creation, continue with [Install vs restore](install-vs-restore.md).
+After site creation, continue with [Install vs restore](../install-vs-restore/).
 
 ## If The Directory Already Has Files
 
@@ -221,7 +219,7 @@ The site summary should show:
 
 Choose one:
 
-- fresh installation: [Install vs restore](install-vs-restore.md#fresh-install)
-- restore from archive: [Install vs restore](install-vs-restore.md#restore-from-backup)
+- fresh installation: [Install vs restore](../install-vs-restore/#fresh-install)
+- restore from archive: [Install vs restore](../install-vs-restore/#restore-from-backup)
 
-Before handing the site to a developer, run [Diagnostics](diagnostics.md).
+Before handing the site to a developer, run [Diagnostics](../diagnostics/).

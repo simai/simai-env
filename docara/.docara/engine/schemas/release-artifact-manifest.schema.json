@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/release-artifact-manifest.schema.json",
+  "title": "Docara release artifact manifest",
+  "type": "object",
+  "required": ["schema", "product", "package", "version", "published", "source_revision", "archive", "archive_sha256", "file_count", "files", "framework_tuple", "dependency_lock_contract", "sbom_path", "content_manifest_path"],
+  "properties": {
+    "schema": {"const": "docara.release_artifact_manifest.v1"},
+    "product": {"const": "Docara"},
+    "package": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "tag_parameter": {"type": "string", "minLength": 1},
+    "published": {"const": false},
+    "source_revision": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+    "archive": {"type": "string", "pattern": "^[^/]+\\.zip$"},
+    "archive_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "file_count": {"type": "integer", "minimum": 1},
+    "files": {"type": "object", "additionalProperties": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "framework_tuple": {"type": "object"},
+    "dependency_lock_contract": {"type": "string", "minLength": 1},
+    "sbom_path": {"const": "RELEASE-SBOM.cdx.json"},
+    "content_manifest_path": {"const": "RELEASE-MANIFEST.json"}
+  },
+  "additionalProperties": false
+}

@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: How To Add Profile
 description: How To Add Profile
 ---

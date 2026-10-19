@@ -1,0 +1,83 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/performance-receipt/v1",
+    "title": "Docara performance receipt",
+    "type": "object",
+    "required": ["schema", "version", "pages", "site", "content_sha256"],
+    "properties": {
+        "schema": {"type": "string", "const": "docara.performance_receipt.v1"},
+        "version": {"type": "integer", "const": 1},
+        "pages": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "required": ["output", "url", "html_bytes", "initial_requests", "initial_local_bytes", "inline_css_bytes", "inline_javascript_bytes", "resources"],
+                "properties": {
+                    "output": {"type": "string", "pattern": "^(?:[^/]+/)*index\\.html$"},
+                    "url": {"type": "string", "pattern": "^/"},
+                    "html_bytes": {"type": "integer", "minimum": 1},
+                    "initial_requests": {"type": "integer", "minimum": 0},
+                    "initial_local_bytes": {"type": "integer", "minimum": 0},
+                    "inline_css_bytes": {"type": "integer", "minimum": 0},
+                    "inline_javascript_bytes": {"type": "integer", "minimum": 0},
+                    "resources": {
+                        "type": "array",
+                        "items": {"$ref": "#/$defs/resource"}
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "site": {
+            "type": "object",
+            "required": ["page_count", "unique_initial_local_resources", "unique_initial_local_bytes", "largest_initial_local_resources"],
+            "properties": {
+                "page_count": {"type": "integer", "minimum": 1},
+                "unique_initial_local_resources": {"type": "integer", "minimum": 0},
+                "unique_initial_local_bytes": {"type": "integer", "minimum": 0},
+                "largest_initial_local_resources": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "items": {"$ref": "#/$defs/localResourceSummary"}
+                }
+            },
+            "additionalProperties": false
+        },
+        "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    },
+    "$defs": {
+        "resource": {
+            "type": "object",
+            "required": ["url", "kinds", "local"],
+            "properties": {
+                "url": {"type": "string", "minLength": 1},
+                "kinds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {"type": "string", "enum": ["css", "font", "javascript"]}
+                },
+                "local": {"type": "boolean"},
+                "output": {"type": "string", "minLength": 1},
+                "bytes": {"type": "integer", "minimum": 0},
+                "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+            },
+            "if": {"properties": {"local": {"const": true}}},
+            "then": {"required": ["output", "bytes", "sha256"]},
+            "else": {"not": {"anyOf": [{"required": ["output"]}, {"required": ["bytes"]}, {"required": ["sha256"]}]}},
+            "additionalProperties": false
+        },
+        "localResourceSummary": {
+            "type": "object",
+            "required": ["output", "bytes", "sha256"],
+            "properties": {
+                "output": {"type": "string", "minLength": 1},
+                "bytes": {"type": "integer", "minimum": 0},
+                "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

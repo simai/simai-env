@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "plan_id", "artifact_sha256", "target", "reference", "scenarios"],
+  "properties": {
+    "schema": {"const": "docara.qa_report.v2"},
+    "plan_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "target": {"$ref": "qa-target.schema.json"},
+    "reference": {"$ref": "qa-reference-identity.schema.json"},
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "screenshot", "screenshot_sha256", "reference_sha256", "a11y_violations", "console_errors", "console_warnings", "overflow", "keyboard", "reduced_motion", "visual_diff_pixels"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "screenshot": {"type": "string", "pattern": "^screenshots/[a-zA-Z0-9._-]+\\.png$"},
+          "screenshot_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "reference_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "a11y_violations": {"type": "integer", "minimum": 0},
+          "console_errors": {"type": "integer", "minimum": 0},
+          "console_warnings": {"type": "integer", "minimum": 0},
+          "overflow": {"type": "integer", "minimum": 0},
+          "keyboard": {"enum": ["pass", "fail"]},
+          "reduced_motion": {"enum": ["pass", "fail"]},
+          "visual_diff_pixels": {"type": "integer", "minimum": 0}
+        }
+      }
+    }
+  }
+}

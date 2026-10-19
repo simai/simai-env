@@ -1,0 +1,40 @@
+{
+    "schema": "docara.lang.v1",
+    "version": 1,
+    "shell": {"skip_to_content": "Skip to content"},
+    "navigation": {
+        "open": "Open navigation", "mobile_title": "Navigation", "primary": "Primary",
+        "sections": "Documentation", "title": "Sections", "close": "Close navigation",
+        "breadcrumbs": "Breadcrumbs", "breadcrumbs_expand": "Show hidden breadcrumb levels",
+        "outline": "Contents", "outline_close": "Close page outline", "previous_next": "Page navigation",
+        "previous": "Previous", "next": "Next", "expand": "Expand: ", "collapse": "Collapse: ",
+        "contains_current": ", contains the current page", "backlinks_heading": "Links to this page",
+        "backlinks_empty": "No backlinks yet."
+    },
+    "language": {"label": "Language"},
+    "search": {
+        "open": "Open documentation search", "label": "Search", "title": "Search documentation",
+        "close": "Close search", "query": "Query", "placeholder": "For example, inheritance",
+        "idle": "Enter at least 2 characters", "loading": "Loading search…", "found": "Found: {count}",
+        "empty": "No results found", "error": "Search is temporarily unavailable. Reload the page and try again.",
+        "navigate": "navigate", "open_result": "open", "dismiss": "close"
+    },
+    "reader": {
+        "open": "Open reading settings", "panel_title": "Settings", "close": "Close reading settings",
+        "appearance": "Appearance", "appearance_description": "Adjust how the documentation looks in this browser.",
+        "help": "Adjust how the documentation looks in this browser.", "reset_all": "Reset settings",
+        "theme_title": "Theme", "theme_description": "Choose a light or dark appearance.",
+        "theme_system": "Use system setting",
+        "theme_light": "Light",
+        "theme_dark": "Dark",
+        "font_size_title": "Font size", "font_size_description": "Changes the size of the whole documentation interface.",
+        "font_size_small": "Small", "font_size_normal": "Normal", "font_size_large": "Large",
+        "content_width_title": "Page width", "content_width_description": "Wide uses the full window and does not limit line length.",
+        "content_width_normal": "Normal", "content_width_wide": "Wide",
+        "outline_hide": "Hide page contents", "focus_mode": "Reading mode", "focus_mode_exit": "Exit reading mode (Esc)",
+        "saved": "Saved: {setting} — {value}.", "applied_not_saved": "The setting was applied. The browser did not allow the choice to be saved.",
+        "restored": "The site settings have been restored."
+    },
+    "redirect": {"title": "Page moved", "message": "The page address has changed.", "link": "Open the current page"},
+    "code": {"copy": "Copy", "copied": "Copied"}
+}

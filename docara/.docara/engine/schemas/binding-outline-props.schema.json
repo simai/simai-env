@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/binding-outline-props/v1",
+  "type": "object",
+  "required": ["items", "label"],
+  "properties": {
+    "items": {"type": "array"},
+    "label": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

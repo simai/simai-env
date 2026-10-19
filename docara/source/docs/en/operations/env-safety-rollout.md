@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Env Safety Rollout
 description: Rolling out confirmation, Bitrix budgets and MySQL localization on a host
 ---

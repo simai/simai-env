@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Diagnostics
 description: Diagnostics
 ---
@@ -79,7 +77,7 @@ CLI short_open_tag: yes
 Agents via scheduler: yes
 ```
 
-If not ready, use [Agents on cron](agents-cron.md).
+If not ready, use [Agents on cron](../agents-cron/).
 
 ## Ownership
 
@@ -127,9 +125,9 @@ Before handing a Bitrix site to a developer or customer:
 
 ## Common Symptoms And Where To Go
 
-- For the full symptom index, see [Troubleshooting](troubleshooting.md).
-- Human-readable Bitrix URLs open wrong content: [Nginx routing](nginx-routing.md).
-- Large PDF/upload fails with `Network error` or `413`: [Uploads](uploads.md).
-- Modules cannot be deleted or updated: [Ownership](ownership.md).
-- Agents are not running from cron: [Agents on cron](agents-cron.md).
-- Wildcard HTTPS is unclear or fails DNS validation: [SSL](ssl.md).
+- For the full symptom index, see [Troubleshooting](../troubleshooting/).
+- Human-readable Bitrix URLs open wrong content: [Nginx routing](../nginx-routing/).
+- Large PDF/upload fails with `Network error` or `413`: [Uploads](../uploads/).
+- Modules cannot be deleted or updated: [Ownership](../ownership/).
+- Agents are not running from cron: [Agents on cron](../agents-cron/).
+- Wildcard HTTPS is unclear or fails DNS validation: [SSL](../ssl/).

@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Os Adapters
 description: Os Adapters
 ---

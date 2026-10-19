@@ -10,9 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-env:
-  DOCARA_BASE_URL: "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -24,6 +21,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -31,6 +32,7 @@ jobs:
           coverage: none
           tools: composer
 
+      # Docara runs SIMAI Framework page composition with Node.js during the build.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -40,77 +42,54 @@ jobs:
         working-directory: docara
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Initialize Docara
+      # The site keeps its historical public paths (/docs/en/...): the content
+      # root source/docs/en is built with base_url <pages base>/docs/en/ and
+      # published under docs/en/ of the Pages artifact. The committed
+      # docara.json keeps "/" and no site_url for local builds.
+      - name: Set the site base URL and site URL
         working-directory: docara
         env:
-          DOCARA_SKIP_FRONTEND_INSTALL: "true"
-        run: php vendor/bin/docara init --update
-
-      - name: Install frontend dependencies
-        working-directory: docara
-        run: YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc install --frozen-lockfile --production=false --non-interactive
-
-      - name: Build frontend assets
-        working-directory: docara
-        run: YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc prod
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          jq --arg base "${BASE_PATH%/}/docs/en/" --arg site "${SITE_URL%/}/docs/en/" \
+            '.base_url = $base | .site_url = $site' docara.json > docara.json.pages
+          mv docara.json.pages docara.json
+          jq -r '.base_url, .site_url' docara.json
 
       - name: Build Docara site
         working-directory: docara
-        env:
-          DOCARA_BASE_URL: ${{ env.DOCARA_BASE_URL }}
         run: php vendor/bin/docara build production
 
-      - name: Adjust GitHub project Pages paths
+      - name: Verify static output
+        working-directory: docara
+        run: php vendor/bin/docara verify-static build_production
+
+      - name: Assemble Pages artifact
         env:
-          DOCARA_PAGES_PREFIX: "auto"
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
         run: |
-          python3 - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-
-          raw_prefix = os.environ.get("DOCARA_PAGES_PREFIX", "auto").strip()
-          if raw_prefix == "auto":
-              repository = os.environ.get("GITHUB_REPOSITORY", "")
-              repo_name = repository.split("/", 1)[1] if "/" in repository else ""
-              prefix = "" if repo_name.endswith(".github.io") else f"/{repo_name}"
-          elif raw_prefix in ("", "none", "/"):
-              prefix = ""
-          else:
-              prefix = "/" + raw_prefix.strip("/")
-
-          if not prefix:
-              raise SystemExit(0)
-
-          root = Path("docara/build_production")
-          patterns = [
-              (re.compile(r'(?P<attr>\b(?:href|src|action)=["\'])/(?!/)(?P<path>[^"\']*)'), rf'\g<attr>{prefix}/\g<path>'),
-              (re.compile(r'(?P<attr>\bcontent=["\'])/(?!/)(?P<path>[^"\']*)'), rf'\g<attr>{prefix}/\g<path>'),
-          ]
-          for path in list(root.rglob("*.html")) + list(root.rglob("*.json")) + list(root.rglob("*.js")):
-              text = path.read_text(encoding="utf-8")
-              updated = text
-              for pattern, replacement in patterns:
-                  updated = pattern.sub(replacement, updated)
-              updated = updated.replace('fetch(`/search-index_', f'fetch(`{prefix}/search-index_')
-              updated = updated.replace('fetch("/search-index_', f'fetch("{prefix}/search-index_')
-              updated = updated.replace("fetch('/search-index_", f"fetch('{prefix}/search-index_")
-              updated = updated.replace('window.location.replace("', f'window.location.replace("{prefix}/')
-              updated = updated.replace('window.location.replace(`', f'window.location.replace(`{prefix}/')
-              updated = updated.replace('"url": "\/', f'"url": "\/{prefix.strip("/")}/')
-              duplicate_locale = re.compile(r'(?P<root>' + re.escape(prefix) + r')?/(?P<locale>[a-z]{2}(?:-[a-z]{2})?)/(?P=locale)(?=[/"?#])')
-              updated = duplicate_locale.sub(lambda match: f'{match.group("root") or ""}/{match.group("locale")}', updated)
-              if updated != text:
-                  path.write_text(updated, encoding="utf-8")
-          PY
-
-      - name: Disable Jekyll
-        run: touch docara/build_production/.nojekyll
+          mkdir -p _site/docs/en
+          cp -a docara/build_production/. _site/docs/en/
+          target="${BASE_PATH%/}/docs/en/"
+          cat > _site/index.html <<HTML
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <title>simai-env documentation</title>
+          <meta http-equiv="refresh" content="0; url=${target}">
+          <link rel="canonical" href="${target}">
+          </head>
+          <body><p><a href="${target}">simai-env documentation</a></p></body>
+          </html>
+          HTML
+          touch _site/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docara/build_production
+          path: _site
 
   deploy:
     environment:

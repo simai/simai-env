@@ -1,0 +1,28 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.ru/docara/upgrade-journal.schema.json",
+    "title": "Docara project upgrade journal",
+    "type": "object",
+    "required": ["schema", "upgrade_id", "plan_sha256", "current_version", "target_version", "phase", "completed_phases", "rollback_available"],
+    "properties": {
+        "schema": {"const": "docara.upgrade_journal.v1"},
+        "upgrade_id": {"$ref": "#/$defs/sha256"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "current_version": {"$ref": "#/$defs/version"},
+        "target_version": {"$ref": "#/$defs/version"},
+        "phase": {"enum": ["prepared", "dependencies_promoted", "engine_synchronized", "build_promoted", "applied", "compensated", "rolled_back"]},
+        "completed_phases": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "rollback_available": {"type": "boolean"},
+        "failure_code": {"type": "string"},
+        "after": {
+            "type": "object",
+            "required": ["composer_lock_sha256", "vendor_sha256", "engine_sha256", "build_sha256"],
+            "additionalProperties": {"$ref": "#/$defs/sha256"}
+        }
+    },
+    "$defs": {
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"}
+    },
+    "additionalProperties": false
+}

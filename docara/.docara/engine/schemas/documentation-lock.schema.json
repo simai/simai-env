@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/documentation-lock/v1",
+  "type": "object",
+  "required": ["schema", "source_locale", "entries", "exclusions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.documentation_lock.v1"},
+    "source_locale": {"type": "string", "format": "docara-bcp47"},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+    "exclusions": {"type": "array", "items": {"$ref": "#/$defs/exclusion"}}
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["source", "key", "kind", "route", "page_path", "examples", "source_sha256", "page_sha256", "examples_sha256", "review"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "key": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "route": {"type": "string", "pattern": "^/(?:[^/]+/)*$"},
+        "page_path": {"type": "string", "minLength": 1},
+        "examples": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "page_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "examples_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "review": {"enum": ["ai_verified", "human_reviewed"]}
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "required": ["source", "key", "kind", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+        "key": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

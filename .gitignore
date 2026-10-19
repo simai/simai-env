@@ -16,7 +16,6 @@ testing/secrets/
 source/
 !docara/source/
 !docara/source/**
-/docara/source/_core/*
 
 # SIMAI project memory runtime logs
 source/logs/

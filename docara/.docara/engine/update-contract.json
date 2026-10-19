@@ -1,0 +1,11 @@
+{
+    "plan_required": true,
+    "project_owned_overwrite": false,
+    "rollback": "hash_verified_directory_swap",
+    "schema": "docara.update_contract.v1",
+    "sequence": [
+        "verify",
+        "dry-run",
+        "apply"
+    ]
+}

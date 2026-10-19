@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-reference-identity.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "reference_id", "manifest_sha256", "kind", "id", "page_html_sha256", "artifact_sha256"],
+  "properties": {
+    "contract": {"const": "docara.production_target_reference.v2"},
+    "reference_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "page_html_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "kind": {"enum": ["smart", "region", "layout"]},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}
+  }
+}

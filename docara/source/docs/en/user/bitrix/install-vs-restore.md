@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Install Vs Restore
 description: Install Vs Restore
 ---

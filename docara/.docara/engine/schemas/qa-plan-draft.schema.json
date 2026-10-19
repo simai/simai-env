@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-plan-draft.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "phase", "plan_id", "subject", "preview", "artifact_sha256", "target", "reference", "scenarios", "assertions"],
+  "properties": {
+    "schema": {"const": "docara.qa_plan_draft.v1"},
+    "phase": {"const": "draft"},
+    "plan_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "subject": {"type": "string", "minLength": 1},
+    "preview": {"type": "string", "pattern": "^\\.docara-preview/output/(?:smart|layout|region)/index\\.html$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "target": {"$ref": "qa-target.schema.json"},
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "kind", "id", "page_html_sha256", "artifact_sha256"],
+      "properties": {
+        "contract": {"const": "docara.production_target_reference_draft.v1"},
+        "page_html_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "kind": {"enum": ["smart", "region", "layout"]},
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}
+      }
+    },
+    "scenarios": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "assertions": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

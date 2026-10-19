@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.ru/docara/upgrade-plan.schema.json",
+    "title": "Docara project upgrade plan",
+    "type": "object",
+    "required": ["schema", "status", "current_version", "target_version", "project_owned_preserved"],
+    "properties": {
+        "schema": {"const": "docara.upgrade_plan.v1"},
+        "status": {"enum": ["current", "upgrade_available"]},
+        "upgrade_id": {"$ref": "#/$defs/sha256"},
+        "current_version": {"$ref": "#/$defs/version"},
+        "target_version": {"$ref": "#/$defs/version"},
+        "composer_constraint": {"type": "string", "minLength": 1},
+        "inputs": {
+            "type": "object",
+            "required": ["composer_json_sha256", "composer_lock_sha256", "project_owned_sha256", "engine_sha256", "build_sha256"],
+            "additionalProperties": {"$ref": "#/$defs/sha256"}
+        },
+        "candidate_lock_sha256": {"$ref": "#/$defs/sha256"},
+        "dependency_graph_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_vendor_sha256": {"$ref": "#/$defs/sha256"},
+        "verified_build_sha256": {"$ref": "#/$defs/sha256"},
+        "verification": {"type": "object"},
+        "project_owned_preserved": {"const": true},
+        "plan_sha256": {"$ref": "#/$defs/sha256"}
+    },
+    "$defs": {
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"}
+    },
+    "allOf": [{
+        "if": {"properties": {"status": {"const": "upgrade_available"}}},
+        "then": {"required": ["upgrade_id", "composer_constraint", "inputs", "candidate_lock_sha256", "dependency_graph_sha256", "candidate_vendor_sha256", "verified_build_sha256", "verification", "plan_sha256"]}
+    }],
+    "additionalProperties": false
+}

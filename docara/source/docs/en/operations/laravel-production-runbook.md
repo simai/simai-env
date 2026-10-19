@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Laravel Production Runbook
 description: Laravel Production Runbook
 ---

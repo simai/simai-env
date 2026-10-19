@@ -287,8 +287,8 @@ Notes:
 - Then the profile-specific status in the `Applications` section
 
 ## Where to read more
-- [Command reference](../commands/README.md)
-- [Daily operator quickstart](../operations/daily-ops-quickstart.md)
+- [Command reference](../../commands/)
+- [Daily operator quickstart](../../operations/daily-ops-quickstart/)
 - Profile runbooks:
   - `docs/operations/bitrix-production-runbook.md`
   - `docs/operations/wordpress-production-runbook.md`

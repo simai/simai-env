@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/operation-result.schema.json",
+  "title": "Docara application operation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operation", "status", "exit_code", "subject", "data", "diagnostics", "provenance"],
+  "properties": {
+    "schema": {"const": "docara.operation_result.v1"},
+    "operation": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "status": {"enum": ["success", "error"]},
+    "exit_code": {"type": "integer", "minimum": 0, "maximum": 255},
+    "subject": {"type": ["string", "null"]},
+    "data": {"type": "object"},
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "message", "source", "owner", "provenance", "suggestion"],
+        "properties": {
+          "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]+$"},
+          "severity": {"enum": ["info", "warning", "error"]},
+          "message": {"type": "string", "minLength": 1},
+          "source": {
+            "type": "object",
+            "required": ["path", "pointer"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+              "pointer": {"type": "string", "minLength": 1, "pattern": "^/"},
+              "line": {"type": ["integer", "null"], "minimum": 1},
+              "column": {"type": ["integer", "null"], "minimum": 1}
+            },
+            "allOf": [
+              {
+                "if": {"properties": {"path": {"pattern": "\\.(?:json|md)$"}}, "required": ["path"]},
+                "then": {
+                  "required": ["line", "column"],
+                  "properties": {
+                    "line": {"type": "integer", "minimum": 1},
+                    "column": {"type": "integer", "minimum": 1}
+                  }
+                }
+              }
+            ],
+            "additionalProperties": false
+          },
+          "owner": {"type": "string", "minLength": 1},
+          "provenance": {
+            "type": "object",
+            "required": ["operation", "subject", "engine_revision", "input_sha256"],
+            "properties": {
+              "operation": {"type": "string", "minLength": 1},
+              "subject": {"type": "string", "minLength": 1},
+              "engine_revision": {"type": "string", "minLength": 1, "pattern": "^(?!unresolved$).+"},
+              "input_sha256": {"type": "string", "pattern": "^(?!0{64}$)[a-f0-9]{64}$"}
+            },
+            "additionalProperties": false
+          },
+          "suggestion": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine_revision", "project_root", "input_sha256"],
+      "properties": {
+        "engine_revision": {"type": "string", "minLength": 1, "pattern": "^(?!unresolved$).+"},
+        "project_root": {"const": "."},
+        "input_sha256": {"type": "string", "pattern": "^(?!0{64}$)[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

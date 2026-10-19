@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Roadmap 2026 Q1
 description: Roadmap 2026 Q1
 ---

@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Developer Guide
 description: Engineering documentation for simai-env architecture, CLI contracts, operations, and implementation work.
 ---

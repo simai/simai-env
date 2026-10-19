@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: User Guide
 description: Operator documentation for the interactive simai-env menu and profile-specific workflows.
 ---

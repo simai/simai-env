@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Wildcard Site Regression
 description: Wildcard Site Regression
 ---

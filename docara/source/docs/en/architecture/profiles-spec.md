@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Profiles Spec
 description: Profiles Spec
 ---

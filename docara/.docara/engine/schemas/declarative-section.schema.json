@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/declarative-section/v1",
+  "type": "object",
+  "required": ["schema", "key", "type", "view", "allowed_regions", "slots", "allowed_blocks", "blocks"],
+  "properties": {
+    "schema": {"type": "string", "const": "docara.section.v1"},
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "type": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "view": {"type": "string", "pattern": "^section\\.[a-z][a-z0-9_.-]+$"},
+    "allowed_regions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+      "uniqueItems": true
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+      "uniqueItems": true
+    },
+    "allowed_blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+      "uniqueItems": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]+$"},
+      "uniqueItems": true
+    },
+    "blocks": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": ["id", "block", "slot"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "block": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "slot": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "smart": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "view": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "bind": {
+            "oneOf": [
+              {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]+$"},
+              {"type": "string", "enum": ["branding", "navigation", "header_navigation", "outline"]}
+            ]
+          },
+          "props": {
+            "type": "object",
+            "properties": {
+              "maximum_depth": {"type": "integer", "const": 4}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

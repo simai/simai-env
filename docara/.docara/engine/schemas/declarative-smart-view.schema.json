@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/declarative-smart-view/v1",
+  "type": "object",
+  "required": ["schema", "smart", "view", "template"],
+  "properties": {
+    "schema": {"type": "string", "const": "docara.smart_view.v1"},
+    "smart": {"type": "string", "pattern": "^(?:ui|docara)(?:\\.[a-z][a-z0-9_]*)+$"},
+    "view": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+    "template": {"type": "string", "pattern": "^smart\\.[a-z][a-z0-9_.-]+$"}
+  },
+  "additionalProperties": false
+}

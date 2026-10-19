@@ -1,0 +1,459 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/component-catalog-entry/v1",
+    "title": "Docara effective component catalogue entry",
+    "type": "object",
+    "required": [
+        "id",
+        "family",
+        "category",
+        "lifecycle",
+        "authoring",
+        "states",
+        "verification",
+        "docs_ref",
+        "provenance"
+    ],
+    "properties": {
+        "id": {
+            "$ref": "#/$defs/id"
+        },
+        "family": {
+            "$ref": "#/$defs/family"
+        },
+        "category": {
+            "$ref": "#/$defs/non_empty_string"
+        },
+        "lifecycle": {
+            "$ref": "#/$defs/lifecycle"
+        },
+        "authoring": {
+            "$ref": "#/$defs/authoring"
+        },
+        "states": {
+            "$ref": "#/$defs/string_list"
+        },
+        "verification": {
+            "$ref": "#/$defs/verification"
+        },
+        "docs_ref": {
+            "$ref": "#/$defs/safe_path"
+        },
+        "provenance": {
+            "$ref": "#/$defs/provenance"
+        },
+        "metadata": {
+            "$ref": "#/$defs/metadata"
+        },
+        "consumer_policy": {
+            "$ref": "#/$defs/consumer_policy"
+        },
+        "gap": {
+            "$ref": "#/$defs/gap"
+        },
+        "container_contract": {
+            "$ref": "design-atlas.schema.json#/$defs/container"
+        },
+        "nesting_contract": {
+            "$ref": "design-atlas.schema.json#/$defs/container"
+        },
+        "capabilities": {
+            "$ref": "#/$defs/string_list"
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$"
+        },
+        "family": {
+            "type": "string",
+            "enum": [
+                "native_markdown",
+                "docara_typed",
+                "framework_smart",
+                "requirement"
+            ]
+        },
+        "lifecycle": {
+            "type": "string",
+            "enum": [
+                "supported",
+                "admission_pending",
+                "framework_gap",
+                "deferred"
+            ]
+        },
+        "non_empty_string": {
+            "type": "string",
+            "minLength": 1
+        },
+        "safe_path": {
+            "type": "string",
+            "format": "docara-relative-path"
+        },
+        "string_list": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+                "$ref": "#/$defs/non_empty_string"
+            }
+        },
+        "authoring": {
+            "type": "object",
+            "required": ["syntax", "call", "jobs", "parameters"],
+            "properties": {
+                "syntax": {
+                    "type": "string",
+                    "enum": [
+                        "markdown",
+                        "inline",
+                        "directive",
+                        "directive_json",
+                        "proposed_directive",
+                        "unavailable"
+                    ]
+                },
+                "call": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                },
+                "jobs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*$"
+                    }
+                },
+                "parameters": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/parameter"
+                    }
+                },
+                "constraints": {
+                    "$ref": "#/$defs/constraints"
+                }
+            },
+            "additionalProperties": false
+        },
+        "parameter": {
+            "type": "object",
+            "required": ["name", "type", "required"],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_-]*$"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["string", "boolean", "integer", "number", "enum", "markdown"]
+                },
+                "required": {
+                    "type": "boolean"
+                },
+                "values": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "$ref": "#/$defs/scalar"
+                    }
+                },
+                "default": {
+                    "$ref": "#/$defs/scalar"
+                },
+                "validation": {
+                    "$ref": "#/$defs/parameter_validation"
+                },
+                "available_when": {
+                    "$ref": "#/$defs/condition"
+                },
+                "mirrors": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_-]*$"
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "parameter_validation": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "min_length": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "max_length": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "pattern": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "minimum": {
+                    "type": "number"
+                },
+                "maximum": {
+                    "type": "number"
+                }
+            },
+            "additionalProperties": false
+        },
+        "constraints": {
+            "type": "object",
+            "required": ["allowed_combinations", "requires"],
+            "properties": {
+                "allowed_combinations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["keys", "values"],
+                        "properties": {
+                            "keys": {
+                                "type": "array",
+                                "minItems": 1,
+                                "uniqueItems": true,
+                                "items": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9_-]*$"
+                                }
+                            },
+                            "values": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "$ref": "#/$defs/scalar"
+                                    }
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "requires": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["when", "then"],
+                        "properties": {
+                            "when": {
+                                "$ref": "#/$defs/condition"
+                            },
+                            "then": {
+                                "$ref": "#/$defs/condition"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "condition": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+                "$ref": "#/$defs/scalar"
+            }
+        },
+        "scalar": {
+            "type": ["string", "boolean", "integer", "number"]
+        },
+        "verification": {
+            "type": "object",
+            "required": ["renderer", "tests", "docs", "demo"],
+            "properties": {
+                "renderer": {
+                    "type": "boolean"
+                },
+                "tests": {
+                    "type": "boolean"
+                },
+                "docs": {
+                    "type": "boolean"
+                },
+        "demo": {
+          "type": "boolean"
+        },
+        "variant_coverage": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "base",
+                  "state",
+                  "parameter"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_-]*$"
+              },
+              "value": {
+                "$ref": "#/$defs/scalar"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+            },
+            "additionalProperties": false
+        },
+        "provenance": {
+            "type": "object",
+            "required": ["source_kind"],
+            "properties": {
+                "source_kind": {
+                    "type": "string",
+                    "enum": [
+                        "portable_markdown_profile",
+                        "typed_definition",
+                        "inline_definition",
+                        "smart_consumer_metadata",
+                        "product_requirement"
+                    ]
+                },
+                "profile_id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9._-]+$"
+                },
+                "definition_ref": {
+                    "$ref": "#/$defs/safe_path"
+                },
+                "manifest_ref": {
+                    "$ref": "#/$defs/safe_path"
+                },
+                "admission_authority": {
+                    "$ref": "#/$defs/safe_path"
+                },
+                "framework_owner": {
+                    "$ref": "#/$defs/non_empty_string"
+                },
+                "provider": {
+                    "$ref": "#/$defs/non_empty_string"
+                },
+                "provider_revision": {
+                    "type": "string",
+                    "format": "docara-immutable-revision"
+                },
+                "upstream_revision": {
+                    "type": "string",
+                    "format": "docara-immutable-revision"
+                },
+                "manifest_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "runtime_pair": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9._-]+$"
+                }
+            },
+            "additionalProperties": false
+        },
+        "metadata": {
+            "type": "object",
+            "required": ["owner", "package", "version", "source_ref", "capabilities", "source_sha256", "release", "source_url", "history_url", "history_exact"],
+            "properties": {
+                "owner": {
+                    "$ref": "#/$defs/non_empty_string"
+                },
+                "package": {
+                    "$ref": "#/$defs/non_empty_string"
+                },
+                "version": {
+                    "$ref": "#/$defs/non_empty_string"
+                },
+                "source_ref": {
+                    "$ref": "#/$defs/safe_path"
+                },
+                "capabilities": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*$"
+                    }
+                },
+                "source_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                },
+                "release": {
+                    "type": "string",
+                    "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+                },
+                "source_url": {
+                    "type": ["string", "null"]
+                },
+                "history_url": {
+                    "type": ["string", "null"]
+                },
+                "history_exact": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        },
+        "consumer_policy": {
+            "type": "object",
+            "required": ["can_admit", "managed_properties", "forbidden_inputs", "omitted_assets", "excluded_states"],
+            "properties": {
+                "can_admit": {
+                    "type": "boolean",
+                    "const": false
+                },
+                "managed_properties": {
+                    "$ref": "#/$defs/string_list"
+                },
+                "forbidden_inputs": {
+                    "$ref": "#/$defs/string_list"
+                },
+                "omitted_assets": {
+                    "$ref": "#/$defs/string_list"
+                },
+                "excluded_states": {
+                    "$ref": "#/$defs/string_list"
+                }
+            },
+            "additionalProperties": false
+        },
+        "gap": {
+            "type": "object",
+            "required": ["owner"],
+            "properties": {
+                "owner": {
+                    "$ref": "#/$defs/non_empty_string"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

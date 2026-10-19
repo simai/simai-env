@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/declarative-view-tree/v1",
+  "type": "object",
+  "required": ["schema", "key", "tree"],
+  "properties": {
+    "schema": {"type": "string", "const": "docara.view_tree.v1"},
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "tree": {"$ref": "#/$defs/node"}
+  },
+  "$defs": {
+    "node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "tag"],
+          "properties": {
+            "kind": {"const": "element"},
+            "tag": {
+              "type": "string",
+              "enum": ["article", "section", "div", "header", "main", "aside", "footer", "nav"]
+            },
+            "utilities": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_:/.-]*$"},
+              "uniqueItems": true
+            },
+            "attributes": {
+              "type": "object",
+              "properties": {
+                "role": {"type": "string", "minLength": 1, "maxLength": 160},
+                "aria-label": {"type": "string", "minLength": 1, "maxLength": 160}
+              },
+              "patternProperties": {
+                "^data-[a-z0-9-]+$": {"type": "string", "minLength": 1, "maxLength": 160}
+              },
+              "additionalProperties": false
+            },
+            "identity": {
+              "type": "string",
+              "enum": ["page", "section"]
+            },
+            "children": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/node"}
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "region", "tag"],
+          "properties": {
+            "kind": {"const": "region"},
+            "region": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.-]+$"
+            },
+            "tag": {
+              "type": "string",
+              "enum": ["header", "main", "aside", "footer", "div"]
+            },
+            "utilities": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_:/.-]*$"},
+              "uniqueItems": true
+            },
+            "attributes": {
+              "type": "object",
+              "properties": {
+                "role": {"type": "string", "minLength": 1, "maxLength": 160},
+                "aria-label": {"type": "string", "minLength": 1, "maxLength": 160}
+              },
+              "patternProperties": {
+                "^data-[a-z0-9-]+$": {"type": "string", "minLength": 1, "maxLength": 160}
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "slot"],
+          "properties": {
+            "kind": {"const": "slot"},
+            "slot": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false
+}

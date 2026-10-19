@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Production Readiness
 description: Production Readiness
 ---
@@ -66,9 +64,9 @@ Acceptance criteria per profile:
 6. `site doctor` finishes without `FAIL`
 
 Profile-specific references:
-- Bitrix: [`bitrix-production-runbook.md`](./bitrix-production-runbook.md)
-- WordPress: [`wordpress-production-runbook.md`](./wordpress-production-runbook.md)
-- Laravel: [`laravel-production-runbook.md`](./laravel-production-runbook.md)
+- Bitrix: [`bitrix-production-runbook.md`](../bitrix-production-runbook/)
+- WordPress: [`wordpress-production-runbook.md`](../wordpress-production-runbook/)
+- Laravel: [`laravel-production-runbook.md`](../laravel-production-runbook/)
 
 ### 3. Daily Operations Acceptance
 

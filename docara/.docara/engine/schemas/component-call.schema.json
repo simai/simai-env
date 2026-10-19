@@ -1,0 +1,21 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/component-call/v1",
+    "title": "Docara component call",
+    "type": "object",
+    "required": ["schema", "id", "props"],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.component_call.v1"
+        },
+        "id": {
+            "type": "string",
+            "pattern": "^ui(?:\\.[a-z][a-z0-9_]*)+$"
+        },
+        "props": {
+            "type": "object"
+        }
+    },
+    "additionalProperties": false
+}

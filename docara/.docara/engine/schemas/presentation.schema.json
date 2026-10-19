@@ -1,0 +1,376 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/presentation/v1",
+    "title": "Docara portable presentation fragments",
+    "$defs": {
+        "branding": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "title": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "label": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "logo": {
+                    "type": "string",
+                    "format": "docara-relative-path"
+                },
+                "logo_dark": {
+                    "type": "string",
+                    "format": "docara-relative-path"
+                },
+                "favicon": {
+                    "type": "string",
+                    "format": "docara-relative-path"
+                },
+                "share_image": {
+                    "description": "The picture shown when a page is shared (og:image, twitter:image): a PNG, JPEG or WebP file in the project. Used only when site_url is set.",
+                    "type": "string",
+                    "format": "docara-relative-path"
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["full", "compact", "logo", "text"]
+                },
+                "size": {
+                    "type": "string",
+                    "enum": ["small", "medium", "large"]
+                }
+            },
+            "additionalProperties": false
+        },
+        "layout": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "key": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_.-]+$"
+                },
+                "container": {
+                    "type": "object",
+                    "required": ["max"],
+                    "properties": {
+                        "max": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 8
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "scrollbar": {
+                    "type": "object",
+                    "required": ["preset"],
+                    "properties": {
+                        "preset": {
+                            "type": "string",
+                            "enum": ["overlay", "persistent", "standard", "hidden"]
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "content": {
+                    "type": "object",
+                    "required": ["gap"],
+                    "properties": {
+                        "gap": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 8
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "regions": {
+                    "$ref": "#/$defs/regions"
+                }
+            },
+            "additionalProperties": false
+        },
+        "regions": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                }
+            },
+            "patternProperties": {"^[a-z][a-z0-9_.-]+$": {"$ref": "#/$defs/region"}},
+            "additionalProperties": false
+        },
+        "region": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "sections": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                        "$ref": "#/$defs/region_section"
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "region_section": {
+            "type": "object",
+            "required": ["id", "section"],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_.-]+$"
+                },
+                "section": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_.-]+$"
+                },
+                "blocks": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                        "$ref": "#/$defs/region_block"
+                    }
+                },
+                "utilities": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_:/.-]*$"},
+                    "uniqueItems": true
+                }
+            },
+            "additionalProperties": false
+        },
+        "region_block": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["id", "block", "slot", "element"],
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "block": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "slot": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "element": {
+                            "type": "object",
+                            "required": ["tag", "text"],
+                            "properties": {
+                                "tag": {"type": "string", "enum": ["div", "p", "span", "a"]},
+                                "text": {"type": "string", "minLength": 1, "maxLength": 500},
+                                "href": {"type": "string", "pattern": "^(?:/|[/#][^\\u0000-\\u0020\\\"'<>\\\\]+)$"},
+                                "aria_label": {"type": "string", "minLength": 1, "maxLength": 160},
+                                "utilities": {
+                                    "type": "array",
+                                    "maxItems": 16,
+                                    "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_:/.-]*$"},
+                                    "uniqueItems": true
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "required": ["id", "block", "slot", "smart", "props"],
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "block": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "slot": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "smart": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "view": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+                        "bind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]+$"},
+                        "props": {"type": "object", "maxProperties": 32}
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "settings": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "theme": {
+                    "type": "string",
+                    "enum": ["system", "light", "dark"]
+                },
+                "modal_blur": {
+                    "type": "string",
+                    "enum": ["none", "small", "medium", "large"]
+                },
+                "ui_radius": {
+                    "type": "string",
+                    "enum": ["default", "medium", "large"]
+                }
+            },
+            "additionalProperties": false
+        },
+        "examples": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "fullscreen": {
+                    "type": "boolean"
+                },
+                "wrap": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        },
+        "code": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "wrap": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        },
+        "navigation": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "hidden": {
+                    "type": "boolean"
+                },
+                "order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483647
+                },
+                "scope": {
+                    "type": "string",
+                    "enum": ["site", "section"]
+                }
+            },
+            "additionalProperties": false
+        },
+        "header_navigation": {
+            "type": "object",
+            "minProperties": 1,
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "enabled": {"const": true}
+                        },
+                        "required": ["enabled"]
+                    },
+                    "then": {
+                        "required": ["items"]
+                    }
+                }
+            ],
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "label", "href"],
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9_.-]{0,63}$"
+                            },
+                            "label": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 80
+                            },
+                            "href": {
+                                "type": "string",
+                                "maxLength": 2000,
+                                "pattern": "^(?:#(?!$)|/(?!/)|https://)[^\\x{0000}-\\x{0020}\\\"'<>\\\\]+$"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "search": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "indexed": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        },
+        "reading": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "$reset": {
+                    "const": true
+                },
+                "breadcrumbs": {
+                    "type": "boolean"
+                },
+                "toc": {
+                    "type": "boolean"
+                },
+                "mobile_toc": {
+                    "type": "string",
+                    "enum": ["auto", "always", "never"]
+                },
+                "toc_depth": {
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 6
+                },
+                "previous_next": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

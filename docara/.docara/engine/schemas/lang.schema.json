@@ -1,0 +1,37 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/lang/v1",
+    "title": "Docara shared public locale strings",
+    "type": "object",
+    "required": ["schema", "version"],
+    "properties": {
+        "schema": {"type": "string", "const": "docara.lang.v1"},
+        "version": {"type": "integer", "const": 1},
+        "search": {"$ref": "#/$defs/group"},
+        "toc": {"$ref": "#/$defs/group"},
+        "copy": {"$ref": "#/$defs/group"},
+        "navigation": {"$ref": "#/$defs/group"},
+        "transitions": {"$ref": "#/$defs/group"},
+        "accessibility": {"$ref": "#/$defs/group"},
+        "common": {"$ref": "#/$defs/group"},
+        "language": {"$ref": "#/$defs/group"},
+        "reader": {"$ref": "#/$defs/group"},
+        "redirect": {"$ref": "#/$defs/group"},
+        "code": {"$ref": "#/$defs/group"},
+        "examples": {"$ref": "#/$defs/group"},
+        "shell": {"$ref": "#/$defs/group"}
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "group": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": {
+                "oneOf": [
+                    {"type": "string", "minLength": 1, "maxLength": 280},
+                    {"$ref": "#/$defs/group"}
+                ]
+            }
+        }
+    }
+}

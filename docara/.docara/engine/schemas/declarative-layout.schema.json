@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/declarative-layout/v1",
+  "type": "object",
+  "required": ["schema", "key", "default", "view", "configuration", "document", "regions", "assets"],
+  "properties": {
+    "schema": {"type": "string", "const": "docara.layout.v1"},
+    "key": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "default": {"type": "boolean"},
+    "view": {"type": "string", "pattern": "^layout\\.[a-z][a-z0-9_.-]+$"},
+    "configuration": {
+      "type": "object",
+      "required": ["container", "scrollbar", "content"],
+      "properties": {
+        "container": {"type": "object", "required": ["max"], "properties": {"max": {"type": "integer", "minimum": 1, "maximum": 8}}, "additionalProperties": false},
+        "scrollbar": {"type": "object", "required": ["preset"], "properties": {"preset": {"type": "string", "enum": ["overlay", "persistent", "standard", "hidden"]}}, "additionalProperties": false},
+        "content": {"type": "object", "required": ["gap"], "properties": {"gap": {"type": "integer", "minimum": 0, "maximum": 8}}, "additionalProperties": false}
+      },
+      "additionalProperties": false
+    },
+    "document": {
+      "type": "object",
+      "required": ["region", "section", "slot", "block"],
+      "properties": {
+        "region": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "section": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "slot": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+        "block": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}
+      },
+      "additionalProperties": false
+    },
+    "regions": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {"^[a-z][a-z0-9_.-]+$": {"$ref": "#/$defs/region"}},
+      "additionalProperties": false
+    },
+    "assets": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "region": {
+      "type": "object",
+      "required": ["required", "default_enabled", "default_sections", "section_types"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "default_enabled": {"type": "boolean"},
+        "default_sections": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["id", "section"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+              "section": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "section_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9_.-]+$"},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

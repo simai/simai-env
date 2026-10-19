@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/design-atlas/v1",
+  "type": "object",
+  "required": ["schema", "vocabulary", "registry_fingerprints", "entries", "count", "fingerprint"],
+  "properties": {
+    "schema": {"type": "string", "const": "docara.design_atlas.v1"},
+    "vocabulary": {
+      "type": "object",
+      "required": ["kinds", "authoring_kinds", "support_states", "origins", "typing_source", "fence_length_semantics"],
+      "properties": {
+        "kinds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "authoring_kinds": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "support_states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "origins": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "typing_source": {"type": "string", "const": "admitted_registry_descriptor"},
+        "fence_length_semantics": {"type": "string", "const": "none"}
+      },
+      "additionalProperties": false
+    },
+    "registry_fingerprints": {
+      "type": "object",
+      "required": ["bindings", "components", "design", "smart"],
+      "properties": {
+        "bindings": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "components": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "design": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "smart": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entry"}
+    },
+    "count": {"type": "integer", "minimum": 1},
+    "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "required": ["id", "kind", "namespace", "owner", "owner_package", "origin", "authoring_kind", "support", "status", "provider", "capabilities", "preview_supported", "schema", "container_contract", "provenance"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {"type": "string", "enum": ["binding", "block", "layout", "preset", "section", "smart", "view"]},
+        "owner": {"type": "string", "minLength": 1},
+        "namespace": {"type": "string", "minLength": 1},
+        "owner_package": {"type": "string", "minLength": 1},
+        "origin": {"type": "string", "enum": ["docara", "framework", "native", "project", "requirement"]},
+        "authoring_kind": {"type": "string", "enum": ["configuration", "container", "inline", "block", "markdown", "none"]},
+        "support": {"type": "string", "enum": ["supported", "compatibility", "project", "proposal", "rejected"]},
+        "status": {"type": "string", "minLength": 1},
+        "provider": {"type": "string", "minLength": 1},
+        "capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "states": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "parameters": {"type": "array", "items": {"type": "object"}},
+        "preview_supported": {"type": "boolean"},
+        "schema": {"type": "string", "minLength": 1},
+        "container_contract": {
+          "oneOf": [
+            {"type": "null"},
+            {"$ref": "#/$defs/container"}
+          ]
+        },
+        "provenance": {"type": "object", "minProperties": 1}
+      },
+      "additionalProperties": false
+    },
+    "container": {
+      "type": "object",
+      "required": ["allowed_children", "slots", "min_children", "max_children", "order", "max_depth", "depth_semantics"],
+      "properties": {
+        "allowed_children": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "allowed_child_capabilities": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "slots": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "min_children": {"type": "integer", "minimum": 0},
+        "max_children": {"type": "integer", "minimum": 1, "maximum": 512},
+        "order": {"type": "string", "enum": ["declared", "layout_regions", "manifest"]},
+        "max_depth": {"type": "integer", "minimum": 1, "maximum": 16},
+        "depth_semantics": {"type": "string", "enum": ["relative_subtree_root_level_1"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

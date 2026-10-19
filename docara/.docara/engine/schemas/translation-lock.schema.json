@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/translation-lock/v1",
+  "type": "object",
+  "required": ["schema", "source_locale", "entries", "exclusions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.translation_lock.v1"},
+    "source_locale": {"type": "string", "format": "docara-bcp47"},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+    "exclusions": {"type": "array", "items": {"$ref": "#/$defs/exclusion"}}
+  },
+  "$defs": {
+    "identity": {
+      "type": "object",
+      "required": ["kind", "key", "locale"],
+      "properties": {
+        "kind": {"enum": ["page", "lang"]},
+        "key": {"type": "string", "minLength": 1},
+        "locale": {"type": "string", "format": "docara-bcp47"}
+      }
+    },
+    "entry": {
+      "allOf": [{"$ref": "#/$defs/identity"}],
+      "type": "object",
+      "required": ["kind", "key", "locale", "source_path", "target_path", "source_sha256", "target_sha256", "source_structure_sha256", "target_structure_sha256", "review"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["page", "lang"]},
+        "key": {"type": "string", "minLength": 1},
+        "locale": {"type": "string", "format": "docara-bcp47"},
+        "source_path": {"type": "string", "minLength": 1},
+        "target_path": {"type": "string", "minLength": 1},
+        "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "target_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "source_structure_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "target_structure_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "review": {"enum": ["ai_verified", "human_reviewed"]}
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "required": ["kind", "key", "locale", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["page", "lang"]},
+        "key": {"type": "string", "minLength": 1},
+        "locale": {"type": "string", "format": "docara-bcp47"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

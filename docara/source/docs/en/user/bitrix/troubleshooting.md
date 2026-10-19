@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Troubleshooting
 description: Troubleshooting
 ---
@@ -36,8 +34,8 @@ sudo /root/simai-env/simai-admin.sh site doctor --domain <domain>
 
 Read:
 
-- [Diagnostics](diagnostics.md)
-- [Nginx routing](nginx-routing.md)
+- [Diagnostics](../diagnostics/)
+- [Nginx routing](../nginx-routing/)
 
 If this is a production incident, measure response times before changing settings.
 
@@ -60,9 +58,9 @@ curl -I -H "Host: test.<domain>" http://127.0.0.1/
 
 Read:
 
-- [Create site](create-site.md)
-- [Nginx routing](nginx-routing.md)
-- [SSL](ssl.md)
+- [Create site](../create-site/)
+- [Nginx routing](../nginx-routing/)
+- [SSL](../ssl/)
 
 ## HTTPS Issue Fails
 
@@ -83,7 +81,7 @@ sudo /root/simai-env/simai-admin.sh ssl status --domain <domain>
 
 Read:
 
-- [SSL](ssl.md)
+- [SSL](../ssl/)
 
 For wildcard HTTPS, confirm:
 
@@ -111,9 +109,9 @@ sudo /root/simai-env/simai-admin.sh site doctor --domain <domain>
 
 Read:
 
-- [Install vs restore](install-vs-restore.md)
-- [Database](database.md)
-- [Ownership](ownership.md)
+- [Install vs restore](../install-vs-restore/)
+- [Database](../database/)
+- [Ownership](../ownership/)
 
 ## FileInput Shows Network Error
 
@@ -132,7 +130,7 @@ sudo /root/simai-env/simai-admin.sh site doctor --domain <domain>
 
 Read:
 
-- [Uploads](uploads.md)
+- [Uploads](../uploads/)
 
 If small files work and larger files fail with `413`, check nginx first.
 
@@ -158,7 +156,7 @@ sudo /root/simai-env/simai-admin.sh bitrix ownership --domain <domain> --apply y
 
 Read:
 
-- [Ownership](ownership.md)
+- [Ownership](../ownership/)
 
 ## CHPU/SEF Page Opens Wrong Content
 
@@ -177,7 +175,7 @@ sudo /root/simai-env/simai-admin.sh site doctor --domain <domain>
 
 Read:
 
-- [Nginx routing](nginx-routing.md)
+- [Nginx routing](../nginx-routing/)
 
 Expected fallback:
 
@@ -209,7 +207,7 @@ sudo /root/simai-env/simai-admin.sh bitrix agents-sync --domain <domain> --apply
 
 Read:
 
-- [Agents on cron](agents-cron.md)
+- [Agents on cron](../agents-cron/)
 
 ## Site Doctor Has Warnings But No Failures
 
@@ -218,10 +216,10 @@ Read:
 Check what the warning is about:
 
 - PHP recommended values: usually tune through Bitrix baseline/performance commands
-- root-owned files: [Ownership](ownership.md)
-- nginx Bitrix checks: [Nginx routing](nginx-routing.md) or [Uploads](uploads.md)
-- cron/agents: [Agents on cron](agents-cron.md)
-- SSL: [SSL](ssl.md)
+- root-owned files: [Ownership](../ownership/)
+- nginx Bitrix checks: [Nginx routing](../nginx-routing/) or [Uploads](../uploads/)
+- cron/agents: [Agents on cron](../agents-cron/)
+- SSL: [SSL](../ssl/)
 
 Use:
 

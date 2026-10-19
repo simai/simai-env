@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/smart-view/v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "kind", "smart", "code", "template", "props"],
+  "properties": {
+    "schemaVersion": {"type": "string", "const": "1.0"},
+    "kind": {"type": "string", "const": "smart.view"},
+    "smart": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+    "code": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+    "title": {"type": "string"},
+    "template": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$"},
+    "props": {"type": "object"},
+    "children": {"type": "object"}
+  }
+}

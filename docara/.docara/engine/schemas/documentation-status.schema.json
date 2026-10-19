@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/documentation-status/v1",
+  "type": "object",
+  "required": ["schema", "enabled", "source_locale", "mode", "sources", "diagnostics", "items", "summary", "content_sha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.documentation_status.v1"},
+    "enabled": {"type": "boolean"},
+    "source_locale": {"type": ["string", "null"]},
+    "mode": {"const": "report"},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/diagnostic"}},
+    "items": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "summary": {
+      "type": "object",
+      "required": ["total", "current", "new", "changed", "missing", "missing_example", "unverified", "orphan", "excluded"],
+      "additionalProperties": false,
+      "properties": {
+        "total": {"type": "integer", "minimum": 0}, "current": {"type": "integer", "minimum": 0},
+        "new": {"type": "integer", "minimum": 0}, "changed": {"type": "integer", "minimum": 0},
+        "missing": {"type": "integer", "minimum": 0}, "missing_example": {"type": "integer", "minimum": 0},
+        "unverified": {"type": "integer", "minimum": 0}, "orphan": {"type": "integer", "minimum": 0},
+        "excluded": {"type": "integer", "minimum": 0}
+      }
+    },
+    "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  },
+  "$defs": {
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "provider", "revision", "contract_sha256", "compatibility_adapter"],
+      "properties": {
+        "id": {"type": "string"}, "provider": {"type": "string"}, "revision": {"type": "string"},
+        "contract_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "compatibility_adapter": {"type": "boolean"}
+      }
+    },
+    "diagnostic": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "severity", "source", "message"],
+      "properties": {
+        "code": {"type": "string"}, "severity": {"enum": ["warning", "error"]},
+        "source": {"type": "string"}, "message": {"type": "string"}
+      }
+    },
+    "item": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "key", "kind", "title", "status", "route", "page_path", "source_revision", "source_sha256", "accepted_source_sha256", "page_sha256", "examples_sha256", "review", "reason", "missing_example_cases", "provenance"],
+      "properties": {
+        "source": {"type": "string"}, "key": {"type": "string"}, "kind": {"type": "string"},
+        "title": {"type": ["string", "null"]},
+        "status": {"enum": ["current", "new", "changed", "missing", "missing_example", "unverified", "orphan", "excluded"]},
+        "route": {"type": ["string", "null"]}, "page_path": {"type": ["string", "null"]},
+        "source_revision": {"type": ["string", "null"]}, "source_sha256": {"type": ["string", "null"]},
+        "accepted_source_sha256": {"type": ["string", "null"]}, "page_sha256": {"type": ["string", "null"]},
+        "examples_sha256": {"type": ["string", "null"]}, "review": {"type": ["string", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "missing_example_cases": {"type": "array", "items": {"type": "string"}},
+        "provenance": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

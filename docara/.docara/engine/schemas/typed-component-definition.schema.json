@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/typed-component-definition/v1",
+    "title": "Docara typed component definition",
+    "type": "object",
+    "required": [
+        "id",
+        "name",
+        "renderer",
+        "family",
+        "category",
+        "lifecycle",
+        "authoring",
+        "states",
+        "verification",
+        "docs_ref",
+        "provenance"
+    ],
+    "properties": {
+        "id": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/id"
+        },
+        "name": {
+            "type": "string",
+            "pattern": "^(?!ui)[a-z][a-z0-9_]*$"
+        },
+        "renderer": {
+            "type": "string",
+            "pattern": "^docara\\.[a-z][a-z0-9_]*\\.v[1-9][0-9]*$"
+        },
+        "family": {
+            "type": "string",
+            "const": "docara_typed"
+        },
+        "category": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/non_empty_string"
+        },
+        "lifecycle": {
+            "type": "string",
+            "const": "supported"
+        },
+        "authoring": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/authoring"
+        },
+        "states": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/string_list"
+        },
+        "verification": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/verification"
+        },
+        "docs_ref": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/safe_path"
+        },
+        "capabilities": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/string_list"
+        },
+    "container_contract": {"$ref": "design-atlas.schema.json#/$defs/container"},
+    "nesting_contract": {"$ref": "design-atlas.schema.json#/$defs/container"},
+    "provenance": {
+            "$ref": "component-catalog-entry.schema.json#/$defs/provenance"
+        }
+    },
+    "additionalProperties": false
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/authoring.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.authoring.v1"},
+    "audiences": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"}
+    },
+    "default_profile": {"$ref": "#/$defs/profile"},
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match", "profile"],
+        "properties": {
+          "match": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9_.*?/-]+$"},
+          "profile": {"$ref": "#/$defs/profile"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profile": {"enum": ["landing", "article", "tutorial", "how_to", "reference", "explanation"]}
+  }
+}

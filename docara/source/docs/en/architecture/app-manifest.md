@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: App Manifest
 description: Application manifest .simai/app.json
 ---

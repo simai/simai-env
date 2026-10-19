@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/binding-branding-props/v1",
+  "type": "object",
+  "required": ["branding", "preset"],
+  "properties": {
+    "branding": {"type": "object"},
+    "preset": {"type": "string", "enum": ["default", "compact", "logo", "text"]}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,98 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/redirect-receipt/v1",
+    "title": "Docara generated redirect receipt",
+    "type": "object",
+    "required": [
+        "schema",
+        "version",
+        "source",
+        "source_sha256",
+        "base_url",
+        "locale",
+        "documentation_version",
+        "direction",
+        "copy",
+        "content_sha256",
+        "redirects"
+    ],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.redirect_receipt.v1"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "source": {
+            "type": "string",
+            "format": "docara-relative-path"
+        },
+        "source_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "base_url": {
+            "type": "string",
+            "pattern": "^(?:/|/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+)*/?)$"
+        },
+        "locale": {
+            "type": "string",
+            "format": "docara-bcp47"
+        },
+        "direction": {
+            "type": "string",
+            "enum": ["ltr", "rtl"]
+        },
+        "copy": {
+            "type": "object",
+            "required": ["redirect.title", "redirect.message", "redirect.link"],
+            "properties": {
+                "redirect.title": {"type": "string", "minLength": 1},
+                "redirect.message": {"type": "string", "minLength": 1},
+                "redirect.link": {"type": "string", "minLength": 1}
+            },
+            "additionalProperties": false
+        },
+        "documentation_version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$"
+        },
+        "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "redirects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["from", "to", "url", "target_url", "output"],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*$"
+                    },
+                    "to": {
+                        "type": "string",
+                        "pattern": "^(?:[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?(?:/[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?)*)?$"
+                    },
+                    "url": {
+                        "type": "string",
+                        "pattern": "^/(?:[A-Za-z0-9._~-]+/)*$"
+                    },
+                    "target_url": {
+                        "type": "string",
+                        "pattern": "^/(?:[A-Za-z0-9._~-]+/)*$"
+                    },
+                    "output": {
+                        "type": "string",
+                        "pattern": "^(?:[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?/)+index\\.html$"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}

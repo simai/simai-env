@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: simai-env Documentation
 description: Start here for user workflows, developer reference, architecture, and operations.
 ---

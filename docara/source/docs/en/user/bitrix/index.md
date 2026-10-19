@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Readme
 description: Readme
 ---
@@ -19,25 +17,25 @@ sudo /root/simai-env/simai-admin.sh menu
 
 Use this route for first launch:
 
-1. Create infrastructure: [Create site](create-site.md).
-2. Choose fresh install or restore: [Install vs restore](install-vs-restore.md).
-3. Make sure DB choice matches the scenario: [Database](database.md).
+1. Create infrastructure: [Create site](create-site/).
+2. Choose fresh install or restore: [Install vs restore](install-vs-restore/).
+3. Make sure DB choice matches the scenario: [Database](database/).
 4. Complete Bitrix browser installer or restore wizard.
 5. Run `Bitrix complete setup`.
-6. Verify the result: [Diagnostics](diagnostics.md).
+6. Verify the result: [Diagnostics](diagnostics/).
 
 ## Common Operations
 
-- [Agents on cron](agents-cron.md): move Bitrix agents from web hits to cron and verify scheduler readiness.
-- [SSL](ssl.md): issue standard or wildcard HTTPS certificate.
-- [Nginx routing](nginx-routing.md): check CHPU/SEF fallback, host variables, and wildcard host mode.
-- [Uploads](uploads.md): diagnose `Network error`, `413 Request Entity Too Large`, and upload size limits.
-- [Ownership](ownership.md): detect and repair root-owned files after restore, module operations, or manual file changes.
-- [Diagnostics](diagnostics.md): run the standard handoff checks.
+- [Agents on cron](agents-cron/): move Bitrix agents from web hits to cron and verify scheduler readiness.
+- [SSL](ssl/): issue standard or wildcard HTTPS certificate.
+- [Nginx routing](nginx-routing/): check CHPU/SEF fallback, host variables, and wildcard host mode.
+- [Uploads](uploads/): diagnose `Network error`, `413 Request Entity Too Large`, and upload size limits.
+- [Ownership](ownership/): detect and repair root-owned files after restore, module operations, or manual file changes.
+- [Diagnostics](diagnostics/): run the standard handoff checks.
 
 ## Find By Symptom
 
-Use [Troubleshooting](troubleshooting.md) when you know the symptom but not the command:
+Use [Troubleshooting](troubleshooting/) when you know the symptom but not the command:
 
 - site opens slowly on first request
 - subdomain opens wrong host or wrong data

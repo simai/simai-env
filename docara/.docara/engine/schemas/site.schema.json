@@ -1,0 +1,365 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/site/v1",
+    "title": "Docara portable site",
+    "type": "object",
+    "required": ["schema", "preset", "framework_lock"],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.site.v1"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "preset": {
+            "type": "string",
+            "enum": ["docs", "landing"]
+        },
+        "framework_lock": {
+            "type": "string",
+            "format": "docara-relative-path"
+        },
+        "content_root": {
+            "type": "string",
+            "format": "docara-relative-path"
+        },
+        "base_url": {
+            "type": "string",
+            "pattern": "^(?:/|/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._~-]+)*/?)$"
+        },
+        "site_url": {
+            "description": "The site's absolute public address: origin plus base_url, such as https://example.com/docs/. When set, the build writes sitemap.xml, robots.txt and llms.txt.",
+            "type": "string",
+            "pattern": "^https?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/|/[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*/?)$"
+        },
+        "effects": {
+            "description": "The SIMAI Framework background effects catalogue (SF.Effects) that hero effects load from. Written to SF_BOOT_CONFIG.effects. Pin catalogue to a commit. Needs a Framework pair with SF.Effects (ui-08c07b3e938a or later).",
+            "type": "object",
+            "required": ["catalogue"],
+            "properties": {
+                "catalogue": {"type": "string", "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/(?:[A-Za-z0-9._~%@+-]+/)*$"},
+                "index": {"type": "string", "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*\\.json$"},
+                "index_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            },
+            "additionalProperties": false
+        },
+        "portal": {
+            "description": "Builds the site for one path of a portal, such as /ru/docara/docs/ on https://simai.io/. Needs site_url, one locale and locale_routing.strategy default_unprefixed. The build writes llms.txt but no sitemap.xml or robots.txt, refuses CNAME, .nojekyll, robots.txt, sitemap.xml and 404.html, and links back to home_url from the header. docara portal-artifact packs it.",
+            "type": "object",
+            "required": ["product", "home_url"],
+            "properties": {
+                "product": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+                "home_url": {"type": "string", "pattern": "^https://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~%-]*)*$"},
+                "home_label": {"type": "string", "minLength": 1, "maxLength": 80}
+            },
+            "additionalProperties": false
+        },
+        "discovery": {
+            "description": "What llms.txt says about the site. Used only when site_url is set.",
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "minLength": 1},
+                "llms_links": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                        "type": "object",
+                        "required": ["title", "path"],
+                        "properties": {
+                            "title": {"type": "string", "minLength": 1},
+                            "path": {"type": "string", "pattern": "^[A-Za-z0-9._~-]+(?:/[A-Za-z0-9._~-]+)*/?$"},
+                            "description": {"type": "string", "minLength": 1}
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "default_locale": {
+            "type": "string",
+            "format": "docara-bcp47"
+        },
+        "locales": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "missing_page_policy": {
+                    "type": "string",
+                    "enum": ["skip", "error"]
+                }
+            },
+            "patternProperties": {
+                "^(?!missing_page_policy$)[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$": {
+                    "$ref": "#/$defs/locale"
+                }
+            },
+            "additionalProperties": false
+        },
+        "locale_routing": {
+            "$ref": "#/$defs/localeRouting"
+        },
+        "documentation_version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$"
+        },
+        "redirects_file": {
+            "type": "string",
+            "format": "docara-relative-path"
+        },
+        "page_transforms": {
+            "description": "Commands run over the written site before Docara measures it: each gets the site's directory as its last argument and runs in the project root; a failure fails the build.",
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+                "type": "object",
+                "required": ["command"],
+                "properties": {
+                    "command": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 16,
+                        "items": {"type": "string", "minLength": 1}
+                    }
+                },
+                "additionalProperties": false
+            }
+        },
+        "title": {
+            "type": "string",
+            "minLength": 1
+        },
+        "locale": {
+            "type": "string",
+            "format": "docara-bcp47"
+        },
+        "branding": {
+            "$ref": "presentation.schema.json#/$defs/branding"
+        },
+        "theme": {
+            "description": "The site's colours from one main colour: color is a hex colour, #rgb or #rrggbb; hue (0-360) and chroma (0-150) override how the colour is read.",
+            "type": "object",
+            "required": [
+                "color"
+            ],
+            "properties": {
+                "color": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "hue": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 360
+                },
+                "chroma": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 150
+                }
+            },
+            "additionalProperties": false
+        },
+        "layout": {
+            "$ref": "presentation.schema.json#/$defs/layout"
+        },
+        "settings": {
+            "$ref": "presentation.schema.json#/$defs/settings"
+        },
+        "examples": {
+            "$ref": "presentation.schema.json#/$defs/examples"
+        },
+        "code": {
+            "$ref": "presentation.schema.json#/$defs/code"
+        },
+        "reader_preferences": {
+            "$ref": "#/$defs/readerPreferences"
+        },
+        "navigation": {
+            "$ref": "presentation.schema.json#/$defs/navigation"
+        },
+        "header_navigation": {
+            "$ref": "presentation.schema.json#/$defs/header_navigation"
+        },
+        "search": {
+            "$ref": "presentation.schema.json#/$defs/search"
+        },
+        "reading": {
+            "$ref": "presentation.schema.json#/$defs/reading"
+        },
+        "smart": {
+            "$ref": "#/$defs/projectSmart"
+        },
+        "translation_tracking": {
+            "$ref": "#/$defs/translationTracking"
+        },
+        "documentation_tracking": {
+            "$ref": "#/$defs/documentationTracking"
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "documentationTracking": {
+            "type": "object",
+            "required": ["enabled", "source_locale", "mode", "lock_file", "sources"],
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "source_locale": {"type": "string", "format": "docara-bcp47"},
+                "mode": {"type": "string", "const": "report"},
+                "lock_file": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.json$"
+                },
+                "sources": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/documentationSource"}
+                }
+            },
+            "additionalProperties": false
+        },
+        "documentationSource": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "required": ["id", "provider", "framework_lock"],
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+                        "provider": {"const": "simai_framework"},
+                        "framework_lock": {"type": "string", "format": "docara-relative-path"}
+                    },
+                    "additionalProperties": false
+                },
+                {
+                    "type": "object",
+                    "required": ["id", "provider", "file"],
+                    "properties": {
+                        "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+                        "provider": {"const": "contract_json"},
+                        "file": {"type": "string", "format": "docara-relative-path"}
+                    },
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "translationTracking": {
+            "type": "object",
+            "required": ["enabled", "source_locale", "mode", "lock_file"],
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "source_locale": {"type": "string", "format": "docara-bcp47"},
+                "mode": {"type": "string", "enum": ["report", "publish-current"]},
+                "lock_file": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.json$"
+                }
+            },
+            "additionalProperties": false
+        },
+        "projectSmart": {
+            "type": "object",
+            "required": ["namespace"],
+            "properties": {
+                "namespace": {
+                    "type": "string",
+                    "pattern": "^(?!ui$|docara$)[a-z][a-z0-9-]*$"
+                }
+            },
+            "additionalProperties": false
+        },
+        "readerPreferences": {
+            "type": "object",
+            "required": ["enabled", "view", "groups"],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "view": {
+                    "type": "string",
+                    "const": "side-panel"
+                },
+                "hidden_fields": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+                        "maxLength": 120
+                    }
+                },
+                "groups": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "maxItems": 20,
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "fields"],
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+                                "maxLength": 80
+                            },
+                            "fields": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 50,
+                                "uniqueItems": true,
+                                "items": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+                                    "maxLength": 120
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "localeRouting": {
+            "type": "object",
+            "required": ["strategy", "root", "detect_browser_language"],
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "enum": ["default_unprefixed", "prefixed"]
+                },
+                "root": {
+                    "type": "string",
+                    "enum": ["default_locale", "redirect"]
+                },
+                "detect_browser_language": {
+                    "type": "boolean"
+                },
+                "legacy_unprefixed_redirects": {
+                    "type": "boolean"
+                }
+            },
+            "additionalProperties": false
+        },
+        "locale": {
+            "type": "object",
+            "required": ["label", "direction", "content_root"],
+            "properties": {
+                "label": {"type": "string", "minLength": 1},
+                "direction": {"type": "string", "enum": ["ltr", "rtl"]},
+                "content_root": {"type": "string", "format": "docara-relative-path"},
+                "public_prefix": {
+                    "type": "string",
+                    "pattern": "^(?:|[A-Za-z0-9](?:[A-Za-z0-9._~-]*[A-Za-z0-9])?)$"
+                },
+                "fallbacks": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {"type": "string", "format": "docara-bcp47"}
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}

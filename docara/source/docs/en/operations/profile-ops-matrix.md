@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Profile Ops Matrix
 description: Profile Ops Matrix
 ---

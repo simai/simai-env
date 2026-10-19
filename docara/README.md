@@ -1,41 +1,46 @@
 # Docara Site
 
-This repository publishes its documentation through a contained Docara project in `docara/`.
+This repository publishes its documentation through a contained Docara 3 project in `docara/`.
 
 ## What Lives Here
 
-- `source/docs/en/`: published documentation source
-- `source/_core/`: Docara UI and generated support files
+- `docara.json`: site settings (title, locale, branding, layout, search, header menu)
+- `source/docs/en/`: published documentation source (the content root)
+  - `section.json`: section title for a folder
+  - `<page>.page.json` / `index.page.json`: menu order of a page or section
+  - `lang.json`: interface strings
+- `assets/`: logo and favicon
+- `contracts/`, `simai-framework.lock.json`, `.docara/engine/`: Docara-managed files; do not edit
 - `build_production/`: generated static site output, not committed
 - `.github/workflows/docara-pages.yml`: GitHub Pages build and deploy workflow
 
 ## Local Build
 
-Use PHP 8.2 and Node 20.
-
-On this machine, the Homebrew `php` binary is broken because of an ICU mismatch, so local Docara commands should use ServBay PHP:
+Requires PHP 8.2+ (`ctype`, `dom`, `intl`, `json`, `libxml`, `mbstring`), Composer and Node.js 20+.
 
 ```bash
 cd docara
-/Applications/ServBay/bin/php /Applications/ServBay/bin/composer install
-DOCARA_SKIP_FRONTEND_INSTALL=true /Applications/ServBay/bin/php vendor/bin/docara init --update
-YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc install --frozen-lockfile --production=false --non-interactive
-YARN_IGNORE_PATH=1 npx --yes yarn@1.22.22 --no-default-rc prod
-/Applications/ServBay/bin/php vendor/bin/docara build production
+composer install
+php vendor/bin/docara build production
+php vendor/bin/docara verify-static build_production
+php vendor/bin/docara serve production --no-build
 ```
 
-Output is written to `docara/build_production/`.
+Output is written to `docara/build_production/`. Locally pages are served from the site root
+(`/architecture/command-execution/`).
 
 ## Publishing
 
 The repository publishes the Docara site through GitHub Pages Actions.
 
 - Workflow: `.github/workflows/docara-pages.yml`
-- Artifact path: `docara/build_production`
+- Public paths keep the `/docs/en/` prefix: the workflow builds with
+  `base_url=<pages base>/docs/en/`, publishes the build under `docs/en/` of the Pages artifact
+  and adds a root redirect to it.
 - Required repository setting: GitHub Settings -> Pages -> Source -> GitHub Actions
 
 ## Notes
 
-- `config.php` uses `DOCARA_BASE_URL` from the environment, so the same site can build locally and on GitHub Pages.
-- The workflow uses Node 20, Yarn 1.22.22 and Vite from the committed lockfile.
-- Legacy Mix and webpack dependencies are not part of this site.
+- Markdown is strict: raw HTML is rejected, so write placeholders such as `php<version>` in backticks.
+- Link to other pages by their site route (`../ssl/`), not by `.md` file name; `verify-static` fails on broken links.
+- Update Docara with `php vendor/bin/docara upgrade` (same major version).

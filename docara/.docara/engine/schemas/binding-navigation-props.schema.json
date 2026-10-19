@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/binding-navigation-props/v1",
+  "type": "object",
+  "required": ["items", "maximum_depth", "label", "expand_label", "collapse_label", "contains_current_label"],
+  "properties": {
+    "items": {"type": "array"},
+    "maximum_depth": {"type": "integer", "minimum": 1, "maximum": 4},
+    "label": {"type": "string", "minLength": 1},
+    "expand_label": {"type": "string", "minLength": 1},
+    "collapse_label": {"type": "string", "minLength": 1},
+    "contains_current_label": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

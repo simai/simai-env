@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/documentation-source/v1",
+  "type": "object",
+  "required": ["schema", "id", "provider", "revision", "entities"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.documentation_source.v1"},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+    "provider": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*$"},
+    "revision": {"type": "string", "minLength": 1, "maxLength": 200},
+    "entities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entity"}
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "required": ["key", "kind", "title", "public_contract", "example_cases", "provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)+$"},
+        "kind": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:-[a-z0-9]+)*$"},
+        "title": {"type": "string", "minLength": 1},
+        "public_contract": {"type": "object"},
+        "example_cases": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]*(?:\\.[a-z0-9_-]+)*$"}
+        },
+        "provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "scaffold": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "summary": {"type": "string"},
+            "sections": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "examples": {
+              "type": "object",
+              "additionalProperties": {"type": "object", "additionalProperties": {"type": "string"}}
+            }
+          }
+        }
+      }
+    }
+  }
+}

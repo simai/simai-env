@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-plan.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "phase", "plan_id", "source_plan_id", "subject", "preview", "artifact_sha256", "target", "reference", "scenarios", "assertions"],
+  "properties": {
+    "schema": {"const": "docara.qa_plan.v2"},
+    "phase": {"const": "finalized"},
+    "plan_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "source_plan_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "subject": {"type": "string", "minLength": 1},
+    "preview": {"type": "string", "pattern": "^\\.docara-preview/output/(?:smart|layout|region)/index\\.html$"},
+    "artifact_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "target": {"$ref": "qa-target.schema.json"},
+    "reference": {"$ref": "qa-reference-identity.schema.json"},
+    "scenarios": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "assertions": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

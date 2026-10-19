@@ -1,0 +1,73 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/effective-component-catalog/v1",
+    "title": "Docara effective component catalogue",
+    "type": "object",
+    "required": [
+        "schema",
+        "version",
+        "framework_pair",
+        "provider_revision",
+        "content_sha256",
+        "entries",
+        "nonclaims"
+    ],
+    "properties": {
+        "schema": {
+            "type": "string",
+            "const": "docara.effective_component_catalog.v1"
+        },
+        "version": {
+            "type": "integer",
+            "const": 1
+        },
+        "framework_pair": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]+$"
+        },
+        "provider_revision": {
+            "type": "string",
+            "format": "docara-immutable-revision"
+        },
+        "content_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+        },
+        "entries": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "$ref": "component-catalog-entry.schema.json"
+            }
+        },
+        "nonclaims": {
+            "type": "object",
+            "required": [
+                "catalog_is_canonical_framework_registry",
+                "all_framework_components_supported",
+                "production_ready",
+                "public_release_ready"
+            ],
+            "properties": {
+                "catalog_is_canonical_framework_registry": {
+                    "type": "boolean",
+                    "const": false
+                },
+                "all_framework_components_supported": {
+                    "type": "boolean",
+                    "const": false
+                },
+                "production_ready": {
+                    "type": "boolean",
+                    "const": false
+                },
+                "public_release_ready": {
+                    "type": "boolean",
+                    "const": false
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}

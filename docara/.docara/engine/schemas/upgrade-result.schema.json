@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.ru/docara/upgrade-result.schema.json",
+    "title": "Docara project upgrade result",
+    "type": "object",
+    "required": ["schema", "status", "upgrade_id", "rollback_id", "from_version", "to_version", "plan_sha256", "build_sha256", "project_owned_preserved"],
+    "properties": {
+        "schema": {"const": "docara.upgrade_result.v1"},
+        "status": {"enum": ["applied", "rolled_back"]},
+        "upgrade_id": {"$ref": "#/$defs/sha256"},
+        "rollback_id": {"$ref": "#/$defs/sha256"},
+        "from_version": {"$ref": "#/$defs/version"},
+        "to_version": {"$ref": "#/$defs/version"},
+        "plan_sha256": {"$ref": "#/$defs/sha256"},
+        "build_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "project_owned_preserved": {"const": true}
+    },
+    "$defs": {
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"}
+    },
+    "additionalProperties": false
+}

@@ -1,0 +1,72 @@
+{
+  "schema": "docara.site.v1",
+  "title": "simai-env",
+  "preset": "docs",
+  "content_root": "source/docs/en",
+  "framework_lock": "simai-framework.lock.json",
+  "default_locale": "en",
+  "locales": {
+    "missing_page_policy": "skip",
+    "en": {
+      "label": "English",
+      "direction": "ltr",
+      "content_root": "source/docs/en",
+      "public_prefix": "",
+      "fallbacks": []
+    }
+  },
+  "locale_routing": {
+    "strategy": "default_unprefixed",
+    "root": "default_locale",
+    "detect_browser_language": false
+  },
+  "redirects_file": "redirects.json",
+  "base_url": "/",
+  "branding": {
+    "title": "simai-env",
+    "mode": "compact",
+    "size": "large",
+    "logo": "assets/docara-mark.svg",
+    "favicon": "assets/favicon.ico"
+  },
+  "layout": {
+    "key": "docara.docs",
+    "container": {
+      "max": 7
+    }
+  },
+  "header_navigation": {
+    "enabled": true,
+    "items": [
+      {
+        "id": "user",
+        "label": "User Guide",
+        "href": "/user/"
+      },
+      {
+        "id": "developer",
+        "label": "Developer Guide",
+        "href": "/developer/"
+      },
+      {
+        "id": "github",
+        "label": "GitHub",
+        "href": "https://github.com/simai/simai-env"
+      }
+    ]
+  },
+  "settings": {
+    "theme": "system"
+  },
+  "search": {
+    "enabled": true,
+    "indexed": true
+  },
+  "reading": {
+    "breadcrumbs": true,
+    "toc": true,
+    "mobile_toc": "auto",
+    "toc_depth": 3,
+    "previous_next": true
+  }
+}

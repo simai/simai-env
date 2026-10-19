@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Nginx Routing
 description: Nginx Routing
 ---
@@ -200,4 +198,4 @@ Before saying Bitrix nginx routing is ready:
 - `site doctor` reports Bitrix nginx checks as pass
 - wildcard host mode is enabled when subdomains are required
 - root and subdomain hosts open the expected Bitrix application
-- large uploads are covered by [Uploads](uploads.md)
+- large uploads are covered by [Uploads](../uploads/)

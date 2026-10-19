@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.simai.io/docara/translation-status/v1",
+  "type": "object",
+  "required": ["schema", "enabled", "source_locale", "mode", "items", "summary", "content_sha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {"const": "docara.translation_status.v1"},
+    "enabled": {"type": "boolean"},
+    "source_locale": {"type": ["string", "null"]},
+    "mode": {"enum": ["report", "publish-current"]},
+    "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "summary": {"type": "object"},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "key", "locale", "status", "source_path", "target_path", "source_sha256", "target_sha256", "source_structure_sha256", "target_structure_sha256", "review", "reason", "fallback_locale"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {"enum": ["page", "lang"]},
+          "key": {"type": "string"},
+          "locale": {"type": "string"},
+          "status": {"enum": ["current", "stale", "missing", "unverified", "orphan", "duplicate_key", "structure_mismatch", "excluded"]},
+          "source_path": {"type": ["string", "null"]},
+          "target_path": {"type": ["string", "null"]},
+          "source_sha256": {"type": ["string", "null"]},
+          "target_sha256": {"type": ["string", "null"]},
+          "source_structure_sha256": {"type": ["string", "null"]},
+          "target_structure_sha256": {"type": ["string", "null"]},
+          "review": {"type": ["string", "null"]},
+          "reason": {"type": ["string", "null"]},
+          "fallback_locale": {"type": ["string", "null"]}
+        }
+      }
+    }
+  }
+}

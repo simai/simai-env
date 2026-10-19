@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Logging And Audit
 description: Logging And Audit
 ---

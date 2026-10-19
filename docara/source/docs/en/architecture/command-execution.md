@@ -1,6 +1,4 @@
 ---
-extends: _core._layouts.documentation
-section: content
 title: Command Execution
 description: Confirmation, locks, strict execution and machine-readable results
 ---

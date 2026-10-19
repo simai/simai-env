@@ -1,0 +1,40 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://schemas.simai.io/docara/locale-route-receipt/v1",
+    "title": "Docara locale route receipt",
+    "type": "object",
+    "required": ["schema", "version", "routing", "content_sha256", "redirects"],
+    "properties": {
+        "schema": {"type": "string", "const": "docara.locale_route_receipt.v1"},
+        "version": {"type": "integer", "const": 1},
+        "routing": {
+            "type": "object",
+            "required": ["strategy", "root", "detect_browser_language", "legacy_unprefixed_redirects"],
+            "properties": {
+                "strategy": {"type": "string", "enum": ["default_unprefixed", "prefixed"]},
+                "root": {"type": "string", "enum": ["default_locale", "redirect"]},
+                "detect_browser_language": {"type": "boolean"},
+                "legacy_unprefixed_redirects": {"type": "boolean"}
+            },
+            "additionalProperties": false
+        },
+        "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "redirects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["kind", "from", "to", "url", "target_url", "output"],
+                "properties": {
+                    "kind": {"type": "string", "enum": ["root", "legacy_unprefixed"]},
+                    "from": {"type": "string"},
+                    "to": {"type": "string", "minLength": 1},
+                    "url": {"type": "string", "pattern": "^/"},
+                    "target_url": {"type": "string", "pattern": "^/"},
+                    "output": {"type": "string", "pattern": "^(?:[a-z0-9._-]+/)*index\\.html$"}
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "additionalProperties": false
+}

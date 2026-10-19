@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://docara.local/schemas/qa-target.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "id", "scope", "locator", "html_sha256"],
+  "properties": {
+    "kind": {"enum": ["smart", "region", "layout"]},
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]+$"},
+    "scope": {"enum": ["element", "document"]},
+    "locator": {"type": "string", "minLength": 1, "maxLength": 256},
+    "html_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}
