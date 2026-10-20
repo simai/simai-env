@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.17.1 - 2026-10-20
+
+- Deployed releases are readable by nginx on shared-account hosts
+  (`SIMAI_SITE_ISOLATION=no`): the site user extracted files with its own
+  primary group and umask, so a static site deployed through the gate
+  answered 403. After fetching, the release gets the site's web group and
+  group read/traverse permissions. `static_e2e` deploys an artifact with
+  owner-only modes to a shared-account site.
+
 ## 1.17.0 - 2026-10-20
 
 - Static sites deploy from CI artifacts: `site deploy --archive F --sha256 S`

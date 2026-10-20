@@ -450,6 +450,11 @@ site_deploy_handler() {
     rsync -a --delete --exclude=.git --exclude=/.env --exclude=/storage "${from%/}/" "${release}/" >>"$LOG_FILE" 2>&1 \
       && chown -R "${user}:${group}" "$release" || failed="copy"
   fi
+  # The site user extracts with its own umask and primary group; nginx reads
+  # through the site's web group (www-data on shared-account hosts).
+  if [[ -z "$failed" ]]; then
+    chgrp -R -h "$group" "$release" && chmod -R g+rX "$release" || failed="release permissions"
+  fi
   [[ -z "$failed" && "$service" != yes && "$static" != yes ]] && { deploy_link_shared "$root" "$release" "$user" "$group" || failed="shared links"; }
 
   local php_bin=""

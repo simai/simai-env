@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.17.1](v1.17.1.md) — releases readable by nginx on shared-account hosts.
 - [v1.17.0](v1.17.0.md) — static deploys from CI artifacts, per-site deploy
   keys, redirects, GitHub Pages behaviour for static sites.
 - [v1.16.3](v1.16.3.md) — HTTP/2 on HTTPS sites, `X-Content-Type-Options:

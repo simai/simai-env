@@ -62,6 +62,17 @@ s3=$(mk_artifact v3 escape)
 cli site deploy --domain $D --archive /root/art-v3.tgz --sha256 "$s3" --confirm yes >/tmp/s-d3 2>&1 && bad "escaping symlink accepted" || { grep -q 'symbolic link leaving the release' /tmp/s-d3 && ok "symlink leaving the release is refused" || { bad "escape message"; tail -3 /tmp/s-d3; }; }
 cli site deploy --domain $D --archive /root/art-v1.tgz --sha256 "$s2" --confirm yes >/dev/null 2>&1 && bad "wrong sha256 accepted" || ok "wrong sha256 refused"
 
+# Shared-account hosts (SIMAI_SITE_ISOLATION=no): nginx reads the release
+# through www-data, not through a per-site group.
+SIMAI_SITE_ISOLATION=no cli site add --domain shared-pages.test --profile static --confirm yes >/tmp/s-sh 2>&1 || { bad "shared site add"; tail -5 /tmp/s-sh; }
+# Files private to their owner (as CI tarballs or a restrictive umask make
+# them) must still reach nginx through the site's web group.
+rm -rf /root/art-private && cp -a /root/art-v1 /root/art-private && chmod -R go-rwx /root/art-private
+tar -C /root/art-private -czf /root/art-private.tgz . && sp=$(sha256sum /root/art-private.tgz | cut -d' ' -f1)
+cli site deploy --domain shared-pages.test --archive /root/art-private.tgz --sha256 "$sp" --confirm yes >/tmp/s-shd 2>&1 || { bad "shared deploy"; tail -8 /tmp/s-shd; }
+[[ "$(curl -s -H 'Host: shared-pages.test' http://127.0.0.1/dir/)" == dir-v1 ]] && ok "nested files of a shared-account site are readable by nginx" || bad "shared nested: $(curl -s -o /dev/null -w '%{http_code}' -H 'Host: shared-pages.test' http://127.0.0.1/dir/)"
+[[ "$(stat -c %U /home/simai/www/shared-pages.test/current/dir/index.html)" == simai ]] && ok "shared release owned by simai" || bad "shared owner"
+
 # Path redirects survive a re-render of the nginx config (ssl install).
 cli site redirect-add --domain $D --from / --to /ru/ --code 302 --confirm yes >/tmp/s-r 2>&1 && ok "redirect-add" || { bad "redirect-add"; tail -5 /tmp/s-r; }
 wait_code $D / 302
