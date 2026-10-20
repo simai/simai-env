@@ -7,7 +7,9 @@ normal situations and silently end a command:
     whenever cond is false);
   * `(( x += n ))` / `(( x -= n ))` / `(( x++ ))` as a statement (returns 1 when
     the result is 0);
-  * `var=$(grep ...)` without a fallback (grep finds nothing -> status 1).
+  * `var=$(grep ...)` without a fallback (grep finds nothing -> status 1);
+  * `exec N>file 2>/dev/null` (opens a descriptor and silences the shell's
+    stderr for the rest of the command).
 Predicates that intentionally return their condition are not flagged.
 """
 import pathlib
@@ -17,6 +19,7 @@ import sys
 ROOTS = ["admin", "lib", "simai-admin.sh", "simai-env.sh", "update.sh", "install.sh"]
 ASSIGN_TAIL = re.compile(r"&&\s*(local\s+)?[A-Za-z_][A-Za-z0-9_]*(\[[^]]*\])?\+?=")
 ARITH_STMT = re.compile(r"^\s*\(\(\s*[A-Za-z_][A-Za-z0-9_]*\s*(\+\+|--|[-+*/]=)")
+EXEC_SILENCE = re.compile(r"^\s*exec\s+(\d+|\{[A-Za-z_]+\})\s*[<>].*\s2>\s*/dev/null")
 GREP_SUBST = re.compile(r"^\s*(local\s+)?[A-Za-z_][A-Za-z0-9_]*=\$\((.*\|)?\s*grep\b(?!.*-c\b)")
 
 
@@ -39,6 +42,8 @@ def main() -> int:
                 continue
             if ARITH_STMT.match(line) and "|| true" not in line:
                 problems.append(f"{path}:{number}: arithmetic statement can return 1; use x=$((x + n))")
+            if EXEC_SILENCE.match(line):
+                problems.append(f"{path}:{number}: 'exec N>file 2>/dev/null' silences stderr of the whole command")
             if GREP_SUBST.match(line) and "||" not in line:
                 problems.append(f"{path}:{number}: grep in command substitution needs '|| true'")
             if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{\s*$", line):

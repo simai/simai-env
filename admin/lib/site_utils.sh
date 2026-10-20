@@ -1426,6 +1426,16 @@ create_nginx_site() {
       return 1
     fi
   fi
+  # Whole-domain redirect sites (profile redirect).
+  local redirect_target="" redirect_code=""
+  if grep -q '{{REDIRECT_TARGET}}' "$template_path"; then
+    redirect_target="${SITE_REDIRECT_TARGET:-$(site_redirect_env_get "$domain" TARGET)}"
+    redirect_code="${SITE_REDIRECT_CODE:-$(site_redirect_env_get "$domain" CODE)}"
+    if ! site_redirect_target_valid "$redirect_target" || [[ ! "$redirect_code" =~ ^30[1278]$ ]]; then
+      error "nginx template ${template_path##*/} needs a redirect target and code"
+      return 1
+    fi
+  fi
   {
     printf "%s\n" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${server_name_value}#g" \
@@ -1435,7 +1445,9 @@ create_nginx_site() {
       -e "s#{{PROJECT_NAME}}#${project}#g" \
       -e "s#{{PHP_VERSION}}#${php_version}#g" \
       -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" \
-      -e "s#{{APP_PORT}}#${app_port}#g" "$template_path"
+      -e "s#{{APP_PORT}}#${app_port}#g" \
+      -e "s#{{REDIRECT_TARGET}}#${redirect_target//&/\\&}#g" \
+      -e "s#{{REDIRECT_CODE}}#${redirect_code}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)
@@ -1445,6 +1457,10 @@ create_nginx_site() {
     return 1
   fi
   mv "$frame_tmp" "$site_available"
+  if ! site_redirects_apply "$domain" "$site_available"; then
+    restore_nginx_backup "$site_available" "$site_enabled" "$backup"
+    return 1
+  fi
   ln -sf "$site_available" "$site_enabled"
   if [[ -f /etc/nginx/sites-enabled/default ]]; then
     rm -f /etc/nginx/sites-enabled/default
@@ -1516,6 +1532,7 @@ create_nginx_site() {
     fi
   fi
   ensure_nginx_catchall
+  ensure_nginx_static_maps
   local nginx_test_output
   if ! nginx_test_output=$(nginx -t 2>&1); then
     echo "$nginx_test_output" >>"$LOG_FILE"
@@ -1864,6 +1881,76 @@ EOF
 
 # Unknown Host headers and bare-IP requests are dropped on both ports, so the
 # first TLS site is never served for a foreign or missing Host.
+# --- redirects --------------------------------------------------------------
+# Path redirects live in /etc/simai-env/sites/<domain>/redirects (one
+# "<code> <from> <to>" per line) and are rendered into the site config inside
+# a managed block, so every re-render (ssl install, renew) keeps them.
+
+site_redirect_target_valid() {
+  # No spaces, quotes, ';', '$' or '\': the target is written into nginx.
+  local to="$1" path_re='^/[A-Za-z0-9._~/?=&%+-]{0,300}$'
+  local url_re='^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~/?=&%+-]{0,300})?$'
+  [[ "$to" =~ $path_re || "$to" =~ $url_re ]]
+}
+
+site_redirect_from_valid() {
+  [[ "$1" =~ ^/[A-Za-z0-9._~/-]{0,300}$ ]]
+}
+
+site_redirects_file() {
+  echo "$(site_sites_config_dir)/$1/redirects"
+}
+
+site_redirect_env_get() {
+  sed -n "s/^${2}=//p" "$(site_sites_config_dir)/$1/redirect.env" 2>/dev/null | tail -n1
+}
+
+site_redirects_apply() {
+  local domain="$1" cfg="$2" file block="" code from to tmp
+  file=$(site_redirects_file "$domain")
+  if [[ -s "$file" ]]; then
+    while read -r code from to; do
+      [[ -z "$code" ]] && continue
+      [[ "$code" =~ ^30[1278]$ ]] && site_redirect_from_valid "$from" && site_redirect_target_valid "$to" || { error "Invalid redirect entry in ${file}: ${code} ${from} ${to}"; return 1; }
+      block+="    location = ${from} { return ${code} ${to}; }"$'\n'
+    done <"$file"
+  fi
+  tmp=$(mktemp) || return 1
+  BLOCK="$block" awk '
+    /# simai-redirects-begin/ {skip = 1; next}
+    /# simai-redirects-end/ {skip = 0; next}
+    skip {next}
+    !done && ENVIRON["BLOCK"] != "" && /^[ \t]*location / {
+      printf "    # simai-redirects-begin (site redirect-add)\n%s    # simai-redirects-end\n", ENVIRON["BLOCK"]
+      done = 1
+    }
+    {print}
+  ' "$cfg" >"$tmp" || { rm -f "$tmp"; return 1; }
+  cat "$tmp" >"$cfg" && rm -f "$tmp"
+}
+
+# http-level maps used by the static template: HTML revalidates on every
+# visit, file names carrying a content hash (12+ hex digits) are immutable for
+# a year, other files revalidate after ten minutes (ETag/Last-Modified).
+ensure_nginx_static_maps() {
+  local conf=/etc/nginx/conf.d/simai-static.conf
+  grep -qs 'simai-static-v2' "$conf" && return 0
+  [[ -d /etc/nginx/conf.d ]] || return 0
+  cat >"$conf" <<'EOF'
+# simai-static-v2 (managed by simai-env)
+map $sent_http_content_type $simai_static_html {
+    ~*text/html 1;
+    default     0;
+}
+map "$simai_static_html:$uri" $simai_static_cache_control {
+    "~^1:"                                   "no-cache";
+    "~*^0:.*[.-][0-9a-f]{12,}\.[a-z0-9]+$"   "public, max-age=31536000, immutable";
+    default                                  "public, max-age=600";
+}
+EOF
+  chmod 0644 "$conf"
+}
+
 ensure_nginx_catchall() {
   local catchall_avail="/etc/nginx/sites-available/000-catchall.conf"
   local catchall_enabled="/etc/nginx/sites-enabled/000-catchall.conf"
@@ -2239,6 +2326,7 @@ site_nginx_template_path_for_id() {
     wordpress) echo "${SCRIPT_DIR}/templates/nginx-wordpress.conf" ;;
     bitrix) echo "${SCRIPT_DIR}/templates/nginx-bitrix.conf" ;;
     node) echo "${SCRIPT_DIR}/templates/nginx-node.conf" ;;
+    redirect) echo "${SCRIPT_DIR}/templates/nginx-redirect.conf" ;;
     *)
       error "Unsupported nginx template id: ${template_id:-<empty>}"
       return 1

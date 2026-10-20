@@ -565,7 +565,7 @@ site_add_transaction_rollback() {
   if [[ ( "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 || "${SITE_ADD_TX_OWNER_ASSIGNED:-0}" -eq 1 ) && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
     site_user_delete "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   fi
-  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/service.env"
+  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/service.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirect.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirects"
   rmdir -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}" >/dev/null 2>&1 || true
   if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED:-0}" -eq 1 ]]; then
     if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED:-0}" -eq 1 ]]; then
@@ -1102,6 +1102,16 @@ site_add_handler_impl() {
   local ssl_redirect="no" ssl_hsts="no"
   local doc_root
   doc_root=$(site_compute_doc_root "$path" "$public_dir") || return 1
+  SITE_REDIRECT_TARGET="" SITE_REDIRECT_CODE=""
+  if grep -q '{{REDIRECT_TARGET}}' "$template_path"; then
+    SITE_REDIRECT_TARGET="${PARSED_ARGS[redirect-to]:-}"
+    SITE_REDIRECT_CODE="${PARSED_ARGS[redirect-code]:-301}"
+    local origin_re='^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$'
+    [[ "$SITE_REDIRECT_TARGET" =~ $origin_re ]] || { error "--redirect-to must be an origin such as https://example.com (path and query are kept)"; return 1; }
+    [[ "$SITE_REDIRECT_CODE" =~ ^30[1278]$ ]] || { error "--redirect-code must be 301, 302, 307 or 308"; return 1; }
+    install -d -m 0750 "$(site_sites_config_dir)/${domain}"
+    printf 'TARGET=%s\nCODE=%s\n' "$SITE_REDIRECT_TARGET" "$SITE_REDIRECT_CODE" >"$(site_sites_config_dir)/${domain}/redirect.env"
+  fi
   SITE_APP_PORT=""
   if grep -q '{{APP_PORT}}' "$template_path"; then
     SITE_APP_PORT=$(app_port_allocate "${PARSED_ARGS[app-port]:-}") || return 1
@@ -2281,7 +2291,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine= app-port=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine= app-port= redirect-to= redirect-code=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

@@ -448,3 +448,16 @@ runs `simai-app-<project>.service` from `current` (restarted on failure and
 on boot) and returns to the previous release when the health check fails.
 Details: `docs/architecture/app-manifest.md`.
 
+## Static sites from CI artifacts
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --archive site.tgz --sha256 <sum> --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy-key-add --domain D --pubkey-file ci.pub --confirm yes
+sudo /root/simai-env/simai-admin.sh site redirect-add --domain D --from / --to /ru/ --code 302 --confirm yes
+```
+
+The artifact is the document root; `<root>/public` points at `current`.
+Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
+`200.html` for single-page apps). Deploy keys, the gate and the workflow
+step: `docs/operations/ci-deploy.md`.
+

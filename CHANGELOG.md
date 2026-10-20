@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## 1.17.0 - 2026-10-20
+
+- Static sites deploy from CI artifacts: `site deploy --archive F --sha256 S`
+  works for profile static. `<root>/public` becomes a symlink to `current`,
+  so nginx and the ACME webroot never change; the health path from the
+  artifact's `.simai/app.json` is requested through nginx after the switch,
+  and a failing release returns to the previous one (kept as `-failed`).
+- The static template behaves like GitHub Pages: `/dir` -> `/dir/`,
+  `$uri.html`, `404.html` as the error page, `200.html` as the single-page
+  app fallback (the previous `/index.html` fallback is replaced), HTML
+  `no-cache` and other files one hour, gzip for text types.
+- Per-site CI deploy keys: `site deploy-key-add/list/remove`. Keys log in as
+  `simai-deploy`; a forced command runs the deploy gate through one sudo rule
+  and accepts only `deploy-artifact <sha256>`, `deploy-git <commit>`,
+  `status` and `rollback` for that site. Guide: `docs/operations/ci-deploy.md`.
+- Redirects: `site redirect-add/remove/list` for exact paths (kept across
+  re-renders such as `ssl install`) and the `redirect` profile for whole
+  domains (path and query kept, ACME still answered).
+- Release archives may not contain symbolic links leaving the release, and
+  are limited in size (`SIMAI_DEPLOY_MAX_ARCHIVE_MB`, default 1024 MB packed,
+  four times that unpacked).
+- Fixed: `site deploy` silenced its own stderr after taking the deploy lock
+  (`exec 7>file 2>/dev/null`), so errors and progress never reached the
+  console; the errexit lint now rejects that pattern. Two deploys within one
+  second no longer share a release directory.
+
 ## 1.16.3 - 2026-10-20
 
 - HTTPS sites serve HTTP/2. The listener follows the installed nginx:

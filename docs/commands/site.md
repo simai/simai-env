@@ -122,6 +122,19 @@ switches code only; database migrations are not reverted.
 Without `--confirm yes`, `deploy` and `deploy-rollback` print their detailed
 plan and change nothing.
 
+### Static sites from CI artifacts
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --archive site.tgz --sha256 <sum> --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy-key-add --domain D --pubkey-file ci.pub --confirm yes
+sudo /root/simai-env/simai-admin.sh site redirect-add --domain D --from / --to /ru/ --code 302 --confirm yes
+```
+
+The artifact is the document root; `<root>/public` points at `current`.
+Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
+`200.html` for single-page apps). Deploy keys, the gate and the workflow
+step: `docs/operations/ci-deploy.md`.
+
 ### Node.js services (profile `node`)
 
 ```bash

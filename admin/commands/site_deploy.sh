@@ -9,6 +9,9 @@
 # Service sites (profile node) build with npm/yarn (and a Python venv when the
 # manifest asks for one), restart simai-app-<project>.service after the switch
 # and return to the previous release when its health check fails.
+# Static sites (profile static) deploy a built artifact: <root>/<public> is a
+# symlink to current, so nginx and the ACME webroot never change; the release
+# is checked through nginx before the switch is kept.
 
 deploy_state_file() {
   echo "$(site_sites_config_dir)/$1/deploy.env"
@@ -63,6 +66,20 @@ deploy_archive_safe() {
     error "Archive contains hard links or special files"
     return 1
   fi
+  # Symbolic links must stay inside the release: nginx would follow a link
+  # to another site's files.
+  local target
+  while IFS= read -r target; do
+    if [[ "$target" == /* || "$target" == ".." || "$target" == ../* || "$target" == */../* || "$target" == */.. ]]; then
+      error "Archive contains a symbolic link leaving the release: ${target}"
+      return 1
+    fi
+  done < <(tar -tvzf "$archive" | awk 'substr($0,1,1) == "l" {sub(/.* -> /, ""); print}')
+  local max_mb="${SIMAI_DEPLOY_MAX_ARCHIVE_MB:-1024}" size_mb unpacked_mb
+  size_mb=$(( $(stat -c %s "$archive") / 1048576 ))
+  (( size_mb <= max_mb )) || { error "Archive is ${size_mb} MB; the limit is ${max_mb} MB (SIMAI_DEPLOY_MAX_ARCHIVE_MB)"; return 1; }
+  unpacked_mb=$(tar -tvzf "$archive" | awk '{s += $3} END {printf "%d", s / 1048576}')
+  (( unpacked_mb <= max_mb * 4 )) || { error "Archive unpacks to ${unpacked_mb} MB; the limit is $((max_mb * 4)) MB"; return 1; }
 }
 
 # Points nginx at <root>/current/<public> and background jobs at current.
@@ -220,6 +237,47 @@ deploy_activate_service() {
   return 1
 }
 
+# First deploy of a static site: the current document root becomes release
+# <ts>-initial and <root>/<public> turns into a symlink to current.
+deploy_static_init_layout() {
+  local root="$1" public="$2" user="$3" group="$4" id="$5"
+  local docroot="${root}/${public}" release="${root}/releases/${id}"
+  install -d -m 0755 -o "$user" -g "$group" "${root}/releases" "$release" || return 1
+  if [[ -d "$docroot" && ! -L "$docroot" ]]; then
+    shopt -s dotglob nullglob
+    local entry
+    for entry in "$docroot"/*; do mv -- "$entry" "$release/" || { shopt -u dotglob nullglob; return 1; }; done
+    shopt -u dotglob nullglob
+    rmdir -- "$docroot" || return 1
+  fi
+  ln -sfn "releases/${id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
+  ln -sfn current "${docroot}.tmp" && mv -Tf "${docroot}.tmp" "$docroot" || return 1
+  chown -h "${user}:${group}" "${root}/current" "$docroot" 2>/dev/null || true
+}
+
+# Requests a path of a static site through nginx (following its own
+# redirects, such as / -> /ru/ or http -> https); 2xx means healthy.
+deploy_static_probe() {
+  local domain="$1" path="${2:-/}"
+  curl -sk -o /dev/null -w '%{http_code}' -L --max-redirs 5 --max-time 20 \
+    --resolve "${domain}:80:127.0.0.1" --resolve "${domain}:443:127.0.0.1" "http://${domain}${path}" 2>/dev/null || echo 000
+}
+
+deploy_activate_static() {
+  local domain="$1" root="$2" release_id="$3" previous_link code
+  previous_link=$(readlink "${root}/current")
+  ln -sfn "releases/${release_id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
+  code=$(deploy_static_probe "$domain" "${APP_HEALTH_PATH:-/}")
+  DEPLOY_PROBE_CODE="$code"
+  [[ "$code" =~ ^2 ]] && return 0
+  error "${domain}${APP_HEALTH_PATH:-/} answered ${code} with release ${release_id}"
+  if [[ -n "$previous_link" && "$previous_link" != "releases/${release_id}" && -d "${root}/${previous_link}" ]]; then
+    ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
+    warn "Returned to ${previous_link}"
+  fi
+  return 1
+}
+
 deploy_prune() {
   local root="$1" keep="$2" current previous name
   current=$(basename "$(readlink "${root}/current")")
@@ -290,9 +348,12 @@ site_deploy_handler() {
   read_site_metadata "$domain" || return 1
   local root="${SITE_META[root]}" php="${SITE_META[php]}" profile="${SITE_META[profile]}"
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
-  local service=no
+  local service=no static=no
   [[ -n "$(app_port_get "$domain")" ]] && service=yes
-  [[ "$profile" != alias && ( "$php" != none || "$service" == yes ) ]] || { error "Deploy supports PHP application sites and service sites (profile node)"; return 1; }
+  [[ "$profile" == static && "$service" == no ]] && static=yes
+  [[ "$profile" != alias && ( "$php" != none || "$service" == yes || "$static" == yes ) ]] || { error "Deploy supports PHP application sites, service sites (profile node) and static sites"; return 1; }
+  local public_dir="${SITE_META[public_dir]-public}"
+  [[ "$static" != yes || ( -n "$public_dir" && "$public_dir" != . && "$public_dir" != current* ) ]] || public_dir=public
   [[ "$keep" =~ ^[0-9]+$ ]] && (( keep >= 2 && keep <= 50 )) || { error "--keep must be 2..50"; return 1; }
   local sources=0
   [[ -n "$git_url" ]] && sources=$((sources + 1))
@@ -323,7 +384,10 @@ site_deploy_handler() {
     echo "Deploy plan for ${domain}:"
     deploy_layout_active "$root" || echo "  - first deploy: move the current code to releases/${release_id}-initial and serve ${root}/current"
     echo "  - fetch $(deploy_source_label "$(redact_by_key git "$git_url")" "$ref" "$archive" "$from") into releases/<new> as ${user}"
-    if [[ "$service" == yes ]]; then
+    if [[ "$static" == yes ]]; then
+      echo "  - the release is the document root (index.html at its top); ${root}/${public_dir} becomes a symlink to current"
+      echo "  - switch current, request health.path from .simai/app.json (default /) through nginx; on failure return to the previous release; keep ${keep} releases"
+    elif [[ "$service" == yes ]]; then
       echo "  - read .simai/app.json (node.start required); link shared .env and the manifest's shared paths"
       echo "  - install dependencies (yarn/npm), Python venv when the manifest lists requirements, optional build"
       echo "  - switch current, (re)write and restart $(app_service_unit_name "$project") on 127.0.0.1:$(app_port_get "$domain")"
@@ -337,20 +401,34 @@ site_deploy_handler() {
     return 0
   fi
 
-  exec 7>"$(site_sites_config_dir)/${domain}/.deploy.lock" 2>/dev/null || { install -d -m 0750 "$(site_sites_config_dir)/${domain}"; exec 7>"$(site_sites_config_dir)/${domain}/.deploy.lock"; }
+  # Separate statement: "exec 7>file 2>/dev/null" would silence this shell's
+  # stderr (every later error and progress line) for the rest of the deploy.
+  install -d -m 0750 "$(site_sites_config_dir)/${domain}"
+  exec 7>"$(site_sites_config_dir)/${domain}/.deploy.lock"
   flock -n 7 || { error "Another deploy of ${domain} is running"; return 1; }
   ui_header "SIMAI ENV · Deploy"
 
   if ! deploy_layout_active "$root"; then
     info "Converting ${root} to the release layout"
-    deploy_init_layout "$root" "$user" "$group" "${release_id}-initial" "$service" || { error "Could not create the release layout"; return 1; }
-    # nginx of a service site proxies to the unit and keeps public/ for ACME.
-    [[ "$service" == yes ]] || deploy_switch_site_to_layout "$domain" "$root" "$php" "$profile" "$project" || return 1
+    if [[ "$static" == yes ]]; then
+      deploy_static_init_layout "$root" "$public_dir" "$user" "$group" "${release_id}-initial" || { error "Could not create the release layout"; return 1; }
+    else
+      deploy_init_layout "$root" "$user" "$group" "${release_id}-initial" "$service" || { error "Could not create the release layout"; return 1; }
+      # nginx of a service site proxies to the unit and keeps public/ for ACME.
+      [[ "$service" == yes ]] || deploy_switch_site_to_layout "$domain" "$root" "$php" "$profile" "$project" || return 1
+    fi
     deploy_state_set "$domain" CURRENT "${release_id}-initial"
     sleep 1
     release_id="$(date -u +%Y%m%d%H%M%S)"
   fi
 
+  # Release ids are timestamps; two deploys within one second must not share
+  # (and overwrite) one directory.
+  local id_base="$release_id" id_n=1
+  while [[ -e "${root}/releases/${release_id}" || -e "${root}/releases/${release_id}-failed" ]]; do
+    id_n=$((id_n + 1))
+    release_id="${id_base}-${id_n}"
+  done
   local release="${root}/releases/${release_id}"
   install -d -m 0750 -o "$user" -g "$group" "$release" || return 1
   local failed="" release_ref=""
@@ -372,7 +450,7 @@ site_deploy_handler() {
     rsync -a --delete --exclude=.git --exclude=/.env --exclude=/storage "${from%/}/" "${release}/" >>"$LOG_FILE" 2>&1 \
       && chown -R "${user}:${group}" "$release" || failed="copy"
   fi
-  [[ -z "$failed" && "$service" != yes ]] && { deploy_link_shared "$root" "$release" "$user" "$group" || failed="shared links"; }
+  [[ -z "$failed" && "$service" != yes && "$static" != yes ]] && { deploy_link_shared "$root" "$release" "$user" "$group" || failed="shared links"; }
 
   local php_bin=""
   [[ "$php" != none ]] && php_bin=$(resolve_php_bin "$php")
@@ -386,7 +464,7 @@ site_deploy_handler() {
   if [[ -z "$failed" && -n "$APP_PHP_MIN" && -n "$php_bin" ]] && ! "$php_bin" -r "exit(version_compare(PHP_VERSION, '${APP_PHP_MIN}', '>=') ? 0 : 1);"; then
     failed="PHP ${php} is older than the release requires (${APP_PHP_MIN}); run site adopt --confirm yes first"
   fi
-  if [[ -z "$failed" && "$service" != yes ]]; then
+  if [[ -z "$failed" && "$service" != yes && "$static" != yes ]]; then
     local -a missing=()
     mapfile -t missing < <(app_missing_packages "${APP_PACKAGES[@]}"; [[ -z "$php_bin" ]] || app_php_ext_packages "$php" "${APP_PHP_EXTS[@]}")
     [[ ${#missing[@]} -eq 0 ]] || failed="missing requirements: ${missing[*]} (run site adopt --domain ${domain} --confirm yes)"
@@ -419,7 +497,14 @@ site_deploy_handler() {
   fi
 
   DEPLOY_PREVIOUS=$(basename "$(readlink "${root}/current")")
-  if [[ "$service" == yes ]]; then
+  if [[ "$static" == yes ]]; then
+    if ! deploy_activate_static "$domain" "$root" "$release_id"; then
+      mv -T -- "$release" "${release}-failed" 2>/dev/null || true
+      deploy_state_set "$domain" FAILED "${release_id}-failed"
+      error "Deploy of ${domain} failed at: health check. The release is kept as releases/${release_id}-failed for inspection"
+      return 1
+    fi
+  elif [[ "$service" == yes ]]; then
     if ! deploy_activate_service "$domain" "$root" "$release_id" "$project"; then
       # Kept for inspection under a name that rollback never picks.
       mv -T -- "$release" "${release}-failed" 2>/dev/null || true
@@ -441,8 +526,12 @@ site_deploy_handler() {
 
   local http_code
   local probe=/
-  [[ "$service" == yes ]] && probe="${APP_HEALTH_PATH:-/}"
-  http_code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${domain}" "http://127.0.0.1${probe}" --max-time 20 || echo 000)
+  [[ "$service" == yes || "$static" == yes ]] && probe="${APP_HEALTH_PATH:-/}"
+  if [[ "$static" == yes ]]; then
+    http_code="${DEPLOY_PROBE_CODE:-000}"
+  else
+    http_code=$(deploy_static_probe "$domain" "$probe")
+  fi
   ui_result_table "Domain|${domain}" "Release|${release_id}" "Previous|${DEPLOY_PREVIOUS}" "Migrated|${migrate}" "Local HTTP ${probe}|${http_code}"
   ui_next_steps
   ui_kv "Roll back" "simai-admin.sh site deploy-rollback --domain ${domain} --confirm yes"
@@ -468,6 +557,9 @@ site_deploy_rollback_handler() {
   if [[ -n "$(app_port_get "$domain")" ]]; then
     app_manifest_load "${root}/releases/${to}" || return 1
     deploy_activate_service "$domain" "$root" "$to" "$project" || return 1
+  elif [[ "${SITE_META[profile]}" == static ]]; then
+    app_manifest_load "${root}/releases/${to}" || return 1
+    deploy_activate_static "$domain" "$root" "$to" || return 1
   else
     deploy_activate "$domain" "$root" "$php" "$to" "$(site_effective_user "$project")" || return 1
   fi

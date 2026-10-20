@@ -19,22 +19,22 @@ echo '* filter=x' >"$L/.git/info/attributes"
 chown -R root:root /home/simai/runtime-observer
 printf '*/5 * * * * root /root/simai-env/simai-admin.sh observer snapshot --domain rim1.ru >/dev/null 2>&1\n' >/etc/cron.d/simai-runtime-observer-rim1-ru
 # A TLS Bitrix site rendered by an earlier release: no HTTP/2, no nosniff.
-openssl req -x509 -nodes -newkey rsa:2048 -days 2 -subj /CN=legacy.test -addext subjectAltName=DNS:legacy.test \
+openssl req -x509 -nodes -newkey rsa:2048 -days 2 -subj /CN=h2legacy.test -addext subjectAltName=DNS:h2legacy.test \
   -keyout /etc/nginx/legacy.key -out /etc/nginx/legacy.crt >/dev/null 2>&1
-mkdir -p /srv/legacy/bitrix/cache && echo ok >/srv/legacy/index.html && echo 'a{}' >/srv/legacy/bitrix/cache/a.css && chmod -R a+rX /srv/legacy
+mkdir -p /srv/h2legacy/bitrix/cache && echo ok >/srv/h2legacy/index.html && echo 'a{}' >/srv/h2legacy/bitrix/cache/a.css && chmod -R a+rX /srv/h2legacy
 {
-  printf '# simai-domain: legacy.test\n# simai-profile: bitrix\n# simai-project: legacy-test\n'
+  printf '# simai-domain: h2legacy.test\n# simai-profile: bitrix\n# simai-project: h2legacy-test\n'
   sed -e '/X-Content-Type-Options/d; /Locations with their own add_header/d' \
-    -e 's#{{SERVER_NAME}}#legacy.test#; s#{{DOC_ROOT}}#/srv/legacy#; s#{{ACME_ROOT}}#/srv/legacy#' \
-    -e 's#{{PROJECT_NAME}}#legacy-test#g; s#{{PHP_VERSION}}#8.3#g; s#{{PHP_SOCKET_PROJECT}}#legacy-test#g' \
+    -e 's#{{SERVER_NAME}}#h2legacy.test#; s#{{DOC_ROOT}}#/srv/h2legacy#; s#{{ACME_ROOT}}#/srv/h2legacy#' \
+    -e 's#{{PROJECT_NAME}}#h2legacy-test#g; s#{{PHP_VERSION}}#8.3#g; s#{{PHP_SOCKET_PROJECT}}#h2legacy-test#g' \
     -e 's#^    listen 80;#    listen 80;\n    listen 443 ssl;\n    ssl_certificate /etc/nginx/legacy.crt;\n    ssl_certificate_key /etc/nginx/legacy.key;#' templates/nginx-bitrix.conf
-} >/etc/nginx/sites-available/legacy.test.conf
-ln -sf /etc/nginx/sites-available/legacy.test.conf /etc/nginx/sites-enabled/legacy.test.conf
+} >/etc/nginx/sites-available/h2legacy.test.conf
+ln -sf /etc/nginx/sites-available/h2legacy.test.conf /etc/nginx/sites-enabled/h2legacy.test.conf
 nginx -t >/dev/null 2>&1 && systemctl reload nginx || bad "legacy site rejected by nginx"
 bash ./simai-admin.sh self migrate --confirm yes >/tmp/m 2>&1 || { bad "self migrate rc"; tail /tmp/m; }
-grep -q 'legacy.test: http2, nosniff' /tmp/m && ok "migration reports http2 and nosniff" || { bad "legacy site not migrated"; grep -i legacy /tmp/m; }
-compgen -G '/etc/nginx/sites-available/legacy.test.conf.bak.*' >/dev/null && ok "previous config kept for rollback" || bad "no rollback copy"
-h2() { curl --http2 -skI --max-time 5 --resolve "legacy.test:443:127.0.0.1" "https://legacy.test$1" | tr -d '\r'; }
+grep -q 'h2legacy.test: http2, nosniff' /tmp/m && ok "migration reports http2 and nosniff" || { bad "legacy site not migrated"; grep -i legacy /tmp/m; }
+compgen -G '/etc/nginx/sites-available/h2legacy.test.conf.bak.*' >/dev/null && ok "previous config kept for rollback" || bad "no rollback copy"
+h2() { curl --http2 -skI --max-time 5 --resolve "h2legacy.test:443:127.0.0.1" "https://h2legacy.test$1" | tr -d '\r'; }
 # Until the reload completes, old workers still accept connections with the
 # previous config: wait for five consistent answers in a row.
 migrated() { h2 /index.html | grep -qi '^x-content-type-options: nosniff$'; }
