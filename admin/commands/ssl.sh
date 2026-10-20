@@ -860,6 +860,10 @@ ssl_renew_handler() {
     error "Renew failed for ${domain}; see ${LOG_FILE}"
     return 1
   fi
+  local hardened
+  if hardened=$(site_nginx_hardening_upgrade "/etc/nginx/sites-available/${domain}.conf") && [[ -n "$hardened" ]]; then
+    info "nginx config updated: ${hardened}"
+  fi
   progress_step "Reloading nginx"
   os_svc_reload nginx >>"$LOG_FILE" 2>&1 || true
   echo "Renewed certificate for ${domain}"

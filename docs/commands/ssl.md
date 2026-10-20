@@ -2,6 +2,14 @@
 
 Run with `sudo /root/simai-env/simai-admin.sh ssl <command> [options]` or via menu.
 
+Every HTTPS listener serves HTTP/2: `listen 443 ssl http2;` on nginx before
+1.25.1 (Ubuntu 22.04, 24.04), `listen 443 ssl;` plus `http2 on;` from 1.25.1
+(Ubuntu 26.04), where the listen parameter is deprecated. The form is chosen
+from `nginx -v` whenever `letsencrypt` or `install` renders the site; `renew`
+and `self migrate` upgrade configs written by earlier releases in place. All site templates
+send `X-Content-Type-Options: nosniff` (also in locations that set their own
+headers, such as Bitrix static files).
+
 ## list
 Show SSL status for all current sites.
 
@@ -50,7 +58,8 @@ sudo /root/simai-env/simai-admin.sh ssl letsencrypt --domain obr.site --email op
 ```
 
 ## renew
-Force renew LE cert for domain, reload nginx.
+Force renew LE cert for domain, bring the site config up to the current TLS
+defaults (HTTP/2, nosniff) in place, reload nginx.
 - `--domain` (required)
 
 Notes:

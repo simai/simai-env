@@ -108,9 +108,23 @@ cli ssl install --domain $D --cert $C/fullchain.pem --key $C/key.pem --chain $C/
   && ok "ssl install on a node site" || { bad "ssl install"; grep -iE "error|warn" /tmp/n-ssl | head -5; }
 [[ $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) -eq 2 ]] && ok "fullchain plus --chain is not duplicated" || bad "bundle has $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) certificates"
 grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/sites-available/$D.conf && ok "proxy port kept after the SSL re-render" || bad "proxy lost"
+# A reload returns before the master has replaced its workers; old workers
+# keep answering with the HTTP-only config for a moment. Wait for five
+# consistent answers in a row.
+redirected() { [[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/health)" == 301 ]]; }
+n=0; for _ in {1..100}; do if redirected; then n=$((n + 1)); ((n >= 5)) && break; else n=0; fi; sleep 0.2; done
 [[ "$(curl -s --max-time 5 --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/health)" == ok ]] && ok "HTTPS reaches the service" || bad "https health"
 [[ "$(curl -s --max-time 5 --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/proto)" == https ]] && ok "service sees X-Forwarded-Proto https" || bad "proto $(curl -s --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/proto)"
 [[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/health)" == 301 ]] && ok "HTTP redirects to HTTPS" || bad "no redirect"
+hdr=$(curl --http2 -sI --max-time 5 --cacert $C/ca.pem --resolve $D:443:127.0.0.1 https://$D/health | tr -d '\r')
+head -n1 <<<"$hdr" | grep -q '^HTTP/2 200' && ok "node site answers over HTTP/2" || bad "node TLS: $(head -n1 <<<"$hdr")"
+grep -qi '^x-content-type-options: nosniff$' <<<"$hdr" && ok "node site sends nosniff" || bad "node site: no nosniff"
+if [[ "$(printf '%s\n%s\n' 1.25.1 "$(nginx -v 2>&1 | sed -n 's#.*nginx/\([0-9.]*\).*#\1#p')" | sort -V | head -n1)" == 1.25.1 ]]; then
+  grep -q '^    http2 on;$' /etc/nginx/sites-available/$D.conf && ! grep -q 'ssl http2' /etc/nginx/sites-available/$D.conf && ok "ssl install renders http2 on" || bad "http2 form"
+else
+  grep -q '^    listen 443 ssl http2;$' /etc/nginx/sites-available/$D.conf && ok "ssl install renders listen ... http2" || bad "http2 form"
+fi
+nginx -t 2>&1 | grep -qi deprecated && bad "nginx -t warns: $(nginx -t 2>&1 | grep -i deprecated)" || ok "nginx -t without deprecation warnings"
 
 cli site remove --domain $D --remove-files yes --confirm yes >/tmp/n-rm 2>&1 && ok "site remove" || { bad "site remove"; grep -iE "warn|error" /tmp/n-rm | head -10; ls -la $P 2>&1 | head; }
 [[ ! -f /etc/systemd/system/simai-app-svc-test.service && ! -f /etc/simai-env/sites/$D/service.env ]] && ok "service unit and port record removed" || bad "leftovers"

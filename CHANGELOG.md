@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 1.16.3 - 2026-10-20
+
+- HTTPS sites serve HTTP/2. The listener follows the installed nginx:
+  `listen 443 ssl http2;` before 1.25.1 (Ubuntu 22.04, 24.04), `http2 on;`
+  from 1.25.1 (Ubuntu 26.04), where the listen parameter is deprecated.
+  `ssl letsencrypt` and `ssl install` render it; `ssl renew` and
+  `self migrate` upgrade configs written by earlier releases in place
+  (`nginx -t`, previous file restored on failure).
+- Every site template sends `X-Content-Type-Options: nosniff`, also from the
+  Bitrix static-file location, whose own `Cache-Control` header would
+  otherwise drop the server-level one. `self migrate` adds it to existing
+  sites.
+- `node_e2e` waits for nginx to finish reloading before its HTTPS checks.
+
 ## 1.16.2 - 2026-10-20
 
 - Let's Encrypt renewals reload nginx whichever path renews: certbot's own

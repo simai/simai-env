@@ -157,6 +157,23 @@ self_migrate_certbot_hook() {
   return 0
 }
 
+# Sites rendered by earlier releases: HTTPS without HTTP/2 and no
+# X-Content-Type-Options.
+self_migrate_nginx_hardening() {
+  command -v nginx >/dev/null 2>&1 || return 0
+  local cfg changed reload=0
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" && ! -L "$cfg" ]] || continue
+    grep -q '^# simai-profile:' "$cfg" || continue
+    changed=$(site_nginx_hardening_upgrade "$cfg") || continue
+    [[ -n "$changed" ]] || continue
+    SELF_MIGRATE_CHANGES+=("$(basename "$cfg" .conf): ${changed}")
+    reload=1
+  done
+  (( reload == 0 )) || os_svc_reload nginx || true
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -168,6 +185,7 @@ self_migrate_handler() {
   self_migrate_bitrix_runtime
   self_migrate_agent_guide
   self_migrate_certbot_hook
+  self_migrate_nginx_hardening
   self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"

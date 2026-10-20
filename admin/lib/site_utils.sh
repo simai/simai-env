@@ -1450,7 +1450,11 @@ create_nginx_site() {
     rm -f /etc/nginx/sites-enabled/default
   fi
   if [[ -n "$ssl_cert" && -n "$ssl_key" ]]; then
-    SSL_CERT="$ssl_cert" SSL_KEY="$ssl_key" SSL_CHAIN="$ssl_chain" SSL_HSTS="$ssl_hsts" SSL_REDIRECT="$ssl_redirect" perl -0pi -e '
+    local ssl_listen
+    ssl_listen=$(nginx_https_listen_directives)
+    SSL_CERT="$ssl_cert" SSL_KEY="$ssl_key" SSL_CHAIN="$ssl_chain" SSL_HSTS="$ssl_hsts" SSL_REDIRECT="$ssl_redirect" SSL_LISTEN="$ssl_listen" perl -0pi -e '
+      my $listen   = $ENV{SSL_LISTEN} // "    listen 443 ssl;";
+      $listen .= "\n" unless $listen =~ /\n\z/;
       my $cert     = $ENV{SSL_CERT} // "";
       my $key      = $ENV{SSL_KEY} // "";
       my $chain    = $ENV{SSL_CHAIN} // "";
@@ -1467,11 +1471,11 @@ create_nginx_site() {
       }
 
       if ($cert && $key) {
-        if ($_ !~ /listen\s+443\s+ssl;/) {
-          if ($_ =~ s/(^[ \t]*listen\s+80[^\n]*;\s*\n)/$1    listen 443 ssl;\n/m) {
-          } elsif ($_ =~ s/(^[ \t]*server_name\s+.*;\s*\n)/$1    listen 443 ssl;\n/m) {
+        if ($_ !~ /listen\s+443\s+ssl\b/) {
+          if ($_ =~ s/(^[ \t]*listen\s+80[^\n]*;[ \t]*\n)/$1$listen/m) {
+          } elsif ($_ =~ s/(^[ \t]*server_name\s+.*;[ \t]*\n)/$1$listen/m) {
           } else {
-            insert_before_server_closing("    listen 443 ssl;");
+            insert_before_server_closing($listen);
           }
         }
 
@@ -1759,6 +1763,77 @@ nginx_supports_ssl_reject_handshake() {
   version=$(nginx -v 2>&1 | sed -n 's#.*nginx/\([0-9.]*\).*#\1#p')
   [[ -n "$version" ]] || return 1
   [[ "$(printf '%s\n%s\n' 1.19.4 "$version" | sort -V | head -n1)" == 1.19.4 ]]
+}
+
+# nginx 1.25.1 moved HTTP/2 from the listen parameter (now deprecated and
+# warned about) to the per-server `http2` directive.
+nginx_supports_http2_directive() {
+  local version
+  version=$(nginx -v 2>&1 | sed -n 's#.*nginx/\([0-9.]*\).*#\1#p')
+  [[ -n "$version" ]] || return 1
+  [[ "$(printf '%s\n%s\n' 1.25.1 "$version" | sort -V | head -n1)" == 1.25.1 ]]
+}
+
+# The HTTPS listener with HTTP/2 in the form this nginx understands.
+nginx_https_listen_directives() {
+  if nginx_supports_http2_directive; then
+    printf '    listen 443 ssl;\n    http2 on;\n'
+  else
+    printf '    listen 443 ssl http2;\n'
+  fi
+}
+
+# Brings a config rendered by an earlier release up to the current defaults
+# in place: HTTP/2 on the HTTPS listener and X-Content-Type-Options. Prints
+# what changed ("http2, nosniff"), nothing if the file is current. The
+# previous file is kept as <cfg>.bak.<timestamp> and put back when nginx -t
+# rejects the result; the caller reloads nginx.
+site_nginx_hardening_upgrade() {
+  local cfg="$1" backup changed http2_directive=no
+  [[ -f "$cfg" ]] || return 1
+  nginx_supports_http2_directive && http2_directive=yes
+  backup=$(mktemp) || return 1
+  cp -p "$cfg" "$backup" || { rm -f -- "$backup"; return 1; }
+  changed=$(SIMAI_HTTP2_DIRECTIVE="$http2_directive" perl -0 -e '
+      local $/; my $c = <STDIN>; my @done;
+      if ($c =~ /^[ \t]*listen\s+443\s+ssl\b/m) {
+        if ($ENV{SIMAI_HTTP2_DIRECTIVE} eq "yes") {
+          $c =~ s/^([ \t]*listen\s+443\s+ssl)\s+http2;/$1;/mg;
+          if ($c !~ /^[ \t]*http2\s+on\s*;/m
+            && $c =~ s/^([ \t]*)(listen\s+443\s+ssl\b[^\n]*;[ \t]*\n)/$1$2$1http2 on;\n/m) {
+            push @done, "http2";
+          }
+        } elsif ($c !~ /^[ \t]*listen\s+443\s+ssl\b[^;\n]*\bhttp2\b/m
+          && $c !~ /^[ \t]*http2\s+on\s*;/m) {
+          push @done, "http2" if $c =~ s/^([ \t]*listen\s+443\s+ssl)\s*;/$1 http2;/mg;
+        }
+      }
+      if ($c !~ /X-Content-Type-Options/) {
+        my $h = "    add_header X-Content-Type-Options \"nosniff\" always;\n";
+        if ($c =~ s/^([ \t]*# simai-frame-policy-end[ \t]*\n)/$1$h/m
+          || $c =~ s/^([ \t]*error_log\s[^\n]*;[ \t]*\n)/$1$h/m) {
+          $c =~ s/^([ \t]+)(add_header\s+Cache-Control\s+"public, immutable";[ \t]*\n)/$1$2$1add_header X-Content-Type-Options "nosniff" always;\n/mg;
+          push @done, "nosniff";
+        }
+      }
+      print STDERR join(" ", @done);
+      print $c;
+    ' <"$backup" 2>&1 >"$cfg") || changed=""
+  if [[ -z "$changed" ]] || cmp -s "$cfg" "$backup"; then
+    cp -p "$backup" "$cfg"
+    changed=""
+  elif ! nginx -t >>"$LOG_FILE" 2>&1; then
+    cp -p "$backup" "$cfg"
+    warn "nginx -t failed after adding ${changed} to ${cfg}; previous config restored"
+    rm -f -- "$backup"
+    return 1
+  fi
+  if [[ -n "$changed" ]]; then
+    cp -p "$backup" "${cfg}.bak.$(date +%Y%m%d%H%M%S)" || true
+    printf '%s\n' "${changed// /, }"
+  fi
+  rm -f -- "$backup"
+  return 0
 }
 
 nginx_catchall_ssl_directives() {

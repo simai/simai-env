@@ -43,11 +43,27 @@ mkdir -p /etc/nginx/sites-available
 ensure_nginx_catchall
 grep -q simai-catchall-v2 /etc/nginx/sites-available/000-catchall.conf && ok "catch-all v2 written" || bad "catch-all fell back: $(cat /etc/nginx/sites-available/000-catchall.conf)"
 
-# A TLS site so 443 has a real vhost besides the catch-all.
-openssl req -x509 -nodes -newkey rsa:2048 -days 2 -subj /CN=generic.test -keyout /etc/nginx/g.key -out /etc/nginx/g.crt >/dev/null 2>&1
-sed -i 's#    listen 80;#    listen 80;\n    listen 443 ssl;\n    ssl_certificate /etc/nginx/g.crt;\n    ssl_certificate_key /etc/nginx/g.key;#' /etc/nginx/sites-enabled/generic.conf
+# Every profile over TLS, rendered like create_nginx_site does: frame policy
+# block, then the HTTPS listener in the form this nginx understands.
+openssl req -x509 -nodes -newkey rsa:2048 -days 2 -subj /CN=generic.test \
+  -addext "subjectAltName=DNS:generic.test,DNS:laravel.test,DNS:static.test,DNS:wordpress.test,DNS:bitrix.test" \
+  -keyout /etc/nginx/g.key -out /etc/nginx/g.crt >/dev/null 2>&1
+listen=$(nginx_https_listen_directives)
+if nginx_supports_http2_directive; then
+  [[ "$listen" == *"http2 on;"* && "$listen" != *"ssl http2"* ]] && ok "nginx >= 1.25.1 gets http2 on" || bad "listen form: ${listen}"
+else
+  [[ "$listen" == *"listen 443 ssl http2;"* && "$listen" != *"http2 on"* ]] && ok "nginx < 1.25.1 gets listen ... http2" || bad "listen form: ${listen}"
+fi
+for t in generic laravel static wordpress bitrix; do
+  f=/etc/nginx/sites-enabled/${t}.conf
+  policy=same-origin; [[ "$t" == bitrix ]] && policy='origins:https://*.bitrix24.ru'
+  site_frame_policy_render_file "$f" /tmp/framed "$policy" && cat /tmp/framed >"$f" || bad "frame policy on ${t}"
+  L="$listen" perl -0pi -e 's/(\n    listen 80;\n)/$1$ENV{L}    ssl_certificate \/etc\/nginx\/g.crt;\n    ssl_certificate_key \/etc\/nginx\/g.key;\n/' "$f"
+  grep -q 'X-Content-Type-Options "nosniff" always' "$f" && ok "${t} template sets nosniff" || bad "${t} template without nosniff"
+done
 
 nginx -t >/tmp/t 2>&1 && ok "nginx -t passes with all templates" || { bad "nginx -t"; cat /tmp/t; }
+grep -qi 'http2.*deprecated' /tmp/t && bad "nginx warns about the http2 form: $(grep -i deprecated /tmp/t)" || ok "no http2 deprecation warning"
 systemctl reload nginx
 for _ in {1..50}; do
   curl -fs --max-time 2 -H 'Host: generic.test' http://127.0.0.1/index.html >/dev/null 2>&1 && break
@@ -78,6 +94,26 @@ curl -sk --resolve evil.example:443:127.0.0.1 https://evil.example/index.html -o
 [[ $rc -ne 0 ]] && ok "unknown host on :443 dropped (curl rc=$rc)" || bad "unknown host :443 served: $(cat /tmp/body)"
 body=$(curl -sk --resolve generic.test:443:127.0.0.1 https://generic.test/index.html)
 [[ "$body" == ok ]] && ok "known TLS host still served" || bad "known TLS host -> '$body'"
+
+# HTTP/2 and nosniff on every profile; locations with their own add_header
+# (Bitrix static files) must keep nosniff too.
+h2() { curl --http2 -skI --max-time 5 --resolve "$1:443:127.0.0.1" "https://$1$2" | tr -d '\r'; }
+for t in generic laravel static wordpress bitrix; do
+  hdr=$(h2 "${t}.test" /index.html)
+  head -n1 <<<"$hdr" | grep -q '^HTTP/2 200' && ok "${t}: HTTP/2" || bad "${t}: $(head -n1 <<<"$hdr")"
+  grep -qi '^x-content-type-options: nosniff$' <<<"$hdr" && ok "${t}: nosniff" || bad "${t}: no nosniff"
+  grep -qiE '^(x-frame-options|content-security-policy):' <<<"$hdr" && ok "${t}: frame policy kept" || bad "${t}: frame policy header lost"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: ${t}.test" http://127.0.0.1/index.html)
+  [[ "$code" == 200 ]] && ok "${t}: plain HTTP still served" || bad "${t}: HTTP -> ${code}"
+done
+hdr=$(h2 bitrix.test /bitrix/cache/css/a.css)
+grep -qi '^x-content-type-options: nosniff$' <<<"$hdr" && grep -qi '^cache-control: public, immutable$' <<<"$hdr" \
+  && ok "bitrix static files: nosniff and cache headers" || bad "bitrix static headers: ${hdr}"
+grep -qi "^content-security-policy: frame-ancestors 'self' https://\*.bitrix24.ru$" <<<"$(h2 bitrix.test /index.html)" \
+  && ok "bitrix frame-ancestors policy served" || bad "bitrix CSP missing"
+hdr=$(h2 wordpress.test /wp-content/uploads/shell.php)
+head -n1 <<<"$hdr" | grep -q '^HTTP/2 403' && grep -qi '^x-content-type-options: nosniff$' <<<"$hdr" \
+  && ok "wordpress denials over HTTP/2 carry nosniff" || bad "wordpress deny: ${hdr}"
 
 echo "failures=${fails}"
 exit "$fails"
