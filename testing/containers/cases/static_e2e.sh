@@ -46,6 +46,16 @@ cli site deploy --domain $D --archive /root/art-v1.tgz --sha256 "$s1" --confirm 
 [[ "$(get /page)" == page-v1 ]] && ok "/page serves page.html" || bad "page: $(get /page)"
 [[ "$(code /missing)" == 404 && "$(get /missing)" == not-found-v1 ]] && ok "404.html is the error page" || bad "404: $(code /missing) $(get /missing)"
 hdr / | grep -qi '^Cache-Control: no-cache' && ok "HTML is revalidated" || bad "html cache: $(hdr / | grep -i cache)"
+hdr / | grep -qi '^Content-Type: text/html; charset=utf-8' && ok "HTML carries charset utf-8" || bad "content-type: $(hdr / | grep -i content-type)"
+hdr /style.css | grep -qi '^Content-Type: text/css; charset=utf-8' && ok "CSS carries charset utf-8" || bad "css type: $(hdr /style.css | grep -i content-type)"
+# Sites rendered before 1.17.3 get the charset from self migrate.
+cfg=/etc/nginx/sites-available/$D.conf
+sed -i '/charset utf-8;/d; /charset_types /d' $cfg && nginx -s reload && sleep 1
+cli self migrate --confirm yes >/tmp/s-mig 2>&1
+grep -q "$D: text served with charset utf-8" /tmp/s-mig && grep -c 'charset utf-8;' $cfg | grep -qx 1 && ok "migrate adds the charset once" || { bad "charset migration"; grep -i charset /tmp/s-mig; }
+for _ in {1..20}; do hdr / | grep -qi 'charset=utf-8' && break; sleep 0.5; done
+hdr / | grep -qi '^Content-Type: text/html; charset=utf-8' && ok "migrated site serves charset" || bad "after migrate: $(hdr / | grep -i content-type)"
+cli self migrate --confirm yes 2>&1 | grep -q "text served with charset" && bad "charset migration not idempotent" || ok "charset migration is idempotent"
 hdr /style.css | grep -qi '^Cache-Control: public, max-age=600$' && ok "plain assets revalidate after ten minutes" || bad "css cache: $(hdr /style.css | grep -i cache)"
 hdr /_docara/shell.0123456789abcdef.css | grep -qi '^Cache-Control: public, max-age=31536000, immutable$' && ok "hashed assets are immutable" || bad "hashed cache: $(hdr /_docara/shell.0123456789abcdef.css | grep -i cache)"
 [[ "$(code /_docara/plain.css)" == 200 ]] && ok "underscore directories are served" || bad "_docara: $(code /_docara/plain.css)"

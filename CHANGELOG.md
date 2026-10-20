@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.17.3 - 2026-10-20
+
+- Static sites send `charset=utf-8` with text answers (HTML, CSS, JS, JSON,
+  SVG, XML, text), as GitHub Pages does. `self migrate` adds it to static
+  sites rendered by 1.17.0-1.17.2, once, with nginx -t and a backup.
+
 ## 1.17.2 - 2026-10-20
 
 - Path redirects (`site redirect-add`) keep the query string unless the

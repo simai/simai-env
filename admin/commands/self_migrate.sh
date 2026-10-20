@@ -174,6 +174,29 @@ self_migrate_nginx_hardening() {
   return 0
 }
 
+# Static sites rendered by 1.17.0-1.17.2 answered text without a charset.
+self_migrate_static_charset() {
+  local cfg domain backup
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" ]] || continue
+    grep -q '^# simai-nginx-template: static$' "$cfg" || continue
+    grep -q '^[[:space:]]*default_type text/plain;' "$cfg" || continue
+    grep -q '^[[:space:]]*charset utf-8;' "$cfg" && continue
+    domain=$(basename "$cfg" .conf)
+    backup="${cfg}.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$cfg" "$backup" || continue
+    sed -i '/^[[:space:]]*default_type text\/plain;/a\    charset utf-8;\n    charset_types text/html text/plain text/xml text/css application/javascript application/json image/svg+xml;' "$cfg"
+    if nginx -t >>"$LOG_FILE" 2>&1; then
+      SELF_MIGRATE_CHANGES+=("${domain}: text served with charset utf-8")
+      SELF_MIGRATE_RELOAD_NGINX=1
+    else
+      cp -p "$backup" "$cfg"
+      warn "Could not add charset to ${cfg}; previous configuration restored"
+    fi
+  done
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -185,6 +208,11 @@ self_migrate_handler() {
   self_migrate_bitrix_runtime
   self_migrate_agent_guide
   self_migrate_certbot_hook
+  SELF_MIGRATE_RELOAD_NGINX=0
+  self_migrate_static_charset
+  if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
+    os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the charset migration"
+  fi
   self_migrate_nginx_hardening
   self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
