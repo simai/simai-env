@@ -10,6 +10,8 @@ Group={{GROUP}}
 WorkingDirectory={{PROJECT_ROOT}}/current
 EnvironmentFile={{PROJECT_ROOT}}/.env
 Environment=NODE_ENV=production
+# Persistent application state outside releases (survives deploys).
+Environment=SIMAI_STATE_DIR={{PROJECT_ROOT}}/shared/state
 Environment=PATH={{PROJECT_ROOT}}/current/.venv/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/env -- {{START}}
 Restart=always

@@ -54,7 +54,8 @@ for ACME challenges. `site deploy` then:
 3. installs dependencies (yarn/npm), the Python venv and runs `node.build`;
 4. switches `current`, writes `simai-app-<project>.service`
    (`WorkingDirectory=<root>/current`, `EnvironmentFile=<root>/.env`,
-   `Restart=always`, enabled for boot, logs in journald) and restarts it;
+   `Restart=always`, enabled for boot, logs in journald,
+   `SIMAI_STATE_DIR=<root>/shared/state` for persistent data) and restarts it;
 5. waits for `health.path`; when it fails, `current` returns to the previous
    release and the new one is kept as `releases/<id>-failed`.
 

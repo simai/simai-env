@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.17.4](v1.17.4.md) — SIMAI_STATE_DIR for node services.
 - [v1.17.3](v1.17.3.md) — static sites send charset utf-8.
 - [v1.17.2](v1.17.2.md) — path redirects keep the query string.
 - [v1.17.1](v1.17.1.md) — releases readable by nginx on shared-account hosts.

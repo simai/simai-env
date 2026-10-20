@@ -28,6 +28,7 @@ const broken = fs.existsSync(__dirname + '/BROKEN');
 fs.appendFileSync(__dirname + '/cache/starts.log', '$1\n');
 http.createServer((q, r) => {
   if (q.url === '/health') { r.statusCode = broken ? 500 : 200; return r.end('ok'); }
+  if (q.url === '/state') { const f = process.env.SIMAI_STATE_DIR + '/visits'; fs.appendFileSync(f, '$1\n'); return r.end(process.env.SIMAI_STATE_DIR + ' ' + fs.readFileSync(f, 'utf8').trim().split('\n').join(',')); }
   if (q.url === '/proto') return r.end(String(q.headers['x-forwarded-proto']));
   if (q.url === '/env') return r.end([process.env.PORT, process.env.HOST, process.env.GREETING, process.getuid()].join(' '));
   r.end('release-$1');
@@ -73,8 +74,10 @@ systemctl is-enabled --quiet simai-app-svc-test && ok "service enabled for reboo
 command -v tree >/dev/null && ok "deploy installed the packages the manifest declares" || bad "manifest package not installed"
 grep -q '^git .*@ ' /etc/simai-env/sites/$D/deploy.env 2>/dev/null || grep -q '^SOURCE=dir /root/node-v1$' /etc/simai-env/sites/$D/deploy.env && ok "deploy source recorded on one line" || bad "source: $(grep SOURCE /etc/simai-env/sites/$D/deploy.env)"
 
+page /state >/dev/null
 mk_app v2
 cli site deploy --domain $D --from /root/node-v2 --confirm yes >/tmp/n-d2 2>&1 && [[ "$(page)" == release-v2 ]] && ok "deploy v2" || { bad "deploy v2"; tail -10 /tmp/n-d2; }
+[[ "$(page /state)" == "$P/shared/state v1,v2" ]] && ok "SIMAI_STATE_DIR persists across releases" || bad "state: $(page /state)"
 grep -q v1 $P/shared/cache/starts.log && grep -q v2 $P/shared/cache/starts.log && ok "shared cache survives releases" || bad "cache lost"
 
 mk_app v3 broken

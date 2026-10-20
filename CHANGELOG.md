@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.17.4 - 2026-10-21
+
+- Node services get `SIMAI_STATE_DIR=<root>/shared/state`, a persistent
+  directory outside releases owned by the site user; a manifest entry
+  `"shared": ["state"]` links the same directory into each release.
+
 ## 1.17.3 - 2026-10-20
 
 - Static sites send `charset=utf-8` with text answers (HTML, CSS, JS, JSON,

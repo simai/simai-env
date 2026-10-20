@@ -188,6 +188,7 @@ app_service_write() {
   user=$(site_effective_user "$project")
   group=$(site_effective_group "$project")
   unit=$(app_service_unit_name "$project")
+  install -d -m 0750 -o "$user" -g "$group" "${root}/shared" "${root}/shared/state" || return 1
   tmp=$(mktemp) || return 1
   PROJECT_NAME="$project" PROJECT_ROOT="$root" START="$APP_START" USER_NAME="$user" GROUP_NAME="$group" perl -pe '
     s/\{\{PROJECT_NAME\}\}/$ENV{PROJECT_NAME}/g; s/\{\{PROJECT_ROOT\}\}/$ENV{PROJECT_ROOT}/g;
