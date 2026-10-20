@@ -1,0 +1,106 @@
+name: Deploy docs to the simai server
+
+# Builds the Docara documentation and deploys it to the simai-env server
+# (201.51.24.222) as env.simai.io through the deploy gate. Runs after CI
+# passes on main when the repository variable SIMAI_SERVER_DEPLOY is "true",
+# and on a manual run. The environment simai-server holds SIMAI_DEPLOY_KEY (a
+# key the gate lets deploy env.simai.io only) and SIMAI_DEPLOY_KNOWN_HOSTS.
+# GitHub Pages (docara-pages.yml) stays as the fallback.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: simai-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (vars.SIMAI_SERVER_DEPLOY == 'true' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: simai-server
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          coverage: none
+          tools: composer
+
+      # Docara runs SIMAI Framework page composition with Node.js during the build.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Composer dependencies
+        working-directory: docara
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      # Same public paths as on Pages: the docs live under /docs/en/.
+      - name: Set the site base URL and site URL
+        working-directory: docara
+        run: |
+          jq '.base_url = "/docs/en/" | .site_url = "https://env.simai.io/docs/en/"' docara.json > docara.json.server
+          mv docara.json.server docara.json
+
+      - name: Build Docara site
+        working-directory: docara
+        run: php vendor/bin/docara build production
+
+      - name: Verify static output
+        working-directory: docara
+        run: php vendor/bin/docara verify-static build_production
+
+      - name: Assemble the artifact
+        run: |
+          set -euo pipefail
+          mkdir -p site/docs/en site/.simai
+          cp -a docara/build_production/. site/docs/en/
+          # The server answers / with a redirect to /docs/en/; this page is the
+          # fallback when the redirect is not configured.
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <title>simai-env documentation</title>
+          <meta http-equiv="refresh" content="0; url=/docs/en/">
+          <link rel="canonical" href="https://env.simai.io/docs/en/">
+          </head>
+          <body><p><a href="/docs/en/">simai-env documentation</a></p></body>
+          </html>
+          HTML
+          printf '%s\n' '{"schema":"simai-app/1","profile":"static","health":{"path":"/docs/en/"}}' > site/.simai/app.json
+
+      - name: Deploy the artifact
+        env:
+          DEPLOY_KEY: ${{ secrets.SIMAI_DEPLOY_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.SIMAI_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 600 /dev/null "$RUNNER_TEMP/key" && printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          tar -C site -czf "$RUNNER_TEMP/site.tgz" .
+          sum=$(sha256sum "$RUNNER_TEMP/site.tgz" | cut -d' ' -f1)
+          echo "artifact sha256 $sum"
+          ssh -i "$RUNNER_TEMP/key" -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" -o StrictHostKeyChecking=yes \
+            simai-deploy@201.51.24.222 "deploy-artifact $sum" < "$RUNNER_TEMP/site.tgz"
+          rm -f "$RUNNER_TEMP/key"
