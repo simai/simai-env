@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.17.2 - 2026-10-20
+
+- Path redirects (`site redirect-add`) keep the query string unless the
+  target sets its own (`/?utm_source=x` -> `/ru/?utm_source=x`).
+
 ## 1.17.1 - 2026-10-20
 
 - Deployed releases are readable by nginx on shared-account hosts

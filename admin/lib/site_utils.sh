@@ -1912,7 +1912,10 @@ site_redirects_apply() {
     while read -r code from to; do
       [[ -z "$code" ]] && continue
       [[ "$code" =~ ^30[1278]$ ]] && site_redirect_from_valid "$from" && site_redirect_target_valid "$to" || { error "Invalid redirect entry in ${file}: ${code} ${from} ${to}"; return 1; }
-      block+="    location = ${from} { return ${code} ${to}; }"$'\n'
+      # The query string travels with the redirect unless the target sets one.
+      local args='$is_args$args'
+      [[ "$to" == *\?* ]] && args=""
+      block+="    location = ${from} { return ${code} ${to}${args}; }"$'\n'
     done <"$file"
   fi
   tmp=$(mktemp) || return 1

@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.17.2](v1.17.2.md) — path redirects keep the query string.
 - [v1.17.1](v1.17.1.md) — releases readable by nginx on shared-account hosts.
 - [v1.17.0](v1.17.0.md) — static deploys from CI artifacts, per-site deploy
   keys, redirects, GitHub Pages behaviour for static sites.

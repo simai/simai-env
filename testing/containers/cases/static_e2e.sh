@@ -77,12 +77,14 @@ cli site deploy --domain shared-pages.test --archive /root/art-private.tgz --sha
 cli site redirect-add --domain $D --from / --to /ru/ --code 302 --confirm yes >/tmp/s-r 2>&1 && ok "redirect-add" || { bad "redirect-add"; tail -5 /tmp/s-r; }
 wait_code $D / 302
 [[ "$(code /)" == 302 && "$(hdr / | sed -n 's/^Location: //p')" == */ru/ ]] && ok "/ answers 302 to /ru/" || bad "redirect: $(code /)"
+[[ "$(hdr '/?utm_source=x&a=1' | sed -n 's/^Location: //p')" == */ru/?utm_source=x\&a=1 ]] && ok "redirect keeps the query string" || bad "query: $(hdr '/?utm_source=x&a=1' | sed -n 's/^Location: //p')"
 [[ "$(get /page)" == page-v1 ]] && ok "other paths are unchanged" || bad "page after redirect"
 cli site redirect-add --domain $D --from /x --to '/y;return 200 hacked' --confirm yes >/dev/null 2>&1 && bad "unsafe target accepted" || ok "unsafe redirect target refused"
 C=/root/tls; mkdir -p $C
 openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=$D" -addext "subjectAltName=DNS:$D" -keyout $C/key.pem -out $C/cert.pem >/dev/null 2>&1
 cli ssl install --domain $D --cert $C/cert.pem --key $C/key.pem --confirm yes >/tmp/s-ssl 2>&1 || { bad "ssl install"; tail -5 /tmp/s-ssl; }
-[[ "$(curl -sk -o /dev/null -w '%{http_code}' --resolve $D:443:127.0.0.1 https://$D/)" == 302 ]] && ok "redirect kept after ssl install" || bad "redirect lost after re-render"
+for _ in {1..20}; do [[ "$(curl -sk -o /dev/null -w '%{http_code}' --resolve $D:443:127.0.0.1 https://$D/)" == 302 ]] && break; sleep 0.5; done
+[[ "$(curl -sk -o /dev/null -w '%{http_code}' --resolve $D:443:127.0.0.1 https://$D/)" == 302 ]] && ok "redirect kept after ssl install" || { bad "redirect lost after re-render"; grep -n "simai-redirects\|listen\|return 30" /etc/nginx/sites-available/$D.conf; }
 [[ "$(curl -sk --resolve $D:443:127.0.0.1 https://$D/missing)" == not-found-v1 ]] && ok "static behaviour kept over HTTPS" || bad "https 404"
 cli site redirect-list --domain $D 2>&1 | grep -q '/ru/' && ok "redirect-list" || bad "redirect-list"
 
