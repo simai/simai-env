@@ -73,6 +73,7 @@ cli site deploy --domain $D --from /root/app-v1 --confirm yes >/tmp/a-d1 2>&1 &&
 rel1=$(basename "$(readlink $P/current)")
 [[ "$(get /)" == home-v1 ]] && ok "static root served by nginx" || bad "home: $(get /)"
 [[ "$(get /deep/link)" == home-v1 ]] && ok "SPA fallback to /index.html" || bad "fallback: $(get /deep/link)"
+[[ "$(h / Content-Type)" == "text/html; charset=utf-8" && "$(h /runner/assets/app-abcdef1234.js Content-Type)" == "application/javascript; charset=utf-8" ]] && ok "text carries charset utf-8" || bad "charset: $(h / Content-Type) / $(h /runner/assets/app-abcdef1234.js Content-Type)"
 api=$(get /api/ping)
 python3 - "$api" "$port" "$P" <<'PY' && ok "/api/ goes to the service with API_PORT/API_HOST and {state}" || bad "api: $api"
 import json, sys
@@ -94,6 +95,11 @@ PY
 hdr /runner/assets/app-abcdef1234.js -H 'Accept-Encoding: gzip' | grep -qi '^Content-Encoding: gzip' && ok "gzip" || bad "gzip"
 grep -q '^API_PORT='"$port"'$' $P/.env && [[ $(grep -c '^API_PORT=' $P/.env) -eq 1 ]] && ok "port_env overrides the manifest value" || bad "API_PORT in .env"
 
+# Routes rendered by 1.18.0/1.18.1 (no charset) are rendered again by migrate.
+sed -i '/charset utf-8;/d; /charset_types /d' /etc/nginx/simai-app/$D/routes.conf && nginx -s reload && sleep 1
+cli self migrate --confirm yes >/tmp/a-mig 2>&1
+grep -q "$D: routes render charset utf-8" /tmp/a-mig && grep -q 'charset utf-8;' /etc/nginx/simai-app/$D/routes.conf && ok "migrate renders routes with charset" || { bad "routes charset migration"; grep -iE "charset|warn" /tmp/a-mig; }
+cli self migrate --confirm yes 2>&1 | grep -q "routes render charset" && bad "routes migration not idempotent" || ok "routes migration is idempotent"
 mk_app v2
 cli site deploy --domain $D --from /root/app-v2 --confirm yes >/tmp/a-d2 2>&1 && [[ "$(get /)" == home-v2 ]] && ok "deploy v2" || { bad "deploy v2"; tail -8 /tmp/a-d2; }
 rel2=$(basename "$(readlink $P/current)")

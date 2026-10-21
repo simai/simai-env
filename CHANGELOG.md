@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.18.2 - 2026-10-21
+
+- Node sites with a static root send `charset=utf-8` with text answers, as
+  the static profile does; `self migrate` renders the routes of such sites
+  again from their current release.
+
 ## 1.18.1 - 2026-10-21
 
 - `deny` patterns of node sites with a static root run at server level, so

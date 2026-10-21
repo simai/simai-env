@@ -197,6 +197,28 @@ self_migrate_static_charset() {
   return 0
 }
 
+# Node sites with a static root rendered by 1.18.0-1.18.1: routes without
+# charset; render them again from the current release.
+self_migrate_app_routes_charset() {
+  local routes domain root project port current
+  for routes in /etc/nginx/simai-app/*/routes.conf; do
+    [[ -f "$routes" ]] || continue
+    grep -q '^[[:space:]]*root ' "$routes" || continue
+    grep -q '^[[:space:]]*charset utf-8;' "$routes" && continue
+    domain=$(basename "$(dirname "$routes")")
+    read_site_metadata "$domain" >/dev/null 2>&1 || continue
+    root="${SITE_META[root]}"; project="${SITE_META[project]}"
+    port=$(app_port_get "$domain")
+    current=$(readlink "${root}/current" 2>/dev/null) || continue
+    if app_routes_apply "$domain" "$project" "$port" "$root" "${root}/${current}" "$(basename "$current")"; then
+      SELF_MIGRATE_CHANGES+=("${domain}: routes render charset utf-8")
+    else
+      warn "Could not render the routes of ${domain} again"
+    fi
+  done
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -210,6 +232,7 @@ self_migrate_handler() {
   self_migrate_certbot_hook
   SELF_MIGRATE_RELOAD_NGINX=0
   self_migrate_static_charset
+  self_migrate_app_routes_charset
   if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
     os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the charset migration"
   fi

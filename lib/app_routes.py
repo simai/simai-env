@@ -196,6 +196,8 @@ def main() -> int:
     gzip_types = manifest.get("gzip_types", ["text/css", "application/javascript", "application/json", "image/svg+xml", "text/plain", "text/xml"])
     if not isinstance(gzip_types, list) or not all(isinstance(t, str) and MIME.match(t) for t in gzip_types):
         fail("gzip_types must be a list of MIME types")
+    # Text answers carry their encoding, as on the static profile.
+    out.append("    charset utf-8;\n    charset_types text/html text/plain text/xml text/css application/javascript application/json image/svg+xml;\n")
     out.append("    gzip on;\n    gzip_vary on;\n    gzip_proxied any;\n    gzip_min_length 1024;\n")
     out.append(f"    gzip_types {' '.join(gzip_types)};\n")
 
