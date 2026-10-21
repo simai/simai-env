@@ -23,6 +23,7 @@ mk_app() {  # $1 label, $2 variant
   head -c 3000 /dev/zero | tr '\0' 'x' | sed 's/^/var a=1;/' >"$dir/public/runner/assets/app-abcdef1234.js"
   echo "a{}" >"$dir/public/simai/x.css"; echo "font" >"$dir/public/simai/fonts/f.ttf"
   echo "embed-$1" >"$dir/public/embed.html"; echo '{}' >"$dir/public/package.json"
+  echo "secret" >"$dir/public/simai/.htaccess"; echo "secret" >"$dir/public/runner/.env"
   cat >"$dir/server.js" <<'JS'
 const http = require('http');
 http.createServer((q, r) => {
@@ -89,6 +90,7 @@ PY
 [[ "$(get /embed.html)" == embed-v1 && "$(h /embed.html Content-Security-Policy)" == "frame-ancestors *" ]] && ok "exact location" || bad "embed"
 [[ "$(h / X-App-Release)" == "$rel1" ]] && ok "release header names the release" || bad "release header: $(h / X-App-Release)"
 [[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/package.json)" == 404 ]] && ok "deny pattern" || bad "deny"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/simai/.htaccess)" == 404 && "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/runner/.env)" == 404 ]] && ok "hidden files denied inside prefix locations" || bad "hidden under prefix: $(curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" http://127.0.0.1/simai/.htaccess)"
 hdr /runner/assets/app-abcdef1234.js -H 'Accept-Encoding: gzip' | grep -qi '^Content-Encoding: gzip' && ok "gzip" || bad "gzip"
 grep -q '^API_PORT='"$port"'$' $P/.env && [[ $(grep -c '^API_PORT=' $P/.env) -eq 1 ]] && ok "port_env overrides the manifest value" || bad "API_PORT in .env"
 

@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.18.1](v1.18.1.md) — deny rules cover prefix locations.
 - [v1.18.0](v1.18.0.md) — node sites with a static root and service routes,
   per-path headers and cache rules, `site paths-allow`.
 - [v1.17.4](v1.17.4.md) — SIMAI_STATE_DIR for node services.

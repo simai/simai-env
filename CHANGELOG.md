@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.18.1 - 2026-10-21
+
+- `deny` patterns of node sites with a static root run at server level, so
+  they also cover paths inside prefix locations (`/simai/.htaccess` was
+  served in 1.18.0, because regex locations do not apply under `^~`); hidden
+  files are always denied there, except ACME challenges.
+
 ## 1.18.0 - 2026-10-21
 
 - Node sites with a static root: `.simai/app.json` `static` makes nginx serve

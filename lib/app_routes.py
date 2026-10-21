@@ -199,10 +199,14 @@ def main() -> int:
     out.append("    gzip on;\n    gzip_vary on;\n    gzip_proxied any;\n    gzip_min_length 1024;\n")
     out.append(f"    gzip_types {' '.join(gzip_types)};\n")
 
+    # Deny rules run at server level, before location selection, so they also
+    # cover paths inside ^~ prefix locations (where regex locations do not
+    # apply). Hidden files are always denied, except ACME challenges.
+    out.append('    if ($uri ~ "/\\.(?!well-known/)") {\n        return 404;\n    }\n')
     for pattern in manifest.get("deny", []):
         if not regex_ok(pattern):
             fail(f"invalid deny pattern {pattern!r}")
-        out.append(f'    location ~* "{pattern}" {{\n        return 404;\n    }}\n')
+        out.append(f'    if ($uri ~* "{pattern}") {{\n        return 404;\n    }}\n')
 
     for route in manifest.get("routes", []):
         if not isinstance(route, dict) or route.get("to") != "service" or not PATH.match(str(route.get("path", ""))):
