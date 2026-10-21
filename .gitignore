@@ -19,4 +19,5 @@ source/
 
 # SIMAI project memory runtime logs
 source/logs/
+.mirai/
 __pycache__/
