@@ -1712,6 +1712,7 @@ site_remove_handler() {
     fi
     # Application service of a node site (no-op for other profiles).
     app_service_remove "$safe_project" || warn "Could not remove $(app_service_unit_name "$safe_project")"
+    rm -rf -- "/etc/nginx/simai-app/${domain}" "$(app_routes_maps_file "$safe_project")"
   fi
 
   progress_step "Removing project files (if approved)"

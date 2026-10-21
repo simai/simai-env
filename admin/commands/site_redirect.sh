@@ -70,6 +70,43 @@ site_redirect_remove_handler() {
   ui_result_table "Domain|${domain}" "Removed|${from}"
 }
 
+site_paths_allow_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}" allow="${PARSED_ARGS[allow]:-}" clear="${PARSED_ARGS[clear]:-no}" file previous="" item
+  require_args "domain" || return 1
+  require_site_exists "$domain" || return 1
+  file=$(site_paths_allow_file "$domain")
+  [[ -f "$file" ]] && previous=$(cat "$file")
+  install -d -m 0750 "$(dirname "$file")"
+  if [[ "${clear,,}" == yes ]]; then
+    rm -f -- "$file"
+  else
+    [[ -n "$allow" ]] || { error "--allow needs a comma-separated list such as /runner.html,/assets/ (or --clear yes)"; return 1; }
+    local -a items=()
+    IFS=',' read -r -a items <<<"$allow"
+    : >"${file}.tmp"
+    for item in "${items[@]}"; do
+      item="${item// /}"
+      [[ -z "$item" ]] && continue
+      [[ "$item" =~ ^/[A-Za-z0-9._~/-]{1,200}$ ]] || { rm -f "${file}.tmp"; error "Invalid path ${item}"; return 1; }
+      printf '%s\n' "$item" >>"${file}.tmp"
+    done
+    mv -f "${file}.tmp" "$file" && chmod 0640 "$file"
+  fi
+  local cfg="/etc/nginx/sites-available/${domain}.conf" backup
+  backup=$(mktemp) && cp -p "$cfg" "$backup"
+  if ! site_paths_allow_apply "$domain" "$cfg" || ! nginx -t >>"$LOG_FILE" 2>&1; then
+    cp -p "$backup" "$cfg"; rm -f "$backup"
+    if [[ -n "$previous" ]]; then printf '%s\n' "$previous" >"$file"; else rm -f -- "$file"; fi
+    error "nginx rejected the path allowlist; configuration restored"
+    return 1
+  fi
+  rm -f "$backup"
+  os_svc_reload nginx >/dev/null 2>&1 || { error "nginx reload failed"; return 1; }
+  ui_result_table "Domain|${domain}" "Allowed paths|$([[ -s $file ]] && paste -sd ' ' "$file" || echo "all (no limit)")"
+}
+
+register_cmd "site" "paths-allow" "Serve only the listed paths of a site (exact files or prefixes ending in /); others answer 404" "site_paths_allow_handler" "domain" "allow= clear=" "tier:advanced"
 register_cmd "site" "redirect-list" "Show path redirects of a site" "site_redirect_list_handler" "domain" "" "effects:read"
 register_cmd "site" "redirect-add" "Redirect one exact path (for example / -> /ru/) with 301/302/307/308" "site_redirect_add_handler" "domain from to" "code=" "tier:advanced"
 register_cmd "site" "redirect-remove" "Remove a path redirect" "site_redirect_remove_handler" "domain from" "" "tier:advanced"

@@ -13,7 +13,7 @@ D=svc.test; P=/home/simai/www/$D
 page() { curl -s --max-time 5 -H "Host: $D" "http://127.0.0.1${1:-/}"; }
 
 apt-get remove -y -qq tree >/dev/null 2>&1
-if ! command -v node >/dev/null 2>&1; then
+if ! command -v npm >/dev/null 2>&1; then
   apt-get install -y -qq nodejs npm >/dev/null 2>&1 || { echo "FAIL nodejs install"; exit 1; }
 fi
 
@@ -53,7 +53,7 @@ cli profile enable --id node --confirm yes >/dev/null 2>&1
 cli site add --domain $D --profile node --confirm yes >/tmp/n-add 2>&1 && ok "site add --profile node" || { bad "site add"; tail -15 /tmp/n-add; }
 port=$(sed -n 's/^APP_PORT=//p' /etc/simai-env/sites/$D/service.env)
 [[ "$port" =~ ^3[0-9]{3}$ ]] && ok "port ${port} allocated" || bad "port: ${port}"
-grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/sites-available/$D.conf && nginx -t >/dev/null 2>&1 && ok "nginx proxies to the port" || bad "nginx config"
+grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/simai-app/$D/routes.conf && grep -q "include /etc/nginx/simai-app/$D/routes.conf;" /etc/nginx/sites-available/$D.conf && nginx -t >/dev/null 2>&1 && ok "nginx proxies to the port" || bad "nginx config"
 [[ ! -e /etc/php ]] || ! ls /etc/php/*/fpm/pool.d/svc-test.conf >/dev/null 2>&1 && ok "no PHP pool for a node site" || bad "php pool created"
 
 mk_app v1
@@ -110,7 +110,7 @@ cat $C/leaf.pem $C/ca.pem >$C/fullchain.pem
 cli ssl install --domain $D --cert $C/fullchain.pem --key $C/key.pem --chain $C/ca.pem --redirect yes --confirm yes >/tmp/n-ssl 2>&1 \
   && ok "ssl install on a node site" || { bad "ssl install"; grep -iE "error|warn" /tmp/n-ssl | head -5; }
 [[ $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) -eq 2 ]] && ok "fullchain plus --chain is not duplicated" || bad "bundle has $(grep -c 'BEGIN CERTIFICATE' /etc/nginx/ssl/$D/fullchain.pem 2>/dev/null) certificates"
-grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/sites-available/$D.conf && ok "proxy port kept after the SSL re-render" || bad "proxy lost"
+grep -q "include /etc/nginx/simai-app/$D/routes.conf;" /etc/nginx/sites-available/$D.conf && grep -q "proxy_pass http://127.0.0.1:${port};" /etc/nginx/simai-app/$D/routes.conf && ok "proxy port kept after the SSL re-render" || bad "proxy lost"
 # A reload returns before the master has replaced its workers; old workers
 # keep answering with the HTTP-only config for a moment. Wait for five
 # consistent answers in a row.

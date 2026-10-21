@@ -1426,6 +1426,9 @@ create_nginx_site() {
       return 1
     fi
   fi
+  if grep -q '{{APP_ROUTES_FILE}}' "$template_path"; then
+    app_routes_ensure "$domain" "$project" "$app_port" "$project_path" || return 1
+  fi
   # Whole-domain redirect sites (profile redirect).
   local redirect_target="" redirect_code=""
   if grep -q '{{REDIRECT_TARGET}}' "$template_path"; then
@@ -1446,6 +1449,7 @@ create_nginx_site() {
       -e "s#{{PHP_VERSION}}#${php_version}#g" \
       -e "s#{{PHP_SOCKET_PROJECT}}#${php_socket_project}#g" \
       -e "s#{{APP_PORT}}#${app_port}#g" \
+      -e "s#{{APP_ROUTES_FILE}}#$(app_routes_file "$domain")#g" \
       -e "s#{{REDIRECT_TARGET}}#${redirect_target//&/\\&}#g" \
       -e "s#{{REDIRECT_CODE}}#${redirect_code}#g" "$template_path"
   } > "$site_available"
@@ -1457,7 +1461,7 @@ create_nginx_site() {
     return 1
   fi
   mv "$frame_tmp" "$site_available"
-  if ! site_redirects_apply "$domain" "$site_available"; then
+  if ! site_redirects_apply "$domain" "$site_available" || ! site_paths_allow_apply "$domain" "$site_available"; then
     restore_nginx_backup "$site_available" "$site_enabled" "$backup"
     return 1
   fi
@@ -1925,6 +1929,42 @@ site_redirects_apply() {
     skip {next}
     !done && ENVIRON["BLOCK"] != "" && /^[ \t]*location / {
       printf "    # simai-redirects-begin (site redirect-add)\n%s    # simai-redirects-end\n", ENVIRON["BLOCK"]
+      done = 1
+    }
+    {print}
+  ' "$cfg" >"$tmp" || { rm -f "$tmp"; return 1; }
+  cat "$tmp" >"$cfg" && rm -f "$tmp"
+}
+
+# --- path allowlist ------------------------------------------------------------
+# /etc/simai-env/sites/<domain>/paths-allow lists the only paths a site serves
+# (exact files such as /runner.html, prefixes ending in /); everything else
+# answers 404. ACME challenges always pass.
+
+site_paths_allow_file() {
+  echo "$(site_sites_config_dir)/$1/paths-allow"
+}
+
+site_paths_allow_apply() {
+  local domain="$1" cfg="$2" file entry alt="" tmp
+  file=$(site_paths_allow_file "$domain")
+  if [[ -s "$file" ]]; then
+    while read -r entry; do
+      [[ -z "$entry" ]] && continue
+      [[ "$entry" =~ ^/[A-Za-z0-9._~/-]{1,200}$ ]] || { error "Invalid allowed path in ${file}: ${entry}"; return 1; }
+      entry="${entry#/}"
+      entry="${entry//./\\.}"
+      [[ "$entry" == */ ]] || entry="${entry}\$"
+      alt+="${alt:+|}${entry}"
+    done <"$file"
+  fi
+  tmp=$(mktemp) || return 1
+  BLOCK="$alt" awk '
+    /# simai-paths-allow-begin/ {skip = 1; next}
+    /# simai-paths-allow-end/ {skip = 0; next}
+    skip {next}
+    !done && ENVIRON["BLOCK"] != "" && /^[ \t]*location / {
+      printf "    # simai-paths-allow-begin (site paths-allow)\n    location ~ \"^/(?!(?:%s|\\.well-known/acme-challenge/))\" {\n        return 404;\n    }\n    # simai-paths-allow-end\n", ENVIRON["BLOCK"]
       done = 1
     }
     {print}

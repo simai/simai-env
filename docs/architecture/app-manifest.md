@@ -73,6 +73,63 @@ for ACME challenges. `site deploy` then:
 }
 ```
 
+## Static root with service routes (play-style apps)
+
+A node site whose release carries a static build and an API adds `static`:
+nginx serves the static root of `current`, and only the listed `routes` go to
+the service. Everything below is rendered by `lib/app_routes.py` into
+`/etc/nginx/simai-app/<domain>/routes.conf` (included by the site) and
+`/etc/nginx/conf.d/simai-app-<project>.conf` (http-level maps) on every
+deploy and rollback; a release whose routes nginx rejects is not switched.
+
+```json
+{
+  "schema": "simai-app/1",
+  "profile": "node",
+  "node": {"version": "22", "start": "node api/server.js", "install": "none"},
+  "port_env": ["API_PORT"], "host_env": ["API_HOST"],
+  "env": {"EXAMPLES_DIR": "{state}/examples", "PLAY_STATE_DIR": "{state}/state"},
+  "static": {"root": "public", "fallback": "/index.html"},
+  "routes": [{"path": "/api/", "to": "service"}],
+  "headers": {
+    "page":   {"Content-Security-Policy": "default-src 'self'", "X-Frame-Options": "SAMEORIGIN"},
+    "runner": {"Content-Security-Policy": "default-src 'self'; frame-ancestors *"}
+  },
+  "page": {"headers": ["page"], "cache": "no-cache"},
+  "locations": [
+    {"path": "/simai/fonts/", "headers": ["page"], "cors": true, "default_type": "font/ttf", "cache": "framework"},
+    {"path": "/runner/", "headers": ["runner"], "cache": "runner", "try": "dir"},
+    {"path": "/embed.html", "exact": true, "headers": ["page"], "cache": "no-cache"}
+  ],
+  "cache": {
+    "framework": {"arg": "sf_v", "values": ["ui-…"], "value": "public, max-age=31536000, immutable", "default": "no-cache"},
+    "runner": {"uri": "^/runner/assets/.+-[A-Za-z0-9_-]{8,}\\.(?:css|js)$", "value": "public, max-age=31536000, immutable", "default": "no-cache"}
+  },
+  "deny": ["^/(?:\\.env|package(?:-lock)?\\.json$)"],
+  "release_header": "X-UI-Play-Release",
+  "health": {"path": "/api/health"}
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `static.root` | directory of the release served by nginx |
+| `static.fallback` | `"/index.html"` for single-page apps, `"404"` (default) otherwise |
+| `routes` | path prefixes proxied to the service (optional `headers`) |
+| `headers` | named header sets; names from an allowlist (CSP, Permissions-Policy, Referrer-Policy, X-Frame-Options, CORS, CORP/COOP/COEP, HSTS, Cache-Control, Vary, X-Robots-Tag) |
+| `page` | header sets and cache of `location /` |
+| `locations` | prefix (or `exact`) paths with header sets, `cors` (Access-Control-Allow-Origin `*` + Cross-Origin-Resource-Policy `cross-origin`), `cache`, `default_type`, `try` (`file` or `dir`) |
+| `cache` | rules: `arg` + exact `values`, or `uri` regex; `value` when matched, `default` otherwise |
+| `deny` | regex paths answered with 404 |
+| `release_header` | header carrying the release id |
+| `gzip_types` | compressed types (defaults to text, CSS, JS, JSON, SVG) |
+| `port_env`, `host_env` | extra names for the service port and host (`API_PORT`) |
+| `env` values | `{port}`, `{state}` (`<root>/shared/state`) and `{root}` expand on the server; new keys are added on each deploy, values already set on the server are kept |
+
+Every location repeats `X-Content-Type-Options: nosniff`, because an
+`add_header` in a location drops the server-level ones. Header values may not
+contain `"`, `\`, `$` or braces; regexes may use `$` only as an anchor.
+
 ## Validation
 
 `lib/app_manifest.py` validates every field before the shell sees it:

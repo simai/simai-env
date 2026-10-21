@@ -9,7 +9,7 @@ app_manifest_load() {
   APP_MANIFEST="absent" APP_PROFILE="" APP_PHP_MIN="" APP_DB_ENGINE="" APP_DB_VERSION=""
   APP_SCHEDULER="" APP_MIGRATE=""
   APP_NODE_VERSION="" APP_START="" APP_INSTALL="" APP_BUILD="" APP_PYTHON_REQUIREMENTS=""
-  APP_HEALTH_PATH="" APP_HEALTH_TIMEOUT=""
+  APP_HEALTH_PATH="" APP_HEALTH_TIMEOUT="" APP_PORT_ENV=() APP_HOST_ENV=()
   APP_PHP_EXTS=() APP_PACKAGES=() APP_EXECUTABLES=() APP_ENV=() APP_WORKERS=() APP_FRAME_ANCESTORS=() APP_SHARED=()
   out=$(python3 "${SIMAI_ENV_ROOT}/lib/app_manifest.py" "$root" 2>&1) || {
     error "${out:-app manifest could not be read}"
@@ -39,6 +39,8 @@ app_manifest_load() {
       shared) APP_SHARED+=("$a") ;;
       health_path) APP_HEALTH_PATH="$a" ;;
       health_timeout) APP_HEALTH_TIMEOUT="$a" ;;
+      port_env) APP_PORT_ENV+=("$a") ;;
+      host_env) APP_HOST_ENV+=("$a") ;;
     esac
   done <<<"$out"
 }
@@ -212,21 +214,36 @@ app_service_remove() {
 # Shared .env of a service site: created from the release's .env.example and
 # the manifest env on first deploy; PORT and HOST are always simai-managed.
 app_service_env_ensure() {
-  local root="$1" release="$2" port="$3" group="$4" env="${1}/.env" kv key
+  local root="$1" release="$2" port="$3" group="$4" env="${1}/.env" kv key created=no
   if [[ ! -f "$env" ]]; then
+    created=yes
     if [[ -f "${release}/.env.example" ]]; then
       install -m 0640 -o root -g "$group" "${release}/.env.example" "$env"
     else
       install -m 0640 -o root -g "$group" /dev/null "$env"
     fi
-    for kv in "${APP_ENV[@]}"; do
-      key="${kv%%=*}"
-      sed -i "/^${key}=/d" "$env"
-      printf '%s\n' "$kv" >>"$env"
-    done
   fi
-  sed -i -E '/^(PORT|HOST)=/d' "$env"
+  # Manifest env: new keys are added on every deploy (values set on the server
+  # are kept); {port}, {state} and {root} expand to this site's values.
+  local value
+  for kv in "${APP_ENV[@]}"; do
+    key="${kv%%=*}"
+    value="${kv#*=}"
+    value="${value//\{port\}/$port}"
+    value="${value//\{state\}/${root}/shared/state}"
+    value="${value//\{root\}/${root}}"
+    # On creation the manifest wins over .env.example.
+    [[ "$created" == yes ]] && sed -i "/^${key}=/d" "$env"
+    grep -q "^${key}=" "$env" || printf '%s=%s\n' "$key" "$value" >>"$env"
+  done
+  # The port and host are simai-managed, also under the names the
+  # application reads (manifest port_env/host_env).
+  for key in PORT HOST "${APP_PORT_ENV[@]}" "${APP_HOST_ENV[@]}"; do
+    sed -i "/^${key}=/d" "$env"
+  done
   printf 'PORT=%s\nHOST=127.0.0.1\n' "$port" >>"$env"
+  for key in "${APP_PORT_ENV[@]}"; do printf '%s=%s\n' "$key" "$port" >>"$env"; done
+  for key in "${APP_HOST_ENV[@]}"; do printf '%s=127.0.0.1\n' "$key" >>"$env"; done
   chown "root:${group}" "$env" && chmod 0640 "$env"
 }
 
@@ -239,5 +256,66 @@ app_health_wait() {
     sleep 3
     waited=$((waited + 3))
   done
+  return 1
+}
+
+# --- nginx routes of service sites -------------------------------------------
+# /etc/nginx/simai-app/<domain>/routes.conf is included by the node template;
+# /etc/nginx/conf.d/simai-app-<project>.conf holds its http-level maps. Both
+# are rendered by lib/app_routes.py from the release's .simai/app.json.
+
+app_routes_file() {
+  echo "/etc/nginx/simai-app/$1/routes.conf"
+}
+
+app_routes_maps_file() {
+  echo "/etc/nginx/conf.d/simai-app-$1.conf"
+}
+
+# Renders routes for a release into place (no nginx test or reload).
+app_routes_render() {
+  local domain="$1" project="$2" port="$3" root="$4" release_dir="$5" release_id="$6"
+  local routes maps tmp_r tmp_m out
+  routes=$(app_routes_file "$domain"); maps=$(app_routes_maps_file "$project")
+  install -d -m 0755 "$(dirname "$routes")" || return 1
+  tmp_r=$(mktemp) && tmp_m=$(mktemp) || return 1
+  if ! out=$(python3 "${SIMAI_ENV_ROOT}/lib/app_routes.py" "$release_dir" "$project" "$port" "$root" "$release_id" "$tmp_r" "$tmp_m" 2>&1); then
+    rm -f "$tmp_r" "$tmp_m"
+    error "${out:-routes could not be rendered}"
+    return 1
+  fi
+  chmod 0644 "$tmp_r" "$tmp_m"
+  mv -f "$tmp_r" "$routes" && mv -f "$tmp_m" "$maps"
+}
+
+# Default routes (a proxy to the service) when a site has none yet.
+app_routes_ensure() {
+  local domain="$1" project="$2" port="$3" root="$4"
+  [[ -f "$(app_routes_file "$domain")" && -f "$(app_routes_maps_file "$project")" ]] && return 0
+  local empty
+  empty=$(mktemp -d) || return 1
+  app_routes_render "$domain" "$project" "$port" "$root" "$empty" "none"
+  local rc=$?
+  rmdir "$empty" 2>/dev/null || true
+  return $rc
+}
+
+# Routes for a release, tested and loaded; the previous files come back on failure.
+app_routes_apply() {
+  local domain="$1" project="$2" port="$3" root="$4" release_dir="$5" release_id="$6"
+  local routes maps br bm
+  routes=$(app_routes_file "$domain"); maps=$(app_routes_maps_file "$project")
+  br=$(mktemp) && bm=$(mktemp) || return 1
+  [[ -f "$routes" ]] && cp -p "$routes" "$br"
+  [[ -f "$maps" ]] && cp -p "$maps" "$bm"
+  if app_routes_render "$domain" "$project" "$port" "$root" "$release_dir" "$release_id" && nginx -t >>"$LOG_FILE" 2>&1; then
+    rm -f "$br" "$bm"
+    os_svc_reload nginx >/dev/null 2>&1 || true
+    return 0
+  fi
+  [[ -s "$br" ]] && cp -p "$br" "$routes"
+  [[ -s "$bm" ]] && cp -p "$bm" "$maps"
+  rm -f "$br" "$bm"
+  error "nginx rejected the routes of release ${release_id}; previous routes kept"
   return 1
 }

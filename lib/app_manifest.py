@@ -227,6 +227,15 @@ def main() -> int:
             fail(f"invalid shared path {item!r}")
         emit("shared", item.rstrip("/"))
 
+    for field, kind in (("port_env", "port_env"), ("host_env", "host_env")):
+        names = manifest.get(field, [])
+        if not isinstance(names, list):
+            fail(f"{field} must be a list of variable names")
+        for item in names:
+            if not isinstance(item, str) or not ENV_KEY.match(item) or item in ("PORT", "HOST"):
+                fail(f"invalid {field} entry {item!r}")
+            emit(kind, item)
+
     health = manifest.get("health")
     if health is not None:
         if not isinstance(health, dict):

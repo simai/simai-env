@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.18.0 - 2026-10-21
+
+- Node sites with a static root: `.simai/app.json` `static` makes nginx serve
+  the release and send only `routes` to the service, with named header sets
+  per path (allowlisted names, validated values), a CORS/CORP pair, cache
+  rules by query argument or URI pattern, deny patterns, `default_type`,
+  `gzip_types` and a release header. Routes are rendered by
+  `lib/app_routes.py` into an included file on every deploy and rollback; a
+  release whose routes nginx rejects is not switched. Plain node sites get a
+  proxy-only routes file.
+- Manifest `port_env`/`host_env` give the service port and host under the
+  names the application reads (`API_PORT`); `env` values expand `{port}`,
+  `{state}` and `{root}`; new manifest keys are added on each deploy.
+- `site paths-allow` serves only the listed paths of a site (ACME always
+  passes); kept across re-renders.
+
 ## 1.17.4 - 2026-10-21
 
 - Node services get `SIMAI_STATE_DIR=<root>/shared/state`, a persistent

@@ -212,6 +212,10 @@ deploy_activate_service() {
   port=$(app_port_get "$domain")
   previous_link=$(readlink "${root}/current")
   ln -sfn "releases/${release_id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
+  if ! app_routes_apply "$domain" "$project" "$port" "$root" "${root}/releases/${release_id}" "$release_id"; then
+    [[ -n "$previous_link" ]] && ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
+    return 1
+  fi
   app_service_write "$project" "$root" || return 1
   systemctl restart "$unit" >/dev/null 2>&1 || true
   info "Waiting for ${unit} on 127.0.0.1:${port}${APP_HEALTH_PATH:-/} (up to ${APP_HEALTH_TIMEOUT:-120} s)"
@@ -221,6 +225,7 @@ deploy_activate_service() {
   error "${unit} did not pass its health check; see: journalctl -u ${unit} -n 50"
   if [[ -n "$previous_link" && "$previous_link" != "releases/${release_id}" && -d "${root}/${previous_link}" ]]; then
     ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
+    app_routes_apply "$domain" "$project" "$port" "$root" "${root}/${previous_link}" "$(basename "$previous_link")" || warn "Routes of ${previous_link} could not be restored"
     if [[ -f "${root}/${previous_link}/.simai/app.json" ]]; then
       systemctl restart "$unit" >/dev/null 2>&1 || true
       if app_health_wait "$port" "${APP_HEALTH_PATH:-/}" "${APP_HEALTH_TIMEOUT:-120}"; then

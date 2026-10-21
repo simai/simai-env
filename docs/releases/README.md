@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.18.0](v1.18.0.md) — node sites with a static root and service routes,
+  per-path headers and cache rules, `site paths-allow`.
 - [v1.17.4](v1.17.4.md) — SIMAI_STATE_DIR for node services.
 - [v1.17.3](v1.17.3.md) — static sites send charset utf-8.
 - [v1.17.2](v1.17.2.md) — path redirects keep the query string.

@@ -14,7 +14,7 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 UBUNTU=24.04
 PHP=8.3
 NAME="simai-env-e2e-$(date +%s)-$$"
-DEFAULT_CASES=(p0_tests p1_tests upgrade_e2e dispatch_e2e config_e2e menu_e2e nginx_tests backup_tests migrate_e2e iso_e2e lara_e2e sftp_e2e owner_e2e moveq_e2e sot_e2e pg_e2e adopt_e2e deploy_e2e node_e2e host_e2e static_e2e)
+DEFAULT_CASES=(p0_tests p1_tests upgrade_e2e dispatch_e2e config_e2e menu_e2e nginx_tests backup_tests migrate_e2e iso_e2e lara_e2e sftp_e2e owner_e2e moveq_e2e sot_e2e pg_e2e adopt_e2e deploy_e2e node_e2e host_e2e static_e2e app_e2e)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

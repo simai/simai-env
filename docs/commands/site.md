@@ -135,6 +135,17 @@ Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
 `200.html` for single-page apps). Deploy keys, the gate and the workflow
 step: `docs/operations/ci-deploy.md`.
 
+### Serving only some paths
+
+```bash
+sudo /root/simai-env/simai-admin.sh site paths-allow --domain runner.example.com --allow /runner.html,/assets/,/distr/ --confirm yes
+sudo /root/simai-env/simai-admin.sh site paths-allow --domain runner.example.com --clear yes --confirm yes
+```
+
+Exact files and prefixes ending in `/`; every other path answers 404 (ACME
+challenges always pass). The list survives certificate changes and other
+re-renders.
+
 ### Node.js services (profile `node`)
 
 ```bash

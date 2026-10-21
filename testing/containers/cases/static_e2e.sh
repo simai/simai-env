@@ -74,7 +74,10 @@ cli site deploy --domain $D --archive /root/art-v1.tgz --sha256 "$s2" --confirm 
 
 # Shared-account hosts (SIMAI_SITE_ISOLATION=no): nginx reads the release
 # through www-data, not through a per-site group.
-SIMAI_SITE_ISOLATION=no cli site add --domain shared-pages.test --profile static --confirm yes >/tmp/s-sh 2>&1 || { bad "shared site add"; tail -5 /tmp/s-sh; }
+# The host setting decides (an earlier case may have written it explicitly).
+cli self setting-set --key SIMAI_SITE_ISOLATION --value no --confirm yes >/dev/null 2>&1
+cli site add --domain shared-pages.test --profile static --confirm yes >/tmp/s-sh 2>&1 || { bad "shared site add"; tail -5 /tmp/s-sh; }
+cli self setting-set --key SIMAI_SITE_ISOLATION --value yes --confirm yes >/dev/null 2>&1
 # Files private to their owner (as CI tarballs or a restrictive umask make
 # them) must still reach nginx through the site's web group.
 rm -rf /root/art-private && cp -a /root/art-v1 /root/art-private && chmod -R go-rwx /root/art-private
@@ -82,6 +85,17 @@ tar -C /root/art-private -czf /root/art-private.tgz . && sp=$(sha256sum /root/ar
 cli site deploy --domain shared-pages.test --archive /root/art-private.tgz --sha256 "$sp" --confirm yes >/tmp/s-shd 2>&1 || { bad "shared deploy"; tail -8 /tmp/s-shd; }
 [[ "$(curl -s -H 'Host: shared-pages.test' http://127.0.0.1/dir/)" == dir-v1 ]] && ok "nested files of a shared-account site are readable by nginx" || bad "shared nested: $(curl -s -o /dev/null -w '%{http_code}' -H 'Host: shared-pages.test' http://127.0.0.1/dir/)"
 [[ "$(stat -c %U /home/simai/www/shared-pages.test/current/dir/index.html)" == simai ]] && ok "shared release owned by simai" || bad "shared owner"
+
+# A path allowlist (studio-run serves only its runner).
+sh() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 -H 'Host: shared-pages.test' "http://127.0.0.1$1"; }
+cli site paths-allow --domain shared-pages.test --allow /dir/,/page.html --confirm yes >/tmp/s-pa 2>&1 || { bad "paths-allow"; tail -5 /tmp/s-pa; }
+for _ in {1..20}; do [[ "$(sh /)" == 404 ]] && break; sleep 0.5; done
+[[ "$(sh /dir/)" == 200 && "$(sh /page.html)" == 200 && "$(sh /)" == 404 && "$(sh /index.html)" == 404 && "$(sh /page.htmlx)" == 404 ]] && ok "only allowed paths are served" || bad "paths-allow: / $(sh /) /dir/ $(sh /dir/) /page.html $(sh /page.html) /index.html $(sh /index.html)"
+mkdir -p /home/simai/www/shared-pages.test/current/.well-known/acme-challenge && echo t >/home/simai/www/shared-pages.test/current/.well-known/acme-challenge/t
+[[ "$(sh /.well-known/acme-challenge/t)" == 200 ]] && ok "ACME passes the allowlist" || bad "acme blocked: $(sh /.well-known/acme-challenge/t)"
+cli site paths-allow --domain shared-pages.test --clear yes --confirm yes >/dev/null 2>&1
+for _ in {1..20}; do [[ "$(sh /)" == 200 ]] && break; sleep 0.5; done
+[[ "$(sh /)" == 200 ]] && ok "paths-allow --clear restores everything" || bad "clear: $(sh /)"
 
 # Path redirects survive a re-render of the nginx config (ssl install).
 cli site redirect-add --domain $D --from / --to /ru/ --code 302 --confirm yes >/tmp/s-r 2>&1 && ok "redirect-add" || { bad "redirect-add"; tail -5 /tmp/s-r; }
