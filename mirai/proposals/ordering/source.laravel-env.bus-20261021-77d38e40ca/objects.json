@@ -1,0 +1,362 @@
+[
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.redirect-query",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: redirect-query",
+    "predicate": "source_reports",
+    "value": "Redirects now append `$is_args$args` unless the target sets a\nquery of its own. Existing redirects pick it up on the next re-render or the\nnext `redirect-add`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.2.md#chars=169-328"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.1c190c0be5da2b6a.4",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.2.md",
+        "content_digest": "sha256:e5da2b6a6973e19cdd34faa2d4d0576f49cbfc00cd32e28e57f0beb92e50defb",
+        "start": 169,
+        "end": 328,
+        "quote": "Redirects now append `$is_args$args` unless the target sets a\nquery of its own. Existing redirects pick it up on the next re-render or the\nnext `redirect-add`."
+      }
+    ],
+    "assertion_id": "assertion.69075124c677a6fca2732f79d16a5e95589db00a639bb007d9c5869118ee6f6c"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.static-charset",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: static-charset",
+    "predicate": "source_reports",
+    "value": "The static template now sets\n`charset utf-8` for HTML, plain text, XML, CSS, JavaScript, JSON and SVG.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.3.md#chars=270-372"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.26933b1f41416ead.4",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.3.md",
+        "content_digest": "sha256:41416eadece3d368525fcbe8e9799dc0207f4a5f4941b5f30492252c8afdf2e8",
+        "start": 270,
+        "end": 372,
+        "quote": "The static template now sets\n`charset utf-8` for HTML, plain text, XML, CSS, JavaScript, JSON and SVG."
+      }
+    ],
+    "assertion_id": "assertion.5278b4ec8c51bbc1b82c9fa231ed9fde81475e4f8e3667eaed6f1ca0751d227c"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.charset-migration-guard",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: charset-migration-guard",
+    "predicate": "source_reports",
+    "value": "`self migrate` (run by `self update`) adds the setting to static sites\ncreated by 1.17.0-1.17.2: once per site, after a backup of the config and an\n`nginx -t` check; a failing site is restored and reported.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.3.md#chars=0-206"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.26933b1f91f5f580.5",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.3.md",
+        "content_digest": "sha256:91f5f580a2e4dfb3ca10b6607c78b6e257c1927ef344b63a2470eb4ebe46064a",
+        "start": 0,
+        "end": 206,
+        "quote": "`self migrate` (run by `self update`) adds the setting to static sites\ncreated by 1.17.0-1.17.2: once per site, after a backup of the config and an\n`nginx -t` check; a failing site is restored and reported."
+      }
+    ],
+    "assertion_id": "assertion.60799793740cc9ab03b9b0a26b13a550185768b29608f6dc77019de5ed6804c5"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.persistent-node-state",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: persistent-node-state",
+    "predicate": "source_reports",
+    "value": "Node services (profile `node`) get `SIMAI_STATE_DIR=<site root>/shared/state`\nin their unit: a directory outside releases, owned by the site user, that\nsurvives deploys and rollbacks.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.4.md#chars=0-183"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.33efef801a5ec7ad.4",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.4.md",
+        "content_digest": "sha256:1a5ec7adc519fccb18640d55e8f74a961819bb4b186d2097c3c49baf6e82dbe3",
+        "start": 0,
+        "end": 183,
+        "quote": "Node services (profile `node`) get `SIMAI_STATE_DIR=<site root>/shared/state`\nin their unit: a directory outside releases, owned by the site user, that\nsurvives deploys and rollbacks."
+      }
+    ],
+    "assertion_id": "assertion.e60b4b2371dfb70cf1f2b78871a517afa9b37d0ef9d35d172273b9492849555d"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.existing-node-adoption",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: existing-node-adoption",
+    "predicate": "source_reports",
+    "value": "Existing node services pick the variable up on their next deploy or\n`site service-restart`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.4.md#chars=0-91"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.33efef80d1b3dddd.7",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.17.4.md",
+        "content_digest": "sha256:d1b3dddd1f534d7f530c5ae2e97b63490702781a566509c2958120da81eb2b39",
+        "start": 0,
+        "end": 91,
+        "quote": "Existing node services pick the variable up on their next deploy or\n`site service-restart`."
+      }
+    ],
+    "assertion_id": "assertion.4a879090b5c9ad7b278d3cbce7becdf68960254ae933be111fe0ffdc3a140a88"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.static-plus-api",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: static-plus-api",
+    "predicate": "source_reports",
+    "value": "Applications that ship a static build plus an API (the SIMAI playground) run\nas one node site: nginx serves the build, the service answers only its\nroutes, and every path keeps the headers and caching the application needs.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md#chars=0-223"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.244cce6205f65f61.4",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md",
+        "content_digest": "sha256:05f65f61d20eb4ea14b2a07cb12fb3b903ce46267aefea1448b7277af8c105b4",
+        "start": 0,
+        "end": 223,
+        "quote": "Applications that ship a static build plus an API (the SIMAI playground) run\nas one node site: nginx serves the build, the service answers only its\nroutes, and every path keeps the headers and caching the application needs."
+      }
+    ],
+    "assertion_id": "assertion.43c92c61beb1940a1a150d761219db1279ae2c37e6bb28f9b4bd5686795c6111"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.routes-validation-rollback",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: routes-validation-rollback",
+    "predicate": "source_reports",
+    "value": "Deploys and rollbacks render the routes of the release being switched and\n  run `nginx -t` before the switch is kept; a failing release returns to the\n  previous one together with its routes.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md#chars=430-621"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.244cce62e66d96de.5",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md",
+        "content_digest": "sha256:e66d96ded03c45a13138c2fdae4418842b925810e6a3e1cb1a5fbf971fafd740",
+        "start": 430,
+        "end": 621,
+        "quote": "Deploys and rollbacks render the routes of the release being switched and\n  run `nginx -t` before the switch is kept; a failing release returns to the\n  previous one together with its routes."
+      }
+    ],
+    "assertion_id": "assertion.a82f696ef5145f539ec5056eb64f724f43417d656bd6de407091d75e2315bbbc"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.old-node-proxy-compatibility",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: old-node-proxy-compatibility",
+    "predicate": "source_reports",
+    "value": "Node sites created before 1.18 keep their inline proxy until their nginx\nconfiguration is next rendered (for example by `ssl install`); they then get\nthe same proxy from a generated routes file.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md#chars=0-194"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.244cce626c374046.6",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md",
+        "content_digest": "sha256:6c3740460f56429234c6f50bb15a1b6a340b2bacba47f70b651371c9a7da85fc",
+        "start": 0,
+        "end": 194,
+        "quote": "Node sites created before 1.18 keep their inline proxy until their nginx\nconfiguration is next rendered (for example by `ssl install`); they then get\nthe same proxy from a generated routes file."
+      }
+    ],
+    "assertion_id": "assertion.912edbac4c08fcbe4f659ccc89a61e69bd94d04d3e01a8d0b97d227999ede94b"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.path-allow-acme-persistence",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: path-allow-acme-persistence",
+    "predicate": "source_reports",
+    "value": "Exact files and prefixes ending in `/`; every other path answers 404 (ACME\nchallenges always pass). The list survives certificate changes and other\nre-renders.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/commands/site.md#chars=0-159"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.0e2618ae4afc1031.19",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/commands/site.md",
+        "content_digest": "sha256:4afc1031b453d900807dc8fed84d218fad6f551d9230d91312bf98153db28daf",
+        "start": 0,
+        "end": 159,
+        "quote": "Exact files and prefixes ending in `/`; every other path answers 404 (ACME\nchallenges always pass). The list survives certificate changes and other\nre-renders."
+      }
+    ],
+    "assertion_id": "assertion.f2115445c677bb5b0032ff7bac5603e36ea6033a340b97d97105109ec6e98c9c"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.header-validation",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: header-validation",
+    "predicate": "source_reports",
+    "value": "Every location repeats `X-Content-Type-Options: nosniff`, because an\n`add_header` in a location drops the server-level ones. Header values may not\ncontain `\"`, `\\`, `$` or braces; regexes may use `$` only as an anchor.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md#chars=0-218"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.43b72b5639a53dd0.16",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md",
+        "content_digest": "sha256:39a53dd03c0aadb0b0568e0d5ef3212bfc5dc50c77797f255a1e7fc810ca134d",
+        "start": 0,
+        "end": 218,
+        "quote": "Every location repeats `X-Content-Type-Options: nosniff`, because an\n`add_header` in a location drops the server-level ones. Header values may not\ncontain `\"`, `\\`, `$` or braces; regexes may use `$` only as an anchor."
+      }
+    ],
+    "assertion_id": "assertion.add1cc80e3cc5e65cc6127ef9748bb2d34dece62627c5f514263254ac5f4a8e4"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.server-env-preserved",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: server-env-preserved",
+    "predicate": "source_reports",
+    "value": "| `env` values | `{port}`, `{state}` (`<root>/shared/state`) and `{root}` expand on the server; new keys are added on each deploy, values already set on the server are kept |",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md#chars=1049-1223"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.43b72b56c1446e2e.15",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md",
+        "content_digest": "sha256:c1446e2e9755163a1de2082d3926f625d187b1985ec889d2f18f8b19964d5956",
+        "start": 1049,
+        "end": 1223,
+        "quote": "| `env` values | `{port}`, `{state}` (`<root>/shared/state`) and `{root}` expand on the server; new keys are added on each deploy, values already set on the server are kept |"
+      }
+    ],
+    "assertion_id": "assertion.f9897a3991eb391ad3f60f09c08ee390060557e8a9e2347e4eab9164dbca5eb5"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.cache-rule-contract",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: cache-rule-contract",
+    "predicate": "source_reports",
+    "value": "| `cache` | rules: `arg` + exact `values`, or `uri` regex; `value` when matched, `default` otherwise |",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md#chars=690-792"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.43b72b56c1446e2e.15",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md",
+        "content_digest": "sha256:c1446e2e9755163a1de2082d3926f625d187b1985ec889d2f18f8b19964d5956",
+        "start": 690,
+        "end": 792,
+        "quote": "| `cache` | rules: `arg` + exact `values`, or `uri` regex; `value` when matched, `default` otherwise |"
+      }
+    ],
+    "assertion_id": "assertion.a3d8f5a9d05a0297b063d60bf4fa3e5fe90a2f2f136134ab67c0b592e3c15692"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.manifest-service-routes",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: manifest-service-routes",
+    "predicate": "source_reports",
+    "value": "| `routes` | path prefixes proxied to the service (optional `headers`) |",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md#chars=185-257"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.43b72b56c1446e2e.15",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md",
+        "content_digest": "sha256:c1446e2e9755163a1de2082d3926f625d187b1985ec889d2f18f8b19964d5956",
+        "start": 185,
+        "end": 257,
+        "quote": "| `routes` | path prefixes proxied to the service (optional `headers`) |"
+      }
+    ],
+    "assertion_id": "assertion.113cc165d3b2aeef11af0332b25e8711c2d8d07564a433c3018c87096f12217b"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.static-root-fallback",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: static-root-fallback",
+    "predicate": "source_reports",
+    "value": "| `static.fallback` | `\"/index.html\"` for single-page apps, `\"404\"` (default) otherwise |",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md#chars=95-184"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.43b72b56c1446e2e.15",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/architecture/app-manifest.md",
+        "content_digest": "sha256:c1446e2e9755163a1de2082d3926f625d187b1985ec889d2f18f8b19964d5956",
+        "start": 95,
+        "end": 184,
+        "quote": "| `static.fallback` | `\"/index.html\"` for single-page apps, `\"404\"` (default) otherwise |"
+      }
+    ],
+    "assertion_id": "assertion.9b1fd345d46d7d92da39e3316628df9848a1f91796db7081d90b2bac3dcb1128"
+  },
+  {
+    "id": "object.ordering.laravel-env.77d38e40ca.verification-scope",
+    "kind": "documented_source_observation",
+    "title": "Отчёт laravel-env: verification-scope",
+    "predicate": "source_reports",
+    "value": "- New `app_e2e` (25 checks) on Ubuntu 24.04 and 26.04: static root, SPA\n  fallback, `/api/` to the service with `API_PORT`/`API_HOST` and `{state}`,\n  page/runner/embed header sets, nosniff on every location, URI and\n  query-argument cache rules, CORS/CORP, `default_type`, exact locations,\n  release header following the release, deny pattern, gzip, a disallowed\n  header refused with the previous release still serving, routes kept after\n  `ssl install`, cleanup on `site remove`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md#chars=0-482"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.244cce62ac185097.10",
+        "source_ref": "repo://laravel-env@77d38e40cafb469068c8c3340ac8f4843e277a12/docs/releases/v1.18.0.md",
+        "content_digest": "sha256:ac185097c5aa1a2dd560fc47bbbe469e94342752be8ccadf9d74451522f74d41",
+        "start": 0,
+        "end": 482,
+        "quote": "- New `app_e2e` (25 checks) on Ubuntu 24.04 and 26.04: static root, SPA\n  fallback, `/api/` to the service with `API_PORT`/`API_HOST` and `{state}`,\n  page/runner/embed header sets, nosniff on every location, URI and\n  query-argument cache rules, CORS/CORP, `default_type`, exact locations,\n  release header following the release, deny pattern, gzip, a disallowed\n  header refused with the previous release still serving, routes kept after\n  `ssl install`, cleanup on `site remove`."
+      }
+    ],
+    "assertion_id": "assertion.fe9bd7a54020ddfd7a0b43b7fe8e7ff7d78707579c76889d711b7f34da10a215"
+  }
+]
