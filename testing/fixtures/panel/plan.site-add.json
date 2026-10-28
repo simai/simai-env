@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-add",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:add",
+    "args": {
+      "domain": "new.test",
+      "profile": "static"
+    },
+    "target": "new.test",
+    "description": "Create site scaffolding (nginx/php-fpm)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

@@ -10,6 +10,7 @@ commands with validated arguments reach simai-admin.sh, always as an argv
 list and with `--output json`; nothing from the request is ever interpreted
 by a shell.
 """
+import hashlib
 import json
 import os
 import re
@@ -25,6 +26,7 @@ CLI = str(ROOT / "simai-admin.sh")
 LOG = os.environ.get("SIMAI_PANEL_GATE_LOG", "/var/log/simai-panel-gate.log")
 JOBS = Path(os.environ.get("SIMAI_PANEL_JOBS", "/var/lib/simai-env/panel-jobs"))
 MAX_REQUEST = 64 * 1024
+MAX_ATTACHMENT = int(os.environ.get("SIMAI_DEPLOY_MAX_ARCHIVE_MB", "1024")) * 1048576
 TIMEOUT = 300
 JOB_KEEP_DAYS = 30
 MAX_LOG_LINES = 1000
@@ -40,6 +42,21 @@ LINES = re.compile(r"^(?:[1-9][0-9]{0,2}|1000)$")
 JOB_ID = re.compile(r"^[a-f0-9]{24}$")
 CURSOR = re.compile(r"^[0-9]{1,7}$")
 KIND = re.compile(r"^(access|error)$")
+PHP = re.compile(r"^[5-9]\.[0-9]$")
+PROFILE = re.compile(r"^(static|generic|laravel|wordpress|node|redirect)$")
+ENGINE = re.compile(r"^(mysql|pgsql)$")
+ORIGIN = re.compile(r"^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
+CODE = re.compile(r"^30[1278]$")
+KEEP_DROP = re.compile(r"^(keep|drop)$")
+URL_PATH = re.compile(r"^/[A-Za-z0-9._~/%-]{0,500}$")
+REDIRECT_TO = re.compile(r"^(/|https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/?)[A-Za-z0-9._~/%?&=+-]{0,500}$")
+GIT_URL = re.compile(r"^(https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/[A-Za-z0-9._~/-]{1,300}|"
+                     r"git@[A-Za-z0-9.-]{1,253}:[A-Za-z0-9._~/-]{1,300})$")
+GIT_REF = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._/-]{0,199}$")
+KEEP = re.compile(r"^(?:[1-9]|[1-4][0-9]|50)$")
+PUBKEY = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com) "
+                    r"[A-Za-z0-9+/]{20,8192}={0,3}( [ -~]{0,200})?$")
+SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 # command -> (arguments with validators, required arguments, kind). Read
 # commands answer structured, secret-free data (lib/command_contract.py);
@@ -57,12 +74,35 @@ ALLOW = {
     "backup:data": ({"domain": DOMAIN, "db": YES_NO, "files": YES_NO}, {"domain"}, "action"),
     "queue:restart": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:service-restart": ({"domain": DOMAIN}, {"domain"}, "action"),
+    # Stage 3-4: deploys, creating and removing.
+    "site:deploy": ({"domain": DOMAIN, "git": GIT_URL, "ref": GIT_REF, "migrate": YES_NO, "keep": KEEP},
+                    {"domain"}, "action"),
+    "site:add": ({"domain": DOMAIN, "profile": PROFILE, "php": PHP, "owner": OWNER, "create-db": YES_NO,
+                  "db-engine": ENGINE, "redirect-to": ORIGIN, "redirect-code": CODE, "redirect-path": KEEP_DROP},
+                 {"domain", "profile"}, "action"),
+    "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
+                    {"domain"}, "action"),
+    "site:set-php": ({"domain": DOMAIN, "php": PHP}, {"domain", "php"}, "action"),
+    "site:redirect-add": ({"domain": DOMAIN, "from": URL_PATH, "to": REDIRECT_TO, "code": CODE},
+                          {"domain", "from", "to"}, "action"),
+    "site:redirect-remove": ({"domain": DOMAIN, "from": URL_PATH}, {"domain", "from"}, "action"),
+    "site:db-create": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "site:db-drop": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "cron:remove": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "ssl:remove": ({"domain": DOMAIN, "delete-cert": YES_NO}, {"domain"}, "action"),
+    "owner:create": ({"name": OWNER, "pubkey": PUBKEY}, {"name"}, "action"),
+    "owner:add-key": ({"name": OWNER, "pubkey": PUBKEY}, {"name", "pubkey"}, "action"),
+    "owner:remove": ({"name": OWNER}, {"name"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:list": ({}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
+ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove"}
+FILE_ARGS = {"pubkey": "pubkey-file"}  # passed to the command as a file
+ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
 
 
 class Refused(Exception):
@@ -112,20 +152,46 @@ def parse(raw):
     confirm = req.get("confirm", False)
     if confirm not in (False, True) or (confirm and kind != "action"):
         raise Refused("not_allowed")  # only actions are confirmed
+    attachment = req.get("attachment")
+    if attachment is not None:
+        if command not in ATTACHMENT or not isinstance(attachment, dict) or set(attachment) != {"sha256", "size"} \
+                or not isinstance(attachment["sha256"], str) or not SHA256.match(attachment["sha256"]) \
+                or not isinstance(attachment["size"], int) or isinstance(attachment["size"], bool) \
+                or not 0 < attachment["size"] <= MAX_ATTACHMENT:
+            raise Refused("invalid_argument")
+        if "git" in args or "ref" in args:
+            raise Refused("invalid_argument")  # an archive or a git ref, not both
+    elif command in ATTACHMENT and "git" not in args:
+        raise Refused("invalid_argument")
+    if command == "site:deploy" and ("git" in args) != ("ref" in args):
+        raise Refused("invalid_argument")
+    if owner is not None:
+        if command in ADMIN_ONLY:
+            raise Refused("not_allowed")
+        if command == "site:add":
+            if args.get("owner", owner) != owner:
+                raise Refused("owner_scope")
+            args["owner"] = owner  # an owner's new site is always theirs
     return req, command, args, owner
 
 
-def argv_for(command, args):
+def argv_for(command, args, files=None):
+    """Command line; file arguments become paths (placeholders for a plan)."""
     section, name = command.split(":", 1)
     argv = [CLI, section, name]
     for key, value in args.items():
+        if key in FILE_ARGS:
+            argv += [f"--{FILE_ARGS[key]}", (files or {}).get(key, "/dev/null")]
+        else:
+            argv += [f"--{key}", value]
+    for key, value in ((files or {}).get("attachment") or {}).items():
         argv += [f"--{key}", value]
     return argv
 
 
-def run(command, args):
+def run(command, args, files=None):
     try:
-        proc = subprocess.run(argv_for(command, args) + ["--output", "json"], stdin=subprocess.DEVNULL,
+        proc = subprocess.run(argv_for(command, args, files) + ["--output", "json"], stdin=subprocess.DEVNULL,
                               capture_output=True, env=ENV, timeout=TIMEOUT, cwd="/")
     except subprocess.TimeoutExpired:
         return None
@@ -144,11 +210,12 @@ def registry_entry(command):
     return {}
 
 
-def plan(command, args):
+def plan(command, args, attachment=None):
     # Without --confirm only a command that requires confirmation is safe to call.
     if registry_entry(command).get("confirmation") != "required":
         return None
-    result = run(command, args)
+    files = {"attachment": {"archive": "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
+    result = run(command, args, files)
     if result is None or result.get("status") != "planned":
         return None
     entry = registry_entry(command)
@@ -174,19 +241,51 @@ def prune_jobs():
             shutil.rmtree(d, ignore_errors=True)
 
 
-def start_job(req, command, args):
+def receive_attachment(path, attachment, stream):
+    """Copy exactly `size` bytes from stdin and check their sha256."""
+    digest, left = hashlib.sha256(), attachment["size"]
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "wb") as out:
+        while left:
+            chunk = stream.read(min(left, 1 << 20))
+            if not chunk:
+                break
+            digest.update(chunk)
+            out.write(chunk)
+            left -= len(chunk)
+    if left or stream.read(1) or digest.hexdigest() != attachment["sha256"]:
+        path.unlink(missing_ok=True)
+        raise Refused("attachment_mismatch")
+
+
+def start_job(req, command, args, stream):
     JOBS.mkdir(mode=0o700, parents=True, exist_ok=True)
     prune_jobs()
     job_id = secrets.token_hex(12)
     d = job_dir(job_id)
     d.mkdir(mode=0o700)
+    files, cleanup = {}, ""
+    try:
+        for key in FILE_ARGS:
+            if key in args:
+                (d / f"{key}.txt").write_text(args[key] + "\n")
+                files[key] = str(d / f"{key}.txt")
+        if req.get("attachment"):
+            archive = d / "release.tar.gz"
+            receive_attachment(archive, req["attachment"], stream)
+            files["attachment"] = {"archive": str(archive), "sha256": req["attachment"]["sha256"]}
+            cleanup = f"rm -f {archive}\n"
+    except Refused:
+        shutil.rmtree(d, ignore_errors=True)
+        raise
     meta = {"job_id": job_id, "request_id": req["request_id"], "actor": req["actor"], "command": command,
-            "args": args, "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+            "args": args, "attachment": req.get("attachment"),
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (d / "job.json").write_text(json.dumps(meta, ensure_ascii=False))
     script = d / "run.sh"
-    quoted = " ".join("'" + a.replace("'", "'\\''") + "'" for a in argv_for(command, args) + ["--confirm", "yes"])
+    quoted = " ".join("'" + a.replace("'", "'\\''") + "'" for a in argv_for(command, args, files) + ["--confirm", "yes"])
     # The arguments were validated against strict patterns; quoting keeps them literal.
-    script.write_text(f"#!/bin/bash\n{quoted} </dev/null >{d}/log 2>&1\necho $? >{d}/exit_code\n")
+    script.write_text(f"#!/bin/bash\n{quoted} </dev/null >{d}/log 2>&1\necho $? >{d}/exit_code\n{cleanup}")
     script.chmod(0o700)
     proc = subprocess.run(["systemd-run", f"--unit={unit_name(job_id)}", "--collect", "--quiet",
                            "--property=Type=exec", *(f"--setenv={k}={v}" for k, v in ENV.items()),
@@ -281,7 +380,8 @@ def log(entry):
 
 def main():
     started = time.time()
-    raw = sys.stdin.buffer.read(MAX_REQUEST + 1)
+    stream = sys.stdin.buffer
+    raw = stream.readline(MAX_REQUEST + 1)  # the request line; an archive may follow
     answer = {"schema": "simai-panel-answer/1", "request_id": None}
     entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "caller": os.environ.get("SUDO_USER", "")}
@@ -291,7 +391,10 @@ def main():
         entry.update(request_id=req["request_id"], user=req["actor"]["user"], owner=owner,
                      impersonated_by=req["actor"].get("impersonated_by"), command=command,
                      domain=args.get("domain"))
-        if owner is not None and "domain" in args and not owned(owner, args["domain"]):
+        if command not in ATTACHMENT or not req.get("confirm") or not req.get("attachment"):
+            if stream.read(1):
+                raise Refused("bad_request")  # nothing may follow a request without an archive
+        if owner is not None and "domain" in args and command != "site:add" and not owned(owner, args["domain"]):
             raise Refused("owner_scope")
         kind = ALLOW[command][2]
         if kind == "job":
@@ -299,13 +402,13 @@ def main():
             raise Done
         if kind == "action":
             if not req.get("confirm", False):
-                data = plan(command, args)
+                data = plan(command, args, req.get("attachment"))
                 if data is None:
                     answer.update(status="failed", reason="plan_failed")
                 else:
                     answer.update(status="ok", kind="plan", data=data)
                 raise Done
-            job_id, started_ok = start_job(req, command, args)
+            job_id, started_ok = start_job(req, command, args, stream)
             entry["job_id"] = job_id
             if started_ok:
                 answer.update(status="ok", kind="job", job_id=job_id)

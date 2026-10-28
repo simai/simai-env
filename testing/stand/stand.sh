@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=2
+FIXTURE_SET=3
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -99,8 +99,11 @@ record() {
     "self-describe.owner-demo|\"demo\"|self:describe|{}"
     "self-commands|null|self:commands|{}"
     "refused.owner-scope|\"demo\"|site:describe|{\"domain\":\"demo-php.test\"}"
-    "refused.not-allowed|null|site:add|{\"domain\":\"x.test\"}"
+    "refused.not-allowed|null|self:update|{}"
     "plan.backup-data|null|backup:data|{\"domain\":\"demo-owned.test\",\"db\":\"no\"}"
+    "plan.site-add|null|site:add|{\"domain\":\"new.test\",\"profile\":\"static\"}"
+    "plan.site-deploy-git|null|site:deploy|{\"domain\":\"demo-static.test\",\"git\":\"https://github.com/example/site\",\"ref\":\"v1.0.0\"}"
+    "refused.owner-admin-only|\"demo\"|owner:create|{\"name\":\"other\"}"
     "logs-nginx.demo-static.test|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\"}"
   )
   local d

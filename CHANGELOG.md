@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.22.0 - 2026-10-29
+
+- Panel gateway, stages 3–4: deploys from a git ref or from a release
+  archive sent after the request line (size and sha256 checked, removed
+  after the job); creating and removing sites, databases, path redirects,
+  the Laravel scheduler entry and certificates; owners with SSH keys sent as
+  text. Owners create sites only for themselves and cannot manage owners.
+
 ## 1.21.0 - 2026-10-29
 
 - Panel gateway, stage 2: actions answer a plan, and with `confirm` start a

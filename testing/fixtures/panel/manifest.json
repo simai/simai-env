@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 2,
+  "set_version": 3,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.21.0",
+  "simai_env": "1.22.0",
   "files": {
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
@@ -25,7 +25,19 @@
       "sha256": "de23cf2ece8df5d4dd3db2a513fba0a6cd83531b52064072bf51e7ad7a485c93",
       "status": "ok"
     },
+    "plan.site-add.json": {
+      "sha256": "a74e86ae7c087d56e255eeb571da5a2c32d7c09cd220e76e86eaeca7775bfb13",
+      "status": "ok"
+    },
+    "plan.site-deploy-git.json": {
+      "sha256": "a0f0072af2d932ef9aa66a204d390730d5dc10179a2bb8cfffd34eb8704fc691",
+      "status": "ok"
+    },
     "refused.not-allowed.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-admin-only.json": {
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
       "status": "refused"
     },
@@ -38,11 +50,11 @@
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "575f97b077653bd08c86316b3ff05bf7beea5aad4dc4fb19468dc42f16876843",
+      "sha256": "194abf2546eee692e8ef4e18d35d743ceb86867d144145809ab36cfe8152610e",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "19a949c4f4f4fc437a7c5482da913cea785891ea836934a37c41ace066bcd4db",
+      "sha256": "933de9097059d5214ffa62f32395b56c703852c56789a2b220c28820d0a43868",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {

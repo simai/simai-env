@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.22.0](v1.22.0.md) — panel deploys, creating and removing sites,
+  databases, redirects and owners.
 - [v1.21.0](v1.21.0.md) — panel actions as jobs; certificates, backups and
   logs as data.
 - [v1.20.0](v1.20.0.md) — read-only panel gateway for SIMAI ENV Panel.

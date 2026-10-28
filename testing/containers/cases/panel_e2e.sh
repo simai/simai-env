@@ -46,7 +46,8 @@ a=$(gate "$(req '"acme"' site:describe '{"domain":"open.test"}')")
 
 # Refusals.
 refused() { local a; a=$(gate "$2"); [[ "$(field 'd["status"]+":"+d["reason"]' <<<"$a")" == "refused:$1" ]] && ok "refused $1: $3" || bad "$3: $a"; }
-refused not_allowed "$(req null site:add '{"domain":"x.test"}')" "write command"
+refused not_allowed "$(req null self:update '{}')" "host update"
+refused not_allowed "$(req null db:drop '{}')" "database server command"
 refused not_allowed "$(req null access:reset-password '{}')" "operator command"
 refused invalid_argument "$(req null site:describe '{"domain":"x.test; id"}')" "shell metacharacters"
 refused invalid_argument "$(req null site:describe '{"domain":"x.test","confirm":"yes"}')" "unknown argument"
@@ -115,6 +116,55 @@ a=$(gate "$(req null job:cancel "{\"job_id\":\"$cjob\"}")")
 [[ "$(field 'd["data"]["state"]' <<<"$a")" == cancelled ]] && ok "running job cancelled" || bad "cancel: $a"
 systemctl is-active "simai-panel-job-${cjob}" >/dev/null 2>&1 && bad "job unit still running" || ok "job unit stopped"
 rm -f /home/simai/www/open.test/big.bin
+
+# Stage 3-4: creating sites, deploying archives, redirects, owners, removing.
+job_ok() { local a j; a=$(gate "$2"); j=$(field 'd.get("job_id","")' <<<"$a"); [[ -n "$j" && "$(wait_job "$1" "$j")" == succeeded ]]; }
+a=$(gate "$(req null site:add '{"domain":"new.test","profile":"static"}')")
+[[ "$(field 'd["kind"]' <<<"$a")" == plan ]] && ok "site add answers a plan" || bad "site add plan: $a"
+[[ -f /etc/nginx/sites-available/new.test.conf ]] && bad "plan created the site" || ok "site add plan changes nothing"
+job_ok null "$(creq null site:add '{"domain":"new.test","profile":"static"}')" && ok "site add job" || bad "site add job"
+gate "$(req null self:describe '{}')" | field '[s["domain"] for s in d["data"]["sites"]]' | grep -q new.test && ok "new site is listed" || bad "new site missing"
+
+mkdir -p /root/rel && echo panel-release >/root/rel/index.html && tar -C /root/rel -czf /root/rel.tgz .
+sum=$(sha256sum /root/rel.tgz | cut -d' ' -f1); size=$(stat -c %s /root/rel.tgz)
+dreq() { printf '{"schema":"simai-panel-request/1","request_id":"d1","actor":{"user":"admin@x","owner":null},"command":"site:deploy","args":{"domain":"new.test"},"confirm":%s,"attachment":{"sha256":"%s","size":%s}}\n' "$1" "$2" "$3"; }
+gate_with() { { printf '%s\n' "$1"; cat "$2"; } | sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate; }
+a=$(gate "$(dreq false "$sum" "$size")")
+[[ "$(field 'd["kind"]' <<<"$a")" == plan ]] && ok "deploy plan without the archive" || bad "deploy plan: $a"
+a=$(gate_with "$(dreq true "$sum" "$size")" /root/rel.tgz)
+j=$(field 'd.get("job_id","")' <<<"$a")
+[[ -n "$j" && "$(wait_job null "$j")" == succeeded ]] && ok "archive deploy through the gateway" || { bad "archive deploy: $a"; gate "$(req null job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"][-8:])'; }
+[[ "$(curl -s -H 'Host: new.test' http://127.0.0.1/)" == panel-release ]] && ok "deployed release is served" || bad "release not served"
+[[ -z "$(ls /var/lib/simai-env/panel-jobs/"$j"/release.tar.gz 2>/dev/null)" ]] && ok "uploaded archive removed after the job" || bad "archive left behind"
+a=$(gate_with "$(dreq true "$(printf '0%.0s' {1..64})" "$size")" /root/rel.tgz)
+[[ "$(field 'd["status"]+":"+d["reason"]' <<<"$a")" == refused:attachment_mismatch ]] && ok "refused attachment_mismatch: wrong sha256" || bad "sha mismatch: $a"
+a=$(gate_with "$(dreq true "$sum" $((size + 10)))" /root/rel.tgz)
+[[ "$(field 'd["reason"]' <<<"$a")" == attachment_mismatch ]] && ok "refused attachment_mismatch: short archive" || bad "short archive: $a"
+refused invalid_argument "$(req null site:deploy '{"domain":"new.test"}')" "deploy without archive or git"
+refused invalid_argument "$(req null site:deploy '{"domain":"new.test","git":"https://github.com/x/y"}')" "git without ref"
+refused invalid_argument "$(req null site:deploy '{"domain":"new.test","git":"ext::sh -c id","ref":"main"}')" "unsafe git url"
+refused invalid_argument '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"user":"a","owner":null},"command":"backup:data","args":{"domain":"new.test"},"attachment":{"sha256":"'"$sum"'","size":1}}' "attachment on another command"
+a=$(gate_with "$(req null self:describe '{}')" /root/rel.tgz)
+[[ "$(field 'd["reason"]' <<<"$a")" == bad_request ]] && ok "refused bad_request: data after a plain request" || bad "trailing data: $a"
+
+job_ok null "$(creq null site:redirect-add '{"domain":"new.test","from":"/old","to":"/","code":"301"}')" && ok "redirect-add job" || bad "redirect-add job"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: new.test' http://127.0.0.1/old)" == 301 ]] && ok "redirect answers 301" || bad "redirect"
+refused invalid_argument "$(req null site:redirect-add '{"domain":"new.test","from":"/x;return 200","to":"/"}')" "unsafe redirect path"
+
+# Owners through the panel.
+key=$(ssh-keygen -q -t ed25519 -N '' -f /root/beta && cat /root/beta.pub)
+job_ok null "$(creq null owner:create "{\"name\":\"beta\",\"pubkey\":\"${key}\"}")" && ok "owner create with a key" || bad "owner create"
+[[ "$(gate "$(req null self:describe '{}')" | field '"beta" in [o["name"] for o in d["data"]["isolation"]["owners"]]')" == True ]] && ok "new owner listed" || bad "owner missing"
+refused invalid_argument "$(req null owner:create '{"name":"gamma","pubkey":"ssh-ed25519 AAAA\"; id"}')" "malformed public key"
+job_ok '"acme"' "$(creq '"acme"' site:add '{"domain":"own.test","profile":"generic","php":"8.3","create-db":"no"}')" && ok "owner creates a site" || bad "owner site add"
+[[ "$(gate "$(req null site:describe '{"domain":"own.test"}')" | field 'd["data"]["owner"]')" == acme ]] && ok "owner's new site belongs to the owner" || bad "owner of new site"
+refused owner_scope "$(creq '"acme"' site:add '{"domain":"x2.test","profile":"static","owner":"beta"}')" "owner creates a site for another owner"
+refused not_allowed "$(creq '"acme"' owner:create '{"name":"evil"}')" "owner creates owners"
+refused owner_scope "$(creq '"acme"' site:remove '{"domain":"new.test"}')" "owner removes another site"
+
+job_ok null "$(creq null site:remove '{"domain":"new.test","remove-files":"yes"}')" && ok "site remove job" || bad "site remove"
+[[ -f /etc/nginx/sites-available/new.test.conf ]] && bad "site still configured" || ok "site removed"
+job_ok null "$(creq null owner:remove '{"name":"beta"}')" && ok "owner remove job" || bad "owner remove"
 
 # The account has no other way in.
 sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate extra </dev/null >/dev/null 2>&1 && bad "gateway accepted arguments" || ok "gateway takes no arguments"

@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-deploy-git",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:deploy",
+    "args": {
+      "domain": "demo-static.test",
+      "git": "https://github.com/example/site",
+      "ref": "v1.0.0"
+    },
+    "target": "demo-static.test",
+    "description": "Deploy a release (git ref, archive or directory) with atomic switch",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

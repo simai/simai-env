@@ -1,10 +1,10 @@
 # Panel gateway
 
-Status: stage 1 (read-only, 1.20.0) and stage 2 (certificates, backups and
-logs in the answers; plans, confirmed actions as jobs, 1.21.0) are
-implemented in `admin/panel_gate.py`, `panel gate-enable|gate-disable|
-gate-status`, test `panel_e2e`. Creating and deleting sites, databases and
-owners are the next stages.
+Status: implemented in `admin/panel_gate.py`, `panel gate-enable|
+gate-disable|gate-status`, test `panel_e2e`: stage 1 (read-only, 1.20.0),
+stage 2 (certificates, backups and logs as data; plans and jobs, 1.21.0),
+stages 3–4 (deploys with an uploaded archive or a git ref; creating and
+removing sites, databases, redirects, owners, 1.22.0).
 
 SIMAI ENV Panel is a Larena application (package `larena/env`) installed by
 simai-env as an ordinary site. simai-env stays the only component that
@@ -49,6 +49,16 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
 - `confirm: false` on a state-changing command returns the plan only, as the
   CLI does without `--confirm yes`.
 
+An action that carries a file sends it after the request line: the request
+is one line ending in `\n` with `"attachment": {"sha256": "<hex>", "size":
+<bytes>}`, followed by exactly that many bytes. Only `site:deploy` takes an
+attachment (a release `tar.gz`, at most `SIMAI_DEPLOY_MAX_ARCHIVE_MB`, 1024
+MB by default), and only with `confirm: true`; a plan needs the metadata
+only. A wrong size or digest is refused `attachment_mismatch`; bytes after a
+request without an attachment are refused `bad_request`. Public SSH keys
+travel as text (`"pubkey": "ssh-ed25519 AAAA… comment"`) and reach the
+command as a file.
+
 ## Answer
 
 ```json
@@ -65,7 +75,7 @@ simai-env result status: `site doctor` answers `ok` with
 | `status` | Meaning |
 | --- | --- |
 | `ok` | `kind` is `result` (data), `plan` (what an action would do) or `job` (`job_id` of a started action) |
-| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `unknown_job`, `not_running` |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `attachment_mismatch`, `unknown_job`, `not_running` |
 | `failed` | ran and failed; `reason`: the simai-env error code, `invalid_output`, `plan_failed` or `job_not_started` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
@@ -117,8 +127,18 @@ action, job). Everything else is refused.
   redirect, hsts, staging}`, `ssl:renew`, `site:deploy-rollback`,
   `backup:data {domain, db, files}` (`db: no` for a site without a
   database), `queue:restart`, `site:service-restart`; `job:*`;
-- next: deploys (artifact upload), creating and deleting sites, databases,
-  owners, cron and redirects.
+- stages 3–4 (1.22.0): `site:deploy {domain, git, ref, migrate, keep}` or
+  with an attachment; `site:add {domain, profile, php, owner, create-db,
+  db-engine, redirect-to, redirect-code, redirect-path}`; `site:remove
+  {domain, remove-files, drop-db, drop-db-user}`; `site:set-php`;
+  `site:redirect-add {domain, from, to, code}`, `site:redirect-remove`;
+  `site:db-create`, `site:db-drop`; `cron:add`, `cron:remove` (the Laravel
+  scheduler entry); `ssl:remove {domain, delete-cert}`; `owner:create {name,
+  pubkey}`, `owner:add-key`, `owner:remove`.
+
+Owner requests: `owner:*` is refused (`not_allowed`); `site:add` always
+creates the site for the requesting owner (another `owner` is refused
+`owner_scope`); every other domain must belong to the owner.
 
 Interactive and operator-only commands (menus, `self bootstrap`,
 `access reset-password`, `self ssh-hardening-ensure`, …) are never exposed.
