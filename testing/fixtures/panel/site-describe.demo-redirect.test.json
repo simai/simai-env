@@ -10,6 +10,7 @@
     "root": "/home/simai/www/demo-redirect.test",
     "public_dir": "public",
     "ssl": "none",
+    "certificate": null,
     "frame_policy": "same-origin",
     "runs_as": "site-demo-redirect-test",
     "owner": null,
@@ -22,6 +23,10 @@
     "backup_schedule": false,
     "adopted": null,
     "manifest": null,
+    "backups": {
+      "schedule": null,
+      "items": []
+    },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-redirect-test.error.log",
       "php_fpm": "/var/log/phpnone-fpm-demo-redirect-test.log",

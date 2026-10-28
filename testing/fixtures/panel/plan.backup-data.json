@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.backup-data",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "backup:data",
+    "args": {
+      "domain": "demo-owned.test",
+      "db": "no"
+    },
+    "target": "demo-owned.test",
+    "description": "Back up site database and files (with retention)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

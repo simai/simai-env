@@ -1,9 +1,10 @@
 # Panel gateway
 
-Status: stage 1 (read-only) is implemented in 1.20.0 (`admin/panel_gate.py`,
-`panel gate-enable|gate-disable|gate-status`, test `panel_e2e`). Plans,
-long operations and owner-scoped changes below are the agreed direction for
-the next stages.
+Status: stage 1 (read-only, 1.20.0) and stage 2 (certificates, backups and
+logs in the answers; plans, confirmed actions as jobs, 1.21.0) are
+implemented in `admin/panel_gate.py`, `panel gate-enable|gate-disable|
+gate-status`, test `panel_e2e`. Creating and deleting sites, databases and
+owners are the next stages.
 
 SIMAI ENV Panel is a Larena application (package `larena/env`) installed by
 simai-env as an ordinary site. simai-env stays the only component that
@@ -63,41 +64,61 @@ simai-env result status: `site doctor` answers `ok` with
 
 | `status` | Meaning |
 | --- | --- |
-| `ok` | `kind` is `result` (data); later also `plan` (what would change) or `job` (`job_id` of a long operation) |
-| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope` |
-| `failed` | ran and failed; `reason`: the simai-env error code or `invalid_output` |
+| `ok` | `kind` is `result` (data), `plan` (what an action would do) or `job` (`job_id` of a started action) |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `unknown_job`, `not_running` |
+| `failed` | ran and failed; `reason`: the simai-env error code, `invalid_output`, `plan_failed` or `job_not_started` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
 private keys or deploy keys. Commands that print secrets for an operator
 (for example a generated password) are not in the allowlist.
 
-## Long operations
+## Site data in the answers
 
-Commands whose effect is not `read` and that can take longer than a few
-seconds (`ssl letsencrypt`, `site deploy`, `backup data`, `php install`, …)
-start a transient systemd unit and answer `kind: job`. The job survives a
-panel restart.
+`site:describe` (and each site in `self:describe`) carries `certificate`:
+the names, issuer, `not_after`, `days_left` and `auto_renew` of the
+certificate nginx serves, or `null`. `site:describe` also carries `backups`:
+the daily schedule (`time`, `keep`, `dest`) and every data backup directory
+with `created_at`, `size_bytes`, `parts` (`db`, `files`, `config`),
+`checksums` and `encrypted`. `logs:nginx {domain, kind: access|error,
+lines: 1-1000}` answers `simai-log-tail/1` with the last lines.
+
+## Actions and jobs
+
+An action without `confirm` answers `kind: plan`: command, arguments, target,
+description, effects and lock. Nothing runs, and only commands whose
+registry entry requires confirmation are ever called this way.
+
+With `confirm: true` the gateway starts the command with `--confirm yes` as
+a transient systemd unit `simai-panel-job-<job_id>` and answers
+`kind: job`. The job survives the panel and the gateway call; its record,
+human output and exit code are in `/var/lib/simai-env/panel-jobs/<job_id>/`
+(root only, kept 30 days).
 
 | Command | Answer |
 | --- | --- |
-| `job:status` `{job_id}` | `queued`, `running`, `succeeded`, `failed`, `cancelled`, current step, timestamps |
-| `job:log` `{job_id, after}` | log lines after a cursor (for a live view) |
-| `job:cancel` `{job_id}` | stops the unit; the command's own rollback applies |
+| `job:status` `{job_id}` | `state`: `running`, `succeeded`, `failed`, `busy` (target locked), `cancelled`; exit code, command, arguments, actor |
+| `job:log` `{job_id, after}` | up to 1000 output lines after the cursor and `next`, for a live view |
+| `job:cancel` `{job_id}` | stops the unit; refused `not_running` for a finished job |
+| `job:list` | the last 100 jobs |
+
+An owner sees and controls only jobs started as that owner.
 
 ## Allowlist
 
-The allowlist is derived from the registry (`self commands`: effects,
-confirmation, lock) and a panel policy file shipped with simai-env:
+The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
+with a validator per argument, its required arguments and its kind (read,
+action, job). Everything else is refused.
 
-- stage 1 (implemented): `self:describe`, `self:commands`,
+- stage 1 (1.20.0): `self:describe`, `self:commands`,
   `site:describe {domain}`, `site:doctor {domain, strict, include-target}`.
   An owner gets `self:describe` reduced to their own sites and is refused
-  (`owner_scope`) on any other domain. `confirm` must be absent or false;
-- next read commands need a structured answer first: SSL status and expiry,
-  backups, log tails;
-- stage 2: safe actions (`ssl letsencrypt`, `site deploy`,
-  `site deploy-rollback`, `backup data`, `queue restart`);
-- stage 3–4: owner-scoped and creating/deleting commands.
+  (`owner_scope`) on any other domain. `confirm` is refused on reads;
+- stage 2 (1.21.0): `logs:nginx`; actions `ssl:letsencrypt {domain, email,
+  redirect, hsts, staging}`, `ssl:renew`, `site:deploy-rollback`,
+  `backup:data {domain, db, files}` (`db: no` for a site without a
+  database), `queue:restart`, `site:service-restart`; `job:*`;
+- next: deploys (artifact upload), creating and deleting sites, databases,
+  owners, cron and redirects.
 
 Interactive and operator-only commands (menus, `self bootstrap`,
 `access reset-password`, `self ssh-hardening-ensure`, …) are never exposed.

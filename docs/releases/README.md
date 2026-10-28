@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.21.0](v1.21.0.md) — panel actions as jobs; certificates, backups and
+  logs as data.
 - [v1.20.0](v1.20.0.md) — read-only panel gateway for SIMAI ENV Panel.
 - [v1.19.0](v1.19.0.md) — whole-domain redirects to the target's root page
   (`--redirect-path drop`).

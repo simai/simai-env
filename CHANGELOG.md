@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.21.0 - 2026-10-29
+
+- Panel gateway, stage 2: actions answer a plan, and with `confirm` start a
+  job (a transient systemd unit) followed by `job:status`, `job:log` with a
+  cursor, `job:cancel` and `job:list`; owners see only their own jobs.
+  Actions: `ssl letsencrypt`, `ssl renew`, `site deploy-rollback`,
+  `backup data`, `queue restart`, `site service-restart`.
+- `site describe` and `self describe` show the certificate nginx serves
+  (names, issuer, expiry, days left, auto-renew); `site describe` lists the
+  site's data backups and their schedule. `logs nginx --output json` answers
+  the last lines as data.
+
 ## 1.20.0 - 2026-10-28
 
 - Panel gateway, stage 1 (read-only): `panel gate-enable` lets the

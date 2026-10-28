@@ -1,0 +1,22 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-job-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "job_id": "000000000000000000000000",
+    "state": "succeeded",
+    "exit_code": 0,
+    "command": "backup:data",
+    "args": {
+      "domain": "demo-owned.test",
+      "db": "no"
+    },
+    "created_at": "2026-01-01T00:00:00Z",
+    "request_id": "fixture-job-start",
+    "actor": {
+      "user": "admin@stand.test",
+      "owner": null
+    }
+  }
+}

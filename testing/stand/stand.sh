@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=1
+FIXTURE_SET=2
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -100,6 +100,8 @@ record() {
     "self-commands|null|self:commands|{}"
     "refused.owner-scope|\"demo\"|site:describe|{\"domain\":\"demo-php.test\"}"
     "refused.not-allowed|null|site:add|{\"domain\":\"x.test\"}"
+    "plan.backup-data|null|backup:data|{\"domain\":\"demo-owned.test\",\"db\":\"no\"}"
+    "logs-nginx.demo-static.test|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\"}"
   )
   local d
   for d in demo-static.test demo-php.test demo-owned.test demo-redirect.test; do
@@ -112,10 +114,25 @@ record() {
     printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":%s},"command":"%s","args":%s}' \
       "$name" "$owner" "$command" "$args" | gate >"${FIXTURES}/${name}.json"
   done
+  # A job: start, follow to the end, then remove the backup it made so the
+  # site answers above stay the same on the next recording.
+  local job req='{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":null},"command":"%s","args":%s%s}'
+  # shellcheck disable=SC2059 # the format is the request template above
+  printf "$req" job-start backup:data '{"domain":"demo-owned.test","db":"no"}' ',"confirm":true' | gate >"${FIXTURES}/job-start.json"
+  job=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["job_id"])' "${FIXTURES}/job-start.json")
+  for _ in $(seq 60); do
+    # shellcheck disable=SC2059
+    printf "$req" job-status job:status "{\"job_id\":\"${job}\"}" '' | gate >"${FIXTURES}/job-status.json"
+    grep -q '"state": "running"' "${FIXTURES}/job-status.json" || break
+    sleep 1
+  done
+  # shellcheck disable=SC2059
+  printf "$req" job-log job:log "{\"job_id\":\"${job}\"}" '' | gate >"${FIXTURES}/job-log.json"
+  in_stand bash -c 'ls -1d /var/backups/simai/demo-owned.test/*/ | tail -n1 | xargs -r rm -rf'
   # Every answer must be valid JSON; a recording with stray output is useless.
   # manifest.json pins the set: larena/env checks its copy against it.
   python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'
-import hashlib, json, pathlib, sys
+import hashlib, json, pathlib, re, sys
 root, env_version, set_version = pathlib.Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
 files = {}
 for f in sorted(root.glob("*.json")):
@@ -125,8 +142,21 @@ for f in sorted(root.glob("*.json")):
     # Volatile values are pinned so that only a real change alters the set.
     if "operation_id" in d:
         d["operation_id"] = "fixture"
-    if isinstance(d.get("data"), dict) and "generated_at" in d["data"]:
-        d["data"]["generated_at"] = "2026-01-01T00:00:00Z"
+    data = d.get("data") if isinstance(d.get("data"), dict) else {}
+    if "generated_at" in data:
+        data["generated_at"] = "2026-01-01T00:00:00Z"
+    if "job_id" in d:
+        d["job_id"] = "0" * 24
+    if "job_id" in data:
+        data["job_id"] = "0" * 24
+        if "created_at" in data:
+            data["created_at"] = "2026-01-01T00:00:00Z"
+    if "lines" in data:
+        # Dates, times and backup ids change on every run.
+        data["lines"] = [re.sub(r"\d{8}-\d{6}", "20260101-000000", re.sub(r"corr_id=[0-9A-Za-z-]+", "corr_id=fixture",
+                         re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "2026-01-01T00:00:00",
+                         re.sub(r"\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4}", "01/Jan/2026:00:00:00 +0000", l))))
+                         for l in data["lines"]]
     f.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
     files[f.name] = {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "status": d["status"]}
     print(f"[stand] recorded {f.name}: {d['status']}")

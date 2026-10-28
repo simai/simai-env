@@ -10,6 +10,7 @@
     "root": "/home/simai/www/demo-static.test",
     "public_dir": "public",
     "ssl": "none",
+    "certificate": null,
     "frame_policy": "same-origin",
     "runs_as": "site-demo-static-test",
     "owner": null,
@@ -27,6 +28,10 @@
     "backup_schedule": false,
     "adopted": null,
     "manifest": null,
+    "backups": {
+      "schedule": null,
+      "items": []
+    },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-static-test.error.log",
       "php_fpm": "/var/log/phpnone-fpm-demo-static-test.log",

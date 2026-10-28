@@ -26,7 +26,7 @@ def result(args):
         "verification": "not_run" if status == "planned" else "handler_exit_only",
     }
     # Only these audited handlers return structured, secret-free native data.
-    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog"} or key == "site:doctor" and status in {"success", "failed"}) and output:
+    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx"} or key == "site:doctor" and status in {"success", "failed"}) and output:
         try:
             value["data"] = json.loads(Path(output).read_text())
             if key == "site:doctor":

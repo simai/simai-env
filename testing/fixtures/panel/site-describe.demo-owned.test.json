@@ -10,6 +10,7 @@
     "root": "/home/simai/www/demo-owned.test",
     "public_dir": "public",
     "ssl": "none",
+    "certificate": null,
     "frame_policy": "same-origin",
     "runs_as": "demo",
     "owner": "demo",
@@ -22,6 +23,10 @@
     "backup_schedule": false,
     "adopted": null,
     "manifest": null,
+    "backups": {
+      "schedule": null,
+      "items": []
+    },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-owned-test.error.log",
       "php_fpm": "/var/log/php8.3-fpm-demo-owned-test.log",

@@ -1,0 +1,31 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-job-log",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "job_id": "000000000000000000000000",
+    "state": "succeeded",
+    "lines": [
+      "2026-01-01T00:00:00 [INFO] Running command backup data (corr_id=fixture)",
+      "",
+      "SIMAI ENV · Data backup",
+      "2026-01-01T00:00:00 [INFO] Archiving /home/simai/www/demo-owned.test",
+      "",
+      "Result",
+      "+----------+----------------------------------------------------+",
+      "| Domain   | demo-owned.test                                    |",
+      "| Backup   | /var/backups/simai/demo-owned.test/20260101-000000 |",
+      "| Database | skipped                                            |",
+      "| Files    | yes                                                |",
+      "| Size     | 20K                                                |",
+      "| Kept     | last 7                                             |",
+      "| Off-site | not configured                                     |",
+      "+----------+----------------------------------------------------+",
+      "",
+      "Next steps",
+      "  Verify:            simai-admin.sh backup data-verify --path /var/backups/simai/demo-owned.test/20260101-000000 --restore-test yes --confirm yes"
+    ],
+    "next": 18
+  }
+}

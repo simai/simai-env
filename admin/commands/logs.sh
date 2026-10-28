@@ -82,6 +82,16 @@ logs_nginx_handler() {
     warn "No ${kind} log found for ${domain} (checked: ${candidates[*]})"
     return 1
   fi
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    [[ "$lines" =~ ^[0-9]+$ ]] && (( lines >= 1 && lines <= 1000 )) || { error "--lines must be 1-1000"; return 1; }
+    tail -n "$lines" "$file" | python3 -c '
+import json, sys
+rows = [l.rstrip("\n") for l in sys.stdin.buffer.read().decode("utf-8", "replace").splitlines()]
+json.dump({"schema": "simai-log-tail/1", "domain": sys.argv[1], "kind": sys.argv[2], "file": sys.argv[3],
+           "lines": rows}, sys.stdout, ensure_ascii=False)
+print()' "$domain" "$kind" "$file"
+    return 0
+  fi
   logs_tail_file "$file" "$lines"
 }
 

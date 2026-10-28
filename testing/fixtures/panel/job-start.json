@@ -1,0 +1,7 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-job-start",
+  "status": "ok",
+  "kind": "job",
+  "job_id": "000000000000000000000000"
+}

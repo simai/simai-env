@@ -108,6 +108,71 @@ def manifest_summary(root: Path) -> dict | None:
     return None
 
 
+def certificate(domain: str) -> dict | None:
+    """Certificate nginx serves for the site: names, issuer, expiry (no key material)."""
+    conf = NGINX / f"{domain}.conf"
+    try:
+        match = re.search(r"^\s*ssl_certificate\s+([^;\s]+);", conf.read_text(), re.M)
+    except OSError:
+        return None
+    if not match:
+        return None
+    path = match.group(1)
+    try:
+        out = subprocess.run(["openssl", "x509", "-in", path, "-noout", "-enddate", "-issuer", "-ext", "subjectAltName",
+                              "-nameopt", "multiline"], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        out = ""
+    end = re.search(r"^notAfter=(.+)$", out, re.M)
+    if not end:
+        return {"path": path, "valid": False}
+    not_after = datetime.strptime(end.group(1).strip(), "%b %d %H:%M:%S %Y %Z").replace(tzinfo=timezone.utc)
+    issuer = {k.strip(): v.strip() for k, v in re.findall(r"^\s+(commonName|organizationName)\s*=\s*(.+)$", out, re.M)}
+    names = re.findall(r"DNS:([^,\s]+)", out)
+    return {
+        "path": path,
+        "valid": True,
+        "names": names,
+        "issuer": issuer.get("organizationName") or issuer.get("commonName"),
+        "not_after": not_after.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "days_left": (not_after - datetime.now(timezone.utc)).days,
+        "auto_renew": (Path("/etc/letsencrypt/renewal") / f"{domain}.conf").is_file(),
+    }
+
+
+def backups(domain: str, project: str) -> dict:
+    """Data backups of the site: schedule and the backup directories it keeps."""
+    cron = Path("/etc/cron.d") / f"simai-backup-{project}"
+    schedule, dests = None, {os.environ.get("SIMAI_BACKUP_DEST", "/var/backups/simai")}
+    try:
+        line = next(l for l in cron.read_text().splitlines() if l and not l.startswith("#"))
+        fields = line.split()
+        opts = dict(zip(fields[::1], fields[1::1]))
+        schedule = {"time": f"{int(fields[1]):02d}:{int(fields[0]):02d}", "keep": opts.get("--keep"), "dest": opts.get("--dest")}
+        if schedule["dest"]:
+            dests.add(schedule["dest"])
+    except (OSError, StopIteration, ValueError, IndexError):
+        pass
+    items = []
+    for dest in sorted(dests):
+        base = Path(dest) / domain
+        if not base.is_dir():
+            continue
+        for d in sorted(base.iterdir(), reverse=True):
+            if not (d.is_dir() and re.match(r"^\d{8}-\d{6}$", d.name)):
+                continue
+            files = [f for f in d.iterdir() if f.is_file()]
+            items.append({
+                "path": str(d),
+                "created_at": datetime.strptime(d.name, "%Y%m%d-%H%M%S").strftime("%Y-%m-%dT%H:%M:%S"),
+                "size_bytes": sum(f.stat().st_size for f in files),
+                "parts": sorted(n for n in ("db", "files", "config") if any(f.name.startswith(n + ".") for f in files)),
+                "checksums": (d / "SHA256SUMS").is_file(),
+                "encrypted": any(f.name.endswith(".age") for f in files),
+            })
+    return {"schedule": schedule, "items": items}
+
+
 def describe_site(domain: str, detailed: bool) -> dict:
     meta = metadata(domain)
     project = meta.get("project") or domain.replace(".", "-")
@@ -139,6 +204,7 @@ def describe_site(domain: str, detailed: bool) -> dict:
         "root": str(root),
         "public_dir": meta.get("public-dir"),
         "ssl": meta.get("ssl"),
+        "certificate": certificate(domain),
         "frame_policy": meta.get("frame-policy", "same-origin"),
         "runs_as": runs_as or "simai (shared, not isolated)",
         "owner": owner,
@@ -156,6 +222,7 @@ def describe_site(domain: str, detailed: bool) -> dict:
     if detailed:
         cli = "simai-admin.sh"
         info["manifest"] = manifest_summary(root)
+        info["backups"] = backups(domain, project)
         info["logs"] = {
             "nginx_error": f"/var/log/nginx/{project}.error.log",
             "php_fpm": f"/var/log/php{meta.get('php')}-fpm-{project}.log",

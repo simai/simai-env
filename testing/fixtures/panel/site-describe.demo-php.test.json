@@ -10,6 +10,7 @@
     "root": "/home/simai/www/demo-php.test",
     "public_dir": "public",
     "ssl": "none",
+    "certificate": null,
     "frame_policy": "same-origin",
     "runs_as": "site-demo-php-test",
     "owner": null,
@@ -28,6 +29,23 @@
     "backup_schedule": false,
     "adopted": null,
     "manifest": null,
+    "backups": {
+      "schedule": null,
+      "items": [
+        {
+          "path": "/var/backups/simai/demo-php.test/20261028-205743",
+          "created_at": "2026-10-28T20:57:43",
+          "size_bytes": 4347,
+          "parts": [
+            "config",
+            "db",
+            "files"
+          ],
+          "checksums": true,
+          "encrypted": false
+        }
+      ]
+    },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-php-test.error.log",
       "php_fpm": "/var/log/php8.3-fpm-demo-php-test.log",
