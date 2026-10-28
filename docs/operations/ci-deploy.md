@@ -102,4 +102,11 @@ sudo /root/simai-env/simai-admin.sh site redirect-list --domain example.com
 # a whole domain (path and query are kept; ACME still answers for renewals)
 sudo /root/simai-env/simai-admin.sh profile enable --id redirect --confirm yes
 sudo /root/simai-env/simai-admin.sh site add --domain old.example.com --profile redirect --redirect-to https://new.example.com --redirect-code 301 --confirm yes
+
+# a retired site whose pages have no counterpart: every request goes to the
+# target's root page
+sudo /root/simai-env/simai-admin.sh site add --domain gone.example.com --profile redirect --redirect-to https://new.example.com --redirect-path drop --confirm yes
 ```
+
+`--redirect-to` is always an origin; `--redirect-path keep` (the default)
+sends the path and query along, `drop` sends every request to `/`.

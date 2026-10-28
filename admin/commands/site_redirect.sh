@@ -27,7 +27,11 @@ site_redirect_list_handler() {
       [[ -n "$code" ]] && rows+=("${from}|${code} -> ${to}")
     done <"$file"
   fi
-  [[ -n "$(site_redirect_env_get "$domain" TARGET)" ]] && rows+=("whole domain|$(site_redirect_env_get "$domain" CODE) -> $(site_redirect_env_get "$domain" TARGET)\$request_uri")
+  [[ -n "$(site_redirect_env_get "$domain" TARGET)" ]] && {
+    local suffix='$request_uri'
+    [[ "$(site_redirect_env_get "$domain" PATH)" == drop ]] && suffix="/"
+    rows+=("whole domain|$(site_redirect_env_get "$domain" CODE) -> $(site_redirect_env_get "$domain" TARGET)${suffix}")
+  }
   [[ ${#rows[@]} -gt 0 ]] || rows=("Redirects|none")
   ui_result_table "${rows[@]}"
 }

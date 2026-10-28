@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.19.0](v1.19.0.md) — whole-domain redirects to the target's root page
+  (`--redirect-path drop`).
 - [v1.18.2](v1.18.2.md) — charset utf-8 on node sites with a static root.
 - [v1.18.1](v1.18.1.md) — deny rules cover prefix locations.
 - [v1.18.0](v1.18.0.md) — node sites with a static root and service routes,

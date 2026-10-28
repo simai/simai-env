@@ -121,6 +121,17 @@ loc=$(curl -s -D - -o /dev/null -H "Host: old.test" "http://127.0.0.1/a/b?c=1" |
 mkdir -p /home/simai/www/old.test/public/.well-known/acme-challenge && echo tok >/home/simai/www/old.test/public/.well-known/acme-challenge/t
 [[ "$(curl -s -H 'Host: old.test' http://127.0.0.1/.well-known/acme-challenge/t)" == tok ]] && ok "redirect site still answers ACME" || bad "acme on redirect site"
 cli site add --domain bad.test --profile redirect --redirect-to 'https://new.test/$x' --confirm yes >/dev/null 2>&1 && bad "unsafe domain target accepted" || ok "unsafe domain redirect refused"
+cli site add --domain gone.test --profile redirect --redirect-to https://new.test --redirect-path drop --confirm yes >/tmp/s-gone 2>&1 && ok "site add --redirect-path drop" || { bad "drop redirect site"; tail -8 /tmp/s-gone; }
+wait_code gone.test /en/page 301
+loc=$(curl -s -D - -o /dev/null -H "Host: gone.test" "http://127.0.0.1/en/page?c=1" | tr -d '\r' | sed -n 's/^Location: //p')
+[[ "$loc" == "https://new.test/" ]] && ok "drop redirect goes to the root page" || bad "drop redirect: $loc"
+cli site redirect-list --domain gone.test 2>&1 | grep -q 'https://new.test/' && ok "redirect-list shows the dropped path" || bad "redirect-list drop"
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=gone.test" -addext "subjectAltName=DNS:gone.test" -keyout $C/gone-key.pem -out $C/gone.pem >/dev/null 2>&1
+cli ssl install --domain gone.test --cert $C/gone.pem --key $C/gone-key.pem --redirect no --confirm yes >/tmp/s-gone-ssl 2>&1 || { bad "ssl install on drop redirect"; tail -5 /tmp/s-gone-ssl; }
+for _ in {1..20}; do [[ "$(curl -sk -o /dev/null -w '%{http_code}' --resolve gone.test:443:127.0.0.1 https://gone.test/x)" == 301 ]] && break; sleep 0.5; done
+loc=$(curl -sk -D - -o /dev/null --resolve gone.test:443:127.0.0.1 "https://gone.test/en/x" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')
+[[ "$loc" == "https://new.test/" ]] && ok "drop redirect kept after ssl install" || bad "drop after ssl install: $loc"
+cli site add --domain odd.test --profile redirect --redirect-to https://new.test --redirect-path some --confirm yes >/dev/null 2>&1 && bad "unknown --redirect-path accepted" || ok "unknown --redirect-path refused"
 
 # CI deploy key over real SSH.
 command -v sshd >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq openssh-server >/dev/null 2>&1; }

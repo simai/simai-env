@@ -1430,10 +1430,12 @@ create_nginx_site() {
     app_routes_ensure "$domain" "$project" "$app_port" "$project_path" || return 1
   fi
   # Whole-domain redirect sites (profile redirect).
-  local redirect_target="" redirect_code=""
+  local redirect_target="" redirect_code="" redirect_suffix='$request_uri'
   if grep -q '{{REDIRECT_TARGET}}' "$template_path"; then
     redirect_target="${SITE_REDIRECT_TARGET:-$(site_redirect_env_get "$domain" TARGET)}"
     redirect_code="${SITE_REDIRECT_CODE:-$(site_redirect_env_get "$domain" CODE)}"
+    # Sites created before 1.19.0 have no PATH and keep the path.
+    [[ "${SITE_REDIRECT_PATH:-$(site_redirect_env_get "$domain" PATH)}" == drop ]] && redirect_suffix="/"
     if ! site_redirect_target_valid "$redirect_target" || [[ ! "$redirect_code" =~ ^30[1278]$ ]]; then
       error "nginx template ${template_path##*/} needs a redirect target and code"
       return 1
@@ -1451,7 +1453,8 @@ create_nginx_site() {
       -e "s#{{APP_PORT}}#${app_port}#g" \
       -e "s#{{APP_ROUTES_FILE}}#$(app_routes_file "$domain")#g" \
       -e "s#{{REDIRECT_TARGET}}#${redirect_target//&/\\&}#g" \
-      -e "s#{{REDIRECT_CODE}}#${redirect_code}#g" "$template_path"
+      -e "s#{{REDIRECT_CODE}}#${redirect_code}#g" \
+      -e "s#{{REDIRECT_SUFFIX}}#${redirect_suffix}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)

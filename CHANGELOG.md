@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.19.0 - 2026-10-28
+
+- Whole-domain redirect sites take `--redirect-path keep|drop`: `drop` sends
+  every request to the target's root page, for retired sites whose pages have
+  no counterpart on the new one. `keep` stays the default; existing redirect
+  sites keep their path on re-render. `site redirect-list` shows the mode.
+
 ## 1.18.2 - 2026-10-21
 
 - Node sites with a static root send `charset=utf-8` with text answers, as
