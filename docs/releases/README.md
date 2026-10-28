@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.23.1](v1.23.1.md) — `install.sh` installs the panel with the server.
 - [v1.23.0](v1.23.0.md) — `panel install`: SIMAI ENV Panel as its own site,
   placeholder until the Larena build.
 - [v1.22.0](v1.22.0.md) — panel deploys, creating and removing sites,

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.23.1 - 2026-10-29
+
+- `install.sh` change of 1.23.0 that was left out of its release:
+  `SIMAI_INSTALL_PANEL_DOMAIN` (and `SIMAI_INSTALL_PANEL_EMAIL`) install
+  SIMAI ENV Panel with the server.
+
 ## 1.23.0 - 2026-10-29
 
 - `panel install --domain D` installs SIMAI ENV Panel as its own isolated
