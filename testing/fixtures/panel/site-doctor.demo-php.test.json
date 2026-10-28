@@ -1,1 +1,170 @@
-{"schema": "simai-panel-answer/1", "request_id": "fixture-site-doctor.demo-php.test", "status": "ok", "kind": "result", "data": {"schema": "simai-site-diagnostics/1", "status": "WARN", "summary": {"PASS": 21, "WARN": 1, "FAIL": 0, "SKIP": 3}, "checks": [{"id": 1, "status": "PASS", "area": "profile", "title": "Project slug"}, {"id": 2, "status": "PASS", "area": "fs", "title": "Project root"}, {"id": 3, "status": "PASS", "area": "profile", "title": "Profile"}, {"id": 4, "status": "PASS", "area": "fs", "title": "Root directory"}, {"id": 5, "status": "PASS", "area": "fs", "title": "Docroot"}, {"id": 6, "status": "PASS", "area": "fs", "title": "Bootstrap files"}, {"id": 7, "status": "PASS", "area": "fs", "title": ".env permissions"}, {"id": 8, "status": "PASS", "area": "fs", "title": "World-writable files"}, {"id": 9, "status": "SKIP", "area": "app", "title": "Application profile checks"}, {"id": 10, "status": "PASS", "area": "nginx", "title": "Config exists"}, {"id": 11, "status": "PASS", "area": "nginx", "title": "Enabled link"}, {"id": 12, "status": "PASS", "area": "nginx", "title": "Healthcheck location"}, {"id": 13, "status": "PASS", "area": "nginx", "title": "nginx -t"}, {"id": 14, "status": "PASS", "area": "php", "title": "PHP version"}, {"id": 15, "status": "PASS", "area": "php", "title": "PHP binary"}, {"id": 16, "status": "PASS", "area": "php", "title": "php-fpm service"}, {"id": 17, "status": "PASS", "area": "php", "title": "Pool config"}, {"id": 18, "status": "PASS", "area": "php", "title": "Socket"}, {"id": 19, "status": "PASS", "area": "php", "title": "Required extensions"}, {"id": 20, "status": "WARN", "area": "php", "title": "Recommended extensions"}, {"id": 21, "status": "SKIP", "area": "cron", "title": "Cron"}, {"id": 22, "status": "SKIP", "area": "ssl", "title": "SSL"}, {"id": 23, "status": "PASS", "area": "db", "title": "MySQL service"}, {"id": 24, "status": "PASS", "area": "db", "title": "MySQL network exposure"}, {"id": 25, "status": "PASS", "area": "db", "title": "db.env"}]}, "command_status": "success", "operation_id": "20261028195434296941383"}
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-doctor.demo-php.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-diagnostics/1",
+    "status": "WARN",
+    "summary": {
+      "PASS": 21,
+      "WARN": 1,
+      "FAIL": 0,
+      "SKIP": 3
+    },
+    "checks": [
+      {
+        "id": 1,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Project slug"
+      },
+      {
+        "id": 2,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Project root"
+      },
+      {
+        "id": 3,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Profile"
+      },
+      {
+        "id": 4,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Root directory"
+      },
+      {
+        "id": 5,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Docroot"
+      },
+      {
+        "id": 6,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Bootstrap files"
+      },
+      {
+        "id": 7,
+        "status": "PASS",
+        "area": "fs",
+        "title": ".env permissions"
+      },
+      {
+        "id": 8,
+        "status": "PASS",
+        "area": "fs",
+        "title": "World-writable files"
+      },
+      {
+        "id": 9,
+        "status": "SKIP",
+        "area": "app",
+        "title": "Application profile checks"
+      },
+      {
+        "id": 10,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Config exists"
+      },
+      {
+        "id": 11,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Enabled link"
+      },
+      {
+        "id": 12,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Healthcheck location"
+      },
+      {
+        "id": 13,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "nginx -t"
+      },
+      {
+        "id": 14,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP version"
+      },
+      {
+        "id": 15,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP binary"
+      },
+      {
+        "id": 16,
+        "status": "PASS",
+        "area": "php",
+        "title": "php-fpm service"
+      },
+      {
+        "id": 17,
+        "status": "PASS",
+        "area": "php",
+        "title": "Pool config"
+      },
+      {
+        "id": 18,
+        "status": "PASS",
+        "area": "php",
+        "title": "Socket"
+      },
+      {
+        "id": 19,
+        "status": "PASS",
+        "area": "php",
+        "title": "Required extensions"
+      },
+      {
+        "id": 20,
+        "status": "WARN",
+        "area": "php",
+        "title": "Recommended extensions"
+      },
+      {
+        "id": 21,
+        "status": "SKIP",
+        "area": "cron",
+        "title": "Cron"
+      },
+      {
+        "id": 22,
+        "status": "SKIP",
+        "area": "ssl",
+        "title": "SSL"
+      },
+      {
+        "id": 23,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL service"
+      },
+      {
+        "id": 24,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL network exposure"
+      },
+      {
+        "id": 25,
+        "status": "PASS",
+        "area": "db",
+        "title": "db.env"
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

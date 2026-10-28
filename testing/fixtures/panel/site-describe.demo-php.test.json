@@ -1,1 +1,56 @@
-{"schema": "simai-panel-answer/1", "request_id": "fixture-site-describe.demo-php.test", "status": "ok", "kind": "result", "data": {"domain": "demo-php.test", "profile": "generic", "php": "8.3", "root": "/home/simai/www/demo-php.test", "public_dir": "public", "ssl": "none", "frame_policy": "same-origin", "runs_as": "site-demo-php-test", "owner": null, "database": {"engine": "mysql", "name": "demo_php_test", "user": "demo_php_test", "host": "localhost", "port": "3306"}, "layout": "in-place", "release": null, "workers": [], "service": null, "scheduler": false, "backup_schedule": false, "adopted": null, "manifest": null, "logs": {"nginx_error": "/var/log/nginx/demo-php-test.error.log", "php_fpm": "/var/log/php8.3-fpm-demo-php-test.log", "app": "/home/simai/www/demo-php.test/storage/logs", "workers": []}, "how_to": {"inspect": "simai-admin.sh site doctor --domain demo-php.test", "deploy": "simai-admin.sh site deploy --domain demo-php.test --git <url> --ref <tag> --confirm yes", "deploy_archive": "simai-admin.sh site deploy --domain demo-php.test --archive <file.tar.gz> --sha256 <sum> --confirm yes", "rollback": "simai-admin.sh site deploy-rollback --domain demo-php.test --confirm yes", "reconcile_requirements": "simai-admin.sh site adopt --domain demo-php.test --confirm yes", "backup": "simai-admin.sh backup data --domain demo-php.test --confirm yes", "verify_backup": "simai-admin.sh backup data-verify --path <backup-dir> --restore-test yes --confirm yes", "run_artisan_as_site_user": "sudo -u site-demo-php-test -H php8.3 /home/simai/www/demo-php.test/artisan <command>"}, "rules": ["Commands that change state print a plan unless --confirm yes is given; read the plan first.", "Do not edit nginx, PHP-FPM, cron or systemd files by hand; use simai-admin.sh so metadata stays consistent.", "Application secrets live in the site .env and /etc/simai-env/sites/<domain>/db.env; never print them."], "schema": "simai-site/1"}, "command_status": "success", "operation_id": "20261028195433996206632"}
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-describe.demo-php.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "domain": "demo-php.test",
+    "profile": "generic",
+    "php": "8.3",
+    "root": "/home/simai/www/demo-php.test",
+    "public_dir": "public",
+    "ssl": "none",
+    "frame_policy": "same-origin",
+    "runs_as": "site-demo-php-test",
+    "owner": null,
+    "database": {
+      "engine": "mysql",
+      "name": "demo_php_test",
+      "user": "demo_php_test",
+      "host": "localhost",
+      "port": "3306"
+    },
+    "layout": "in-place",
+    "release": null,
+    "workers": [],
+    "service": null,
+    "scheduler": false,
+    "backup_schedule": false,
+    "adopted": null,
+    "manifest": null,
+    "logs": {
+      "nginx_error": "/var/log/nginx/demo-php-test.error.log",
+      "php_fpm": "/var/log/php8.3-fpm-demo-php-test.log",
+      "app": "/home/simai/www/demo-php.test/storage/logs",
+      "workers": []
+    },
+    "how_to": {
+      "inspect": "simai-admin.sh site doctor --domain demo-php.test",
+      "deploy": "simai-admin.sh site deploy --domain demo-php.test --git <url> --ref <tag> --confirm yes",
+      "deploy_archive": "simai-admin.sh site deploy --domain demo-php.test --archive <file.tar.gz> --sha256 <sum> --confirm yes",
+      "rollback": "simai-admin.sh site deploy-rollback --domain demo-php.test --confirm yes",
+      "reconcile_requirements": "simai-admin.sh site adopt --domain demo-php.test --confirm yes",
+      "backup": "simai-admin.sh backup data --domain demo-php.test --confirm yes",
+      "verify_backup": "simai-admin.sh backup data-verify --path <backup-dir> --restore-test yes --confirm yes",
+      "run_artisan_as_site_user": "sudo -u site-demo-php-test -H php8.3 /home/simai/www/demo-php.test/artisan <command>"
+    },
+    "rules": [
+      "Commands that change state print a plan unless --confirm yes is given; read the plan first.",
+      "Do not edit nginx, PHP-FPM, cron or systemd files by hand; use simai-admin.sh so metadata stays consistent.",
+      "Application secrets live in the site .env and /etc/simai-env/sites/<domain>/db.env; never print them."
+    ],
+    "schema": "simai-site/1"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

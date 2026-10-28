@@ -1,1 +1,53 @@
-{"schema": "simai-panel-answer/1", "request_id": "fixture-self-describe.owner-demo", "status": "ok", "kind": "result", "data": {"schema": "simai-host/1", "generated_at": "2026-10-28T19:54:32Z", "simai_env": {"version": "1.20.0", "root": "/root/simai-env", "cli": "/root/simai-env/simai-admin.sh"}, "os": {"id": "ubuntu", "version": "24.04"}, "services": {"nginx": "active", "mysql": "active", "postgresql": "inactive", "redis": "inactive", "cron": "active", "php8.3-fpm": "active"}, "php_versions": ["8.3"], "sites": [{"domain": "demo-owned.test", "profile": "generic", "php": "8.3", "root": "/home/simai/www/demo-owned.test", "public_dir": "public", "ssl": "none", "frame_policy": "same-origin", "runs_as": "demo", "owner": "demo", "database": null, "layout": "in-place", "release": null, "workers": [], "service": null, "scheduler": false, "backup_schedule": false, "adopted": null}]}, "command_status": "success", "operation_id": "20261028195432106549631"}
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-self-describe.owner-demo",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-host/1",
+    "generated_at": "2026-01-01T00:00:00Z",
+    "simai_env": {
+      "version": "1.20.0",
+      "root": "/root/simai-env",
+      "cli": "/root/simai-env/simai-admin.sh"
+    },
+    "os": {
+      "id": "ubuntu",
+      "version": "24.04"
+    },
+    "services": {
+      "nginx": "active",
+      "mysql": "active",
+      "postgresql": "inactive",
+      "redis": "inactive",
+      "cron": "active",
+      "php8.3-fpm": "active"
+    },
+    "php_versions": [
+      "8.3"
+    ],
+    "sites": [
+      {
+        "domain": "demo-owned.test",
+        "profile": "generic",
+        "php": "8.3",
+        "root": "/home/simai/www/demo-owned.test",
+        "public_dir": "public",
+        "ssl": "none",
+        "frame_policy": "same-origin",
+        "runs_as": "demo",
+        "owner": "demo",
+        "database": null,
+        "layout": "in-place",
+        "release": null,
+        "workers": [],
+        "service": null,
+        "scheduler": false,
+        "backup_schedule": false,
+        "adopted": null
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

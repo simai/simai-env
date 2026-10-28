@@ -29,6 +29,8 @@ HTTPS_PORT="${SIMAI_STAND_HTTPS:-18443}"
 SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
+# Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
+FIXTURE_SET=1
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -111,11 +113,28 @@ record() {
       "$name" "$owner" "$command" "$args" | gate >"${FIXTURES}/${name}.json"
   done
   # Every answer must be valid JSON; a recording with stray output is useless.
-  python3 - "$FIXTURES" <<'PY'
-import json, pathlib, sys
-for f in sorted(pathlib.Path(sys.argv[1]).glob("*.json")):
+  # manifest.json pins the set: larena/env checks its copy against it.
+  python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'
+import hashlib, json, pathlib, sys
+root, env_version, set_version = pathlib.Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+files = {}
+for f in sorted(root.glob("*.json")):
+    if f.name == "manifest.json":
+        continue
     d = json.loads(f.read_text())
+    # Volatile values are pinned so that only a real change alters the set.
+    if "operation_id" in d:
+        d["operation_id"] = "fixture"
+    if isinstance(d.get("data"), dict) and "generated_at" in d["data"]:
+        d["data"]["generated_at"] = "2026-01-01T00:00:00Z"
+    f.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
+    files[f.name] = {"sha256": hashlib.sha256(f.read_bytes()).hexdigest(), "status": d["status"]}
     print(f"[stand] recorded {f.name}: {d['status']}")
+manifest = {"schema": "simai-panel-fixtures/1", "set_version": set_version,
+            "request_schema": "simai-panel-request/1", "answer_schema": "simai-panel-answer/1",
+            "simai_env": env_version, "files": files}
+(root / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+print(f"[stand] manifest: set {set_version}, {len(files)} files")
 PY
 }
 

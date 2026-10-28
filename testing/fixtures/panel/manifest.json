@@ -1,0 +1,61 @@
+{
+  "schema": "simai-panel-fixtures/1",
+  "set_version": 1,
+  "request_schema": "simai-panel-request/1",
+  "answer_schema": "simai-panel-answer/1",
+  "simai_env": "1.20.0",
+  "files": {
+    "refused.not-allowed.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-scope.json": {
+      "sha256": "e8d9aba7b4164fefc3e9b0aabd3c95973f080127a553a41b230c273537d7a12c",
+      "status": "refused"
+    },
+    "self-commands.json": {
+      "sha256": "bcca66383607d66b62e4ce0bb58204707e25966542c7075b96e0213a232fd54f",
+      "status": "ok"
+    },
+    "self-describe.json": {
+      "sha256": "7a1879cb7b549b6f32ac84dab116a5661e0e149869784e41b48dd836ab3b1d32",
+      "status": "ok"
+    },
+    "self-describe.owner-demo.json": {
+      "sha256": "fa6abcde712d268cb07e23dc7be61e2959ab34565d30d6c3eec53035764e8f40",
+      "status": "ok"
+    },
+    "site-describe.demo-owned.test.json": {
+      "sha256": "584629bd129efba9616766cca21c2a2c5ef7b11607dda0c594c06231d87c4a93",
+      "status": "ok"
+    },
+    "site-describe.demo-php.test.json": {
+      "sha256": "f0e7c281ecb599312bec6e98388002e696b338c631af2a8168fe236a116a75db",
+      "status": "ok"
+    },
+    "site-describe.demo-redirect.test.json": {
+      "sha256": "20758bb4184c464948d520643b415261939b7bb56ee1e3f627830226f9a081a0",
+      "status": "ok"
+    },
+    "site-describe.demo-static.test.json": {
+      "sha256": "a5dd976641b61d0b7aec20d00a3ce5d82743a081b8385b9346ff74e8abefc80c",
+      "status": "ok"
+    },
+    "site-doctor.demo-owned.test.json": {
+      "sha256": "7165b7d8b4712af47624c01abebdae2090bd5d149b5c931bf32d5629c15b7ab4",
+      "status": "ok"
+    },
+    "site-doctor.demo-php.test.json": {
+      "sha256": "599e70421b912361bac2962fd64bbff388f4a84c31082589614807d785ee4d1a",
+      "status": "ok"
+    },
+    "site-doctor.demo-redirect.test.json": {
+      "sha256": "79a56cfb5a16ed3eae123f7457d1ff3da155ad34e14043729a3d679b5a2cf0c3",
+      "status": "ok"
+    },
+    "site-doctor.demo-static.test.json": {
+      "sha256": "aed260e50358996ddd6503d4a53034a68588b4062c1208d9f82cf817e3854387",
+      "status": "ok"
+    }
+  }
+}
