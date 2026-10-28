@@ -59,6 +59,7 @@ JSON goes to stdout, logs to stderr. None of these outputs contain secrets.
 | Move a site to its own user | `site isolate --domain D --confirm yes` |
 | PostgreSQL | `db pgsql-install --confirm yes`; `site add ... --db-engine pgsql` |
 | Health | `site doctor --domain D`, `self status` |
+| Panel gateway (read-only JSON) | `panel gate-enable --confirm yes`; see `docs/architecture/panel-gate.md` |
 | Backup / restore | `backup data --domain D --confirm yes`; `backup data-verify --path P --restore-test yes --confirm yes`; `backup data-restore` |
 
 ## Application manifest (`.simai/app.json`)

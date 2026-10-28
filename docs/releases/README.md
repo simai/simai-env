@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.20.0](v1.20.0.md) — read-only panel gateway for SIMAI ENV Panel.
 - [v1.19.0](v1.19.0.md) — whole-domain redirects to the target's root page
   (`--redirect-path drop`).
 - [v1.18.2](v1.18.2.md) — charset utf-8 on node sites with a static root.

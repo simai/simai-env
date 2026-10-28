@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.20.0 - 2026-10-28
+
+- Panel gateway, stage 1 (read-only): `panel gate-enable` lets the
+  `simai-panel` account run one program as root, without arguments, that
+  takes one JSON request on stdin (`self describe`, `self commands`,
+  `site describe`, `site doctor`) and answers in JSON; owners see only their
+  own sites. `--pubkey-file` opens the same gateway to an SSH key as a forced
+  command. `panel gate-disable` and `panel gate-status`.
+- `testing/stand/stand.sh`: a long-lived local container with demo sites
+  and the gateway, and recorded gateway answers in `testing/fixtures/panel/`
+  for developing SIMAI ENV Panel.
+
 ## 1.19.0 - 2026-10-28
 
 - Whole-domain redirect sites take `--redirect-path keep|drop`: `drop` sends

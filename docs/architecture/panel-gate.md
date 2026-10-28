@@ -1,7 +1,9 @@
-# Panel gateway (draft contract)
+# Panel gateway
 
-Status: draft for SIMAI ENV Panel stage 0. Nothing here is implemented yet
-except the read-only commands and recordings listed under "Recorded answers".
+Status: stage 1 (read-only) is implemented in 1.20.0 (`admin/panel_gate.py`,
+`panel gate-enable|gate-disable|gate-status`, test `panel_e2e`). Plans,
+long operations and owner-scoped changes below are the agreed direction for
+the next stages.
 
 SIMAI ENV Panel is a Larena application (package `larena/env`) installed by
 simai-env as an ordinary site. simai-env stays the only component that
@@ -12,13 +14,17 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
 
 - The panel's PHP-FPM pool runs as its own system account `simai-panel`, not
   `simai` (shared sites live there) and not root.
-- `simai-panel` may run exactly one program as root:
-  `sudo /root/simai-env/admin/panel_gate.sh` (sudoers entry written by
-  `panel install`). On another host the same gateway is the forced command of
-  an SSH key, so a panel can later manage several servers.
-- The gateway reads one JSON request on stdin and writes one JSON answer on
-  stdout. Logs go to `/var/log/simai-panel-gate.log`; every request is also in
-  `/var/log/simai-admin.log` with the panel's `request_id` as correlation id.
+- `simai-panel` may run exactly one program as root, without arguments:
+  `sudo -n /usr/local/sbin/simai-panel-gate` (written by
+  `panel gate-enable`; it runs `python3 -I admin/panel_gate.py`).
+- `panel gate-enable --pubkey-file K` also lets an SSH key reach the same
+  gateway as a forced command (`restrict`, no TTY or forwarding): a panel on
+  another machine, the laptop stand, or later several servers.
+- The gateway reads one JSON request on stdin (at most 64 KiB) and writes one
+  JSON answer on stdout. Each request is a JSON line in
+  `/var/log/simai-panel-gate.log` (root only): request id, actor, owner,
+  command, domain, status, reason and the simai-env `operation_id`, which
+  links it to `/var/log/simai-admin.log`.
 
 ## Request
 
@@ -46,14 +52,20 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
 
 ```json
 { "schema": "simai-panel-answer/1", "request_id": "01JB…", "status": "ok",
-  "kind": "result", "data": { … } }
+  "kind": "result", "data": { … }, "command_status": "success",
+  "operation_id": "20261028195030885137839" }
 ```
+
+`data` is the command's own structured answer (`self describe`,
+`site describe`, …; see `testing/fixtures/panel/`). `command_status` is the
+simai-env result status: `site doctor` answers `ok` with
+`command_status: failed` when a diagnostic check fails.
 
 | `status` | Meaning |
 | --- | --- |
-| `ok` | `kind` is `result` (data), `plan` (what would change) or `job` (`job_id` of a long operation) |
-| `refused` | not allowed: command not in the allowlist, owner scope, invalid argument; `reason` is a stable code |
-| `failed` | the command ran and failed; `reason` and a sanitized `message` |
+| `ok` | `kind` is `result` (data); later also `plan` (what would change) or `job` (`job_id` of a long operation) |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope` |
+| `failed` | ran and failed; `reason`: the simai-env error code or `invalid_output` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
 private keys or deploy keys. Commands that print secrets for an operator
@@ -77,8 +89,12 @@ panel restart.
 The allowlist is derived from the registry (`self commands`: effects,
 confirmation, lock) and a panel policy file shipped with simai-env:
 
-- stage 1: `read` commands (`self describe`, `site describe`, `site list`,
-  `ssl status`, `backup inspect`, `logs *` tails, …);
+- stage 1 (implemented): `self:describe`, `self:commands`,
+  `site:describe {domain}`, `site:doctor {domain, strict, include-target}`.
+  An owner gets `self:describe` reduced to their own sites and is refused
+  (`owner_scope`) on any other domain. `confirm` must be absent or false;
+- next read commands need a structured answer first: SSL status and expiry,
+  backups, log tails;
 - stage 2: safe actions (`ssl letsencrypt`, `site deploy`,
   `site deploy-rollback`, `backup data`, `queue restart`);
 - stage 3–4: owner-scoped and creating/deleting commands.
@@ -88,9 +104,10 @@ Interactive and operator-only commands (menus, `self bootstrap`,
 
 ## Recorded answers
 
-`testing/fixtures/panel/` holds JSON answers recorded from the local stand
-(`testing/stand/stand.sh record`): `self describe`, `self commands` and
-`site describe` for demo sites. The panel's fixture driver replays them, and
+`testing/fixtures/panel/` holds gateway answers recorded from the local
+stand (`testing/stand/stand.sh record`): host description (also an owner's
+view), command registry, `site describe` and `site doctor` for demo sites,
+and two refusals. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.
@@ -99,6 +116,11 @@ after a change of the answer shape, never edit the files by hand.
 
 `testing/stand/stand.sh up` starts a long-lived Ubuntu container with
 simai-env and demo sites (static, PHP with a database, an owner's site, a
-redirect) on `127.0.0.1:18080` and SSH on `127.0.0.1:12222`. The panel can
-run on the laptop with the fixture driver, and switch to the stand once the
-gateway exists.
+redirect) on `127.0.0.1:18080`, and enables the gateway for the key
+`~/.simai-stand/panel_ed25519`. The panel can run on the laptop with the
+fixture driver, and switch to the stand with the same requests:
+
+```bash
+printf '%s' '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"user":"me","owner":null},"command":"self:describe","args":{}}' \
+  | ssh -i ~/.simai-stand/panel_ed25519 -p 12222 simai-panel@127.0.0.1
+```

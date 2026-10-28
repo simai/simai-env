@@ -5,7 +5,8 @@
 #
 #   testing/stand/stand.sh up       # build, start, install the working tree, seed demo sites
 #   testing/stand/stand.sh sync     # copy the working tree in again (code changes)
-#   testing/stand/stand.sh record   # write read-only JSON answers to testing/fixtures/panel/
+#   testing/stand/stand.sh record   # write gateway answers to testing/fixtures/panel/
+#   testing/stand/stand.sh gate < request.json   # one gateway request over SSH
 #   testing/stand/stand.sh shell    # root shell inside the stand
 #   testing/stand/stand.sh cli ...  # run simai-admin.sh inside the stand
 #   testing/stand/stand.sh status | down
@@ -13,6 +14,8 @@
 # Sites answer on http://127.0.0.1:${SIMAI_STAND_HTTP:-18080} with a Host
 # header (curl -H 'Host: demo-static.test' ...). Nothing here touches a real
 # server; the container uses the same image as the end-to-end tests.
+# The panel gateway answers over SSH on 127.0.0.1:${SIMAI_STAND_SSH:-12222}
+# as simai-panel with the key ~/.simai-stand/panel_ed25519 (created by up).
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -25,6 +28,7 @@ HTTP_PORT="${SIMAI_STAND_HTTP:-18080}"
 HTTPS_PORT="${SIMAI_STAND_HTTPS:-18443}"
 SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
+KEY_DIR="${HOME}/.simai-stand"
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -70,24 +74,48 @@ if [[ ! -e /home/simai/www/demo-static.test/current ]]; then
 fi
 echo "[stand] demo sites: demo-static.test demo-php.test demo-owned.test (owner demo) demo-redirect.test"
 SEED
+  # The laptop reaches the gateway like a panel on another machine would.
+  install -d -m 0700 "$KEY_DIR"
+  [[ -f "${KEY_DIR}/panel_ed25519" ]] || ssh-keygen -q -t ed25519 -N '' -C simai-stand-panel -f "${KEY_DIR}/panel_ed25519"
+  docker cp "${KEY_DIR}/panel_ed25519.pub" "${NAME}:/root/stand-panel.pub" >/dev/null
+  in_stand /root/simai-env/simai-admin.sh panel gate-enable --pubkey-file /root/stand-panel.pub --confirm yes >/dev/null
+  echo "[stand] panel gateway: ssh -i ${KEY_DIR}/panel_ed25519 -p ${SSH_PORT} simai-panel@127.0.0.1 < request.json"
+}
+
+gate() {
+  ssh -i "${KEY_DIR}/panel_ed25519" -p "$SSH_PORT" -o BatchMode=yes -o LogLevel=ERROR \
+    -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null simai-panel@127.0.0.1
 }
 
 record() {
   need_running
   mkdir -p "$FIXTURES"
-  local cli=/root/simai-env/simai-admin.sh
-  in_stand "$cli" self describe 2>/dev/null >"${FIXTURES}/self-describe.json"
-  in_stand "$cli" self commands 2>/dev/null >"${FIXTURES}/self-commands.json"
+  rm -f "${FIXTURES}"/*.json
+  # name, owner (JSON), command, args (JSON)
+  local -a requests=(
+    "self-describe|null|self:describe|{}"
+    "self-describe.owner-demo|\"demo\"|self:describe|{}"
+    "self-commands|null|self:commands|{}"
+    "refused.owner-scope|\"demo\"|site:describe|{\"domain\":\"demo-php.test\"}"
+    "refused.not-allowed|null|site:add|{\"domain\":\"x.test\"}"
+  )
   local d
   for d in demo-static.test demo-php.test demo-owned.test demo-redirect.test; do
-    in_stand "$cli" site describe --domain "$d" 2>/dev/null >"${FIXTURES}/site-describe.${d}.json"
+    requests+=("site-describe.${d}|null|site:describe|{\"domain\":\"${d}\"}")
+    requests+=("site-doctor.${d}|null|site:doctor|{\"domain\":\"${d}\"}")
+  done
+  local row name owner command args
+  for row in "${requests[@]}"; do
+    IFS='|' read -r name owner command args <<<"$row"
+    printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":%s},"command":"%s","args":%s}' \
+      "$name" "$owner" "$command" "$args" | gate >"${FIXTURES}/${name}.json"
   done
   # Every answer must be valid JSON; a recording with stray output is useless.
   python3 - "$FIXTURES" <<'PY'
 import json, pathlib, sys
 for f in sorted(pathlib.Path(sys.argv[1]).glob("*.json")):
-    json.loads(f.read_text())
-    print(f"[stand] recorded {f.name}")
+    d = json.loads(f.read_text())
+    print(f"[stand] recorded {f.name}: {d['status']}")
 PY
 }
 
@@ -113,6 +141,7 @@ case "${1:-}" in
     ;;
   sync) need_running; sync_code ;;
   record) record ;;
+  gate) need_running; gate ;;
   shell) need_running; docker exec -it "$NAME" bash -l ;;
   cli) need_running; shift; docker exec "$NAME" /root/simai-env/simai-admin.sh "$@" ;;
   status)
