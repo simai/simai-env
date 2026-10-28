@@ -92,6 +92,9 @@ gate() {
 record() {
   need_running
   mkdir -p "$FIXTURES"
+  # Keep the recorded set when the gateway does not answer.
+  printf '{"schema":"simai-panel-request/1","request_id":"probe","actor":{"user":"admin@stand.test","owner":null},"command":"self:commands","args":{}}' \
+    | gate | grep -q '"status": "ok"' || { echo "[stand] the gateway does not answer; run: $0 up" >&2; exit 1; }
   rm -f "${FIXTURES}"/*.json
   # name, owner (JSON), command, args (JSON)
   local -a requests=(

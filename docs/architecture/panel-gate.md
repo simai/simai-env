@@ -4,7 +4,41 @@ Status: implemented in `admin/panel_gate.py`, `panel gate-enable|
 gate-disable|gate-status`, test `panel_e2e`: stage 1 (read-only, 1.20.0),
 stage 2 (certificates, backups and logs as data; plans and jobs, 1.21.0),
 stages 3–4 (deploys with an uploaded archive or a git ref; creating and
-removing sites, databases, redirects, owners, 1.22.0).
+removing sites, databases, redirects, owners, 1.22.0), stage 5 (`panel
+install|remove|status|setup-link`, the placeholder, `install.sh` with the
+panel, 1.23.0).
+
+## Installation
+
+```bash
+# placeholder now; the Larena build later replaces it
+sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --ssl-email ops@example.com --confirm yes
+sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --git <url> --ref <tag> --confirm yes
+# or with the server: SIMAI_INSTALL_PANEL_DOMAIN=panel.example.com (and SIMAI_INSTALL_PANEL_EMAIL) for install.sh
+```
+
+- The panel is an ordinary isolated site with its own account
+  (`site-<project>`), never `simai` or root. Its domain must be new: an
+  existing site is never taken over, and there is one panel per server.
+- Without a source the site gets the placeholder
+  (`templates/panel-placeholder`, a generic PHP site): it calls the gateway
+  through `sudo -n /usr/local/sbin/simai-panel-gate` and shows only whether
+  that works, because it has no sign-in. With `--git/--ref` or
+  `--archive/--sha256` the site is the Larena build: a Laravel site with a
+  database; installing a build over the placeholder replaces it (the
+  placeholder holds no data).
+- The panel site's account is added to the gateway's sudo file (next to
+  `simai-panel` when `panel gate-enable` is on); `panel gate-disable` keeps
+  the installed panel's access.
+- **First sign-in.** The install writes `SIMAI_PANEL_SETUP_TOKEN=<64 hex>`
+  into the site's shared `.env` and prints
+  `https://<domain>/?setup=<token>` once, on stdout only (never in a log).
+  The panel build accepts that link for the first administrator and then
+  removes the line from `.env`. `panel setup-link` replaces the token (the
+  old link stops working).
+- `panel remove` takes away the gateway access, then removes the panel site
+  with its files and database; other sites are not touched. `panel status`
+  shows domain, source, account, install time and release.
 
 SIMAI ENV Panel is a Larena application (package `larena/env`) installed by
 simai-env as an ordinary site. simai-env stays the only component that

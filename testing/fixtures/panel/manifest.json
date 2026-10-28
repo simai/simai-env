@@ -3,7 +3,7 @@
   "set_version": 3,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.22.0",
+  "simai_env": "1.23.0",
   "files": {
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
@@ -46,15 +46,15 @@
       "status": "refused"
     },
     "self-commands.json": {
-      "sha256": "bcca66383607d66b62e4ce0bb58204707e25966542c7075b96e0213a232fd54f",
+      "sha256": "aabd3d3dfe1b3fa0aa6edeee8e93a85757e003058b2c917f069410f176417c76",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "194abf2546eee692e8ef4e18d35d743ceb86867d144145809ab36cfe8152610e",
+      "sha256": "6edcdc0aa9cc2a2a515b5465f6343e4128f24b432b3823320ac03f7d8eea36ab",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "933de9097059d5214ffa62f32395b56c703852c56789a2b220c28820d0a43868",
+      "sha256": "619f5969d0991b9197c51d3da04263b48b80e730de37fac2f5054a513fa75842",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {

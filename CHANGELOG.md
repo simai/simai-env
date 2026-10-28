@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.23.0 - 2026-10-29
+
+- `panel install --domain D` installs SIMAI ENV Panel as its own isolated
+  site whose account may call the gateway: a placeholder that proves the
+  path until the Larena build exists, or the build from `--git/--ref` or
+  `--archive/--sha256` (a Laravel site with a database), which replaces the
+  placeholder. A one-time first sign-in link is printed once and kept out of
+  the logs; `panel setup-link` replaces it. `panel status`, and
+  `panel remove`, which leaves every other site alone.
+- `install.sh` installs the panel right away with
+  `SIMAI_INSTALL_PANEL_DOMAIN` (and `SIMAI_INSTALL_PANEL_EMAIL` for a
+  certificate).
+
 ## 1.22.0 - 2026-10-29
 
 - Panel gateway, stages 3–4: deploys from a git ref or from a release

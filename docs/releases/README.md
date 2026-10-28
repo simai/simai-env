@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.23.0](v1.23.0.md) — `panel install`: SIMAI ENV Panel as its own site,
+  placeholder until the Larena build.
 - [v1.22.0](v1.22.0.md) — panel deploys, creating and removing sites,
   databases, redirects and owners.
 - [v1.21.0](v1.21.0.md) — panel actions as jobs; certificates, backups and
