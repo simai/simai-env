@@ -26,7 +26,7 @@ mk_artifact() {  # $1 label, $2 extra
   [[ "${2:-}" == broken ]] || echo "ok-$1" >"$dir/ok/index.html"
   head -c 4000 /dev/zero | tr '\0' 'a' | sed 's/^/body{}/' >"$dir/style.css"
   echo "pages.test" >"$dir/CNAME"; : >"$dir/.nojekyll"
-  mkdir -p "$dir/_docara/vendor"; echo 'a{}' >"$dir/_docara/shell.0123456789abcdef.css"; echo 'b{}' >"$dir/_docara/plain.css"
+  mkdir -p "$dir/_docara/vendor"; echo 'a{}' >"$dir/_docara/shell.0123456789abcdef.css"; echo 'b{}' >"$dir/_docara/plain.css"; echo font >"$dir/_docara/icons.0123456789abcdef.woff2"
   echo "MIT" >"$dir/_docara/vendor/LICENSE"
   printf '{"schema": "simai-app/1", "profile": "static", "health": {"path": "/ok/"}}\n' >"$dir/.simai/app.json"
   [[ "${2:-}" == escape ]] && ln -s ../../../../etc/passwd "$dir/leak.txt"
@@ -63,6 +63,18 @@ hdr /_docara/vendor/LICENSE | grep -qi '^Content-Type: text/plain' && ok "extens
 [[ $(hdr /style.css | grep -ci '^Cache-Control:') -eq 1 ]] && ok "one Cache-Control header" || bad "duplicate Cache-Control"
 hdr /style.css -H 'Accept-Encoding: gzip' | grep -qi '^Content-Encoding: gzip' && ok "text compressed with gzip" || bad "no gzip"
 hdr / | grep -qi '^X-Content-Type-Options: nosniff' && ok "nosniff kept with the static settings" || bad "nosniff lost"
+font=/_docara/icons.0123456789abcdef.woff2
+hdr $font -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin: \*$' && ok "fonts load from sandboxed frames" || bad "font cors: $(hdr $font -H 'Origin: null')"
+hdr $font | grep -qi '^X-Content-Type-Options: nosniff' && hdr $font | grep -qi '^Cache-Control: public, max-age=31536000, immutable$' && ok "fonts keep nosniff and caching" || bad "font headers: $(hdr $font)"
+[[ "$(code /_docara/missing.woff2)" == 404 ]] && ok "missing font is 404" || bad "missing font: $(code /_docara/missing.woff2)"
+hdr /style.css | grep -qi '^Access-Control-Allow-Origin' && bad "CORS header beyond fonts" || ok "other files stay same-origin"
+# Sites rendered before 1.24.0 get the font location from self migrate.
+sed -i '/# Fonts load in CORS mode/,/^    }$/d' $cfg && nginx -s reload && sleep 1
+cli self migrate --confirm yes >/tmp/s-mig2 2>&1
+grep -q "$D: fonts allowed to any origin" /tmp/s-mig2 && grep -c 'woff2?|ttf|otf|eot' $cfg | grep -qx 1 && ok "migrate adds the font location once" || { bad "font migration"; tail -5 /tmp/s-mig2; }
+for _ in {1..20}; do hdr $font | grep -qi '^Access-Control-Allow-Origin' && break; sleep 0.5; done
+hdr $font | grep -qi '^Access-Control-Allow-Origin: \*$' && ok "migrated site allows fonts" || bad "after font migrate: $(hdr $font)"
+cli self migrate --confirm yes 2>&1 | grep -q "fonts allowed" && bad "font migration not idempotent" || ok "font migration is idempotent"
 [[ "$(code /.simai/app.json)" =~ ^40[34]$ ]] && ok "manifest in the artifact is not served" || bad "manifest served"
 
 s2=$(mk_artifact v2 broken)

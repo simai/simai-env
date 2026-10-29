@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.24.0 - 2026-10-29
+
+- Static sites send `Access-Control-Allow-Origin: *` on fonts (`woff`,
+  `woff2`, `ttf`, `otf`, `eot`), keeping nosniff and caching: icon fonts load
+  inside sandboxed example frames (origin `null`), as on GitHub Pages. Other
+  files stay same-origin. `self migrate` (run by `self update`) adds the
+  font location to existing static sites.
+
 ## 1.23.1 - 2026-10-29
 
 - `install.sh` change of 1.23.0 that was left out of its release:

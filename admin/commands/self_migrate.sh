@@ -197,6 +197,32 @@ self_migrate_static_charset() {
   return 0
 }
 
+# Static sites rendered before 1.24.0 refused fonts to other origins, so icon
+# fonts did not load in sandboxed example frames.
+self_migrate_static_font_cors() {
+  local cfg domain backup
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" ]] || continue
+    grep -q '^# simai-nginx-template: static$' "$cfg" || continue
+    grep -q '^    location / {$' "$cfg" || continue
+    grep -q 'woff2?|ttf|otf|eot' "$cfg" && continue
+    domain=$(basename "$cfg" .conf)
+    backup="${cfg}.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$cfg" "$backup" || continue
+    FONT_BLOCK="$(sed -n '/# Fonts load in CORS mode/,/^    }$/p' "$NGINX_TEMPLATE_STATIC")" awk '
+      $0 == "    location / {" && !done { print ENVIRON["FONT_BLOCK"]; print ""; done = 1 }
+      { print }' "$backup" >"$cfg"
+    if grep -q 'woff2?|ttf|otf|eot' "$cfg" && nginx -t >>"$LOG_FILE" 2>&1; then
+      SELF_MIGRATE_CHANGES+=("${domain}: fonts allowed to any origin")
+      SELF_MIGRATE_RELOAD_NGINX=1
+    else
+      cp -p "$backup" "$cfg"
+      warn "Could not add the font location to ${cfg}; previous configuration restored"
+    fi
+  done
+  return 0
+}
+
 # Node sites with a static root rendered by 1.18.0-1.18.1: routes without
 # charset; render them again from the current release.
 self_migrate_app_routes_charset() {
@@ -232,9 +258,10 @@ self_migrate_handler() {
   self_migrate_certbot_hook
   SELF_MIGRATE_RELOAD_NGINX=0
   self_migrate_static_charset
+  self_migrate_static_font_cors
   self_migrate_app_routes_charset
   if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
-    os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the charset migration"
+    os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the static site migrations"
   fi
   self_migrate_nginx_hardening
   self_migrate_confirmed_schedules || return 1

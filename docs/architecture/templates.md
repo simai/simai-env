@@ -7,6 +7,7 @@ Templates define rendered configuration artifacts:
   - `{{DOC_ROOT}}` is derived from profile `PROFILE_PUBLIC_DIR` (may be `public`, empty/"." for project root, or another safe relative path).
 - `templates/healthcheck.php`: local-only healthcheck for non-alias/non-static profiles, copied to `<docroot>/healthcheck.php` when `PROFILE_HEALTHCHECK_MODE=php`.
 - `nginx-static.conf` includes an nginx-served `/healthcheck` (local-only) matching `PROFILE_HEALTHCHECK_MODE=nginx`.
+- `nginx-static.conf` sends `Access-Control-Allow-Origin: *` on fonts (`woff`, `woff2`, `ttf`, `otf`, `eot`) only, so pages in sandboxed frames (origin `null`) can load them, as on GitHub Pages; `self migrate` adds that location to sites rendered before 1.24.0.
 - `systemd/laravel-queue.service`: queue worker unit template with placeholders `{{PROJECT_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_BIN}}`, `{{USER}}`.
 
 Rendering rules:

@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.24.0](v1.24.0.md) — fonts on static sites load from other origins
+  and sandboxed frames.
 - [v1.23.1](v1.23.1.md) — `install.sh` installs the panel with the server.
 - [v1.23.0](v1.23.0.md) — `panel install`: SIMAI ENV Panel as its own site,
   placeholder until the Larena build.
