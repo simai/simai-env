@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2164  # container test script: loose cd checks are fine here
-# panel install / setup-link / status / remove: the panel is an isolated site
+# panel install / update / setup-link / status / remove: the panel is an isolated site
 # whose account may call the gateway; the placeholder proves that path, a
 # build from an archive replaces it, and removing the panel leaves every other
 # site alone.
@@ -49,21 +49,83 @@ new=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/ps)
 [[ "$(page "?format=json&setup=${token}" | field 'd["setup"]')" == invalid ]] && ok "the old link stops working" || bad "old link still valid"
 [[ "$(page "?format=json&setup=${new}" | field 'd["setup"]')" == valid ]] && ok "the new link works" || bad "new link"
 
-# A build replaces the placeholder (a minimal Laravel-shaped application).
-B=/root/build; mkdir -p $B/public $B/bootstrap $B/storage/logs $B/.simai
-printf '<?php echo "panel-build";\n' >$B/public/index.php
-printf '<?php return null;\n' >$B/bootstrap/app.php
-printf '#!/usr/bin/env php\n<?php exit(0);\n' >$B/artisan
-printf '{"schema":"simai-app/1","migrate":false,"scheduler":false}\n' >$B/.simai/app.json
-tar -C $B -czf /root/build.tgz .
-cli panel install --domain $P --archive /root/build.tgz --sha256 "$(sha256sum /root/build.tgz | cut -d' ' -f1)" --confirm yes >/tmp/pb 2>&1 && ok "panel install with a build archive" || { bad "build install"; tail -15 /tmp/pb; tail -20 /var/log/simai-admin.log; }
-[[ "$(page '')" == panel-build ]] && ok "the build replaced the placeholder" || bad "build not served: $(page '' | head -c 200)"
+# A build replaces the placeholder. Installing a build goes through
+# site adopt, so it gets its requirements, .env, database, APP_KEY and
+# releases; a build that does not answer leaves nothing behind.
+mk_build() {  # $1 label, $2 broken
+  local dir=/root/build-$1
+  rm -rf "$dir"; mkdir -p "$dir/public" "$dir/bootstrap/cache" "$dir/storage/logs" "$dir/.simai" "$dir/vendor"
+  if [[ "${2:-}" == broken ]]; then
+    printf '<?php http_response_code(500); echo "broken";\n' >"$dir/public/index.php"
+  else
+    printf '<?php echo "panel-%s";\n' "$1" >"$dir/public/index.php"
+  fi
+  printf '<?php return null;\n' >"$dir/bootstrap/app.php"
+  printf '<?php return [];\n' >"$dir/vendor/autoload.php"
+  printf '{"name":"larena/env","require":{"php":">=8.2"}}\n' >"$dir/composer.json"
+  printf 'APP_NAME=LarenaPanel\nAPP_ENV=local\nAPP_DEBUG=true\nAPP_KEY=\n' >"$dir/.env.example"
+  printf '{"schema":"simai-app/1","migrate":true,"scheduler":false}\n' >"$dir/.simai/app.json"
+  cat >"$dir/artisan" <<'PHP'
+#!/usr/bin/env php
+<?php
+// Stands in for the Larena build: key:generate writes the key, and migrations
+// need the database settings, readable by the account that runs them.
+$env = __DIR__ . '/.env';
+if (($argv[1] ?? '') === 'migrate' && !preg_match('/^DB_DATABASE=./m', (string) @file_get_contents($env))) {
+    fwrite(STDERR, "no database settings in .env\n");
+    exit(1);
+}
+if (($argv[1] ?? '') === 'key:generate') {
+    $body = is_file($env) ? preg_replace('/^APP_KEY=.*$/m', '', file_get_contents($env)) : '';
+    file_put_contents($env, rtrim($body) . "\nAPP_KEY=base64:" . base64_encode(random_bytes(32)) . "\n");
+}
+exit(0);
+PHP
+  chmod +x "$dir/artisan"
+  tar -C "$dir" -czf "/root/build-$1.tgz" .
+  sha256sum "/root/build-$1.tgz" | cut -d' ' -f1
+}
+s1=$(mk_build v1)
+cli panel install --domain $P --archive /root/build-v1.tgz --sha256 "$s1" --confirm yes >/tmp/pb 2>&1 && ok "panel install with a build archive" || { bad "build install"; tail -15 /tmp/pb; tail -20 /var/log/simai-admin.log; }
+[[ "$(page '')" == panel-v1 ]] && ok "the build replaced the placeholder" || bad "build not served: $(page '' | head -c 200)"
 grep -q '^# simai-profile: laravel' /etc/nginx/sites-available/$P.conf && ok "the build runs as a Laravel site" || bad "profile"
 [[ -f /etc/simai-env/sites/$P/db.env ]] && ok "the build has a database" || bad "no database"
-cli panel status 2>&1 | grep -q 'build' && ok "status shows the build" || bad "status build"
+env=/home/simai/www/$P/.env
+grep -q '^APP_KEY=base64:' $env && ok "the build gets an APP_KEY" || bad "APP_KEY: $(grep -c . $env) lines"
+grep -q '^APP_ENV=production' $env && grep -q '^APP_DEBUG=false' $env && ok "the panel runs in production mode" || bad "app env: $(grep -E '^APP_(ENV|DEBUG)=' $env)"
+grep -q "^APP_URL=http://$P" $env && ok "APP_URL is the panel domain" || bad "APP_URL: $(grep '^APP_URL=' $env)"
+grep -q '^DB_DATABASE=' $env && ok "the build knows its database" || bad "no DB_ settings in .env"
+if grep -q '^DB_CONNECTION=mysql' $env; then
+  db_user=$(sed -n 's/^DB_USERNAME=//p' $env)
+  mysql -Ne "SHOW GRANTS FOR '${db_user}'@'localhost'" | grep -q 'REFERENCES' && ok "the database user may create foreign keys" || bad "no REFERENCES grant"
+fi
+project=$(sed -n 's/^# simai-project: *//p' /etc/nginx/sites-available/$P.conf)
 user2=$(cat "/etc/simai-env/site-users/$project")
+[[ "$(stat -c '%U %a' $env)" == "$user2 640" ]] && ok ".env belongs to the panel account only" || bad ".env: $(stat -c '%U %a' $env)"
+[[ -L /home/simai/www/$P/current ]] && ok "the build has releases to roll back to" || bad "no release layout"
+cli panel status 2>&1 | grep -q 'build' && ok "status shows the build" || bad "status build"
 grep -q "^${user2} ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate \"\"" /etc/sudoers.d/simai-panel && ok "gateway rule follows the build's account" || bad "sudoers: $(cat /etc/sudoers.d/simai-panel)"
-grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' /home/simai/www/$P/.env && ok "the build gets a setup token in .env" || bad "token for build"
+grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' $env && ok "the build gets a setup token in .env" || bad "token for build"
+[[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p2","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user2" sudo -n /usr/local/sbin/simai-panel-gate | field 'd["status"]')" == ok ]] && ok "the build calls the gateway" || bad "build gateway call"
+s2=$(mk_build v1 broken)
+cli panel install --domain $P --archive /root/build-v1.tgz --sha256 "$s2" --confirm yes >/dev/null 2>&1 && bad "a second build install accepted" || ok "installing over a build points at panel update"
+
+# panel update: data backup, deploy, health check, rollback when it fails.
+cli panel update >/tmp/pu0 2>&1; [[ "$(page '')" == panel-v1 ]] && ok "update without confirm changes nothing" || bad "update ran without confirm"
+cli panel update --confirm yes >/dev/null 2>&1 && bad "update without a source accepted" || ok "update needs a source"
+s3=$(mk_build v2)
+cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/tmp/pu 2>&1 && ok "panel update" || { bad "panel update"; tail -15 /tmp/pu; }
+[[ "$(page '')" == panel-v2 ]] && ok "the new release is served" || bad "after update: $(page '' | head -c 120)"
+[[ -n "$(ls -A /var/backups/simai/$P 2>/dev/null)" ]] && ok "update backs up the panel data first" || bad "no backup before the update"
+grep -q '^APP_KEY=base64:' $env && grep -q '^SIMAI_PANEL_SETUP_TOKEN=' $env && ok "the update keeps .env" || bad ".env changed by the update"
+# A rollback before the broken update: the newest other release is then not
+# the one that was serving.
+cli site deploy-rollback --domain $P --confirm yes >/dev/null 2>&1
+[[ "$(page '')" == panel-v1 ]] && ok "rollback serves the earlier release" || bad "after rollback: $(page '' | head -c 120)"
+s4=$(mk_build v3 broken)
+cli panel update --archive /root/build-v3.tgz --sha256 "$s4" --confirm yes >/tmp/pu3 2>&1 && bad "a broken release accepted" || ok "a broken release is refused"
+[[ "$(page '')" == panel-v1 ]] && ok "a broken update returns to the release that was serving" || bad "after broken update: $(page '' | head -c 120)"
+grep -q 'rolled back' /tmp/pu3 && ok "the rollback is reported" || bad "rollback message: $(tail -3 /tmp/pu3)"
 
 cli panel remove >/dev/null 2>&1; [[ -f /etc/nginx/sites-available/$P.conf ]] && ok "remove without confirm changes nothing" || bad "remove ran without confirm"
 cli panel remove --confirm yes >/tmp/pr 2>&1 && ok "panel remove" || { bad "panel remove"; tail -10 /tmp/pr; }
@@ -71,6 +133,12 @@ cli panel remove --confirm yes >/tmp/pr 2>&1 && ok "panel remove" || { bad "pane
 [[ ! -f /etc/sudoers.d/simai-panel && ! -f /usr/local/sbin/simai-panel-gate ]] && ok "gateway removed with the panel" || bad "gateway left"
 [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "other sites keep working" || bad "keep.test broken"
 cli panel status 2>&1 | grep -q 'not installed' && ok "status after remove" || bad "status after remove"
+
+s5=$(mk_build v4 broken)
+cli panel install --domain $P --archive /root/build-v4.tgz --sha256 "$s5" --confirm yes >/tmp/pbb 2>&1 && bad "a build that does not answer was installed" || ok "a build that does not answer is refused"
+[[ ! -f /etc/nginx/sites-available/$P.conf && ! -d /home/simai/www/$P ]] && ok "a failed first install leaves nothing" || bad "leftovers: $(ls -d /home/simai/www/$P 2>/dev/null) $(ls /etc/nginx/sites-available/$P.conf 2>/dev/null)"
+cli panel status 2>&1 | grep -q 'not installed' && ok "status after the failed install" || bad "status after failed install"
+cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/dev/null 2>&1 && bad "update without a panel accepted" || ok "update needs an installed panel"
 
 # A host that enabled the gateway before 1.23.0 has the sudo line but no state.
 id -u simai-panel >/dev/null 2>&1 || useradd --system --user-group simai-panel

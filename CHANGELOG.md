@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.25.0 - 2026-10-30
+
+- The panel build is installed through `site adopt`, so it gets the
+  requirements of its manifest and `composer.json`, its `.env` (production
+  mode, `APP_URL`, database values), `APP_KEY`, migrations, workers and the
+  scheduler, and then a release to roll back to. A build that does not answer
+  its health path is not installed: nothing is left behind.
+- `panel update --archive F --sha256 S` (or `--git/--ref`) updates the panel
+  build: a data backup first, then a deploy that migrates before the switch,
+  and a rollback when the new release does not answer. `.env`, the database
+  and `storage/` survive.
+- New site databases grant `REFERENCES`: without it MySQL refuses the foreign
+  keys of Laravel migrations (error 1142). Existing grants are not changed.
+- `site adopt` treats the manifest's PHP as the minimum it is: on an Ubuntu
+  release that ondrej/php does not cover yet (26.04) it uses that release's
+  own PHP when it is new enough, instead of failing.
+- The panel is called Larena Panel in simai-env texts; the `panel` command is
+  unchanged.
+
 ## 1.24.0 - 2026-10-29
 
 - Static sites send `Access-Control-Allow-Origin: *` on fonts (`woff`,

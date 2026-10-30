@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# SIMAI ENV Panel (docs/architecture/panel-gate.md). Two accounts may run
+# Larena Panel (docs/architecture/panel-gate.md). Two accounts may run
 # exactly one program as root, the gateway (admin/panel_gate.py), which reads
 # one JSON request on stdin: the account of the installed panel site
 # (`panel install`), and simai-panel for a panel elsewhere that comes in over
@@ -162,16 +162,78 @@ panel_print_setup_link() {
   printf '\nFirst sign-in (one time): %s://%s/?setup=%s\n' "$scheme" "$domain" "$token"
 }
 
+# env_set_kv gives the file to SIMAI_USER; .env must stay with the panel's
+# account, which reads it for every artisan call.
+panel_env_set() {
+  local domain="$1" key="$2" value="$3" project user env
+  env="$(panel_site_root "$domain")/.env"
+  project=$(site_project_for_domain "$domain") || return 1
+  user=$(site_user_for_project "$project") || return 1
+  env_set_kv "$env" "$key" "$value" && chown "${user}:${user}" "$env"
+}
+
+# A build becomes a site through adopt: requirements from its manifest, .env
+# from its own template, database, APP_KEY and migrations. The caller then
+# deploys the same source, so the site has releases to roll back to.
+panel_adopt_build() {
+  local domain="$1" git="$2" ref="$3" archive="$4" sha="$5" php="$6" engine="$7" root
+  root=$(panel_site_root "$domain")
+  [[ ! -e "$root" ]] || { error "${root} already exists; the panel needs a directory of its own"; return 1; }
+  if [[ -n "$archive" ]]; then
+    deploy_archive_safe "$archive" || return 1
+    install -d -m 0755 "$root" && tar --no-same-owner --no-same-permissions -xzf "$archive" -C "$root" \
+      || { error "Could not unpack ${archive}"; return 1; }
+  else
+    git clone -q --depth 1 --branch "$ref" -- "$git" "$root" >>"$LOG_FILE" 2>&1 || { error "Could not fetch ${ref}; see ${LOG_FILE}"; return 1; }
+    rm -rf --one-file-system -- "${root}/.git"
+  fi
+  local -a adopt=(site adopt --domain "$domain" --path "$root" --profile laravel --create-db yes --confirm yes)
+  [[ -n "$php" ]] && adopt+=(--php "$php")
+  [[ -n "$engine" ]] && adopt+=(--db-engine "$engine")
+  panel_admin "${adopt[@]}" >>"$LOG_FILE" 2>&1 || { error "Installing the panel build failed; see ${LOG_FILE}"; return 1; }
+  # The panel shows server data: error pages must never carry debug output.
+  panel_env_set "$domain" APP_ENV production && panel_env_set "$domain" APP_DEBUG false \
+    && panel_env_set "$domain" APP_URL "http://${domain}"
+}
+
+# A failed first install leaves nothing behind: the domain and directory were
+# checked to be new, and the panel holds no data yet.
+panel_install_abort() {
+  local domain="$1"
+  [[ -f "/etc/nginx/sites-available/${domain}.conf" ]] && panel_remove_site "$domain"
+  rm -rf --one-file-system -- "$(panel_site_root "$domain")"
+  local key
+  for key in PANEL_DOMAIN PANEL_USER SOURCE INSTALLED_AT SSL; do panel_state_set "$key" ""; done
+  panel_gate_sync
+}
+
+# The health path of the release in current: 2xx or 3xx, as for service sites.
+panel_health_ok() {
+  local domain="$1" probe=/ code _
+  if app_manifest_load "$(panel_site_root "$domain")/current" >/dev/null 2>&1; then probe="${APP_HEALTH_PATH:-/}"; fi
+  for _ in {1..15}; do
+    code=$(deploy_static_probe "$domain" "$probe")
+    [[ "$code" =~ ^[23] ]] && return 0
+    sleep 2
+  done
+  warn "${domain}${probe} answers ${code}"
+  return 1
+}
+
 panel_install_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" git="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}"
   local archive="${PARSED_ARGS[archive]:-}" sha="${PARSED_ARGS[sha256]:-}" php="${PARSED_ARGS[php]:-}"
-  local email="${PARSED_ARGS[ssl-email]:-}" engine="${PARSED_ARGS[db-engine]:-mysql}"
+  local email="${PARSED_ARGS[ssl-email]:-}" engine="${PARSED_ARGS[db-engine]:-}"
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   [[ -z "$git" || -n "$ref" ]] || { error "--git needs --ref"; return 1; }
   [[ -z "$archive" || -n "$sha" ]] || { error "--archive needs --sha256"; return 1; }
   [[ -z "$git" || -z "$archive" ]] || { error "Use --git or --archive, not both"; return 1; }
+  if [[ -n "$archive" ]]; then
+    [[ -f "$archive" ]] || { error "Archive not found: ${archive}"; return 1; }
+    [[ "$(sha256sum "$archive" | cut -d' ' -f1)" == "${sha,,}" ]] || { error "Archive checksum does not match --sha256"; return 1; }
+  fi
   local installed source=placeholder profile=generic
   installed=$(panel_state_get PANEL_DOMAIN)
   [[ -n "$git$archive" ]] && { source=build; profile=laravel; }
@@ -184,25 +246,27 @@ panel_install_handler() {
       error "The panel is already installed at ${domain}; give --git/--ref or --archive/--sha256 to install the panel build"
       return 1
     fi
-    if [[ "$(panel_state_get SOURCE)" == placeholder ]]; then
-      # The placeholder holds no data: replace it with a Laravel site.
-      info "Replacing the panel placeholder at ${domain}"
-      panel_remove_site "$domain" || return 1
-      installed=""
+    if [[ "$(panel_state_get SOURCE)" != placeholder ]]; then
+      error "The panel build is already installed at ${domain}; use panel update"
+      return 1
     fi
+    # The placeholder holds no data: replace it with a Laravel site.
+    info "Replacing the panel placeholder at ${domain}"
+    panel_remove_site "$domain" || return 1
+    installed=""
   elif [[ -f "/etc/nginx/sites-available/${domain}.conf" ]]; then
     error "${domain} is an existing site; the panel needs a domain of its own"
     return 1
   fi
-  local steps=2
-  [[ -z "$installed" ]] && steps=$((steps + 1))
+  local steps=3
   [[ -n "$email" ]] && steps=$((steps + 1))
   progress_init "$steps"
-  if [[ -z "$installed" ]]; then
-    progress_step "Creating the panel site ${domain} (${profile})"
-    local -a add=(site add --domain "$domain" --profile "$profile" --confirm yes)
+  progress_step "Creating the panel site ${domain} (${profile})"
+  if [[ "$source" == build ]]; then
+    panel_adopt_build "$domain" "$git" "$ref" "$archive" "$sha" "$php" "$engine" || { panel_install_abort "$domain"; return 1; }
+  else
+    local -a add=(site add --domain "$domain" --profile "$profile" --create-db no --confirm yes)
     [[ -n "$php" ]] && add+=(--php "$php")
-    if [[ "$profile" == laravel ]]; then add+=(--create-db yes --db-engine "$engine"); else add+=(--create-db no); fi
     panel_admin "${add[@]}" >>"$LOG_FILE" 2>&1 || { error "Creating the panel site failed; see ${LOG_FILE}"; return 1; }
   fi
   local project user
@@ -225,7 +289,12 @@ panel_install_handler() {
   local rc=0
   panel_admin "${deploy[@]}" >>"$LOG_FILE" 2>&1 || rc=$?
   [[ -n "${tgz:-}" ]] && rm -f "$tgz"
-  (( rc == 0 )) || { error "Deploying the panel failed; see ${LOG_FILE}"; return 1; }
+  (( rc == 0 )) || { error "Deploying the panel failed; see ${LOG_FILE}"; panel_install_abort "$domain"; return 1; }
+  if [[ "$source" == build ]] && ! panel_health_ok "$domain"; then
+    error "The panel build does not answer its health path; nothing was installed. See ${LOG_FILE}"
+    panel_install_abort "$domain"
+    return 1
+  fi
   progress_step "Letting the panel account ${user} call the gateway"
   panel_state_set PANEL_DOMAIN "$domain" && panel_state_set PANEL_USER "$user" && panel_state_set SOURCE "$source" || return 1
   panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
@@ -234,6 +303,7 @@ panel_install_handler() {
     progress_step "Requesting a Let's Encrypt certificate"
     if panel_admin ssl letsencrypt --domain "$domain" --email "$email" --redirect yes --confirm yes >>"$LOG_FILE" 2>&1; then
       panel_state_set SSL letsencrypt || return 1
+      [[ "$source" == build ]] && panel_env_set "$domain" APP_URL "https://${domain}"
     else
       warn "Certificate request failed (DNS must point to this server); retry: simai-admin.sh ssl letsencrypt --domain ${domain} --email ${email} --confirm yes"
     fi
@@ -242,6 +312,40 @@ panel_install_handler() {
   token=$(panel_setup_token_write "$domain" "$user") || return 1
   ui_result_table "Panel|${domain}" "Source|${source}" "Runs as|${user}" "Gateway|${SIMAI_PANEL_GATE}"
   panel_print_setup_link "$domain" "$token"
+}
+
+# A data backup first, then an ordinary deploy: it migrates before the switch
+# and a failed release never replaces the current one. A release that does not
+# answer its health path is rolled back; the database is not.
+panel_update_handler() {
+  parse_kv_args "$@"
+  local git="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}" archive="${PARSED_ARGS[archive]:-}" sha="${PARSED_ARGS[sha256]:-}"
+  local domain
+  domain=$(panel_state_get PANEL_DOMAIN)
+  [[ -n "$domain" ]] || { error "The panel is not installed (panel install)"; return 1; }
+  [[ "$(panel_state_get SOURCE)" == build ]] || { error "The placeholder has nothing to update; install a build: panel install --domain ${domain} --archive F --sha256 S"; return 1; }
+  [[ -n "$git$archive" ]] || { error "Give --archive/--sha256 or --git/--ref"; return 1; }
+  [[ -z "$git" || -n "$ref" ]] || { error "--git needs --ref"; return 1; }
+  [[ -z "$archive" || -n "$sha" ]] || { error "--archive needs --sha256"; return 1; }
+  [[ -z "$git" || -z "$archive" ]] || { error "Use --git or --archive, not both"; return 1; }
+  local deploy_file previous current
+  deploy_file="$(site_sites_config_dir)/${domain}/deploy.env"
+  previous=$(sed -n 's/^CURRENT=//p' "$deploy_file" 2>/dev/null | tail -n1)
+  progress_init 3
+  progress_step "Backing up the panel's data"
+  panel_admin backup data --domain "$domain" --confirm yes >>"$LOG_FILE" 2>&1 || { error "Backup failed; the panel was not updated. See ${LOG_FILE}"; return 1; }
+  progress_step "Deploying the new release"
+  local -a deploy=(site deploy --domain "$domain" --confirm yes)
+  if [[ -n "$git" ]]; then deploy+=(--git "$git" --ref "$ref"); else deploy+=(--archive "$archive" --sha256 "$sha"); fi
+  panel_admin "${deploy[@]}" >>"$LOG_FILE" 2>&1 || { error "The update failed; release ${previous} keeps serving. See ${LOG_FILE}"; return 1; }
+  progress_step "Checking the panel answers"
+  if ! panel_health_ok "$domain"; then
+    panel_admin site deploy-rollback --domain "$domain" --release "$previous" --confirm yes >>"$LOG_FILE" 2>&1 || { error "The new release is broken and the rollback failed; see ${LOG_FILE}"; return 1; }
+    error "The new release does not answer its health path; rolled back to ${previous}. The database is not rolled back: a backup was taken first (backup data-restore)"
+    return 1
+  fi
+  current=$(sed -n 's/^CURRENT=//p' "$deploy_file" | tail -n1)
+  ui_result_table "Panel|${domain}" "Release|${current}" "Previous|${previous}"
 }
 
 panel_setup_link_handler() {
@@ -286,7 +390,8 @@ panel_status_handler() {
     "Gateway|$([[ -x "$SIMAI_PANEL_GATE" ]] && echo enabled || echo missing)"
 }
 
-register_cmd "panel" "install" "Install SIMAI ENV Panel as its own site (placeholder, or the build from --git/--archive)" "panel_install_handler" "domain" "git= ref= archive= sha256= php= db-engine= ssl-email=" "tier:advanced lock:none"
+register_cmd "panel" "install" "Install Larena Panel as its own site (placeholder, or the build from --git/--archive)" "panel_install_handler" "domain" "git= ref= archive= sha256= php= db-engine= ssl-email=" "tier:advanced lock:none"
+register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "git= ref= archive= sha256=" "tier:advanced lock:none"
 register_cmd "panel" "remove" "Remove the panel site and its gateway access (other sites are not touched)" "panel_remove_handler" "" "" "tier:advanced lock:none"
 register_cmd "panel" "status" "Show the installed panel" "panel_status_handler" "" "" "effects:read"
 register_cmd "panel" "setup-link" "Replace the panel's one-time first sign-in link" "panel_setup_link_handler" "" "" "tier:advanced"

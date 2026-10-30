@@ -12,6 +12,22 @@ adopt_php_satisfies() {
   "php${ver}" -r "exit(version_compare(PHP_VERSION, '${min}', '>=') ? 0 : 1);"
 }
 
+# The manifest gives a minimum. Where ondrej/php does not reach this Ubuntu
+# release, only its own PHP can be installed: use it when it is new enough.
+adopt_php_for_series() {
+  local series="$1" native
+  if ! command -v "php${series}" >/dev/null 2>&1 && ! has_ondrej_php_repo; then
+    [[ -n "${PLATFORM_OS_CODENAME:-}" ]] || platform_detect_os
+    native=$(platform_native_php_version)
+    if ! platform_ondrej_php_available && [[ -n "$native" ]] \
+      && [[ "$(printf '%s\n%s\n' "$series" "$native" | sort -V | head -n1)" == "$series" ]]; then
+      printf '%s\n' "$native"
+      return 0
+    fi
+  fi
+  printf '%s\n' "$series"
+}
+
 adopt_run_as() {
   local user="$1" root="$2"
   shift 2
@@ -66,7 +82,7 @@ site_adopt_handler() {
   if [[ -z "$php" ]]; then
     local series
     series=$(app_php_series "$APP_PHP_MIN") || series=$(php_default_version)
-    php="$series"
+    php=$(adopt_php_for_series "$series")
   fi
   validate_php_version_syntax "$php" || return 1
 

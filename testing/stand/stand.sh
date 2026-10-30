@@ -96,6 +96,8 @@ record() {
   printf '{"schema":"simai-panel-request/1","request_id":"probe","actor":{"user":"admin@stand.test","owner":null},"command":"self:commands","args":{}}' \
     | gate | grep -q '"status": "ok"' || { echo "[stand] the gateway does not answer; run: $0 up" >&2; exit 1; }
   rm -f "${FIXTURES}"/*.json
+  # The site answers show one backup, also on a freshly created stand.
+  in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
   # name, owner (JSON), command, args (JSON)
   local -a requests=(
     "self-describe|null|self:describe|{}"

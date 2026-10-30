@@ -3,7 +3,7 @@
   "set_version": 3,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.23.0",
+  "simai_env": "1.25.0",
   "files": {
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
@@ -18,7 +18,7 @@
       "status": "ok"
     },
     "logs-nginx.demo-static.test.json": {
-      "sha256": "a1293fe91e9fccfb6297b1a0e3531095a3ea9b26942a3468461031601bf06a67",
+      "sha256": "199eda358e70298b25221d6be2e71dd128a3d98e73f564484a69b6a783b3ae17",
       "status": "ok"
     },
     "plan.backup-data.json": {
@@ -46,15 +46,15 @@
       "status": "refused"
     },
     "self-commands.json": {
-      "sha256": "aabd3d3dfe1b3fa0aa6edeee8e93a85757e003058b2c917f069410f176417c76",
+      "sha256": "4d890d5721fc6d4cec1a170abfc1282efa8cc5da6c45140e616b981a2d07376a",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "6edcdc0aa9cc2a2a515b5465f6343e4128f24b432b3823320ac03f7d8eea36ab",
+      "sha256": "e7ab7c368ba3c556cb5e23eabe990287661a0f186890e7107f46372a2c82d9cd",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "619f5969d0991b9197c51d3da04263b48b80e730de37fac2f5054a513fa75842",
+      "sha256": "adabef77577e0a7eddf333f2217d46705f5a1fbe568a9020c2164a2fe7a55cc9",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {
@@ -62,7 +62,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "ca5d5a4ed779ef37000d2bda0198ff4f7b9454880c024c8a2ff8c97a1865c4f6",
+      "sha256": "573afddd5021bde6c434bdd39785cd5a1efa9c8b8becafe8d50bf2c2906952fa",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -70,7 +70,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "ee51594a292274cf03d6770abf9d48c693a8b3592956118005096905d5155c66",
+      "sha256": "1d42176bb2d512abe89b827c3eb5bf9a5c2c4aeba1d3fadd114c8c0a47249c2f",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {

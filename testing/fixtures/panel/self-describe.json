@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.23.0",
+      "version": "1.25.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -118,9 +118,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261028183200",
-          "previous": "20261028183159-initial",
-          "deployed_at": "2026-10-28T18:32:00Z",
+          "current": "20261030173846",
+          "previous": "20261030173845-initial",
+          "deployed_at": "2026-10-30T17:38:46Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],

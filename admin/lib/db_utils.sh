@@ -51,7 +51,7 @@ db_user_has_grant_on() {
 }
 
 db_default_privileges() {
-  printf "%s\n" "SELECT" "INSERT" "UPDATE" "DELETE" "CREATE" "DROP" "INDEX" "ALTER" "CREATE TEMPORARY TABLES" "LOCK TABLES" "EXECUTE"
+  printf "%s\n" "SELECT" "INSERT" "UPDATE" "DELETE" "CREATE" "DROP" "INDEX" "ALTER" "REFERENCES" "CREATE TEMPORARY TABLES" "LOCK TABLES" "EXECUTE"
 }
 
 # Site database engine: mysql (default, also for db.env files written before

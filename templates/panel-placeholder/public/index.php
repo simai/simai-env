@@ -1,5 +1,5 @@
 <?php
-// SIMAI ENV Panel placeholder, installed by `simai-admin.sh panel install`
+// Larena Panel placeholder, installed by `simai-admin.sh panel install`
 // until the Larena build replaces it. It proves the path the panel will use:
 // this site's account -> sudo -> panel gateway. It shows no server data,
 // because it has no sign-in.
@@ -55,7 +55,7 @@ header('Content-Type: text/html; charset=utf-8');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>SIMAI ENV Panel</title>
+<title>Larena Panel</title>
 <style>
   body { font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; color: #1d2330; background: #f6f7f9; }
   .card { background: #fff; border-radius: 12px; padding: 1.5rem 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
@@ -65,7 +65,7 @@ header('Content-Type: text/html; charset=utf-8');
 </head>
 <body>
 <div class="card">
-  <h1>SIMAI ENV Panel</h1>
+  <h1>Larena Panel</h1>
   <p>The panel is installed as a placeholder. The Larena build will replace this page.</p>
   <p>Gateway: <strong class="<?= $gatewayOk ? 'ok' : 'bad' ?>"><?= $gatewayOk ? 'reachable' : 'not reachable' ?></strong></p>
   <?php if ($setup !== 'none'): ?>

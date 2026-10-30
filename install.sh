@@ -293,12 +293,12 @@ if install_profile_init_enabled; then
   fi
 fi
 
-# SIMAI_INSTALL_PANEL_DOMAIN=panel.example.com installs SIMAI ENV Panel as its
+# SIMAI_INSTALL_PANEL_DOMAIN=panel.example.com installs Larena Panel as its
 # own site right away (SIMAI_INSTALL_PANEL_EMAIL also requests a certificate).
 if [[ -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]]; then
   panel_args=(panel install --domain "$SIMAI_INSTALL_PANEL_DOMAIN" --confirm yes)
   [[ -n "${SIMAI_INSTALL_PANEL_EMAIL:-}" ]] && panel_args+=(--ssl-email "$SIMAI_INSTALL_PANEL_EMAIL")
-  echo "Installing SIMAI ENV Panel at ${SIMAI_INSTALL_PANEL_DOMAIN}..."
+  echo "Installing Larena Panel at ${SIMAI_INSTALL_PANEL_DOMAIN}..."
   if ! "${INSTALL_DIR}/simai-admin.sh" "${panel_args[@]}"; then
     echo "WARNING: Panel installation failed. Run later:"
     echo "  sudo ${INSTALL_DIR}/simai-admin.sh panel install --domain ${SIMAI_INSTALL_PANEL_DOMAIN} --confirm yes"

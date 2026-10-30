@@ -6,7 +6,8 @@ stage 2 (certificates, backups and logs as data; plans and jobs, 1.21.0),
 stages 3–4 (deploys with an uploaded archive or a git ref; creating and
 removing sites, databases, redirects, owners, 1.22.0), stage 5 (`panel
 install|remove|status|setup-link`, the placeholder, `install.sh` with the
-panel, 1.23.0).
+panel, 1.23.0), stage 6 (the build installed through `site adopt` with a
+health check, `panel update`, test `panel_install_e2e`, 1.25.0).
 
 ## Installation
 
@@ -26,7 +27,13 @@ sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --g
   that works, because it has no sign-in. With `--git/--ref` or
   `--archive/--sha256` the site is the Larena build: a Laravel site with a
   database; installing a build over the placeholder replaces it (the
-  placeholder holds no data).
+  placeholder holds no data). A build is attached with `site adopt`, so it
+  gets the requirements of its `.simai/app.json` and `composer.json`, its
+  `.env` from `.env.example` (`APP_ENV=production`, `APP_DEBUG=false`,
+  `APP_URL`), the database values, `APP_KEY`, migrations, workers and the
+  scheduler; the same source is then deployed, so there is a release to roll
+  back to. A build that does not answer its health path is not installed: the
+  site, its files and its database are removed again.
 - The panel site's account is added to the gateway's sudo file (next to
   `simai-panel` when `panel gate-enable` is on); `panel gate-disable` keeps
   the installed panel's access.
@@ -36,11 +43,17 @@ sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --g
   The panel build accepts that link for the first administrator and then
   removes the line from `.env`. `panel setup-link` replaces the token (the
   old link stops working).
+- `panel update --archive F --sha256 S` (or `--git/--ref`) installs a newer
+  build: a `backup data` of the panel first, then an ordinary deploy, which
+  migrates before the switch and keeps the current release when anything
+  fails. A release that does not answer its health path is rolled back; the
+  database is not, which is what the backup is for (`backup data-restore`).
+  `.env`, the database and the storage directory survive an update.
 - `panel remove` takes away the gateway access, then removes the panel site
   with its files and database; other sites are not touched. `panel status`
   shows domain, source, account, install time and release.
 
-SIMAI ENV Panel is a Larena application (package `larena/env`) installed by
+Larena Panel is a Larena application (package `larena/env`) installed by
 simai-env as an ordinary site. simai-env stays the only component that
 changes the host; the panel asks it through one narrow entry point, the panel
 gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).

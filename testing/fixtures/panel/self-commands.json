@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 183,
+    "count": 184,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -1643,7 +1643,7 @@
       },
       {
         "command": "simai-admin.sh panel install",
-        "description": "Install SIMAI ENV Panel as its own site (placeholder, or the build from --git/--archive)",
+        "description": "Install Larena Panel as its own site (placeholder, or the build from --git/--archive)",
         "required": [
           "--domain"
         ],
@@ -1727,6 +1727,33 @@
         "effects": "read",
         "authorization": "root",
         "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh panel update",
+        "description": "Update the panel build: data backup, deploy, health check, rollback on failure",
+        "required": [],
+        "optional": {
+          "--git": null,
+          "--ref": null,
+          "--archive": null,
+          "--sha256": null
+        },
+        "flags": [
+          "tier:advanced",
+          "lock:none"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
         "lock": "none",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
