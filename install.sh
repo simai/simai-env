@@ -270,7 +270,10 @@ if install_bootstrap_enabled; then
   # SIMAI_INSTALL_PHP / SIMAI_INSTALL_DB: a version or "none" for hosts that
   # run no PHP or MySQL (for example a Node-only service host).
   install_db="${SIMAI_INSTALL_DB:-}"
-  [[ -n "$install_db" ]] || install_db=percona
+  # Percona publishes no server packages for Ubuntu 26.04 yet.
+  if [[ -z "$install_db" ]]; then
+    [[ "$OS_VERSION_ID" == 26.04 ]] && install_db=mysql || install_db=percona
+  fi
   bootstrap_args=(--mysql "$install_db" --node-version "${SIMAI_INSTALL_NODE:-22}" --silent)
   [[ -n "${SIMAI_INSTALL_PHP:-}" ]] && bootstrap_args+=(--php "$SIMAI_INSTALL_PHP")
   if ! "${INSTALL_DIR}/simai-env.sh" bootstrap "${bootstrap_args[@]}"; then

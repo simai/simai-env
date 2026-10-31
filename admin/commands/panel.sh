@@ -216,6 +216,10 @@ panel_adopt_build() {
     git clone -q --depth 1 --branch "$ref" -- "$git" "$root" >>"$LOG_FILE" 2>&1 || { error "Could not fetch ${ref}; see ${LOG_FILE}"; return 1; }
     rm -rf --one-file-system -- "${root}/.git"
   fi
+  # install.sh leaves only the core profiles enabled; the panel is a Laravel site.
+  if ! is_profile_enabled laravel; then
+    panel_admin profile enable --id laravel --confirm yes >>"$LOG_FILE" 2>&1 || { error "Could not enable the laravel profile; see ${LOG_FILE}"; return 1; }
+  fi
   local -a adopt=(site adopt --domain "$domain" --path "$root" --profile laravel --create-db yes --confirm yes)
   [[ -n "$php" ]] && adopt+=(--php "$php")
   [[ -n "$engine" ]] && adopt+=(--db-engine "$engine")

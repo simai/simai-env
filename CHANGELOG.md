@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.26.1 - 2026-10-31
+
+- `panel install` enables the laravel profile: `install.sh` leaves only the
+  core profiles enabled, so on a new server the panel build was refused.
+- `install.sh` uses MySQL by default on Ubuntu 26.04, where Percona publishes
+  no server packages; the installer failed there without `SIMAI_INSTALL_DB`.
+
 ## 1.26.0 - 2026-10-31
 
 - `panel install --domain D` installs the published Larena Panel: the version

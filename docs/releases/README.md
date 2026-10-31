@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.26.1](v1.26.1.md) — the panel installs on a new server; the installer
+  works on Ubuntu 26.04 by default.
 - [v1.26.0](v1.26.0.md) — `panel install` and `panel update` use the published
   Larena Panel; `install.sh --with-panel`.
 - [v1.25.0](v1.25.0.md) — Larena Panel: the build installed through adopt

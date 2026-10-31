@@ -19,6 +19,10 @@ cli site add --domain keep.test --profile static --confirm yes >/dev/null 2>&1
 mkdir -p /root/k && echo keep-site >/root/k/index.html && tar -C /root/k -czf /root/k.tgz .
 cli site deploy --domain keep.test --archive /root/k.tgz --sha256 "$(sha256sum /root/k.tgz | cut -d' ' -f1)" --confirm yes >/dev/null 2>&1
 
+# As install.sh leaves a new server: only the core profiles are enabled.
+had_profiles=no; [[ -f /etc/simai-env/profiles.enabled ]] && { had_profiles=yes; cp /etc/simai-env/profiles.enabled /root/profiles.enabled.saved; }
+cli profile init --mode core --force yes --confirm yes >/dev/null 2>&1
+
 cli panel status 2>&1 | grep -q 'not installed' && ok "status before install" || bad "status before install"
 cli panel install --domain $P >/tmp/pl 2>&1
 [[ ! -f /etc/nginx/sites-available/$P.conf ]] && ok "install without confirm changes nothing" || bad "plan created the site"
@@ -85,6 +89,7 @@ PHP
   tar -C "$dir" -czf "/root/build-$1.tgz" .
   sha256sum "/root/build-$1.tgz" | cut -d' ' -f1
 }
+grep -q laravel /etc/simai-env/profiles.enabled && bad "the test expects laravel disabled" || ok "laravel is not enabled on a new server"
 s1=$(mk_build v1)
 cli panel install --domain $P --archive /root/build-v1.tgz --sha256 "$s1" --confirm yes >/tmp/pb 2>&1 && ok "panel install with a build archive" || { bad "build install"; tail -15 /tmp/pb; tail -20 /var/log/simai-admin.log; }
 [[ "$(page '')" == panel-v1 ]] && ok "the build replaced the placeholder" || bad "build not served: $(page '' | head -c 200)"
@@ -196,6 +201,7 @@ cli panel gate-disable --confirm yes >/dev/null 2>&1
 cli panel remove --confirm yes >/dev/null 2>&1
 
 # Leave the container as other cases expect it.
+if [[ "$had_profiles" == yes ]]; then cp /root/profiles.enabled.saved /etc/simai-env/profiles.enabled; else rm -f /etc/simai-env/profiles.enabled; fi
 cli site remove --domain keep.test --remove-files yes --confirm yes >/dev/null 2>&1
 rm -f /etc/sudoers.d/simai-panel /usr/local/sbin/simai-panel-gate /etc/simai-env/panel.env
 userdel simai-panel >/dev/null 2>&1 || true
