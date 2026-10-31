@@ -1,0 +1,170 @@
+[
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.implemented-scope",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: implemented-scope",
+    "predicate": "source_reports",
+    "value": "Status: stage 1 (read-only) is implemented in 1.20.0 (`admin/panel_gate.py`,\n`panel gate-enable|gate-disable|gate-status`, test `panel_e2e`). Plans,\nlong operations and owner-scoped changes below are the agreed direction for\nthe next stages.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md#chars=0-241"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.37109b611398918c.2",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:1398918ce51f8673b1a4c0239777b5d2a86f3bc3e99d0f0a9323a82645c10282",
+        "start": 0,
+        "end": 241,
+        "quote": "Status: stage 1 (read-only) is implemented in 1.20.0 (`admin/panel_gate.py`,\n`panel gate-enable|gate-disable|gate-status`, test `panel_e2e`). Plans,\nlong operations and owner-scoped changes below are the agreed direction for\nthe next stages."
+      }
+    ],
+    "assertion_id": "assertion.8334a5d2b2be730bd2cbca62c673bef934b198571171a6bad45b445a19c69be5"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.response-semantics",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: response-semantics",
+    "predicate": "source_reports",
+    "value": "`data` is the command's own structured answer (`self describe`,\n`site describe`, …; see `testing/fixtures/panel/`). `command_status` is the\nsimai-env result status: `site doctor` answers `ok` with\n`command_status: failed` when a diagnostic check fails.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md#chars=0-252"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.37109b6121493177.11",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:214931778a469d89317d737ffc8e3b08c8b38d164d311be5f58fd1e0495fed33",
+        "start": 0,
+        "end": 252,
+        "quote": "`data` is the command's own structured answer (`self describe`,\n`site describe`, …; see `testing/fixtures/panel/`). `command_status` is the\nsimai-env result status: `site doctor` answers `ok` with\n`command_status: failed` when a diagnostic check fails."
+      }
+    ],
+    "assertion_id": "assertion.75aec83b7c5bad69844b2755ff79ec7a261d119df53c8ac20b08e12809d35808"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.allowlist-and-scope",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: allowlist-and-scope",
+    "predicate": "source_reports",
+    "value": "- stage 1 (implemented): `self:describe`, `self:commands`,\n  `site:describe {domain}`, `site:doctor {domain, strict, include-target}`.\n  An owner gets `self:describe` reduced to their own sites and is refused\n  (`owner_scope`) on any other domain. `confirm` must be absent or false;",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md#chars=0-282"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.37109b61f87d0b58.19",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:f87d0b583f0434b7dac4eb123fae448363d17f590ab81c510e9bc0486b49dd2c",
+        "start": 0,
+        "end": 282,
+        "quote": "- stage 1 (implemented): `self:describe`, `self:commands`,\n  `site:describe {domain}`, `site:doctor {domain, strict, include-target}`.\n  An owner gets `self:describe` reduced to their own sites and is refused\n  (`owner_scope`) on any other domain. `confirm` must be absent or false;"
+      }
+    ],
+    "assertion_id": "assertion.2c00fc2b43cac2dcfb40b25ad6e84d1c29980a423becb91bbfea8558913e506a"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.fixture-contract",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: fixture-contract",
+    "predicate": "source_reports",
+    "value": "both sides test against the same files: simai-env checks that it still\nanswers in this shape, `larena/env` checks that it can display it. Re-record\nafter a change of the answer shape, never edit the files by hand.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md#chars=285-498"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.37109b61c2290165.22",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:c2290165830d2e58319276e93bb00f4168887baa3063f1bf767ec23880b8fa96",
+        "start": 285,
+        "end": 498,
+        "quote": "both sides test against the same files: simai-env checks that it still\nanswers in this shape, `larena/env` checks that it can display it. Re-record\nafter a change of the answer shape, never edit the files by hand."
+      }
+    ],
+    "assertion_id": "assertion.8bdc97ab9f3b346e405ba0936f807018579b797f227b1c13deea89119b22c776"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.release-index",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: release-index",
+    "predicate": "source_reports",
+    "value": "- [v1.20.0](v1.20.0.md) — read-only panel gateway for SIMAI ENV Panel.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/README.md#chars=0-70"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.746917f494e17088.2",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/README.md",
+        "content_digest": "sha256:94e17088dcc10536fcee44a5a037614399e26ea1d7375d2d98bc49387f6001e2",
+        "start": 0,
+        "end": 70,
+        "quote": "- [v1.20.0](v1.20.0.md) — read-only panel gateway for SIMAI ENV Panel."
+      }
+    ],
+    "assertion_id": "assertion.dc82784ae5de8b5c44bebf2f85d0b2aaecb4d740a5a96216c782ad93bdd5d1ef"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.activation-boundary",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: activation-boundary",
+    "predicate": "source_reports",
+    "value": "The contract is in `docs/architecture/panel-gate.md`. Nothing changes on\nhosts that do not run `panel gate-enable`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/v1.20.0.md#chars=0-115"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.7d9563146cdb57e1.7",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/v1.20.0.md",
+        "content_digest": "sha256:6cdb57e110f644311aa350a801da43584266af881bf0cd9100658b021fc680ef",
+        "start": 0,
+        "end": 115,
+        "quote": "The contract is in `docs/architecture/panel-gate.md`. Nothing changes on\nhosts that do not run `panel gate-enable`."
+      }
+    ],
+    "assertion_id": "assertion.172f00c4c8214c232fe92077b3c9baf6ffd9ba07010eaecafeffd9ef39962ac4"
+  },
+  {
+    "id": "object.ordering.laravel-env.a5302dce7b.reported-verification",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.20.0: reported-verification",
+    "predicate": "source_reports",
+    "value": "- `panel_e2e` (35 checks) on Ubuntu 22.04, 24.04 and 26.04: allowed commands,\n  owner scope, refusals (write and operator commands, shell metacharacters,\n  unknown or missing arguments, bad actor, malformed and oversized requests,\n  `confirm`), no arguments and no other sudo rights for the panel account,\n  SSH forced command, disable. `static_e2e`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/v1.20.0.md#chars=0-350"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.7d9563141cdf421a.12",
+        "source_ref": "repo://laravel-env@a5302dce7bff8d7d26471d6fbec88333e3ceb4b9/docs/releases/v1.20.0.md",
+        "content_digest": "sha256:1cdf421adfb677233b0137fcf8d1b28d2b05847c69a18425716331c9dbb989c3",
+        "start": 0,
+        "end": 350,
+        "quote": "- `panel_e2e` (35 checks) on Ubuntu 22.04, 24.04 and 26.04: allowed commands,\n  owner scope, refusals (write and operator commands, shell metacharacters,\n  unknown or missing arguments, bad actor, malformed and oversized requests,\n  `confirm`), no arguments and no other sudo rights for the panel account,\n  SSH forced command, disable. `static_e2e`."
+      }
+    ],
+    "assertion_id": "assertion.48dc427004b7de5de32fe43ac52c33eb59d75c5fe5dd5a76aa22a721cd0444d7"
+  }
+]
