@@ -13,6 +13,7 @@ SIMAI_PANEL_KEYS_DIR="${SIMAI_PANEL_KEYS_DIR:-/etc/ssh/simai-panel-keys}"
 SIMAI_PANEL_SSHD_SNIPPET="${SIMAI_PANEL_SSHD_SNIPPET:-/etc/ssh/sshd_config.d/93-simai-panel.conf}"
 SIMAI_PANEL_GATE_LOG="${SIMAI_PANEL_GATE_LOG:-/var/log/simai-panel-gate.log}"
 SIMAI_PANEL_STATE="${SIMAI_PANEL_STATE:-/etc/simai-env/panel.env}"
+SIMAI_PANEL_RELEASE="${SIMAI_PANEL_RELEASE:-${SIMAI_ENV_ROOT}/admin/panel-release.env}"
 
 panel_state_get() {
   [[ -f "$SIMAI_PANEL_STATE" ]] || return 0
@@ -137,10 +138,10 @@ panel_gate_status_handler() {
     "Panel site account|$(panel_state_get PANEL_USER | grep . || echo none)" "SSH keys|${keys}" "Log|${SIMAI_PANEL_GATE_LOG}"
 }
 
-# The panel is an ordinary isolated site. Without a source it gets the
-# placeholder (templates/panel-placeholder, a generic PHP site); with --git or
-# --archive the Larena build (a Laravel site with a database), which replaces
-# the placeholder.
+# The panel is an ordinary isolated site: the Larena build (a Laravel site with
+# a database) pinned in admin/panel-release.env, or from --version, --git or
+# --archive. --placeholder yes installs templates/panel-placeholder, a generic
+# PHP site that needs no download; a build replaces it.
 panel_admin() { SIMAI_ADMIN_MENU=0 bash "${SIMAI_ENV_ROOT}/simai-admin.sh" "$@"; }
 
 panel_site_root() { printf '%s/%s\n' "$WWW_ROOT" "$1"; }
@@ -161,6 +162,34 @@ panel_print_setup_link() {
   # The link is a one-time secret for the operator: stdout only, never the log.
   printf '\nFirst sign-in (one time): %s://%s/?setup=%s\n' "$scheme" "$domain" "$token"
 }
+
+panel_release_get() { sed -n "s/^${1}=//p" "$SIMAI_PANEL_RELEASE" | tail -n1; }
+
+# Downloads a build into PANEL_RELEASE_FILE: the version and checksum pinned
+# for this simai-env release, or --version with its own --sha256. Sets
+# PANEL_RELEASE_VERSION and PANEL_RELEASE_SHA256.
+panel_release_fetch() {
+  local version="$1" sha="$2" url
+  if [[ -n "$version" ]]; then
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { error "Invalid panel version: ${version}"; return 1; }
+    [[ -n "$sha" ]] || { error "--version needs --sha256"; return 1; }
+  else
+    version=$(panel_release_get VERSION); sha=$(panel_release_get SHA256)
+  fi
+  url=$(panel_release_get URL); url="${url//\{version\}/${version}}"
+  [[ -n "$version" && -n "$sha" && -n "$url" ]] || { error "${SIMAI_PANEL_RELEASE} is incomplete"; return 1; }
+  PANEL_RELEASE_FILE=$(mktemp --suffix=.tar.gz) || return 1
+  info "Downloading Larena Panel ${version}"
+  if ! curl -fsSL --retry 2 --max-filesize $(( ${SIMAI_DEPLOY_MAX_ARCHIVE_MB:-1024} * 1048576 )) -o "$PANEL_RELEASE_FILE" "$url" 2>>"$LOG_FILE"; then
+    error "Could not download ${url}; see ${LOG_FILE}"
+    return 1
+  fi
+  [[ "$(sha256sum "$PANEL_RELEASE_FILE" | cut -d' ' -f1)" == "${sha,,}" ]] || { error "The download of Larena Panel ${version} does not match its checksum; nothing was changed"; return 1; }
+  chmod 0644 "$PANEL_RELEASE_FILE"
+  PANEL_RELEASE_VERSION="$version"; PANEL_RELEASE_SHA256="${sha,,}"
+}
+
+panel_release_cleanup() { [[ -z "${PANEL_RELEASE_FILE:-}" ]] || rm -f -- "$PANEL_RELEASE_FILE"; }
 
 # env_set_kv gives the file to SIMAI_USER; .env must stay with the panel's
 # account, which reads it for every artisan call.
@@ -221,34 +250,48 @@ panel_health_ok() {
 }
 
 panel_install_handler() {
+  local rc=0
+  panel_install_run "$@" || rc=$?
+  panel_release_cleanup
+  return "$rc"
+}
+
+panel_install_run() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" git="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}"
   local archive="${PARSED_ARGS[archive]:-}" sha="${PARSED_ARGS[sha256]:-}" php="${PARSED_ARGS[php]:-}"
   local email="${PARSED_ARGS[ssl-email]:-}" engine="${PARSED_ARGS[db-engine]:-}"
+  local version="${PARSED_ARGS[version]:-}" placeholder="${PARSED_ARGS[placeholder]:-no}"
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   [[ -z "$git" || -n "$ref" ]] || { error "--git needs --ref"; return 1; }
   [[ -z "$archive" || -n "$sha" ]] || { error "--archive needs --sha256"; return 1; }
   [[ -z "$git" || -z "$archive" ]] || { error "Use --git or --archive, not both"; return 1; }
+  [[ -z "$version" || -z "$git$archive" ]] || { error "Use --version or --git/--archive, not both"; return 1; }
+  [[ "$placeholder" != yes || -z "$git$archive$version" ]] || { error "--placeholder yes takes no build"; return 1; }
   if [[ -n "$archive" ]]; then
     [[ -f "$archive" ]] || { error "Archive not found: ${archive}"; return 1; }
     [[ "$(sha256sum "$archive" | cut -d' ' -f1)" == "${sha,,}" ]] || { error "Archive checksum does not match --sha256"; return 1; }
   fi
-  local installed source=placeholder profile=generic
+  local installed source=build profile=laravel
   installed=$(panel_state_get PANEL_DOMAIN)
-  [[ -n "$git$archive" ]] && { source=build; profile=laravel; }
+  [[ "$placeholder" == yes ]] && { source=placeholder; profile=generic; }
   if [[ -n "$installed" && "$installed" != "$domain" ]]; then
     error "The panel is already installed at ${installed}; remove it first (panel remove)"
     return 1
   fi
   if [[ -n "$installed" ]]; then
     if [[ "$source" == placeholder ]]; then
-      error "The panel is already installed at ${domain}; give --git/--ref or --archive/--sha256 to install the panel build"
+      error "The panel is already installed at ${domain}; omit --placeholder to install the panel build"
       return 1
     fi
     if [[ "$(panel_state_get SOURCE)" != placeholder ]]; then
       error "The panel build is already installed at ${domain}; use panel update"
       return 1
+    fi
+    if [[ -z "$git$archive" ]]; then
+      panel_release_fetch "$version" "$sha" || return 1
+      archive="$PANEL_RELEASE_FILE"; sha="$PANEL_RELEASE_SHA256"
     fi
     # The placeholder holds no data: replace it with a Laravel site.
     info "Replacing the panel placeholder at ${domain}"
@@ -257,6 +300,9 @@ panel_install_handler() {
   elif [[ -f "/etc/nginx/sites-available/${domain}.conf" ]]; then
     error "${domain} is an existing site; the panel needs a domain of its own"
     return 1
+  elif [[ "$source" == build && -z "$git$archive" ]]; then
+    panel_release_fetch "$version" "$sha" || return 1
+    archive="$PANEL_RELEASE_FILE"; sha="$PANEL_RELEASE_SHA256"
   fi
   local steps=3
   [[ -n "$email" ]] && steps=$((steps + 1))
@@ -297,7 +343,7 @@ panel_install_handler() {
   fi
   progress_step "Letting the panel account ${user} call the gateway"
   panel_state_set PANEL_DOMAIN "$domain" && panel_state_set PANEL_USER "$user" && panel_state_set SOURCE "$source" || return 1
-  panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" || return 1
+  panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" && panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
   panel_gate_sync || return 1
   if [[ -n "$email" ]]; then
     progress_step "Requesting a Let's Encrypt certificate"
@@ -318,16 +364,41 @@ panel_install_handler() {
 # and a failed release never replaces the current one. A release that does not
 # answer its health path is rolled back; the database is not.
 panel_update_handler() {
+  local rc=0
+  panel_update_run "$@" || rc=$?
+  panel_release_cleanup
+  return "$rc"
+}
+
+panel_update_run() {
   parse_kv_args "$@"
   local git="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}" archive="${PARSED_ARGS[archive]:-}" sha="${PARSED_ARGS[sha256]:-}"
+  local version="${PARSED_ARGS[version]:-}"
   local domain
   domain=$(panel_state_get PANEL_DOMAIN)
   [[ -n "$domain" ]] || { error "The panel is not installed (panel install)"; return 1; }
   [[ "$(panel_state_get SOURCE)" == build ]] || { error "The placeholder has nothing to update; install a build: panel install --domain ${domain} --archive F --sha256 S"; return 1; }
-  [[ -n "$git$archive" ]] || { error "Give --archive/--sha256 or --git/--ref"; return 1; }
+  [[ -z "$version" || -z "$git$archive" ]] || { error "Use --version or --git/--archive, not both"; return 1; }
   [[ -z "$git" || -n "$ref" ]] || { error "--git needs --ref"; return 1; }
   [[ -z "$archive" || -n "$sha" ]] || { error "--archive needs --sha256"; return 1; }
   [[ -z "$git" || -z "$archive" ]] || { error "Use --git or --archive, not both"; return 1; }
+  if [[ -z "$git$archive$version" ]]; then
+    # Without a source the pinned version is the target; never a step back.
+    local pinned installed_version
+    pinned=$(panel_release_get VERSION); installed_version=$(panel_state_get VERSION)
+    if [[ "$installed_version" == "$pinned" ]]; then
+      ui_result_table "Panel|${domain}" "Version|${pinned}" "Update|nothing to do"
+      return 0
+    fi
+    if [[ -n "$installed_version" && "$(printf '%s\n%s\n' "$pinned" "$installed_version" | sort -V | tail -n1)" == "$installed_version" ]]; then
+      error "Larena Panel ${installed_version} is newer than ${pinned}, the version of this simai-env release; use --version to choose one"
+      return 1
+    fi
+  fi
+  if [[ -z "$git$archive" ]]; then
+    panel_release_fetch "$version" "$sha" || return 1
+    archive="$PANEL_RELEASE_FILE"; sha="$PANEL_RELEASE_SHA256"
+  fi
   local deploy_file previous current
   deploy_file="$(site_sites_config_dir)/${domain}/deploy.env"
   previous=$(sed -n 's/^CURRENT=//p' "$deploy_file" 2>/dev/null | tail -n1)
@@ -344,8 +415,9 @@ panel_update_handler() {
     error "The new release does not answer its health path; rolled back to ${previous}. The database is not rolled back: a backup was taken first (backup data-restore)"
     return 1
   fi
+  panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
   current=$(sed -n 's/^CURRENT=//p' "$deploy_file" | tail -n1)
-  ui_result_table "Panel|${domain}" "Release|${current}" "Previous|${previous}"
+  ui_result_table "Panel|${domain}" "Version|${PANEL_RELEASE_VERSION:-custom}" "Release|${current}" "Previous|${previous}"
 }
 
 panel_setup_link_handler() {
@@ -374,7 +446,7 @@ panel_remove_handler() {
   progress_step "Removing the panel site ${domain} (other sites are not touched)"
   panel_remove_site "$domain" || return 1
   local key
-  for key in PANEL_DOMAIN SOURCE INSTALLED_AT SSL; do panel_state_set "$key" "" || return 1; done
+  for key in PANEL_DOMAIN SOURCE INSTALLED_AT SSL VERSION; do panel_state_set "$key" "" || return 1; done
   ui_result_table "Panel|removed (${domain})" "Other sites|unchanged" "Gateway log kept|${SIMAI_PANEL_GATE_LOG}"
 }
 
@@ -385,13 +457,13 @@ panel_status_handler() {
     ui_result_table "Panel|not installed" "Install|simai-admin.sh panel install --domain <name> --confirm yes"
     return 0
   fi
-  ui_result_table "Panel|${domain}" "Source|$(panel_state_get SOURCE)" "Runs as|$(panel_state_get PANEL_USER)" \
+  ui_result_table "Panel|${domain}" "Source|$(panel_state_get SOURCE)" "Version|$(panel_state_get VERSION)" "Pinned|$(panel_release_get VERSION)" "Runs as|$(panel_state_get PANEL_USER)" \
     "Installed|$(panel_state_get INSTALLED_AT)" "Release|$(sed -n 's/^CURRENT=//p' "$(site_sites_config_dir)/${domain}/deploy.env" 2>/dev/null | tail -n1)" \
     "Gateway|$([[ -x "$SIMAI_PANEL_GATE" ]] && echo enabled || echo missing)"
 }
 
-register_cmd "panel" "install" "Install Larena Panel as its own site (placeholder, or the build from --git/--archive)" "panel_install_handler" "domain" "git= ref= archive= sha256= php= db-engine= ssl-email=" "tier:advanced lock:none"
-register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "git= ref= archive= sha256=" "tier:advanced lock:none"
+register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "domain" "version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"
+register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "version= git= ref= archive= sha256=" "tier:advanced lock:none"
 register_cmd "panel" "remove" "Remove the panel site and its gateway access (other sites are not touched)" "panel_remove_handler" "" "" "tier:advanced lock:none"
 register_cmd "panel" "status" "Show the installed panel" "panel_status_handler" "" "" "effects:read"
 register_cmd "panel" "setup-link" "Replace the panel's one-time first sign-in link" "panel_setup_link_handler" "" "" "tier:advanced"

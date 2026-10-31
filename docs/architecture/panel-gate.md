@@ -7,27 +7,33 @@ stages 3–4 (deploys with an uploaded archive or a git ref; creating and
 removing sites, databases, redirects, owners, 1.22.0), stage 5 (`panel
 install|remove|status|setup-link`, the placeholder, `install.sh` with the
 panel, 1.23.0), stage 6 (the build installed through `site adopt` with a
-health check, `panel update`, test `panel_install_e2e`, 1.25.0).
+health check, `panel update`, test `panel_install_e2e`, 1.25.0), stage 7 (the
+published build pinned in `admin/panel-release.env`, `install.sh
+--with-panel`, 1.26.0).
 
 ## Installation
 
 ```bash
-# placeholder now; the Larena build later replaces it
 sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --ssl-email ops@example.com --confirm yes
-sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --git <url> --ref <tag> --confirm yes
-# or with the server: SIMAI_INSTALL_PANEL_DOMAIN=panel.example.com (and SIMAI_INSTALL_PANEL_EMAIL) for install.sh
+sudo /root/simai-env/simai-admin.sh panel update --confirm yes
+# with the server:
+bash install.sh --with-panel --panel-domain panel.example.com --panel-email ops@example.com
 ```
 
 - The panel is an ordinary isolated site with its own account
   (`site-<project>`), never `simai` or root. Its domain must be new: an
   existing site is never taken over, and there is one panel per server.
-- Without a source the site gets the placeholder
-  (`templates/panel-placeholder`, a generic PHP site): it calls the gateway
-  through `sudo -n /usr/local/sbin/simai-panel-gate` and shows only whether
-  that works, because it has no sign-in. With `--git/--ref` or
-  `--archive/--sha256` the site is the Larena build: a Laravel site with a
-  database; installing a build over the placeholder replaces it (the
-  placeholder holds no data). A build is attached with `site adopt`, so it
+- **Which build.** Without a source, the version and sha256 in
+  `admin/panel-release.env`: each simai-env release pins one build from the
+  GitHub releases of `simai/larena-env`, and the checksum in simai-env's own
+  history is checked before anything is unpacked. `--version V --sha256 S`
+  chooses another release; `--archive F --sha256 S` and `--git U --ref R` give
+  a build directly.
+- `--placeholder yes` installs `templates/panel-placeholder`, a generic PHP
+  site that needs no download: it calls the gateway through
+  `sudo -n /usr/local/sbin/simai-panel-gate` and shows only whether that works,
+  because it has no sign-in. A build replaces it (it holds no data).
+- The build is a Laravel site with a database. It is attached with `site adopt`, so it
   gets the requirements of its `.simai/app.json` and `composer.json`, its
   `.env` from `.env.example` (`APP_ENV=production`, `APP_DEBUG=false`,
   `APP_URL`), the database values, `APP_KEY`, migrations, workers and the
@@ -43,8 +49,10 @@ sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --g
   The panel build accepts that link for the first administrator and then
   removes the line from `.env`. `panel setup-link` replaces the token (the
   old link stops working).
-- `panel update --archive F --sha256 S` (or `--git/--ref`) installs a newer
-  build: a `backup data` of the panel first, then an ordinary deploy, which
+- `panel update` moves to the version pinned by the current simai-env release
+  (`self update` does not update the panel by itself). It does nothing at that
+  version and never steps back without `--version`; `--archive/--sha256` and
+  `--git/--ref` work as for install. An update takes a `backup data` of the panel first, then an ordinary deploy, which
   migrates before the switch and keeps the current release when anything
   fails. A release that does not answer its health path is rolled back; the
   database is not, which is what the backup is for (`backup data-restore`).

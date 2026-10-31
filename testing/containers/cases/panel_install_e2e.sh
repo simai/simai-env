@@ -22,7 +22,7 @@ cli site deploy --domain keep.test --archive /root/k.tgz --sha256 "$(sha256sum /
 cli panel status 2>&1 | grep -q 'not installed' && ok "status before install" || bad "status before install"
 cli panel install --domain $P >/tmp/pl 2>&1
 [[ ! -f /etc/nginx/sites-available/$P.conf ]] && ok "install without confirm changes nothing" || bad "plan created the site"
-cli panel install --domain $P --confirm yes >/tmp/pi 2>&1 && ok "panel install (placeholder)" || { bad "panel install"; tail -15 /tmp/pi; }
+cli panel install --domain $P --placeholder yes --confirm yes >/tmp/pi 2>&1 && ok "panel install (placeholder)" || { bad "panel install"; tail -15 /tmp/pi; }
 token=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/pi)
 [[ -n "$token" ]] && ok "install prints a one-time sign-in link" || bad "no setup link: $(tail -3 /tmp/pi)"
 grep -rqs "$token" /var/log/simai-admin.log /var/log/simai-audit.log /var/log/simai-panel-gate.log && bad "setup token in a log" || ok "setup token stays out of the logs"
@@ -39,8 +39,8 @@ sudo -n -u "$user" sudo -n /bin/true >/dev/null 2>&1 && bad "panel account has w
 [[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p1","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user" sudo -n /usr/local/sbin/simai-panel-gate | field '{"keep.test", "panel.test"} <= {s["domain"] for s in d["data"]["sites"]}')" == True ]] && ok "panel account calls the gateway" || bad "panel account gateway call"
 
 cli panel status 2>&1 | grep -q 'placeholder' && ok "status shows the placeholder" || bad "status after install"
-cli panel install --domain $P --confirm yes >/dev/null 2>&1 && bad "second placeholder install accepted" || ok "reinstalling the placeholder is refused"
-cli panel install --domain other.test --confirm yes >/dev/null 2>&1 && bad "second panel accepted" || ok "a second panel domain is refused"
+cli panel install --domain $P --placeholder yes --confirm yes >/dev/null 2>&1 && bad "second placeholder install accepted" || ok "reinstalling the placeholder is refused"
+cli panel install --domain other.test --placeholder yes --confirm yes >/dev/null 2>&1 && bad "second panel accepted" || ok "a second panel domain is refused"
 cli panel install --domain keep.test --git https://example.com/x --ref v1 --confirm yes >/dev/null 2>&1; [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "an existing site is never taken over" || bad "keep.test changed"
 
 cli panel setup-link --confirm yes >/tmp/ps 2>&1
@@ -112,7 +112,6 @@ cli panel install --domain $P --archive /root/build-v1.tgz --sha256 "$s2" --conf
 
 # panel update: data backup, deploy, health check, rollback when it fails.
 cli panel update >/tmp/pu0 2>&1; [[ "$(page '')" == panel-v1 ]] && ok "update without confirm changes nothing" || bad "update ran without confirm"
-cli panel update --confirm yes >/dev/null 2>&1 && bad "update without a source accepted" || ok "update needs a source"
 s3=$(mk_build v2)
 cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/tmp/pu 2>&1 && ok "panel update" || { bad "panel update"; tail -15 /tmp/pu; }
 [[ "$(page '')" == panel-v2 ]] && ok "the new release is served" || bad "after update: $(page '' | head -c 120)"
@@ -140,11 +139,49 @@ cli panel install --domain $P --archive /root/build-v4.tgz --sha256 "$s5" --conf
 cli panel status 2>&1 | grep -q 'not installed' && ok "status after the failed install" || bad "status after failed install"
 cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/dev/null 2>&1 && bad "update without a panel accepted" || ok "update needs an installed panel"
 
+# The pinned build: a release file of its own, served by a local web server, so
+# these checks need no network.
+mkdir -p /root/rel/v1.0.0 /root/rel/v2.0.0
+s6=$(mk_build r1); cp /root/build-r1.tgz /root/rel/v1.0.0/panel.tgz
+s7=$(mk_build r2); cp /root/build-r2.tgz /root/rel/v2.0.0/panel.tgz
+(cd /root/rel && exec python3 -m http.server 18099 --bind 127.0.0.1 >/dev/null 2>&1) &
+httpd=$!; sleep 1
+pin() { printf 'VERSION=%s\nSHA256=%s\nURL=http://127.0.0.1:18099/v{version}/panel.tgz\n' "$1" "$2" >/root/rel.env; }
+export SIMAI_PANEL_RELEASE=/root/rel.env
+pin 1.0.0 0000000000000000000000000000000000000000000000000000000000000000
+cli panel install --domain $P --confirm yes >/tmp/pr1 2>&1 && bad "a download with a wrong checksum was installed" || ok "a wrong checksum is refused"
+grep -q 'does not match its checksum' /tmp/pr1 && [[ ! -f /etc/nginx/sites-available/$P.conf && ! -e /home/simai/www/$P ]] && ok "the refused download changes nothing" || bad "after wrong checksum: $(tail -2 /tmp/pr1)"
+pin 1.0.0 "$s6"
+cli panel install --domain $P --confirm yes >/tmp/pr2 2>&1 && ok "panel install downloads the pinned build" || { bad "pinned install"; tail -5 /tmp/pr2; }
+[[ "$(page '')" == panel-r1 ]] && ok "the pinned build is served" || bad "pinned build: $(page '' | head -c 120)"
+cli panel status 2>&1 | grep -q 'Version.*1\.0\.0' && ok "status shows the version" || bad "status version: $(cli panel status 2>&1 | tail -8)"
+cli panel update --confirm yes 2>&1 | grep -q 'nothing to do' && ok "update at the pinned version does nothing" || bad "update same version"
+pin 2.0.0 "$s7"
+cli panel update --confirm yes >/tmp/pr3 2>&1 && ok "update moves to the newly pinned version" || { bad "pinned update"; tail -5 /tmp/pr3; }
+[[ "$(page '')" == panel-r2 ]] && cli panel status 2>&1 | grep -q 'Version.*2\.0\.0' && ok "the new version is served and recorded" || bad "after pinned update: $(page '' | head -c 120)"
+pin 1.0.0 "$s6"
+cli panel update --confirm yes >/dev/null 2>&1 && bad "update stepped back to an older pin" || ok "update never steps back by itself"
+cli panel update --version 1.0.0 --confirm yes >/dev/null 2>&1 && bad "--version without a checksum accepted" || ok "--version needs --sha256"
+cli panel update --version 1.0.0 --sha256 "$s6" --confirm yes >/dev/null 2>&1 && [[ "$(page '')" == panel-r1 ]] && ok "--version with its checksum chooses a version" || bad "--version update: $(page '' | head -c 120)"
+cli panel update --archive /root/build-r2.tgz --sha256 "$s7" --confirm yes >/dev/null 2>&1 && ! cli panel status 2>&1 | grep -q 'Version.*[0-9]\.[0-9]\.[0-9] .*|$' && ok "an archive is not recorded as a version" || bad "archive version"
+cli panel remove --confirm yes >/dev/null 2>&1
+ls /tmp/tmp.*.tar.gz >/dev/null 2>&1 && bad "downloads left in /tmp" || ok "downloads are removed"
+kill "$httpd" 2>/dev/null; unset SIMAI_PANEL_RELEASE
+
+# The installer's options map to the same variables.
+grep -q 'needs --panel-domain' <<<"$(bash ./install.sh --with-panel </dev/null 2>&1)" && ok "--with-panel needs a domain" || bad "--with-panel without a domain"
+
+# The real published build, the one this release pins.
+cli panel install --domain real.test --confirm yes >/tmp/pr4 2>&1 && ok "the published build installs" || { bad "published build"; tail -5 /tmp/pr4; tail -20 /var/log/simai-admin.log | cut -c1-160; }
+[[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'Host: real.test' http://127.0.0.1/up)" == 200 ]] && ok "the published build answers /up" || bad "/up of the published build"
+grep -q '/?setup=[a-f0-9]\{64\}$' /tmp/pr4 && ok "the published build prints its first sign-in link" || bad "no link"
+cli panel remove --confirm yes >/dev/null 2>&1
+
 # A host that enabled the gateway before 1.23.0 has the sudo line but no state.
 id -u simai-panel >/dev/null 2>&1 || useradd --system --user-group simai-panel
 printf 'simai-panel ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate ""\n' >/etc/sudoers.d/simai-panel; chmod 0440 /etc/sudoers.d/simai-panel
 sed -i '/^GATE_ACCOUNT=/d' /etc/simai-env/panel.env 2>/dev/null || true
-cli panel install --domain $P --confirm yes >/dev/null 2>&1
+cli panel install --domain $P --placeholder yes --confirm yes >/dev/null 2>&1
 grep -q '^simai-panel ALL=' /etc/sudoers.d/simai-panel && ok "earlier gateway access survives panel install" || bad "simai-panel lost: $(cat /etc/sudoers.d/simai-panel)"
 cli panel remove --confirm yes >/dev/null 2>&1
 grep -q '^simai-panel ALL=' /etc/sudoers.d/simai-panel 2>/dev/null && ok "and panel remove" || bad "simai-panel lost on remove"
@@ -152,7 +189,7 @@ cli panel gate-disable --confirm yes >/dev/null 2>&1
 
 # The stand account and the installed panel share one sudo file.
 cli panel gate-enable --confirm yes >/dev/null 2>&1
-cli panel install --domain $P --confirm yes >/dev/null 2>&1
+cli panel install --domain $P --placeholder yes --confirm yes >/dev/null 2>&1
 [[ "$(grep -c 'NOPASSWD' /etc/sudoers.d/simai-panel)" == 2 ]] && ok "both gateway accounts listed" || bad "sudo lines: $(cat /etc/sudoers.d/simai-panel)"
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 [[ "$(page '?format=json' | field 'd["gateway"]')" == ok ]] && ok "gate-disable keeps the installed panel's access" || bad "panel lost the gateway"

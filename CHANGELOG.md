@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.26.0 - 2026-10-31
+
+- `panel install --domain D` installs the published Larena Panel: the version
+  and sha256 pinned in `admin/panel-release.env` (0.2.0), checked before
+  unpacking. `--version V --sha256 S` chooses another release.
+  `--placeholder yes` installs the placeholder, which used to be the default.
+- `panel update` without a source moves to the pinned version; it does nothing
+  at that version and never steps back without `--version`. `panel status`
+  shows the installed and the pinned version.
+- `install.sh --with-panel --panel-domain D [--panel-email E]` installs the
+  panel with the server, like the `SIMAI_INSTALL_PANEL_*` variables, which now
+  also get the published build instead of the placeholder.
+
 ## 1.25.0 - 2026-10-30
 
 - The panel build is installed through `site adopt`, so it gets the

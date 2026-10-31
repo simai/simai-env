@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.26.0](v1.26.0.md) — `panel install` and `panel update` use the published
+  Larena Panel; `install.sh --with-panel`.
 - [v1.25.0](v1.25.0.md) — Larena Panel: the build installed through adopt
   with a health check, and `panel update`.
 - [v1.24.0](v1.24.0.md) — fonts on static sites load from other origins

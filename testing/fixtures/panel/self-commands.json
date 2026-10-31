@@ -1643,15 +1643,17 @@
       },
       {
         "command": "simai-admin.sh panel install",
-        "description": "Install Larena Panel as its own site (placeholder, or the build from --git/--archive)",
+        "description": "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes",
         "required": [
           "--domain"
         ],
         "optional": {
+          "--version": null,
           "--git": null,
           "--ref": null,
           "--archive": null,
           "--sha256": null,
+          "--placeholder": null,
           "--php": null,
           "--db-engine": null,
           "--ssl-email": null
@@ -1742,6 +1744,7 @@
         "description": "Update the panel build: data backup, deploy, health check, rollback on failure",
         "required": [],
         "optional": {
+          "--version": null,
           "--git": null,
           "--ref": null,
           "--archive": null,

@@ -41,6 +41,22 @@ fi
 
 install_mode_validate
 
+# bash install.sh --with-panel --panel-domain panel.example.com [--panel-email ops@example.com]
+# is the same as the SIMAI_INSTALL_PANEL_* variables below.
+WITH_PANEL=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --with-panel) WITH_PANEL=1; shift ;;
+    --panel-domain) SIMAI_INSTALL_PANEL_DOMAIN="${2:-}"; shift 2 || shift ;;
+    --panel-email) SIMAI_INSTALL_PANEL_EMAIL="${2:-}"; shift 2 || shift ;;
+    *) shift ;;
+  esac
+done
+if [[ "$WITH_PANEL" == 1 && -z "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]]; then
+  echo "--with-panel needs --panel-domain <name>" >&2
+  exit 1
+fi
+
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
   exit 1
