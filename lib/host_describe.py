@@ -21,6 +21,17 @@ NGINX = Path("/etc/nginx/sites-available")
 STATE = Path("/etc/simai-env")
 UNITS = Path("/etc/systemd/system")
 DB_KEYS = {"DB_ENGINE", "DB_NAME", "DB_USER", "DB_HOST", "DB_PORT"}
+STATUS = Path(os.environ.get("SIMAI_SITE_STATUS", "/var/lib/simai-env/site-status.json"))
+BLOCKS = STATE / "owner-blocks"
+
+
+def site_status() -> dict:
+    """Written by lib/site_status.py from cron (self status-refresh)."""
+    try:
+        data = json.loads(STATUS.read_text()).get("sites", {})
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 def active(unit: str) -> str:
@@ -173,7 +184,22 @@ def backups(domain: str, project: str) -> dict:
     return {"schedule": schedule, "items": items}
 
 
-def describe_site(domain: str, detailed: bool) -> dict:
+def last_backup(domain: str, project: str) -> str | None:
+    """Newest data backup of the site, from directory names only."""
+    dests = {os.environ.get("SIMAI_BACKUP_DEST", "/var/backups/simai")}
+    try:
+        fields = next(l for l in (Path("/etc/cron.d") / f"simai-backup-{project}").read_text().splitlines()
+                      if l and not l.startswith("#")).split()
+        if "--dest" in fields:
+            dests.add(fields[fields.index("--dest") + 1])
+    except (OSError, StopIteration, IndexError):
+        pass
+    names = [d.name for dest in dests if (Path(dest) / domain).is_dir()
+             for d in (Path(dest) / domain).iterdir() if d.is_dir() and re.match(r"^\d{8}-\d{6}$", d.name)]
+    return datetime.strptime(max(names), "%Y%m%d-%H%M%S").strftime("%Y-%m-%dT%H:%M:%S") if names else None
+
+
+def describe_site(domain: str, detailed: bool, status: dict | None = None) -> dict:
     meta = metadata(domain)
     project = meta.get("project") or domain.replace(".", "-")
     root = Path(meta.get("root", ""))
@@ -217,8 +243,13 @@ def describe_site(domain: str, detailed: bool) -> dict:
         "service": service,
         "scheduler": (Path("/etc/cron.d") / project).is_file(),
         "backup_schedule": (Path("/etc/cron.d") / f"simai-backup-{project}").is_file(),
+        "last_backup": last_backup(domain, project),
         "adopted": kv_file(STATE / "sites" / domain / "app.env").get("ADOPTED_AT"),
     }
+    known = (status if status is not None else site_status()).get(domain) or {}
+    info["answers"] = {k: known.get(k) for k in ("http", "path", "checked_at")} if known.get("checked_at") else None
+    size = known.get("disk") if isinstance(known.get("disk"), dict) else {}
+    info["disk"] = {"bytes": size.get("bytes"), "checked_at": size.get("checked_at")} if size.get("checked_at") else None
     if detailed:
         cli = "simai-admin.sh"
         info["manifest"] = manifest_summary(root)
@@ -259,11 +290,19 @@ def describe_site(domain: str, detailed: bool) -> dict:
 def describe_host(root: str) -> dict:
     os_release = kv_file(Path("/etc/os-release"))
     php_versions = sorted(p.parent.name for p in Path("/etc/php").glob("*/fpm")) if Path("/etc/php").is_dir() else []
+    status = site_status()
+    sites = [describe_site(d, False, status) for d in site_domains()]
     owners = []
     registry = STATE / "site-users"
     for owner_file in sorted((STATE / "owners").glob("*")) if (STATE / "owners").is_dir() else []:
         projects = [f.name for f in registry.glob("*") if f.is_file() and f.read_text().strip() == owner_file.name] if registry.is_dir() else []
-        owners.append({"name": owner_file.name, "projects": sorted(projects)})
+        own = [s for s in sites if s.get("owner") == owner_file.name]
+        sizes = [s["disk"]["bytes"] for s in own if s.get("disk") and isinstance(s["disk"].get("bytes"), int)]
+        block = BLOCKS / owner_file.name
+        owners.append({"name": owner_file.name, "projects": sorted(projects),
+                       "blocked": block.is_file(),
+                       "blocked_at": block.read_text().strip() or None if block.is_file() else None,
+                       "sites_disk_bytes": sum(sizes) if own and len(sizes) == len(own) else None})
     version = Path(root, "VERSION").read_text().strip() if Path(root, "VERSION").is_file() else None
     services = {name: active(unit) for name, unit in (
         ("nginx", "nginx"), ("mysql", "mysql"), ("postgresql", "postgresql"),
@@ -277,7 +316,7 @@ def describe_host(root: str) -> dict:
         "services": services,
         "php_versions": php_versions,
         "isolation": {"new_sites": "own user unless SIMAI_SITE_ISOLATION=no", "owners": owners},
-        "sites": [describe_site(d, False) for d in site_domains()],
+        "sites": sites,
         "next": {
             "site_details": "simai-admin.sh site describe --domain <domain>",
             "all_commands": "simai-admin.sh self commands",

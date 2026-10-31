@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.26.0",
+      "version": "1.26.1",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -33,7 +33,10 @@
           "name": "demo",
           "projects": [
             "demo-owned-test"
-          ]
+          ],
+          "blocked": false,
+          "blocked_at": null,
+          "sites_disk_bytes": 1048576
         }
       ]
     },
@@ -56,7 +59,17 @@
         "service": null,
         "scheduler": false,
         "backup_schedule": false,
-        "adopted": null
+        "last_backup": null,
+        "adopted": null,
+        "answers": {
+          "http": 200,
+          "path": "/",
+          "checked_at": "2026-01-01T00:00:00Z"
+        },
+        "disk": {
+          "bytes": 1048576,
+          "checked_at": "2026-01-01T00:00:00Z"
+        }
       },
       {
         "domain": "demo-php.test",
@@ -82,7 +95,17 @@
         "service": null,
         "scheduler": false,
         "backup_schedule": false,
-        "adopted": null
+        "last_backup": "2026-01-01T00:00:00",
+        "adopted": null,
+        "answers": {
+          "http": 200,
+          "path": "/",
+          "checked_at": "2026-01-01T00:00:00Z"
+        },
+        "disk": {
+          "bytes": 1048576,
+          "checked_at": "2026-01-01T00:00:00Z"
+        }
       },
       {
         "domain": "demo-redirect.test",
@@ -102,7 +125,17 @@
         "service": null,
         "scheduler": false,
         "backup_schedule": false,
-        "adopted": null
+        "last_backup": null,
+        "adopted": null,
+        "answers": {
+          "http": 301,
+          "path": "/",
+          "checked_at": "2026-01-01T00:00:00Z"
+        },
+        "disk": {
+          "bytes": 1048576,
+          "checked_at": "2026-01-01T00:00:00Z"
+        }
       },
       {
         "domain": "demo-static.test",
@@ -118,16 +151,26 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261031092442",
-          "previous": "20261031092441-initial",
-          "deployed_at": "2026-10-31T09:24:42Z",
+          "current": "20261031213208",
+          "previous": "20261031213207-initial",
+          "deployed_at": "2026-10-31T21:32:08Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
         "service": null,
         "scheduler": false,
         "backup_schedule": false,
-        "adopted": null
+        "last_backup": null,
+        "adopted": null,
+        "answers": {
+          "http": 200,
+          "path": "/",
+          "checked_at": "2026-01-01T00:00:00Z"
+        },
+        "disk": {
+          "bytes": 1048576,
+          "checked_at": "2026-01-01T00:00:00Z"
+        }
       }
     ],
     "next": {

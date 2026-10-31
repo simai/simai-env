@@ -27,15 +27,25 @@
     "service": null,
     "scheduler": false,
     "backup_schedule": false,
+    "last_backup": "2026-01-01T00:00:00",
     "adopted": null,
+    "answers": {
+      "http": 200,
+      "path": "/",
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
+    "disk": {
+      "bytes": 1048576,
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
     "manifest": null,
     "backups": {
       "schedule": null,
       "items": [
         {
-          "path": "/var/backups/simai/demo-php.test/20261031-092444",
-          "created_at": "2026-10-31T09:24:44",
-          "size_bytes": 4346,
+          "path": "/var/backups/simai/demo-php.test/20261031-213210",
+          "created_at": "2026-10-31T21:32:10",
+          "size_bytes": 4345,
           "parts": [
             "config",
             "db",

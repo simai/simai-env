@@ -21,7 +21,17 @@
     "service": null,
     "scheduler": false,
     "backup_schedule": false,
+    "last_backup": null,
     "adopted": null,
+    "answers": {
+      "http": 200,
+      "path": "/",
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
+    "disk": {
+      "bytes": 1048576,
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
     "manifest": null,
     "backups": {
       "schedule": null,

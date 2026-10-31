@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-set-php",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:set-php",
+    "args": {
+      "domain": "demo-php.test",
+      "php": "8.3"
+    },
+    "target": "demo-php.test",
+    "description": "Switch PHP version for site",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

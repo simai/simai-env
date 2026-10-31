@@ -127,7 +127,9 @@ owner_list_handler() {
     local sites keys
     sites=$(owner_sites "$name" | paste -sd, -)
     keys=$(grep -cv '^[[:space:]]*$' "${SIMAI_OWNER_KEYS_DIR}/${name}" 2>/dev/null || echo 0)
-    rows+=("${name}|keys: ${keys}; projects: ${sites:-none}")
+    local state=""
+    [[ -f "$(owner_blocks_dir)/${name}" ]] && state="; blocked"
+    rows+=("${name}|keys: ${keys}; projects: ${sites:-none}${state}")
   done
   if [[ ${#rows[@]} -eq 0 ]]; then
     info "No owners yet. Create one: simai-admin.sh owner create --name <name> --pubkey-file <key.pub>"
@@ -155,11 +157,40 @@ owner_remove_handler() {
   gpasswd -d www-data "$name" >/dev/null 2>&1 || true
   userdel -r "$name" >/dev/null 2>&1 || userdel "$name" >/dev/null 2>&1 || true
   groupdel "$name" >/dev/null 2>&1 || true
-  rm -f -- "${SIMAI_OWNER_KEYS_DIR}/${name}" "$(site_owners_registry_dir)/${name}"
+  rm -f -- "${SIMAI_OWNER_KEYS_DIR}/${name}" "$(site_owners_registry_dir)/${name}" "$(owner_blocks_dir)/${name}"
   ui_result_table "Owner|${name}" "Status|removed"
+}
+
+owner_blocks_dir() { echo "/etc/simai-env/owner-blocks"; }
+
+# Blocking stops the owner's access: SSH and SFTP (the account expires, open
+# sessions end) and panel requests made as the owner. Sites keep serving and
+# keep running as the owner: PHP-FPM workers are not touched.
+owner_block_handler() {
+  parse_kv_args "$@"
+  local name="${PARSED_ARGS[name]:-}"
+  require_args "name" || return 1
+  site_is_owner "$name" || { error "Owner ${name} does not exist"; return 1; }
+  install -d -m 0755 -o root -g root "$(owner_blocks_dir)" || return 1
+  [[ -f "$(owner_blocks_dir)/${name}" ]] || date -u +%Y-%m-%dT%H:%M:%SZ >"$(owner_blocks_dir)/${name}"
+  usermod --expiredate 1 "$name" || { error "Could not expire the account ${name}"; return 1; }
+  command -v loginctl >/dev/null 2>&1 && loginctl terminate-user "$name" >/dev/null 2>&1 || true
+  ui_result_table "Owner|${name}" "Access|blocked (SSH, SFTP and the panel)" "Sites|keep serving: $(owner_sites "$name" | paste -sd, - || true)"
+}
+
+owner_unblock_handler() {
+  parse_kv_args "$@"
+  local name="${PARSED_ARGS[name]:-}"
+  require_args "name" || return 1
+  site_is_owner "$name" || { error "Owner ${name} does not exist"; return 1; }
+  usermod --expiredate '' "$name" || { error "Could not restore the account ${name}"; return 1; }
+  rm -f -- "$(owner_blocks_dir)/${name}"
+  ui_result_table "Owner|${name}" "Access|restored"
 }
 
 register_cmd "owner" "create" "Create an owner account that can run several sites" "owner_create_handler" "name" "pubkey-file=" "tier:advanced"
 register_cmd "owner" "add-key" "Allow an SSH public key to log in as an owner" "owner_add_key_handler" "name pubkey-file" "" "tier:advanced"
 register_cmd "owner" "list" "List owners, their SSH keys and projects" "owner_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "owner" "remove" "Remove an owner that has no sites" "owner_remove_handler" "name" "confirm=" "tier:advanced"
+register_cmd "owner" "block" "Block an owner's access (SSH, SFTP, panel); sites keep serving" "owner_block_handler" "name" "" "tier:advanced"
+register_cmd "owner" "unblock" "Restore a blocked owner's access" "owner_unblock_handler" "name" "" "tier:advanced"

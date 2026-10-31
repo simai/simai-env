@@ -9,7 +9,8 @@ install|remove|status|setup-link`, the placeholder, `install.sh` with the
 panel, 1.23.0), stage 6 (the build installed through `site adopt` with a
 health check, `panel update`, test `panel_install_e2e`, 1.25.0), stage 7 (the
 published build pinned in `admin/panel-release.env`, `install.sh
---with-panel`, 1.26.0).
+--with-panel`, 1.26.0), stage 8 (site answers, disk and last backup in
+the host description; `owner:block|unblock`, 1.27.0).
 
 ## Installation
 
@@ -130,7 +131,7 @@ simai-env result status: `site doctor` answers `ok` with
 | `status` | Meaning |
 | --- | --- |
 | `ok` | `kind` is `result` (data), `plan` (what an action would do) or `job` (`job_id` of a started action) |
-| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `attachment_mismatch`, `unknown_job`, `not_running` |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `owner_blocked`, `attachment_mismatch`, `unknown_job`, `not_running` |
 | `failed` | ran and failed; `reason`: the simai-env error code, `invalid_output`, `plan_failed` or `job_not_started` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
@@ -138,6 +139,21 @@ private keys or deploy keys. Commands that print secrets for an operator
 (for example a generated password) are not in the allowlist.
 
 ## Site data in the answers
+
+Each site in `self:describe` and `site:describe` also carries:
+
+- `answers`: `{http, path, checked_at}`, the HTTP status of the site's health
+  path (`health.path` of `.simai/app.json`, else `/`) asked through nginx on
+  127.0.0.1 without following redirects; `http` is `null` when nothing
+  answered. `null` before the first check.
+- `disk`: `{bytes, checked_at}`, the size of the site directory.
+- `last_backup`: the time of the newest data backup, or `null`.
+
+`answers` and `disk` come from `/var/lib/simai-env/site-status.json`, written
+by `self status-refresh` from cron every five minutes (disk at most hourly),
+so a description never waits for sites. Each owner in `isolation.owners` has
+`blocked`, `blocked_at` and `sites_disk_bytes` (the sum of the owner's sites,
+`null` while one is not measured yet).
 
 `site:describe` (and each site in `self:describe`) carries `certificate`:
 the names, issuer, `not_after`, `days_left` and `auto_renew` of the
@@ -189,9 +205,14 @@ action, job). Everything else is refused.
   `site:redirect-add {domain, from, to, code}`, `site:redirect-remove`;
   `site:db-create`, `site:db-drop`; `cron:add`, `cron:remove` (the Laravel
   scheduler entry); `ssl:remove {domain, delete-cert}`; `owner:create {name,
-  pubkey}`, `owner:add-key`, `owner:remove`.
+  pubkey}`, `owner:add-key`, `owner:remove`;
+- stage 8 (1.27.0): `owner:block {name}`, `owner:unblock {name}`. Blocking
+  expires the owner's account (SSH and SFTP stop, open sessions end) and
+  refuses every request made as that owner (`owner_blocked`); the owner's
+  sites keep serving.
 
-Owner requests: `owner:*` is refused (`not_allowed`); `site:add` always
+Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
+blocked owner is refused (`owner_blocked`); `site:add` always
 creates the site for the requesting owner (another `owner` is refused
 `owner_scope`); every other domain must belong to the owner.
 

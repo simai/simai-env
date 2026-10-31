@@ -20,6 +20,26 @@ site_describe_handler() {
   python3 "${SIMAI_ENV_ROOT}/lib/host_describe.py" "$SIMAI_ENV_ROOT" site "$domain"
 }
 
+# Whether sites answer and how much disk they use, for self describe; cron
+# runs it every five minutes (self_status_cron_ensure).
+SIMAI_STATUS_CRON="${SIMAI_STATUS_CRON:-/etc/cron.d/simai-site-status}"
+
+self_status_refresh_handler() {
+  parse_kv_args "$@"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/site_status.py" --disk-every "${SIMAI_STATUS_DISK_MINUTES:-60}"
+}
+
+self_status_cron_ensure() {
+  local want tmp
+  want="*/5 * * * * root SIMAI_ADMIN_MENU=0 ${SIMAI_ENV_ROOT}/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1"
+  grep -qsxF "$want" "$SIMAI_STATUS_CRON" && return 1
+  tmp=$(mktemp) || return 0
+  printf '# simai-managed: yes (site answers and disk for self describe)\n%s\n' "$want" >"$tmp"
+  install -m 0644 -o root -g root "$tmp" "$SIMAI_STATUS_CRON"
+  rm -f "$tmp"
+  return 0
+}
+
 # shellcheck disable=SC2120 # called by the dispatcher with optional global arguments
 self_commands_handler() {
   parse_kv_args "$@"
@@ -61,4 +81,5 @@ self_ai_catalog_handler() {
 register_cmd "self" "describe" "Describe this host for humans and AI agents (JSON)" "self_describe_handler" "" "" "tier:advanced effects:read"
 register_cmd "site" "describe" "Describe one site: layout, database, workers, how-to (JSON)" "site_describe_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "self" "commands" "List every command with its options (JSON)" "self_commands_handler" "" "" "tier:advanced effects:read"
+register_cmd "self" "status-refresh" "Check whether sites answer and measure their disk use, for self describe" "self_status_refresh_handler" "" "" "tier:advanced lock:none"
 register_cmd "self" "ai-catalog" "Generate AI First 1.0.0 discovery for the read-only pilot (JSON)" "self_ai_catalog_handler" "" "" "tier:advanced effects:read"

@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.owner-create",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "owner:create",
+    "args": {
+      "name": "staff"
+    },
+    "target": "host",
+    "description": "Create an owner account that can run several sites",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

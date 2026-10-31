@@ -166,6 +166,28 @@ job_ok null "$(creq null site:remove '{"domain":"new.test","remove-files":"yes"}
 [[ -f /etc/nginx/sites-available/new.test.conf ]] && bad "site still configured" || ok "site removed"
 job_ok null "$(creq null owner:remove '{"name":"beta"}')" && ok "owner remove job" || bad "owner remove"
 
+# Site answers, disk and the last backup in one self:describe (stage 2 list).
+cli self status-refresh --confirm yes >/dev/null 2>&1 && ok "self status-refresh" || bad "status-refresh"
+a=$(gate "$(req null self:describe '{}')")
+[[ "$(field 'all(isinstance(s["answers"]["http"], int) and s["answers"]["checked_at"] for s in d["data"]["sites"])' <<<"$a")" == True ]] && ok "every site has an HTTP answer" || bad "answers: $(field '[s.get("answers") for s in d["data"]["sites"]]' <<<"$a")"
+[[ "$(field 'all(isinstance(s["disk"]["bytes"], int) for s in d["data"]["sites"])' <<<"$a")" == True ]] && ok "every site has its disk use" || bad "disk: $(field '[s.get("disk") for s in d["data"]["sites"]]' <<<"$a")"
+[[ "$(field '[s["last_backup"] is not None for s in d["data"]["sites"] if s["domain"] == "open.test"]' <<<"$a")" == "[True]" ]] && ok "last backup time in the list" || bad "last_backup: $a"
+[[ "$(field '[o["sites_disk_bytes"] for o in d["data"]["isolation"]["owners"] if o["name"] == "acme"][0] > 0' <<<"$a")" == True ]] && ok "disk use per owner" || bad "owner disk"
+[[ "$(stat -c '%U %a' /var/lib/simai-env/site-status.json)" == "root 644" ]] && ok "status file is root's" || bad "status file: $(stat -c '%U %a' /var/lib/simai-env/site-status.json)"
+cli self migrate --confirm yes >/dev/null 2>&1; grep -q 'self status-refresh' /etc/cron.d/simai-site-status && ok "status refreshed by cron" || bad "no status cron"
+
+# Blocking an owner: no SSH or panel access, the sites keep serving.
+refused not_allowed "$(req '"acme"' owner:block '{"name":"acme"}')" "an owner cannot block"
+[[ "$(gate "$(req null owner:block '{"name":"acme"}')" | field 'd["kind"]')" == plan ]] && ok "owner block answers a plan" || bad "block plan"
+job_ok null "$(creq null owner:block '{"name":"acme"}')" && ok "owner block job" || bad "owner block"
+[[ "$(getent shadow acme | cut -d: -f8)" == 1 ]] && ok "the blocked account has expired" || bad "expiry: $(getent shadow acme | cut -d: -f8)"
+refused owner_blocked "$(req '"acme"' self:describe '{}')" "requests as a blocked owner"
+[[ "$(gate "$(req null self:describe '{}')" | field '[o["blocked"] for o in d["data"]["isolation"]["owners"] if o["name"] == "acme"]')" == "[True]" ]] && ok "the list shows the block" || bad "blocked flag"
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: acme.test' http://127.0.0.1/)" =~ ^[23] ]] && ok "the blocked owner's site keeps serving" || bad "acme.test down"
+cli owner list 2>&1 | grep -q 'acme.*blocked' && ok "owner list shows the block" || bad "owner list"
+job_ok null "$(creq null owner:unblock '{"name":"acme"}')" && ok "owner unblock job" || bad "owner unblock"
+[[ -z "$(getent shadow acme | cut -d: -f8)" ]] && [[ "$(gate "$(req '"acme"' self:describe '{}')" | field 'd["status"]')" == ok ]] && ok "unblocked owner works again" || bad "after unblock"
+
 # The account has no other way in.
 sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate extra </dev/null >/dev/null 2>&1 && bad "gateway accepted arguments" || ok "gateway takes no arguments"
 sudo -n -u simai-panel sudo -n /root/simai-env/simai-admin.sh self describe >/dev/null 2>&1 && bad "panel account ran simai-admin.sh" || ok "panel account cannot run simai-admin.sh"

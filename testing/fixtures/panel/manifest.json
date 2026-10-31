@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 3,
+  "set_version": 4,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.26.0",
+  "simai_env": "1.26.1",
   "files": {
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
@@ -18,11 +18,23 @@
       "status": "ok"
     },
     "logs-nginx.demo-static.test.json": {
-      "sha256": "199eda358e70298b25221d6be2e71dd128a3d98e73f564484a69b6a783b3ae17",
+      "sha256": "0b63a27ac6674b67521c4171c24504fd65d9b1fa3c72f4770ba979f998f77373",
       "status": "ok"
     },
     "plan.backup-data.json": {
       "sha256": "de23cf2ece8df5d4dd3db2a513fba0a6cd83531b52064072bf51e7ad7a485c93",
+      "status": "ok"
+    },
+    "plan.owner-block.json": {
+      "sha256": "6db96e1f58d3b95912c28a2d0bbab9700bbbbd96745d4fcff475eb05efe0cafe",
+      "status": "ok"
+    },
+    "plan.owner-create.json": {
+      "sha256": "a191e2ef892295d1bb96b04a218956ec87a61f39d43dae5b0600cb52047eb3a4",
+      "status": "ok"
+    },
+    "plan.site-add-laravel.json": {
+      "sha256": "fb91a09fb2a3873a769109f424948e79528240dcac48cb983937493a3b3852f6",
       "status": "ok"
     },
     "plan.site-add.json": {
@@ -31,6 +43,10 @@
     },
     "plan.site-deploy-git.json": {
       "sha256": "a0f0072af2d932ef9aa66a204d390730d5dc10179a2bb8cfffd34eb8704fc691",
+      "status": "ok"
+    },
+    "plan.site-set-php.json": {
+      "sha256": "aba65c453fa369808e07962f3ee4e36c7da14285b2404e6cf5bd12c131f9e9dc",
       "status": "ok"
     },
     "refused.not-allowed.json": {
@@ -46,31 +62,31 @@
       "status": "refused"
     },
     "self-commands.json": {
-      "sha256": "2718d03c3fe74ffa2b918c8d6a7c4d686af6d316180885058032b0e6b4092840",
+      "sha256": "d3573b43b044ee98f11917fbb55cc02929eee3328317602207d5b8a98ba106e0",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "9e5bb7197771789369c713c97868254526158e4ad0f1dc3a38e45dba28252164",
+      "sha256": "e8b9b78b7deccb5ec6373aa623c636c01457d13a129b70b7ec7f6fff8aed241e",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "b18f4da7c86634f6ff941ed651480d1581e34af55e8031e9e37e6261ff9c6bb1",
+      "sha256": "978c6051b5e3e118ec68765f5e6eaa7f9dbd9e8c9232a4d3937149e3e5d5a615",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {
-      "sha256": "00411dd3cc9907accc3489a09c94a3d0f49895ddd884930acffc6aaac5da5c0f",
+      "sha256": "bb08939b708c7d6f973b88b3b1444e82a1e43123fad93b063c55e122719b5a53",
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "b54d278b81187f916911316ddc439d0b41d081076b432d5e99e3ef4a90e0aaaa",
+      "sha256": "a3058ae78bd1ea270c53f5a2ab1bf7925351c0d4f3bd927fee53c3533d9860d7",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
-      "sha256": "4ebe363dd7b4868864a3584457e2a4f478f8b110e8a0ad2c84952bd40fd3f3e0",
+      "sha256": "d158c40149359eb4f0287e61796f2d9a0aa3cc575754cb1c4a152836fcc9625c",
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "963def95d91adb59d5fa00d9850aa8be2f9e84ff116542979ec7517e4b40ce05",
+      "sha256": "c990a9b521ff2ab3260368b68bfb33b11980cba97b80dcdc3fdc8a089864edf7",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {

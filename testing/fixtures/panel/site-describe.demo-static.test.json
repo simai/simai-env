@@ -17,16 +17,26 @@
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261031092442",
-      "previous": "20261031092441-initial",
-      "deployed_at": "2026-10-31T09:24:42Z",
+      "current": "20261031213208",
+      "previous": "20261031213207-initial",
+      "deployed_at": "2026-10-31T21:32:08Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],
     "service": null,
     "scheduler": false,
     "backup_schedule": false,
+    "last_backup": null,
     "adopted": null,
+    "answers": {
+      "http": 200,
+      "path": "/",
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
+    "disk": {
+      "bytes": 1048576,
+      "checked_at": "2026-01-01T00:00:00Z"
+    },
     "manifest": null,
     "backups": {
       "schedule": null,

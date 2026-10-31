@@ -349,6 +349,9 @@ panel_install_run() {
   panel_state_set PANEL_DOMAIN "$domain" && panel_state_set PANEL_USER "$user" && panel_state_set SOURCE "$source" || return 1
   panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" && panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
   panel_gate_sync || return 1
+  # The panel lists sites with whether they answer: keep that fresh.
+  self_status_cron_ensure || true
+  panel_admin self status-refresh --confirm yes >>"$LOG_FILE" 2>&1 || true
   if [[ -n "$email" ]]; then
     progress_step "Requesting a Let's Encrypt certificate"
     if panel_admin ssl letsencrypt --domain "$domain" --email "$email" --redirect yes --confirm yes >>"$LOG_FILE" 2>&1; then

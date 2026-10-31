@@ -255,6 +255,10 @@ self_migrate_handler() {
   self_migrate_catchall
   self_migrate_bitrix_runtime
   self_migrate_agent_guide
+  if self_status_cron_ensure; then
+    SELF_MIGRATE_CHANGES+=("site answers and disk refreshed every five minutes")
+    SIMAI_ADMIN_MENU=0 bash "${SIMAI_ENV_ROOT}/simai-admin.sh" self status-refresh --confirm yes >/dev/null 2>&1 || true
+  fi
   self_migrate_certbot_hook
   SELF_MIGRATE_RELOAD_NGINX=0
   self_migrate_static_charset

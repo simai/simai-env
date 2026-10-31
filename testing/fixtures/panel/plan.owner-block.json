@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.owner-block",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "owner:block",
+    "args": {
+      "name": "demo"
+    },
+    "target": "host",
+    "description": "Block an owner's access (SSH, SFTP, panel); sites keep serving",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

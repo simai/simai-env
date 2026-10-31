@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 184,
+    "count": 187,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -1505,6 +1505,29 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh owner block",
+        "description": "Block an owner's access (SSH, SFTP, panel); sites keep serving",
+        "required": [
+          "--name"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh owner create",
         "description": "Create an owner account that can run several sites",
         "required": [
@@ -1564,6 +1587,29 @@
           "tier:advanced"
         ],
         "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh owner unblock",
+        "description": "Restore a blocked owner's access",
+        "required": [
+          "--name"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
         "authorization": "root",
         "confirmation": "required",
         "lock": "host",
@@ -2802,6 +2848,28 @@
         "effects": "read",
         "authorization": "root",
         "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self status-refresh",
+        "description": "Check whether sites answer and measure their disk use, for self describe",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "lock:none"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
         "lock": "none",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {

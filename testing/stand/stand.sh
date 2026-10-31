@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=3
+FIXTURE_SET=4
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -96,6 +96,7 @@ record() {
   printf '{"schema":"simai-panel-request/1","request_id":"probe","actor":{"user":"admin@stand.test","owner":null},"command":"self:commands","args":{}}' \
     | gate | grep -q '"status": "ok"' || { echo "[stand] the gateway does not answer; run: $0 up" >&2; exit 1; }
   rm -f "${FIXTURES}"/*.json
+  in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
   # The site answers show one backup, also on a freshly created stand.
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
   # name, owner (JSON), command, args (JSON)
@@ -109,6 +110,10 @@ record() {
     "plan.site-add|null|site:add|{\"domain\":\"new.test\",\"profile\":\"static\"}"
     "plan.site-deploy-git|null|site:deploy|{\"domain\":\"demo-static.test\",\"git\":\"https://github.com/example/site\",\"ref\":\"v1.0.0\"}"
     "refused.owner-admin-only|\"demo\"|owner:create|{\"name\":\"other\"}"
+    "plan.site-set-php|null|site:set-php|{\"domain\":\"demo-php.test\",\"php\":\"${PHP}\"}"
+    "plan.owner-create|null|owner:create|{\"name\":\"staff\"}"
+    "plan.owner-block|null|owner:block|{\"name\":\"demo\"}"
+    "plan.site-add-laravel|null|site:add|{\"domain\":\"app.test\",\"profile\":\"laravel\"}"
     "logs-nginx.demo-static.test|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\"}"
   )
   local d
@@ -153,6 +158,19 @@ for f in sorted(root.glob("*.json")):
     data = d.get("data") if isinstance(d.get("data"), dict) else {}
     if "generated_at" in data:
         data["generated_at"] = "2026-01-01T00:00:00Z"
+    sites = list(data.get("sites", [])) if isinstance(data.get("sites"), list) else []
+    if "domain" in data and "answers" in data:
+        sites.append(data)
+    for site in sites:
+        if site.get("answers"):
+            site["answers"]["checked_at"] = "2026-01-01T00:00:00Z"
+        if site.get("disk"):
+            site["disk"] = {"bytes": 1048576, "checked_at": "2026-01-01T00:00:00Z"}
+        if site.get("last_backup"):
+            site["last_backup"] = "2026-01-01T00:00:00"
+    for owner in (data.get("isolation") or {}).get("owners", []):
+        if owner.get("sites_disk_bytes") is not None:
+            owner["sites_disk_bytes"] = 1048576 * len([s for s in sites if s.get("owner") == owner["name"]])
     if "job_id" in d:
         d["job_id"] = "0" * 24
     if "job_id" in data:

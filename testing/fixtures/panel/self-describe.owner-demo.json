@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.26.0",
+      "version": "1.26.1",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -45,7 +45,17 @@
         "service": null,
         "scheduler": false,
         "backup_schedule": false,
-        "adopted": null
+        "last_backup": null,
+        "adopted": null,
+        "answers": {
+          "http": 200,
+          "path": "/",
+          "checked_at": "2026-01-01T00:00:00Z"
+        },
+        "disk": {
+          "bytes": 1048576,
+          "checked_at": "2026-01-01T00:00:00Z"
+        }
       }
     ]
   },

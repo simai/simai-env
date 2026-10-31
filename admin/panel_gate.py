@@ -94,13 +94,16 @@ ALLOW = {
     "owner:create": ({"name": OWNER, "pubkey": PUBKEY}, {"name"}, "action"),
     "owner:add-key": ({"name": OWNER, "pubkey": PUBKEY}, {"name", "pubkey"}, "action"),
     "owner:remove": ({"name": OWNER}, {"name"}, "action"),
+    "owner:block": ({"name": OWNER}, {"name"}, "action"),
+    "owner:unblock": ({"name": OWNER}, {"name"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:list": ({}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
-ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove"}
+ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock"}
+BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file"}  # passed to the command as a file
 ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
 
@@ -166,6 +169,8 @@ def parse(raw):
     if command == "site:deploy" and ("git" in args) != ("ref" in args):
         raise Refused("invalid_argument")
     if owner is not None:
+        if os.path.isfile(os.path.join(BLOCKS, owner)):
+            raise Refused("owner_blocked")
         if command in ADMIN_ONLY:
             raise Refused("not_allowed")
         if command == "site:add":

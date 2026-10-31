@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.27.0 - 2026-11-01
+
+- Each site in `self describe` and `site describe` shows whether it answers
+  (`answers`: HTTP status of its health path, checked through nginx), its disk
+  use (`disk`) and its newest data backup (`last_backup`); owners show their
+  sites' disk use and whether they are blocked. `self status-refresh` measures
+  answers and disk; cron runs it every five minutes, installed by
+  `self migrate` and `panel install`.
+- `owner block --name N` and `owner unblock`: the owner's SSH and SFTP access
+  stops (the account expires, open sessions end) and panel requests made as
+  the owner are refused; the sites keep serving. Also in the panel gateway,
+  administrator only.
+- Recorded panel answers: set 4, with plans for `site:set-php`,
+  `owner:create`, `owner:block` and `site:add` with the laravel profile.
+
 ## 1.26.1 - 2026-10-31
 
 - `panel install` enables the laravel profile: `install.sh` leaves only the
