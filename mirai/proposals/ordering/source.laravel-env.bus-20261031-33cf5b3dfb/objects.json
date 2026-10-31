@@ -1,0 +1,98 @@
+[
+  {
+    "id": "object.ordering.laravel-env.33cf5b3dfb.redirect-path-semantics",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.19.0: redirect-path-semantics",
+    "predicate": "source_reports",
+    "value": "`--redirect-to` is always an origin; `--redirect-path keep` (the default)\nsends the path and query along, `drop` sends every request to `/`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/operations/ci-deploy.md#chars=0-140"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.829edb7b4684131e.24",
+        "source_ref": "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/operations/ci-deploy.md",
+        "content_digest": "sha256:4684131e9dd445022da246ccfd0fead148f1097c1219e2e4a690ea0766ff8051",
+        "start": 0,
+        "end": 140,
+        "quote": "`--redirect-to` is always an origin; `--redirect-path keep` (the default)\nsends the path and query along, `drop` sends every request to `/`."
+      }
+    ],
+    "assertion_id": "assertion.f693fe09440aac0018b5a64d102deb3e9d640b37e2b03c847ef9c88389e8ea1b"
+  },
+  {
+    "id": "object.ordering.laravel-env.33cf5b3dfb.release-index",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.19.0: release-index",
+    "predicate": "source_reports",
+    "value": "- [v1.19.0](v1.19.0.md) — whole-domain redirects to the target's root page\n  (`--redirect-path drop`).",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/README.md#chars=0-102"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.8cf8a1792cb53627.2",
+        "source_ref": "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/README.md",
+        "content_digest": "sha256:2cb53627e5b1bfe546ded72405cfe4a1475befa6fab7189324060a66f40fbfd5",
+        "start": 0,
+        "end": 102,
+        "quote": "- [v1.19.0](v1.19.0.md) — whole-domain redirects to the target's root page\n  (`--redirect-path drop`)."
+      }
+    ],
+    "assertion_id": "assertion.2838d6f742908c5d41818d854e70de39e41315c71112bd551a490e39988acfa0"
+  },
+  {
+    "id": "object.ordering.laravel-env.33cf5b3dfb.redirect-persistence",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.19.0: redirect-persistence",
+    "predicate": "source_reports",
+    "value": "`keep` remains the default. The mode is stored with the site, survives\ncertificate installs and other re-renders, and is shown by\n`site redirect-list`. Redirect sites created before 1.19.0 keep their path.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/v1.19.0.md#chars=0-205"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.94962423d548fe2d.6",
+        "source_ref": "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/v1.19.0.md",
+        "content_digest": "sha256:d548fe2d2ae14f614ffd445b74260e95a35792f2b149343b5f6643dc80632801",
+        "start": 0,
+        "end": 205,
+        "quote": "`keep` remains the default. The mode is stored with the site, survives\ncertificate installs and other re-renders, and is shown by\n`site redirect-list`. Redirect sites created before 1.19.0 keep their path."
+      }
+    ],
+    "assertion_id": "assertion.3ecab95227beb6ec644b8d21748bce5791c37877ef422412795ddac6ac40ddac"
+  },
+  {
+    "id": "object.ordering.laravel-env.33cf5b3dfb.reported-verification",
+    "kind": "documented_source_observation",
+    "title": "laravel-env v1.19.0: reported-verification",
+    "predicate": "source_reports",
+    "value": "- `static_e2e` (61 checks) on Ubuntu 24.04 and 26.04: `drop` answers 301 to the root page\n  for any path and query, also after `ssl install`; unknown modes are refused;\n  `keep` redirects are unchanged.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/v1.19.0.md#chars=0-202"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.94962423d93aa2c5.10",
+        "source_ref": "repo://laravel-env@33cf5b3dfb04dd492d5451b905090431ac2bb86f/docs/releases/v1.19.0.md",
+        "content_digest": "sha256:d93aa2c5be2e5cb2a187806a0762a0082ecbcc3fa9f95c9f9f2932420da356c1",
+        "start": 0,
+        "end": 202,
+        "quote": "- `static_e2e` (61 checks) on Ubuntu 24.04 and 26.04: `drop` answers 301 to the root page\n  for any path and query, also after `ssl install`; unknown modes are refused;\n  `keep` redirects are unchanged."
+      }
+    ],
+    "assertion_id": "assertion.f0f2c79b093dcf2ad860fab7ffebf09b4cb7ad670c67502bfcdcfd475ab1df83"
+  }
+]
