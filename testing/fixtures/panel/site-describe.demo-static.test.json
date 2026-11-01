@@ -17,9 +17,9 @@
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261101151756",
-      "previous": "20261101151755-initial",
-      "deployed_at": "2026-11-01T15:17:56Z",
+      "current": "20261101180047",
+      "previous": "20261101180046-initial",
+      "deployed_at": "2026-11-01T18:00:47Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],

@@ -62,6 +62,12 @@ CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 MATCH = re.compile(r"^[ -~]{1,200}$")
 ACCESS_LOGIN = re.compile(r"^(?!site-)[a-z][a-z0-9-]{2,31}$")
+ALERT_ID = re.compile(r"^[a-f0-9]{12}$")
+CHANNEL_KIND = re.compile(r"^(webhook|telegram|off)$")
+CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~/%?&=+:@-]{0,500})?|"
+                            r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
+TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
+PERIOD = re.compile(r"^(day|week|month)$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -146,20 +152,29 @@ ALLOW = {
     "access:disable": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
     "access:enable": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
     "access:remove": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
+    # Stage 4 (1.31.0): server alerts that work while the panel is down, load history.
+    "self:alerts": ({}, set(), "read"),
+    "self:alerts-ack": ({"id": ALERT_ID}, {"id"}, "action"),
+    "self:alerts-channel": ({"kind": CHANNEL_KIND, "target": CHANNEL_TARGET, "token": TG_TOKEN}, {"kind"}, "action"),
+    "self:alerts-test": ({}, set(), "action"),
+    "self:metrics-history": ({"period": PERIOD}, set(), "read"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:list": ({}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
-ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics"}
+ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics",
+              "self:alerts-channel", "self:alerts-test", "self:metrics-history"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
           "site:php-ini-unset": {"apply": "yes"}}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
-FILE_ARGS = {"pubkey": "pubkey-file"}  # passed to the command as a file
+FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file"}  # passed to the command as a file
+SECRET_ARGS = {"token"}  # never kept in a job record, and their file goes when the job ends
+ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
 ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
 ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
 BY_LOGIN = {"access:add-key", "access:disable", "access:enable", "access:remove"}  # scope from the account
@@ -236,6 +251,8 @@ def parse(raw):
             if args.get("owner", owner) != owner:
                 raise Refused("owner_scope")
             args["owner"] = owner  # an owner's new site is always theirs
+    if command == "self:alerts-ack":
+        args["by"] = actor["user"]  # who acknowledged, as the panel knows them
     return req, command, args, owner
 
 
@@ -283,7 +300,8 @@ def plan(command, args, attachment=None):
     if result is None or result.get("status") != "planned":
         return None
     entry = registry_entry(command)
-    return {"command": command, "args": args, "target": result.get("target"),
+    shown = {k: ("(stored)" if k in SECRET_ARGS else v) for k, v in args.items()}
+    return {"command": command, "args": shown, "target": result.get("target"),
             "description": entry.get("description"), "effects": result.get("effects"),
             "lock": entry.get("lock"), "applied": False}
 
@@ -332,7 +350,9 @@ def start_job(req, command, args, stream):
     try:
         for key in FILE_ARGS:
             if key in args:
-                (d / f"{key}.txt").write_text(args[key] + "\n")
+                fd = os.open(d / f"{key}.txt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "w") as out:
+                    out.write(args[key] + "\n")
                 files[key] = str(d / f"{key}.txt")
         if req.get("attachment"):
             archive = d / "release.tar.gz"
@@ -342,8 +362,12 @@ def start_job(req, command, args, stream):
     except Refused:
         shutil.rmtree(d, ignore_errors=True)
         raise
+    for key in SECRET_ARGS:
+        if key in files:
+            cleanup += f"rm -f {files[key]}\n"
+    shown = {k: ("(stored)" if k in SECRET_ARGS else v) for k, v in args.items()}
     meta = {"job_id": job_id, "request_id": req["request_id"], "actor": req["actor"], "command": command,
-            "args": args, "attachment": req.get("attachment"),
+            "args": shown, "attachment": req.get("attachment"),
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     (d / "job.json").write_text(json.dumps(meta, ensure_ascii=False))
     script = d / "run.sh"
@@ -436,6 +460,13 @@ def owned(owner, domain):
     return domain in owned_domains(owner)
 
 
+def load_alerts():
+    try:
+        return json.loads(ALERTS.read_text()).get("alerts", {})
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
 def access_domain(login):
     """Site of a project SFTP account, from its root-owned metadata; None for others."""
     try:
@@ -485,6 +516,12 @@ def main():
             if owner is not None and not owned(owner, domain):
                 raise Refused("owner_scope")
             entry["domain"] = domain
+        if command == "self:alerts-ack" and owner is not None:
+            alert = load_alerts().get(args["id"])
+            if alert is None:
+                raise Refused("unknown_alert")
+            if not alert.get("domain") or not owned(owner, alert["domain"]):
+                raise Refused("owner_scope")  # host alerts are the administrator's
         kind = ALLOW[command][2]
         if kind == "job":
             answer.update(status="ok", kind="result", data=job_answer(command, args, owner))
@@ -514,6 +551,10 @@ def main():
             data = result["data"]
             if owner is not None and command in HOST_COMMANDS:
                 data = owner_view(data, owner)
+            if owner is not None and command == "self:alerts":
+                mine = owned_domains(owner)
+                data["alerts"] = [a for a in data.get("alerts", []) if a.get("domain") in mine]
+                data.pop("channel", None)
             if owner is not None and command == "access:list":
                 mine = owned_domains(owner)
                 data["accesses"] = [a for a in data.get("accesses", []) if a.get("domain") in mine]

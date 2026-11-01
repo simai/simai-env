@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=6
+FIXTURE_SET=7
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -98,6 +98,10 @@ record() {
   printf '{"schema":"simai-panel-request/1","request_id":"probe","actor":{"user":"admin@stand.test","owner":null},"command":"self:commands","args":{}}' \
     | gate | grep -q '"status": "ok"' || { echo "[stand] the gateway does not answer; run: $0 up" >&2; exit 1; }
   rm -f "${FIXTURES}"/*.json
+  # One known alert (a failed backup of the owner's site) for the alert answers;
+  # two runs, so the load history has points.
+  in_stand bash -c 'mkdir -p /var/lib/simai-env/backup-runs && echo "{\"at\":\"2026-01-01T00:00:00Z\",\"ok\":false}" >/var/lib/simai-env/backup-runs/demo-owned.test.json'
+  in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
   in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
   # The site answers show one backup, also on a freshly created stand.
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
@@ -146,6 +150,14 @@ record() {
     "plan.access-remove|\"demo\"|access:remove|{\"login\":\"demo-staff\"}"
     "refused.unknown-access|null|access:disable|{\"login\":\"nobody1\"}"
     "refused.invalid-argument.access-password|\"demo\"|access:create-project|{\"domain\":\"demo-owned.test\",\"login\":\"pwstaff\",\"password\":\"secret123\"}"
+    "self-alerts|null|self:alerts|{}"
+    "self-alerts.owner-demo|\"demo\"|self:alerts|{}"
+    "plan.self-alerts-ack|\"demo\"|self:alerts-ack|{\"id\":\"9147a2749fff\"}"
+    "plan.self-alerts-channel|null|self:alerts-channel|{\"kind\":\"webhook\",\"target\":\"https://hooks.example.com/simai\"}"
+    "plan.self-alerts-test|null|self:alerts-test|{}"
+    "refused.owner-admin-only.alerts-channel|\"demo\"|self:alerts-channel|{\"kind\":\"off\"}"
+    "self-metrics-history|null|self:metrics-history|{\"period\":\"day\"}"
+    "refused.owner-admin-only.metrics-history|\"demo\"|self:metrics-history|{\"period\":\"week\"}"
     "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
@@ -229,8 +241,17 @@ for f in sorted(root.glob("*.json")):
     for db in data.get("databases", []) if isinstance(data.get("databases"), list) else []:
         if db.get("size_bytes") is not None:
             db["size_bytes"] = 16384
-    if isinstance(data.get("args"), dict) and "backup" in data["args"]:
+    if isinstance(data.get("args"), dict) and re.fullmatch(r"\d{8}-\d{6}", str(data["args"].get("backup", ""))):
         data["args"]["backup"] = "20260101-000000"
+    if data.get("schema") == "simai-alerts/1":
+        # Only the planted alert: disk use and the like differ between machines.
+        data["checked_at"] = "2026-01-01T00:00:00Z"
+        data["alerts"] = [dict(a, first_seen="2026-01-01T00:00:00Z", last_seen="2026-01-01T00:00:00Z")
+                          for a in data["alerts"] if a.get("kind") == "backup_failed"]
+    if data.get("schema") == "simai-metrics-history/1":
+        data["points"] = [{"at": "2026-01-01T00:00:00Z", "load1": 0.1, "cpu_cores": 2, "memory_used_bytes": 1073741824,
+                           "memory_total_bytes": 4294967296, "swap_used_bytes": 0,
+                           "disk": [{"mount": "/", "used_bytes": 10737418240, "total_bytes": 42949672960}]}]
     if "job_id" in d:
         d["job_id"] = "0" * 24
     if "job_id" in data:

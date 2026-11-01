@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.31.0 - 2026-11-01
+
+- Server watch: the five-minute `self status-refresh` also keeps an alert
+  list (disk 90%, certificates under 14 days or a failed renewal, a site or
+  the panel not answering or answering 5xx twice in a row, no backup in 48
+  hours, failed backups and backup checks) and a 31-day load history, so both
+  work while the panel is down. New and resolved alerts go to a webhook or a
+  Telegram chat.
+- New: `self alerts`, `self alerts-ack`, `self alerts-channel`, `self
+  alerts-test`, `self metrics-history`. Every backup records its result for
+  the watch.
+- Panel gateway: the same five commands; `self:alerts` per owner,
+  `self:alerts-channel`, `self:alerts-test` and `self:metrics-history`
+  administrator only. Secret arguments (the Telegram token) are not kept in
+  plans or job records.
+- Recorded panel answers: set 7. Fixed: set 6 pinned `args.backup` of every
+  command, so `plan.site-add-no-backup.json` showed a backup name instead of
+  `no`.
+
 ## 1.30.0 - 2026-11-01
 
 - Panel gateway, stage 10: a site's SFTP accounts, key only:

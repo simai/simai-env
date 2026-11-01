@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 191,
+    "count": 196,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -2194,6 +2194,103 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh self alerts",
+        "description": "List server alerts: disk, certificates, sites, backups, the panel",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self alerts-ack",
+        "description": "Acknowledge an open alert",
+        "required": [
+          "--id"
+        ],
+        "optional": {
+          "--by": null
+        },
+        "flags": [
+          "tier:advanced",
+          "lock:none"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self alerts-channel",
+        "description": "Send alerts to a webhook or a Telegram chat, or nowhere",
+        "required": [
+          "--kind"
+        ],
+        "optional": {
+          "--target": null,
+          "--token-file": null
+        },
+        "flags": [
+          "tier:advanced",
+          "lock:none"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self alerts-test",
+        "description": "Send a test message to the alert channel",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "lock:none"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh self auto-optimize-disable",
         "description": "Disable simple automatic optimization",
         "required": [],
@@ -2523,6 +2620,30 @@
         "description": "Show current CPU load, memory, swap and disk use",
         "required": [],
         "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self metrics-history",
+        "description": "Show the load history: 5-minute points for a day, hourly for a week or month",
+        "required": [],
+        "optional": {
+          "--period": null
+        },
         "flags": [
           "tier:advanced",
           "effects:read"
@@ -2912,7 +3033,7 @@
       },
       {
         "command": "simai-admin.sh self status-refresh",
-        "description": "Check whether sites answer and measure their disk use, for self describe",
+        "description": "Check whether sites answer, measure their disk use, update alerts and the load history",
         "required": [],
         "optional": {},
         "flags": [

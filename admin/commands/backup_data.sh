@@ -7,6 +7,7 @@
 BACKUP_DATA_DEFAULT_DEST="${SIMAI_BACKUP_DEST:-/var/backups/simai}"
 BACKUP_DATA_LOG="/var/log/simai-backup.log"
 BACKUP_DATA_VERIFY_STATE="${SIMAI_BACKUP_VERIFY_STATE:-/var/lib/simai-env/backup-verify}"
+BACKUP_DATA_RUNS="${SIMAI_BACKUP_RUNS:-/var/lib/simai-env/backup-runs}"
 
 backup_data_validate_keep() {
   local keep="$1"
@@ -154,7 +155,21 @@ backup_data_resolve() {
   return 1
 }
 
+# The result of every backup of an existing site is kept for the server watch
+# (lib/server_watch.py: backup_failed).
 backup_data_handler() {
+  local rc=0 domain
+  backup_data_run "$@" || rc=$?
+  domain=$(command_arg domain "$@")
+  if [[ -n "$domain" && -f "/etc/nginx/sites-available/${domain}.conf" && "$domain" =~ ^[a-z0-9.-]+$ ]]; then
+    install -d -m 0755 "$BACKUP_DATA_RUNS" &&
+      printf '{"at":"%s","ok":%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$([[ $rc -eq 0 ]] && echo true || echo false)" \
+        >"${BACKUP_DATA_RUNS}/${domain}.json"
+  fi
+  return "$rc"
+}
+
+backup_data_run() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   local dest="${PARSED_ARGS[dest]:-$BACKUP_DATA_DEFAULT_DEST}"

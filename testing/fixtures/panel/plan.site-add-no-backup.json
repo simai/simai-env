@@ -8,7 +8,7 @@
     "args": {
       "domain": "new.test",
       "profile": "static",
-      "backup": "20260101-000000"
+      "backup": "no"
     },
     "target": "new.test",
     "description": "Create site scaffolding (nginx/php-fpm)",

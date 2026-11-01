@@ -293,6 +293,71 @@ a=$(gate "$(req null self:describe '{}')")
 [[ "$(stat -c '%U %a' /var/lib/simai-env/site-status.json)" == "root 644" ]] && ok "status file is root's" || bad "status file: $(stat -c '%U %a' /var/lib/simai-env/site-status.json)"
 cli self migrate --confirm yes >/dev/null 2>&1; grep -q 'self status-refresh' /etc/cron.d/simai-site-status && ok "status refreshed by cron" || bad "no status cron"
 
+# Server alerts and load history (1.31.0): kept by the 5-minute status run,
+# so they work while the panel is closed or down.
+[[ -f /var/lib/simai-env/alerts.json && -s /var/lib/simai-env/metrics-history.jsonl ]] && ok "the status run keeps alerts and history" || bad "no alerts or history file"
+mkdir -p /var/lib/simai-env/backup-runs; echo '{"at":"2026-11-01T00:00:00Z","ok":false}' >/var/lib/simai-env/backup-runs/db.test.json
+cli self status-refresh --confirm yes >/dev/null 2>&1
+a=$(gate "$(req null self:alerts '{}')")
+[[ "$(field '[(x["kind"], x["state"], x["domain"]) for x in d["data"]["alerts"] if x["kind"] == "backup_failed"]' <<<"$a")" == "[('backup_failed', 'open', 'db.test')]" ]] && ok "a failed backup opens an alert" || bad "alerts: ${a:0:400}"
+a=$(gate "$(req '"acme"' self:alerts '{}')")
+[[ "$(field 'all(x["domain"] in ("db.test", "acme.test", "own.test") for x in d["data"]["alerts"]) and "channel" not in d["data"]' <<<"$a")" == True ]] && ok "an owner sees only their sites' alerts" || bad "owner alerts: ${a:0:300}"
+rm -f /var/lib/simai-env/backup-runs/db.test.json
+pub=$(gate "$(req null site:describe '{"domain":"acme.test"}')" | field 'd["data"]["root"] + "/" + (d["data"]["public_dir"] or "public")')
+mkdir -p "$pub"; [[ -f "$pub/index.php" ]] && cp "$pub/index.php" /root/acme-index.bak
+echo '<?php http_response_code(503);' >"$pub/index.php"; chmod 0644 "$pub/index.php"
+sleep 3  # PHP's opcache rechecks files every two seconds
+cli self status-refresh --confirm yes >/dev/null 2>&1
+[[ "$(gate "$(req null self:alerts '{}')" | field '[x["state"] for x in d["data"]["alerts"] if x["kind"] == "site_down"]')" == "[]" ]] && ok "one failed check does not alert yet" || bad "site_down after one check"
+cli self status-refresh --confirm yes >/dev/null 2>&1
+a=$(gate "$(req null self:alerts '{}')")
+sid=$(field '[x["id"] for x in d["data"]["alerts"] if x["kind"] == "site_down" and x["domain"] == "acme.test"][0]' <<<"$a")
+[[ -n "$sid" && "$(field '[x["message"] for x in d["data"]["alerts"] if x["kind"] == "site_down"][0]' <<<"$a")" == "acme.test answers HTTP 503" ]] && ok "a site answering 503 twice opens an alert" || bad "site_down: ${a:0:400}"
+[[ "$(field '[x["state"] for x in d["data"]["alerts"] if x["kind"] == "backup_failed"]' <<<"$a")" == "['resolved']" ]] && ok "a cleared problem is resolved" || bad "backup_failed not resolved"
+[[ "$(gate "$(req '"acme"' self:alerts-ack "{\"id\":\"${sid}\"}")" | field 'd["kind"]')" == plan ]] && ok "alert ack plan" || bad "ack plan"
+job_ok '"acme"' "$(creq '"acme"' self:alerts-ack "{\"id\":\"${sid}\"}")" && ok "owner acknowledges an alert of their site" || bad "ack job"
+[[ "$(gate "$(req null self:alerts '{}')" | field '[(x["state"], x["acked_by"]) for x in d["data"]["alerts"] if x["id"] == "'"$sid"'"]')" == "[('acked', 'admin@x')]" ]] && ok "the alert is acknowledged by the panel user" || bad "acked state"
+refused unknown_alert "$(req '"acme"' self:alerts-ack '{"id":"000000000000"}')" "an unknown alert"
+if [[ -f /root/acme-index.bak ]]; then cp /root/acme-index.bak "$pub/index.php"; else rm -f "$pub/index.php"; fi
+sleep 3
+cli self status-refresh --confirm yes >/dev/null 2>&1
+[[ "$(gate "$(req null self:alerts '{}')" | field '[x["state"] for x in d["data"]["alerts"] if x["id"] == "'"$sid"'"]')" == "['resolved']" ]] && ok "the site answers again: resolved" || bad "site_down not resolved"
+
+# Delivery: a webhook (a local receiver here) and Telegram, whose token never comes back.
+cat >/root/hook.py <<'PY'
+import http.server
+class H(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers["Content-Length"]))
+        open("/root/hook.log", "ab").write(body + b"\n")
+        self.send_response(204); self.end_headers()
+    def log_message(self, *a): pass
+http.server.HTTPServer(("127.0.0.1", 18999), H).serve_forever()
+PY
+python3 /root/hook.py & hookpid=$!; sleep 1
+job_ok null "$(creq null self:alerts-channel '{"kind":"webhook","target":"http://127.0.0.1:18999/secret-path"}')" && ok "admin sets a webhook" || bad "channel job"
+job_ok null "$(creq null self:alerts-test '{}')" && ok "test message job" || bad "alerts-test job"
+grep -q '"event": "test"' /root/hook.log 2>/dev/null && ok "the webhook received the test" || bad "webhook: $(cat /root/hook.log 2>&1 | head -c 200)"
+a=$(gate "$(req null self:alerts '{}')")
+[[ "$(field 'd["data"]["channel"]["kind"] + " " + d["data"]["channel"]["target_hint"]' <<<"$a")" == "webhook http://127.0.0.1:18999/…" ]] && ok "the channel shows without its path" || bad "channel: $(field 'd["data"]["channel"]' <<<"$a")"
+grep -q secret-path <<<"$a" && bad "the webhook path leaked" || ok "the webhook path is not shown"
+kill $hookpid 2>/dev/null
+tok="123456789:AAFakeFakeFakeFakeFakeFakeFakeFake12"
+a=$(gate "$(creq null self:alerts-channel "{\"kind\":\"telegram\",\"target\":\"-1001234567\",\"token\":\"${tok}\"}")"); j=$(field 'd["job_id"]' <<<"$a")
+[[ "$(wait_job null "$j")" == succeeded ]] && ok "admin sets a Telegram channel" || bad "telegram job"
+[[ "$(stat -c '%U %a' /etc/simai-env/alerts-telegram.token)" == "root 600" ]] && ok "the bot token is root-only" || bad "token file mode"
+grep -rqF -- "$tok" /var/lib/simai-env/panel-jobs /var/log/simai-panel-gate.log && bad "the bot token is in a job record or log" || ok "the bot token is in no job record or log"
+gate "$(req null job:status "{\"job_id\":\"$j\"}")" | grep -qF -- "${tok#*:}" && bad "job status returns the token" || ok "job status hides the token"
+gate "$(req null self:alerts '{}')" | grep -qF -- "${tok#*:}" && bad "alerts return the token" || ok "alerts do not return the token"
+job_ok null "$(creq null self:alerts-channel '{"kind":"off"}')" && [[ ! -f /etc/simai-env/alerts-telegram.token ]] && ok "channel off removes the token" || bad "channel off"
+refused invalid_argument "$(req null self:alerts-channel '{"kind":"webhook","target":"file:///etc/passwd"}')" "a non-HTTP webhook"
+refused not_allowed "$(req '"acme"' self:alerts-channel '{"kind":"off"}')" "an owner sets the channel"
+
+a=$(gate "$(req null self:metrics-history '{"period":"day"}')")
+[[ "$(field 'd["data"]["step_seconds"] == 300 and len(d["data"]["points"]) >= 3 and d["data"]["points"][-1]["memory_total_bytes"] > 0' <<<"$a")" == True ]] && ok "a day of 5-minute load points" || bad "history day: ${a:0:300}"
+[[ "$(gate "$(req null self:metrics-history '{"period":"week"}')" | field 'd["data"]["step_seconds"] == 3600 and len(d["data"]["points"]) >= 1')" == True ]] && ok "a week of hourly points" || bad "history week"
+refused not_allowed "$(req '"acme"' self:metrics-history '{"period":"day"}')" "an owner reads the host history"
+
 # Blocking an owner: no SSH or panel access, the sites keep serving.
 refused not_allowed "$(req '"acme"' owner:block '{"name":"acme"}')" "an owner cannot block"
 [[ "$(gate "$(req null owner:block '{"name":"acme"}')" | field 'd["kind"]')" == plan ]] && ok "owner block answers a plan" || bad "block plan"

@@ -1,0 +1,15 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.self-alerts-test",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "self:alerts-test",
+    "args": {},
+    "target": "host",
+    "description": "Send a test message to the alert channel",
+    "effects": "write",
+    "lock": "none",
+    "applied": false
+  }
+}

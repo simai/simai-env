@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.30.0",
+      "version": "1.31.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -159,9 +159,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261101151756",
-          "previous": "20261101151755-initial",
-          "deployed_at": "2026-11-01T15:17:56Z",
+          "current": "20261101180047",
+          "previous": "20261101180046-initial",
+          "deployed_at": "2026-11-01T18:00:47Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -214,9 +214,14 @@
         "owner:unblock",
         "php:extensions",
         "queue:restart",
+        "self:alerts",
+        "self:alerts-ack",
+        "self:alerts-channel",
+        "self:alerts-test",
         "self:commands",
         "self:describe",
         "self:metrics",
+        "self:metrics-history",
         "site:add",
         "site:db-create",
         "site:db-drop",

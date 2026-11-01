@@ -1,0 +1,28 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-self-alerts.owner-demo",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-alerts/1",
+    "checked_at": "2026-01-01T00:00:00Z",
+    "alerts": [
+      {
+        "id": "9147a2749fff",
+        "kind": "backup_failed",
+        "target": "demo-owned.test",
+        "domain": "demo-owned.test",
+        "severity": "warning",
+        "message": "the last backup of demo-owned.test failed",
+        "state": "open",
+        "first_seen": "2026-01-01T00:00:00Z",
+        "last_seen": "2026-01-01T00:00:00Z",
+        "acked_at": null,
+        "acked_by": null,
+        "resolved_at": null
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

@@ -26,7 +26,50 @@ SIMAI_STATUS_CRON="${SIMAI_STATUS_CRON:-/etc/cron.d/simai-site-status}"
 
 self_status_refresh_handler() {
   parse_kv_args "$@"
-  python3 -I "${SIMAI_ENV_ROOT}/lib/site_status.py" --disk-every "${SIMAI_STATUS_DISK_MINUTES:-60}"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/site_status.py" --disk-every "${SIMAI_STATUS_DISK_MINUTES:-60}" || return 1
+  # Alerts and the load history come from the same run, so they keep working
+  # while the panel is closed or down.
+  python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" run
+}
+
+self_alerts_handler() {
+  parse_kv_args "$@"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" alerts "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
+self_alerts_ack_handler() {
+  parse_kv_args "$@"
+  local id="${PARSED_ARGS[id]:-}" by="${PARSED_ARGS[by]:-${SUDO_USER:-root}}"
+  require_args "id" || return 1
+  [[ "$id" =~ ^[a-f0-9]{12}$ ]] || { error "--id must be an alert id from self alerts"; return 1; }
+  python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" ack "$id" "$by"
+}
+
+# The Telegram bot token is read from a file and kept root-only; it is never
+# printed. The webhook URL is shown only as its scheme and host.
+self_alerts_channel_handler() {
+  parse_kv_args "$@"
+  local kind="${PARSED_ARGS[kind]:-}" target="${PARSED_ARGS[target]:-}" token_file="${PARSED_ARGS[token-file]:-}"
+  require_args "kind" || return 1
+  case "$kind" in
+    off) python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" channel off - ;;
+    webhook|telegram)
+      require_args "target" || return 1
+      python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" channel "$kind" "$target" ${token_file:+"$token_file"} ;;
+    *) error "--kind must be webhook, telegram or off"; return 1 ;;
+  esac
+}
+
+self_alerts_test_handler() {
+  parse_kv_args "$@"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" test
+}
+
+self_metrics_history_handler() {
+  parse_kv_args "$@"
+  local period="${PARSED_ARGS[period]:-day}"
+  [[ "$period" =~ ^(day|week|month)$ ]] || { error "--period must be day, week or month"; return 1; }
+  python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" history "$period" "${SIMAI_COMMAND_OUTPUT:-human}"
 }
 
 self_status_cron_ensure() {
@@ -34,7 +77,7 @@ self_status_cron_ensure() {
   want="*/5 * * * * root SIMAI_ADMIN_MENU=0 ${SIMAI_ENV_ROOT}/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1"
   grep -qsxF "$want" "$SIMAI_STATUS_CRON" && return 1
   tmp=$(mktemp) || return 0
-  printf '# simai-managed: yes (site answers and disk for self describe)\n%s\n' "$want" >"$tmp"
+  printf '# simai-managed: yes (site answers, disk, alerts and load history)\n%s\n' "$want" >"$tmp"
   install -m 0644 -o root -g root "$tmp" "$SIMAI_STATUS_CRON"
   rm -f "$tmp"
   return 0
@@ -87,5 +130,10 @@ register_cmd "self" "describe" "Describe this host for humans and AI agents (JSO
 register_cmd "site" "describe" "Describe one site: layout, database, workers, how-to (JSON)" "site_describe_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "self" "commands" "List every command with its options (JSON)" "self_commands_handler" "" "" "tier:advanced effects:read"
 register_cmd "self" "metrics" "Show current CPU load, memory, swap and disk use" "self_metrics_handler" "" "" "tier:advanced effects:read"
-register_cmd "self" "status-refresh" "Check whether sites answer and measure their disk use, for self describe" "self_status_refresh_handler" "" "" "tier:advanced lock:none"
+register_cmd "self" "status-refresh" "Check whether sites answer, measure their disk use, update alerts and the load history" "self_status_refresh_handler" "" "" "tier:advanced lock:none"
+register_cmd "self" "alerts" "List server alerts: disk, certificates, sites, backups, the panel" "self_alerts_handler" "" "" "tier:advanced effects:read"
+register_cmd "self" "alerts-ack" "Acknowledge an open alert" "self_alerts_ack_handler" "id" "by=" "tier:advanced lock:none"
+register_cmd "self" "alerts-channel" "Send alerts to a webhook or a Telegram chat, or nowhere" "self_alerts_channel_handler" "kind" "target= token-file=" "tier:advanced lock:none"
+register_cmd "self" "alerts-test" "Send a test message to the alert channel" "self_alerts_test_handler" "" "" "tier:advanced lock:none"
+register_cmd "self" "metrics-history" "Show the load history: 5-minute points for a day, hourly for a week or month" "self_metrics_history_handler" "" "period=" "tier:advanced effects:read"
 register_cmd "self" "ai-catalog" "Generate AI First 1.0.0 discovery for the read-only pilot (JSON)" "self_ai_catalog_handler" "" "" "tier:advanced effects:read"

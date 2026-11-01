@@ -14,7 +14,8 @@ the host description; `owner:block|unblock`, 1.27.0), stage 9 (restore,
 verify and schedule backups, PHP settings and extensions, server metrics,
 databases, a log filter, the command list in `self:describe`, 1.28.0),
 stage 10 (a site's SFTP accounts by key, a check after each scheduled backup,
-a daily backup for new sites, the last certificate renewal, 1.30.0).
+a daily backup for new sites, the last certificate renewal, 1.30.0), server
+alerts and the load history (1.31.0).
 
 ## Installation
 
@@ -243,6 +244,28 @@ Stage 10 actions:
   the account (`unknown_access` for an unknown login, `not_allowed` for a
   global account) and checks that an owner owns it (`owner_scope`).
 
+Server alerts and load history (1.31.0). Kept by the server itself every five
+minutes, also while the panel is closed or down (see `self alerts` in
+docs/commands/self.md):
+
+- `self:alerts` answers `simai-alerts/1`: `alerts [{id, kind, severity,
+  domain, target, message, state: open|acked|resolved, first_seen,
+  last_seen, acked_at, acked_by, resolved_at}]`, `checked_at` and `channel
+  {kind, target_hint, last_sent_at, last_error}`. Kinds: `disk_full`,
+  `cert_expiring`, `cert_renew_failed`, `site_down`, `panel_down`,
+  `backup_missing`, `backup_failed`, `backup_check_failed`. An owner gets
+  only alerts of their sites and no channel.
+- `self:alerts-ack {id}` (action): the alert stays until its condition
+  clears, marked as acknowledged by the panel user (`acked_by`). An owner
+  may acknowledge only their sites' alerts (`owner_scope`, `unknown_alert`).
+- `self:alerts-channel {kind: webhook|telegram|off, target, token}` and
+  `self:alerts-test`, administrator only. `token` (the Telegram bot token)
+  is passed as a file, shown as `(stored)` in plans and job records, and its
+  file is removed when the job ends.
+- `self:metrics-history {period: day|week|month}`, administrator only:
+  `simai-metrics-history/1`, 5-minute points for a day, hourly for a week or
+  a month, 30 days back.
+
 ## Allowlist
 
 The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
@@ -275,7 +298,9 @@ action, job). Everything else is refused.
   `self:metrics` (administrator only), `logs:nginx` with `match`;
 - stage 10 (1.30.0): `access:list`, `access:create-project`,
   `access:add-key`, `access:disable`, `access:enable`, `access:remove`;
-  `backup:data-schedule` with `verify`; `site:add` with `backup`.
+  `backup:data-schedule` with `verify`; `site:add` with `backup`;
+- 1.31.0: `self:alerts`, `self:alerts-ack`, `self:alerts-channel`,
+  `self:alerts-test`, `self:metrics-history`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -292,7 +317,8 @@ stand (`testing/stand/stand.sh record`): host description (also an owner's
 view), command registry, `site describe` and `site doctor` for demo sites,
 plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
 refusal per site action of stage 9, the SFTP account list and plans of stage
-10. Set 6 since 1.30.0. The panel's fixture driver replays them, and
+10, the alert list with one planted alert and the load history. Set 7 since
+1.31.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

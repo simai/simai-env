@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.30.0",
+      "version": "1.31.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -81,6 +81,8 @@
         "logs:nginx",
         "php:extensions",
         "queue:restart",
+        "self:alerts",
+        "self:alerts-ack",
         "self:commands",
         "self:describe",
         "site:add",
