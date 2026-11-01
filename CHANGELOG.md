@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.33.0 - 2026-11-02
+
+- New `service list`, `service restart`, `service reload`, `service log` for
+  nginx, PHP-FPM, MySQL/MariaDB, PostgreSQL, Redis and cron. nginx and
+  PHP-FPM test their configuration first; a failed restart prints the
+  unit's last journal lines.
+- New `self profiles`: the enabled site profiles with the `site add`
+  arguments, values and defaults of each (`simai-site-profiles/1`).
+- New profile `proxy`: `site add --profile proxy --upstream-port P
+  [--upstream-path /app/] [--websockets yes]` proxies a domain to a service
+  on 127.0.0.1.
+- Panel gateway: `service:*` (administrator only), `self:profiles`, and
+  `site:add` with profiles `proxy` and `bitrix` (`bitrix-files`).
+- Larena Panel 0.3.0 is the pinned build: `panel install` installs it, and
+  `self update --target panel` moves 0.2.0 panels to it.
+- Recorded panel answers: set 9.
+
 ## 1.32.0 - 2026-11-02
 
 - `self update --check-sites yes` notes which sites answer, updates, and

@@ -179,10 +179,16 @@ kill "$httpd" 2>/dev/null; unset SIMAI_PANEL_RELEASE
 # The installer's options map to the same variables.
 grep -q 'needs --panel-domain' <<<"$(bash ./install.sh --with-panel </dev/null 2>&1)" && ok "--with-panel needs a domain" || bad "--with-panel without a domain"
 
-# The real published build, the one this release pins.
-cli panel install --domain real.test --confirm yes >/tmp/pr4 2>&1 && ok "the published build installs" || { bad "published build"; tail -5 /tmp/pr4; tail -20 /var/log/simai-admin.log | cut -c1-160; }
-[[ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'Host: real.test' http://127.0.0.1/up)" == 200 ]] && ok "the published build answers /up" || bad "/up of the published build"
+# The real published builds: the previous one, then an update to the one
+# this release pins, and back.
+up() { curl -s -o /dev/null -w '%{http_code}' --max-time 10 -H 'Host: real.test' http://127.0.0.1/up; }
+pinned=$(sed -n 's/^VERSION=//p' admin/panel-release.env)
+cli panel install --domain real.test --version 0.2.0 --sha256 7c3c10df6b0cbb2080d97c96f2f26476c343aa38c0c6485cceb9330d01780b24 --confirm yes >/tmp/pr4 2>&1 && ok "the published build 0.2.0 installs" || { bad "published build"; tail -5 /tmp/pr4; tail -20 /var/log/simai-admin.log | cut -c1-160; }
+[[ "$(up)" == 200 ]] && ok "the published build answers /up" || bad "/up of the published build"
 grep -q '/?setup=[a-f0-9]\{64\}$' /tmp/pr4 && ok "the published build prints its first sign-in link" || bad "no link"
+[[ "$(cli self update-plan --target panel --output json 2>/dev/null | field 'd["data"]["current"] + " " + d["data"]["available"] + " " + str(d["data"]["update_available"])')" == "0.2.0 ${pinned} True" ]] && ok "the plan offers ${pinned} over 0.2.0" || bad "real update plan"
+cli self update --target panel --confirm yes >/tmp/pr5 2>&1 && [[ "$(up)" == 200 ]] && cli panel status 2>&1 | grep -q "Version.*${pinned}" && ok "update to the pinned ${pinned} answers /up" || { bad "update to ${pinned}"; tail -8 /tmp/pr5; }
+cli site deploy-rollback --domain real.test --confirm yes >/tmp/pr6 2>&1 && [[ "$(up)" == 200 ]] && ok "rollback to 0.2.0 still answers /up" || { bad "rollback of the published build"; tail -5 /tmp/pr6; }
 cli panel remove --confirm yes >/dev/null 2>&1
 
 # A host that enabled the gateway before 1.23.0 has the sudo line but no state.

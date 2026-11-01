@@ -358,6 +358,48 @@ a=$(gate "$(req null self:metrics-history '{"period":"day"}')")
 [[ "$(gate "$(req null self:metrics-history '{"period":"week"}')" | field 'd["data"]["step_seconds"] == 3600 and len(d["data"]["points"]) >= 1')" == True ]] && ok "a week of hourly points" || bad "history week"
 refused not_allowed "$(req '"acme"' self:metrics-history '{"period":"day"}')" "an owner reads the host history"
 
+# Host services and site profiles (1.33.0).
+a=$(gate "$(req null service:list '{}')")
+[[ "$(field '{s["name"]: s["active"] for s in d["data"]["services"]}.get("nginx")' <<<"$a")" == active ]] && ok "service list shows nginx running" || bad "service list: ${a:0:300}"
+[[ "$(field 'any(s["name"].startswith("php") and s["name"].endswith("-fpm") for s in d["data"]["services"])' <<<"$a")" == True ]] && ok "service list shows PHP-FPM" || bad "no php-fpm in the list"
+a=$(gate "$(req null service:log '{"name":"nginx","lines":"20"}')")
+[[ "$(field 'd["data"]["name"] == "nginx" and isinstance(d["data"]["lines"], list)' <<<"$a")" == True ]] && ok "service log reads the journal" || bad "service log: ${a:0:300}"
+[[ "$(gate "$(req null service:restart '{"name":"nginx"}')" | field 'd["kind"]')" == plan ]] && ok "service restart answers a plan" || bad "restart plan"
+job_ok null "$(creq null service:reload '{"name":"nginx"}')" && ok "nginx reload job" || bad "nginx reload"
+php_unit=$(gate "$(req null service:list '{}')" | field '[s["name"] for s in d["data"]["services"] if s["name"].startswith("php")][0]')
+job_ok null "$(creq null service:restart "{\"name\":\"${php_unit}\"}")" && systemctl is-active --quiet "$php_unit" && ok "PHP-FPM restart job" || bad "php-fpm restart"
+echo 'this is not nginx;' >/etc/nginx/conf.d/zz-broken.conf
+j=$(gate "$(creq null service:restart '{"name":"nginx"}')" | field 'd["job_id"]')
+[[ "$(wait_job null "$j")" == failed ]] && systemctl is-active --quiet nginx && ok "a broken nginx config refuses the restart, nginx keeps running" || bad "restart with a broken config"
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'configuration test failed' && ok "the job says why" || bad "broken config log"
+rm -f /etc/nginx/conf.d/zz-broken.conf
+refused not_allowed "$(req '"acme"' service:restart '{"name":"nginx"}')" "an owner restarts a service"
+refused not_allowed "$(req '"acme"' service:list '{}')" "an owner lists services"
+refused invalid_argument "$(req null service:restart '{"name":"ssh"}')" "a service outside the list"
+a=$(gate "$(req null service:log '{"name":"mariadb"}')")
+[[ "$(field 'd["status"]' <<<"$a")" != ok ]] && ok "a service not on this host is not read" || bad "absent service read: ${a:0:200}"
+
+for p in proxy bitrix; do cli profile enable --id "$p" --confirm yes >/dev/null 2>&1 || true; done
+a=$(gate "$(req '"acme"' self:profiles '{}')")
+ids=$(field 'sorted(p["id"] for p in d["data"]["profiles"])' <<<"$a")
+[[ "$ids" == *proxy* && "$ids" == *bitrix* && "$ids" != *alias* ]] && ok "profiles for the wizard: proxy and bitrix, no alias" || bad "profiles: $ids"
+[[ "$(field '[a["name"] for p in d["data"]["profiles"] if p["id"] == "proxy" for a in p["args"] if a.get("required")]' <<<"$a")" == "['domain', 'upstream-port']" ]] && ok "proxy needs a domain and an upstream port" || bad "proxy args: $(field '[p for p in d["data"]["profiles"] if p["id"] == "proxy"]' <<<"$a")"
+[[ "$(field '[a["values"] for p in d["data"]["profiles"] if p["id"] == "bitrix" for a in p["args"] if a["name"] == "bitrix-files"]' <<<"$a")" == "[['none', 'setup', 'restore']]" ]] && ok "bitrix has its own argument" || bad "bitrix args"
+[[ "$(field '[p["php"]["default"] for p in d["data"]["profiles"] if p["id"] == "generic"][0] in d["data"]["php_installed"] and len(d["data"]["php_installed"]) > 0' <<<"$a")" == True ]] && ok "PHP versions come from this host" || bad "php versions: $(field 'd["data"]["php_installed"]' <<<"$a")"
+
+mkdir -p /root/upstream/app && echo upstream-ok >/root/upstream/app/index.html
+(cd /root/upstream && exec python3 -m http.server 18777 --bind 127.0.0.1 >/dev/null 2>&1) &
+uppid=$!; sleep 1
+job_ok null "$(creq null site:add '{"domain":"px.test","profile":"proxy","upstream-port":"18777","upstream-path":"/app/","websockets":"yes"}')" && ok "a proxy site" || bad "proxy site add"
+[[ "$(curl -s -H 'Host: px.test' http://127.0.0.1/)" == upstream-ok ]] && ok "the proxy site serves the local service" || bad "proxy answer: $(curl -s -H 'Host: px.test' http://127.0.0.1/ | head -c 200)"
+grep -q 'proxy_set_header Upgrade' /etc/nginx/sites-available/px.test.conf && ! grep -q '# *proxy_set_header Upgrade' /etc/nginx/sites-available/px.test.conf && ok "websockets yes upgrades connections" || bad "websocket lines"
+job_ok null "$(creq null site:add '{"domain":"px2.test","profile":"proxy","upstream-port":"18777"}')" && grep -q '# *proxy_set_header Upgrade' /etc/nginx/sites-available/px2.test.conf && ok "without websockets the upgrade is off" || bad "proxy without websockets"
+j=$(gate "$(creq null site:add '{"domain":"px3.test","profile":"proxy","upstream-port":"443"}')" | field 'd["job_id"]')
+[[ "$(wait_job null "$j")" == failed && ! -f /etc/nginx/sites-available/px3.test.conf ]] && ok "the proxy refuses nginx's own port" || bad "proxy to 443"
+refused invalid_argument "$(req null site:add '{"domain":"px4.test","profile":"proxy","upstream-port":"8080","upstream-host":"10.0.0.1"}')" "a proxy to another host"
+job_ok null "$(creq null site:remove '{"domain":"px.test","remove-files":"yes"}')" && job_ok null "$(creq null site:remove '{"domain":"px2.test","remove-files":"yes"}')" && [[ ! -f /etc/simai-env/sites/px.test/proxy.env ]] && ok "proxy sites are removed with their settings" || bad "proxy remove"
+kill "$uppid" 2>/dev/null
+
 # Safe update (1.32.0): a plan with versions and checks, then a job that puts
 # the previous toolkit back when a site stops answering. A stand-in updater
 # replaces the network download: it archives the tree like update.sh and

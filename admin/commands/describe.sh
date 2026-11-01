@@ -32,6 +32,11 @@ self_status_refresh_handler() {
   python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" run
 }
 
+self_profiles_handler() {
+  parse_kv_args "$@"
+  SIMAI_PROFILES_DIR="$(profiles_dir)" python3 -I "${SIMAI_ENV_ROOT}/lib/site_profiles.py" "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
 self_alerts_handler() {
   parse_kv_args "$@"
   python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" alerts "${SIMAI_COMMAND_OUTPUT:-human}"
@@ -136,4 +141,5 @@ register_cmd "self" "alerts-ack" "Acknowledge an open alert" "self_alerts_ack_ha
 register_cmd "self" "alerts-channel" "Send alerts to a webhook or a Telegram chat, or nowhere" "self_alerts_channel_handler" "kind" "target= token-file=" "tier:advanced lock:none"
 register_cmd "self" "alerts-test" "Send a test message to the alert channel" "self_alerts_test_handler" "" "" "tier:advanced lock:none"
 register_cmd "self" "metrics-history" "Show the load history: 5-minute points for a day, hourly for a week or month" "self_metrics_history_handler" "" "period=" "tier:advanced effects:read"
+register_cmd "self" "profiles" "List enabled site profiles with the site add arguments, values and defaults of each" "self_profiles_handler" "" "" "tier:advanced effects:read"
 register_cmd "self" "ai-catalog" "Generate AI First 1.0.0 discovery for the read-only pilot (JSON)" "self_ai_catalog_handler" "" "" "tier:advanced effects:read"

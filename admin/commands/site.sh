@@ -567,7 +567,7 @@ site_add_transaction_rollback() {
   if [[ ( "${SITE_ADD_TX_SITE_USER_CREATED:-0}" -eq 1 || "${SITE_ADD_TX_OWNER_ASSIGNED:-0}" -eq 1 ) && -n "${SITE_ADD_TX_PROJECT:-}" ]]; then
     site_user_delete "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   fi
-  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/service.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirect.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirects"
+  rm -f -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/perf.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/runtime.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/db.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/service.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirect.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/proxy.env" "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}/redirects"
   rmdir -- "$(site_sites_config_dir)/${SITE_ADD_TX_DOMAIN}" >/dev/null 2>&1 || true
   if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED:-0}" -eq 1 ]]; then
     if [[ "${SITE_ADD_TX_PROFILE_ALLOWLIST_EXISTED:-0}" -eq 1 ]]; then
@@ -1118,6 +1118,17 @@ site_add_handler_impl() {
     install -d -m 0750 "$(site_sites_config_dir)/${domain}"
     printf 'TARGET=%s\nCODE=%s\nPATH=%s\n' "$SITE_REDIRECT_TARGET" "$SITE_REDIRECT_CODE" "$SITE_REDIRECT_PATH" >"$(site_sites_config_dir)/${domain}/redirect.env"
   fi
+  SITE_PROXY_PORT="" SITE_PROXY_PATH="" SITE_PROXY_WEBSOCKETS=""
+  if grep -q '{{UPSTREAM_PORT}}' "$template_path"; then
+    SITE_PROXY_PORT="${PARSED_ARGS[upstream-port]:-}"
+    SITE_PROXY_PATH="${PARSED_ARGS[upstream-path]:-/}"
+    SITE_PROXY_WEBSOCKETS="${PARSED_ARGS[websockets]:-no}"
+    site_proxy_port_valid "$SITE_PROXY_PORT" || { error "--upstream-port must be the port of a service on 127.0.0.1 (1-65535, not 80 or 443)"; return 1; }
+    site_proxy_path_valid "$SITE_PROXY_PATH" || { error "--upstream-path must be a path such as / or /app/"; return 1; }
+    [[ "$SITE_PROXY_WEBSOCKETS" =~ ^(yes|no)$ ]] || { error "--websockets must be yes or no"; return 1; }
+    install -d -m 0750 "$(site_sites_config_dir)/${domain}"
+    printf 'PORT=%s\nPATH=%s\nWEBSOCKETS=%s\n' "$SITE_PROXY_PORT" "$SITE_PROXY_PATH" "$SITE_PROXY_WEBSOCKETS" >"$(site_sites_config_dir)/${domain}/proxy.env"
+  fi
   SITE_APP_PORT=""
   if grep -q '{{APP_PORT}}' "$template_path"; then
     SITE_APP_PORT=$(app_port_allocate "${PARSED_ARGS[app-port]:-}") || return 1
@@ -1327,7 +1338,7 @@ site_add_handler_impl() {
   [[ -n "$site_owner" ]] && site_owner_link_site "$site_owner" "$domain" "$path"
   # A new site gets the daily data backup with its defaults (backup data-schedule).
   local backup_summary="off"
-  if [[ "${backup_default,,}" == yes && "$profile" != redirect && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+  if [[ "${backup_default,,}" == yes && "$profile" != redirect && "$profile" != proxy && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
     if ( backup_data_schedule_handler --domain "$domain" --enabled yes ) >>"$LOG_FILE" 2>&1; then
       SITE_ADD_TX_BACKUP_CREATED=1
       backup_summary="daily at 03:30, keep 7 (simai-admin.sh backup data-schedule)"
@@ -2312,7 +2323,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= backup= owner= db-engine= app-port= redirect-to= redirect-code= redirect-path=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= backup= owner= db-engine= app-port= redirect-to= redirect-code= redirect-path= upstream-port= upstream-path= websockets=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

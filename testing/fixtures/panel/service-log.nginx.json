@@ -1,0 +1,15 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-service-log.nginx",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-service-log/1",
+    "name": "nginx",
+    "lines": [
+      "2026-01-01T00:00:00+0000 simai-stand systemd[1]: Started nginx.service - A high performance web server."
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

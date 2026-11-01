@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.service-reload",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "service:reload",
+    "args": {
+      "name": "nginx"
+    },
+    "target": "host",
+    "description": "Reload a host service's configuration after its test",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

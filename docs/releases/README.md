@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.33.0](v1.33.0.md) — host services, site profiles for the wizard, a
+  reverse proxy profile, Bitrix sites from the panel, Larena Panel 0.3.0.
 - [v1.32.0](v1.32.0.md) — safe update of simai-env and the panel from the
   panel: a plan first, site checks after, rollback.
 - [v1.31.0](v1.31.0.md) — server alerts to a webhook or Telegram, and the

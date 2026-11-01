@@ -10,7 +10,7 @@ Options:
 - `--project-name` (optional; derived from domain if missing)
 - `--path` (optional; default uses path style under `/home/simai/www/`)
 - `--path-style` (`slug`|`domain`) controls default path when `--path` is not set. Default is `domain` (e.g., `/home/simai/www/your-domain.tld`). Use `--path-style slug` to restore legacy slug paths or set `/etc/simai-env.conf` with `SIMAI_DEFAULT_PATH_STYLE=domain|slug`. Menu does not prompt for path style; domain-based default is used unless overridden via CLI/config.
-- `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
+- `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Bundled: `generic`, `laravel`, `static`, `alias`, `wordpress`, `bitrix`, `node`, `redirect`, `proxy` (default `generic`); `self profiles` lists the enabled ones with their arguments.
 - `--host-mode standard|wildcard` controls whether the site serves only the main domain or the main domain plus all first-level subdomains. Default is `standard`.
 - `--wildcard-domain` (optional) overrides the wildcard hostname stored in metadata for `--host-mode wildcard`. Default is `*.your-domain.tld`.
 - `--frame-policy same-origin|any` controls whether browsers may embed the site in an iframe. The safe default is `same-origin`; use `any` only for a dedicated embedded application endpoint.
@@ -20,7 +20,8 @@ Options:
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
 - DB (optional): `--create-db=yes|no` (alias: `--db=yes|no`), `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated), `--db-export=yes|no` (export to project `.env`; default yes for required DB profiles, no otherwise), `--skip-db-required=yes|no` (default `no`; allow required-DB profiles to be created without DB — for migration only, emits warning)
 - Access (optional): `--access-create=yes|no`, `--access-login`, `--access-password` (create project-scoped SFTP access after site creation; menu prompts when omitted)
-- Backups: `--backup yes|no` (default `yes`): a new site gets the daily data backup with the `backup data-schedule` defaults (03:30, keep 7); redirect and alias sites never do. `site remove` drops the schedule and keeps the backups already taken.
+- Backups: `--backup yes|no` (default `yes`): a new site gets the daily data backup with the `backup data-schedule` defaults (03:30, keep 7); redirect, proxy and alias sites never do. `site remove` drops the schedule and keeps the backups already taken.
+- Reverse proxy (profile `proxy`): `--upstream-port P` (required; a service on 127.0.0.1, never 80 or 443), `--upstream-path /` (the path requests are passed to), `--websockets yes|no` (default `no`; `yes` passes WebSocket upgrades and keeps them open for an hour). Nothing outside the host is reachable. Settings live in `/etc/simai-env/sites/<domain>/proxy.env`; certificates still renew over http-01 in front of the service. Proxy sites get no daily backup (they hold no data). Enable the profile first: `profile enable --id proxy`.
 - Bitrix helper files (Bitrix profile only): `--bitrix-files=none|setup|restore`. Default is `none` so new Bitrix sites do not expose public installer/restore scripts until the operator chooses the required flow.
 
 Behavior:

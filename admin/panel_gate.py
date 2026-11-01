@@ -43,7 +43,7 @@ JOB_ID = re.compile(r"^[a-f0-9]{24}$")
 CURSOR = re.compile(r"^[0-9]{1,7}$")
 KIND = re.compile(r"^(access|error)$")
 PHP = re.compile(r"^[5-9]\.[0-9]$")
-PROFILE = re.compile(r"^(static|generic|laravel|wordpress|node|redirect)$")
+PROFILE = re.compile(r"^(static|generic|laravel|wordpress|node|redirect|proxy|bitrix)$")
 ENGINE = re.compile(r"^(mysql|pgsql)$")
 ORIGIN = re.compile(r"^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 CODE = re.compile(r"^30[1278]$")
@@ -69,6 +69,10 @@ CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
 PERIOD = re.compile(r"^(day|week|month)$")
 UPDATE_TARGET = re.compile(r"^(env|panel)$")
+SERVICE = re.compile(r"^(nginx|mysql|mariadb|postgresql|redis-server|cron|php[5-9]\.[0-9]-fpm)$")
+PORT = re.compile(r"^[1-9][0-9]{0,4}$")
+UPSTREAM_PATH = re.compile(r"^/[A-Za-z0-9._~/-]{0,200}$")
+BITRIX_FILES = re.compile(r"^(none|setup|restore)$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -113,7 +117,8 @@ ALLOW = {
                     {"domain"}, "action"),
     "site:add": ({"domain": DOMAIN, "profile": PROFILE, "php": PHP, "owner": OWNER, "create-db": YES_NO,
                   "db-engine": ENGINE, "redirect-to": ORIGIN, "redirect-code": CODE, "redirect-path": KEEP_DROP,
-                  "backup": YES_NO},
+                  "backup": YES_NO, "upstream-port": PORT, "upstream-path": UPSTREAM_PATH, "websockets": YES_NO,
+                  "bitrix-files": BITRIX_FILES},
                  {"domain", "profile"}, "action"),
     "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
                     {"domain"}, "action"),
@@ -162,6 +167,12 @@ ALLOW = {
     # 1.32.0: safe update of simai-env or the panel build, with a plan first.
     "self:update-plan": ({"target": UPDATE_TARGET}, {"target"}, "read"),
     "self:update": ({"target": UPDATE_TARGET}, {"target"}, "action"),
+    # 1.33.0: host services, site profiles for the wizard.
+    "service:list": ({}, set(), "read"),
+    "service:log": ({"name": SERVICE, "lines": LINES}, {"name"}, "read"),
+    "service:restart": ({"name": SERVICE}, {"name"}, "action"),
+    "service:reload": ({"name": SERVICE}, {"name"}, "action"),
+    "self:profiles": ({}, set(), "read"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -169,7 +180,8 @@ ALLOW = {
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
 ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics",
-              "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update"}
+              "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
+              "service:list", "service:log", "service:restart", "service:reload"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
@@ -575,6 +587,9 @@ def main():
                 data["databases"] = [d for d in data.get("databases", []) if d.get("site") in mine]
             if command == "self:describe":
                 data["gate"] = {"commands": allowed_commands(owner)}  # what this panel user may call
+            if command == "self:profiles":
+                # Only the profiles site:add accepts here (no alias sites).
+                data["profiles"] = [p for p in data.get("profiles", []) if PROFILE.match(p.get("id", ""))]
             if command == "site:php-ini-list":
                 data["editable"] = sorted(INI_RULES)
             # site:doctor reports failed checks as data, not as a gateway failure.

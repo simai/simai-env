@@ -1441,6 +1441,17 @@ create_nginx_site() {
       return 1
     fi
   fi
+  # Reverse proxy sites (profile proxy): a service on 127.0.0.1 only.
+  local upstream_port="" upstream_path="" websockets='\# ' # commented out unless --websockets yes
+  if grep -q '{{UPSTREAM_PORT}}' "$template_path"; then
+    upstream_port="${SITE_PROXY_PORT:-$(site_proxy_env_get "$domain" PORT)}"
+    upstream_path="${SITE_PROXY_PATH:-$(site_proxy_env_get "$domain" PATH)}"
+    [[ "${SITE_PROXY_WEBSOCKETS:-$(site_proxy_env_get "$domain" WEBSOCKETS)}" == yes ]] && websockets=""
+    if ! site_proxy_port_valid "$upstream_port" || ! site_proxy_path_valid "${upstream_path:-/}"; then
+      error "nginx template ${template_path##*/} needs an upstream port"
+      return 1
+    fi
+  fi
   {
     printf "%s\n" "$meta_block"
     sed -e "s#{{SERVER_NAME}}#${server_name_value}#g" \
@@ -1454,7 +1465,10 @@ create_nginx_site() {
       -e "s#{{APP_ROUTES_FILE}}#$(app_routes_file "$domain")#g" \
       -e "s#{{REDIRECT_TARGET}}#${redirect_target//&/\\&}#g" \
       -e "s#{{REDIRECT_CODE}}#${redirect_code}#g" \
-      -e "s#{{REDIRECT_SUFFIX}}#${redirect_suffix}#g" "$template_path"
+      -e "s#{{REDIRECT_SUFFIX}}#${redirect_suffix}#g" \
+      -e "s#{{UPSTREAM_PORT}}#${upstream_port}#g" \
+      -e "s#{{UPSTREAM_PATH}}#${upstream_path:-/}#g" \
+      -e "s#{{WEBSOCKETS}}#${websockets}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)
@@ -1906,6 +1920,19 @@ site_redirect_from_valid() {
 
 site_redirects_file() {
   echo "$(site_sites_config_dir)/$1/redirects"
+}
+
+site_proxy_env_get() {
+  sed -n "s/^${2}=//p" "$(site_sites_config_dir)/$1/proxy.env" 2>/dev/null | tail -n1
+}
+
+# The upstream of a proxy site is a port on 127.0.0.1, never 80/443 (nginx itself).
+site_proxy_port_valid() {
+  [[ "$1" =~ ^[1-9][0-9]{0,4}$ ]] && (( $1 <= 65535 && $1 != 80 && $1 != 443 ))
+}
+
+site_proxy_path_valid() {
+  [[ "$1" =~ ^/[A-Za-z0-9._~/-]{0,200}$ && "$1" != *..* ]]
 }
 
 site_redirect_env_get() {
@@ -2373,6 +2400,7 @@ site_nginx_template_path_for_id() {
     bitrix) echo "${SCRIPT_DIR}/templates/nginx-bitrix.conf" ;;
     node) echo "${SCRIPT_DIR}/templates/nginx-node.conf" ;;
     redirect) echo "${SCRIPT_DIR}/templates/nginx-redirect.conf" ;;
+    proxy) echo "${SCRIPT_DIR}/templates/nginx-proxy.conf" ;;
     *)
       error "Unsupported nginx template id: ${template_id:-<empty>}"
       return 1

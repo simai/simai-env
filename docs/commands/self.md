@@ -501,6 +501,18 @@ The same run keeps one load sample in `/var/lib/simai-env/metrics-history.jsonl`
 `month` hourly averages: `simai-metrics-history/1` with `points [{at, load1,
 cpu_cores, memory_used_bytes, memory_total_bytes, swap_used_bytes, disk}]`.
 
+## profiles
+List the enabled site profiles with the `site add` arguments each one
+takes: whether it is required, its values or pattern, and its default
+(PHP versions installed here and allowed by the profile, database engines,
+`redirect-*`, `upstream-*`, `websockets`, `app-port`, `bitrix-files`).
+A site wizard builds its form from this answer. `--output json` answers
+`simai-site-profiles/1`.
+
+```bash
+sudo /root/simai-env/simai-admin.sh self profiles
+```
+
 ## settings / setting-set
 
 ```bash

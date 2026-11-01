@@ -1,0 +1,430 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-self-profiles.owner-demo",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-profiles/1",
+    "php_installed": [
+      "8.3"
+    ],
+    "profiles": [
+      {
+        "id": "bitrix",
+        "title": "1C-Bitrix site",
+        "php": {
+          "versions": [
+            "8.3"
+          ],
+          "min": "8.2",
+          "default": "8.3"
+        },
+        "db": "required",
+        "cron": true,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "php",
+            "required": false,
+            "values": [
+              "8.3"
+            ],
+            "default": "8.3"
+          },
+          {
+            "name": "create-db",
+            "required": false,
+            "values": [
+              "yes"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "db-engine",
+            "required": false,
+            "values": [
+              "mysql"
+            ],
+            "default": "mysql"
+          },
+          {
+            "name": "bitrix-files",
+            "required": false,
+            "values": [
+              "none",
+              "setup",
+              "restore"
+            ],
+            "default": "none",
+            "description": "setup: bitrixsetup.php, restore: restore.php in the site root; none until needed"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      },
+      {
+        "id": "generic",
+        "title": "Generic PHP site",
+        "php": {
+          "versions": [
+            "8.3"
+          ],
+          "min": "8.1",
+          "default": "8.3"
+        },
+        "db": "optional",
+        "cron": false,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "php",
+            "required": false,
+            "values": [
+              "8.3"
+            ],
+            "default": "8.3"
+          },
+          {
+            "name": "create-db",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "db-engine",
+            "required": false,
+            "values": [
+              "mysql"
+            ],
+            "default": "mysql"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      },
+      {
+        "id": "laravel",
+        "title": "Laravel application",
+        "php": {
+          "versions": [
+            "8.3"
+          ],
+          "min": "8.1",
+          "default": "8.3"
+        },
+        "db": "required",
+        "cron": true,
+        "queue": true,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "php",
+            "required": false,
+            "values": [
+              "8.3"
+            ],
+            "default": "8.3"
+          },
+          {
+            "name": "create-db",
+            "required": false,
+            "values": [
+              "yes"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "db-engine",
+            "required": false,
+            "values": [
+              "mysql"
+            ],
+            "default": "mysql"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      },
+      {
+        "id": "node",
+        "title": "Node.js service (long-running, behind nginx)",
+        "php": null,
+        "db": "no",
+        "cron": false,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "app-port",
+            "required": false,
+            "pattern": "^[1-9][0-9]{3,4}$",
+            "description": "port of the application service; a free one is chosen when empty"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      },
+      {
+        "id": "proxy",
+        "title": "Reverse proxy to a service on a local port",
+        "php": null,
+        "db": "no",
+        "cron": false,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "upstream-port",
+            "required": true,
+            "pattern": "^[1-9][0-9]{0,4}$",
+            "description": "port of the service on 127.0.0.1 (1-65535, not 80 or 443); nothing outside this host"
+          },
+          {
+            "name": "upstream-path",
+            "required": false,
+            "pattern": "^/[A-Za-z0-9._~/-]{0,200}$",
+            "default": "/"
+          },
+          {
+            "name": "websockets",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "no"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          }
+        ]
+      },
+      {
+        "id": "redirect",
+        "title": "Redirect a whole domain to another URL",
+        "php": null,
+        "db": "no",
+        "cron": false,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "redirect-to",
+            "required": true,
+            "pattern": "^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$",
+            "description": "the origin every request goes to, such as https://example.com"
+          },
+          {
+            "name": "redirect-code",
+            "required": false,
+            "values": [
+              "301",
+              "302",
+              "307",
+              "308"
+            ],
+            "default": "301"
+          },
+          {
+            "name": "redirect-path",
+            "required": false,
+            "values": [
+              "keep",
+              "drop"
+            ],
+            "default": "keep",
+            "description": "keep: path and query go along; drop: every request goes to the target's root page"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          }
+        ]
+      },
+      {
+        "id": "static",
+        "title": "Static site",
+        "php": null,
+        "db": "no",
+        "cron": false,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      },
+      {
+        "id": "wordpress",
+        "title": "WordPress site",
+        "php": {
+          "versions": [
+            "8.3"
+          ],
+          "min": "8.1",
+          "default": "8.3"
+        },
+        "db": "required",
+        "cron": true,
+        "queue": false,
+        "alias": false,
+        "args": [
+          {
+            "name": "domain",
+            "required": true,
+            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+          },
+          {
+            "name": "php",
+            "required": false,
+            "values": [
+              "8.3"
+            ],
+            "default": "8.3"
+          },
+          {
+            "name": "create-db",
+            "required": false,
+            "values": [
+              "yes"
+            ],
+            "default": "yes"
+          },
+          {
+            "name": "db-engine",
+            "required": false,
+            "values": [
+              "mysql"
+            ],
+            "default": "mysql"
+          },
+          {
+            "name": "owner",
+            "required": false,
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+          },
+          {
+            "name": "backup",
+            "required": false,
+            "values": [
+              "yes",
+              "no"
+            ],
+            "default": "yes",
+            "description": "a daily data backup from the start"
+          }
+        ]
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

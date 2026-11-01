@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=8
+FIXTURE_SET=9
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -162,6 +162,16 @@ record() {
     "self-update-plan.panel|null|self:update-plan|{\"target\":\"panel\"}"
     "plan.self-update|null|self:update|{\"target\":\"env\"}"
     "refused.owner-admin-only.update|\"demo\"|self:update|{\"target\":\"env\"}"
+    "service-list|null|service:list|{}"
+    "service-log.nginx|null|service:log|{\"name\":\"nginx\",\"lines\":\"20\"}"
+    "plan.service-restart|null|service:restart|{\"name\":\"nginx\"}"
+    "plan.service-reload|null|service:reload|{\"name\":\"nginx\"}"
+    "refused.owner-admin-only.service-restart|\"demo\"|service:restart|{\"name\":\"nginx\"}"
+    "refused.invalid-argument.service-name|null|service:restart|{\"name\":\"ssh\"}"
+    "self-profiles|null|self:profiles|{}"
+    "self-profiles.owner-demo|\"demo\"|self:profiles|{}"
+    "plan.site-add-proxy|null|site:add|{\"domain\":\"demo-proxy.test\",\"profile\":\"proxy\",\"upstream-port\":\"3000\",\"websockets\":\"yes\"}"
+    "plan.site-add-bitrix|null|site:add|{\"domain\":\"demo-bitrix.test\",\"profile\":\"bitrix\",\"bitrix-files\":\"setup\"}"
     "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
@@ -256,6 +266,11 @@ for f in sorted(root.glob("*.json")):
         data["points"] = [{"at": "2026-01-01T00:00:00Z", "load1": 0.1, "cpu_cores": 2, "memory_used_bytes": 1073741824,
                            "memory_total_bytes": 4294967296, "swap_used_bytes": 0,
                            "disk": [{"mount": "/", "used_bytes": 10737418240, "total_bytes": 42949672960}]}]
+    if data.get("schema") == "simai-services/1":
+        for svc in data["services"]:
+            svc["since"] = "Thu 2026-01-01 00:00:00 UTC"
+    if data.get("schema") == "simai-service-log/1":
+        data["lines"] = ["2026-01-01T00:00:00+0000 simai-stand systemd[1]: Started nginx.service - A high performance web server."]
     for plan in (data, data.get("update") if isinstance(data.get("update"), dict) else {}):
         if plan.get("schema") == "simai-update-plan/1" and plan.get("target") == "env":
             # The update channel answers whatever is published today.

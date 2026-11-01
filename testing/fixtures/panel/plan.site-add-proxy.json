@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-add-proxy",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:add",
+    "args": {
+      "domain": "demo-proxy.test",
+      "profile": "proxy",
+      "upstream-port": "3000",
+      "websockets": "yes"
+    },
+    "target": "demo-proxy.test",
+    "description": "Create site scaffolding (nginx/php-fpm)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

@@ -288,6 +288,26 @@ Safe update (1.32.0), administrator only:
   follow it with `job:status` and `job:log`. `job:cancel` answers
   `not_cancellable`: stopping midway could leave a half-replaced tree.
 
+Host services and site profiles (1.33.0):
+
+- `service:list` (`simai-services/1`: `services [{name, active, enabled,
+  since, can_reload}]`), `service:log {name, lines}` (`simai-service-log/1`:
+  `{name, lines}`), `service:restart {name}` and `service:reload {name}`
+  (actions), administrator only. `name` is one of `nginx`, `php<ver>-fpm`,
+  `mysql`, `mariadb`, `postgresql`, `redis-server`, `cron`, and must exist on
+  the host. nginx and PHP-FPM test their configuration first; a failed test
+  fails the job and the service keeps running. A failed restart ends the job
+  log with the unit's last journal lines.
+- `self:profiles` (`simai-site-profiles/1`), for owners too: `php_installed`
+  and `profiles [{id, title, php {versions, min, default} | null, db:
+  no|optional|required, cron, queue, alias, args [{name, required, values |
+  pattern, default, description}]}]`. Only the profiles `site:add` accepts
+  through the gateway (no `alias`). Build the site wizard from it.
+- `site:add` takes `profile: proxy` with `upstream-port` (a service on
+  127.0.0.1, not 80 or 443), `upstream-path`, `websockets: yes|no`, and
+  `profile: bitrix` with `bitrix-files: none|setup|restore`. A profile the
+  administrator has not enabled fails the job.
+
 ## Allowlist
 
 The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
@@ -323,7 +343,9 @@ action, job). Everything else is refused.
   `backup:data-schedule` with `verify`; `site:add` with `backup`;
 - 1.31.0: `self:alerts`, `self:alerts-ack`, `self:alerts-channel`,
   `self:alerts-test`, `self:metrics-history`;
-- 1.32.0: `self:update-plan`, `self:update`.
+- 1.32.0: `self:update-plan`, `self:update`;
+- 1.33.0: `service:list`, `service:log`, `service:restart`, `service:reload`,
+  `self:profiles`; `site:add` with profiles `proxy` and `bitrix`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -341,8 +363,8 @@ view), command registry, `site describe` and `site doctor` for demo sites,
 plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
 refusal per site action of stage 9, the SFTP account list and plans of stage
 10, the alert list with one planted alert, the load history, and the update
-plans (the remote version and notes of the `env` plan are pinned). Set 8
-since 1.32.0. The panel's fixture driver replays them, and
+plans (the remote version and notes of the `env` plan are pinned), the
+service list and log, and the site profiles. Set 9 since 1.33.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

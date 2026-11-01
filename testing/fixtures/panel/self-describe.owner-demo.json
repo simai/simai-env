@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.32.0",
+      "version": "1.33.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -85,6 +85,7 @@
         "self:alerts-ack",
         "self:commands",
         "self:describe",
+        "self:profiles",
         "site:add",
         "site:db-create",
         "site:db-drop",

@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.service-restart",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "service:restart",
+    "args": {
+      "name": "nginx"
+    },
+    "target": "host",
+    "description": "Restart a host service after its configuration test",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

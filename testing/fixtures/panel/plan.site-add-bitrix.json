@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-add-bitrix",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:add",
+    "args": {
+      "domain": "demo-bitrix.test",
+      "profile": "bitrix",
+      "bitrix-files": "setup"
+    },
+    "target": "demo-bitrix.test",
+    "description": "Create site scaffolding (nginx/php-fpm)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 197,
+    "count": 202,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -2797,6 +2797,28 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh self profiles",
+        "description": "List enabled site profiles with the site add arguments, values and defaults of each",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh self scheduler",
         "description": "Run the internal simai scheduler tick",
         "required": [],
@@ -3240,6 +3262,100 @@
         "conditional_effects": "--refresh yes writes update cache"
       },
       {
+        "command": "simai-admin.sh service list",
+        "description": "List host services (nginx, PHP-FPM, databases, Redis, cron) and their state",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh service log",
+        "description": "Show the last journal lines of a host service",
+        "required": [
+          "--name"
+        ],
+        "optional": {
+          "--lines": null
+        },
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh service reload",
+        "description": "Reload a host service's configuration after its test",
+        "required": [
+          "--name"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh service restart",
+        "description": "Restart a host service after its configuration test",
+        "required": [
+          "--name"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh site add",
         "description": "Create site scaffolding (nginx/php-fpm)",
         "required": [
@@ -3278,7 +3394,10 @@
           "--app-port": null,
           "--redirect-to": null,
           "--redirect-code": null,
-          "--redirect-path": null
+          "--redirect-path": null,
+          "--upstream-port": null,
+          "--upstream-path": null,
+          "--websockets": null
         },
         "flags": [
           "menu:internal-confirm"
