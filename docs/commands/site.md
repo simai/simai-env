@@ -20,6 +20,7 @@ Options:
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
 - DB (optional): `--create-db=yes|no` (alias: `--db=yes|no`), `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated), `--db-export=yes|no` (export to project `.env`; default yes for required DB profiles, no otherwise), `--skip-db-required=yes|no` (default `no`; allow required-DB profiles to be created without DB — for migration only, emits warning)
 - Access (optional): `--access-create=yes|no`, `--access-login`, `--access-password` (create project-scoped SFTP access after site creation; menu prompts when omitted)
+- Backups: `--backup yes|no` (default `yes`): a new site gets the daily data backup with the `backup data-schedule` defaults (03:30, keep 7); redirect and alias sites never do. `site remove` drops the schedule and keeps the backups already taken.
 - Bitrix helper files (Bitrix profile only): `--bitrix-files=none|setup|restore`. Default is `none` so new Bitrix sites do not expose public installer/restore scripts until the operator chooses the required flow.
 
 Behavior:

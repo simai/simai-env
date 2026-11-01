@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.access-disable",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "access:disable",
+    "args": {
+      "login": "demo-staff"
+    },
+    "target": "host",
+    "description": "Disable access",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

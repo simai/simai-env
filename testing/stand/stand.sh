@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=5
+FIXTURE_SET=6
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -74,6 +74,8 @@ if [[ ! -e /home/simai/www/demo-static.test/current ]]; then
   tar -C /root/stand-art -czf /root/stand-art.tgz .
   cli site deploy --domain demo-static.test --archive /root/stand-art.tgz --sha256 "$(sha256sum /root/stand-art.tgz | cut -d' ' -f1)" --confirm yes
 fi
+./simai-admin.sh access list 2>/dev/null | grep -q demo-staff ||
+  cli access create-project --domain demo-owned.test --login demo-staff --pubkey-file /root/stand-owner.pub --confirm yes
 echo "[stand] demo sites: demo-static.test demo-php.test demo-owned.test (owner demo) demo-redirect.test"
 SEED
   # The laptop reaches the gateway like a panel on another machine would.
@@ -101,6 +103,9 @@ record() {
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
   local bk
   bk=$(in_stand bash -c 'ls -1 /var/backups/simai/demo-php.test | grep -E "^[0-9]{8}-[0-9]{6}$" | tail -n1')
+  # The site answers show a checked copy (last_verify).
+  in_stand /root/simai-env/simai-admin.sh backup data-verify --domain demo-php.test --backup latest --restore-test auto --confirm yes >/dev/null 2>&1
+  local key='ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureKeyFixtureKeyFixtureKeyFixtureKeyFixt staff@example'
   # name, owner (JSON), command, args (JSON)
   local -a requests=(
     "self-describe|null|self:describe|{}"
@@ -130,7 +135,18 @@ record() {
     "plan.site-db-rotate|null|site:db-rotate|{\"domain\":\"demo-php.test\"}"
     "plan.backup-data-restore|null|backup:data-restore|{\"domain\":\"demo-php.test\",\"backup\":\"${bk}\",\"files\":\"no\"}"
     "plan.backup-data-verify|null|backup:data-verify|{\"domain\":\"demo-php.test\",\"backup\":\"${bk}\"}"
-    "plan.backup-data-schedule|null|backup:data-schedule|{\"domain\":\"demo-php.test\",\"time\":\"03:30\",\"keep\":\"14\"}"
+    "plan.backup-data-schedule|null|backup:data-schedule|{\"domain\":\"demo-php.test\",\"time\":\"03:30\",\"keep\":\"14\",\"verify\":\"yes\"}"
+    "plan.site-add-no-backup|null|site:add|{\"domain\":\"new.test\",\"profile\":\"static\",\"backup\":\"no\"}"
+    "access-list|null|access:list|{}"
+    "access-list.owner-demo|\"demo\"|access:list|{}"
+    "plan.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-owned.test\",\"login\":\"demo-staff2\",\"pubkey\":\"${key}\"}"
+    "plan.access-add-key|\"demo\"|access:add-key|{\"login\":\"demo-staff\",\"pubkey\":\"${key}\"}"
+    "plan.access-disable|\"demo\"|access:disable|{\"login\":\"demo-staff\"}"
+    "plan.access-enable|\"demo\"|access:enable|{\"login\":\"demo-staff\"}"
+    "plan.access-remove|\"demo\"|access:remove|{\"login\":\"demo-staff\"}"
+    "refused.unknown-access|null|access:disable|{\"login\":\"nobody1\"}"
+    "refused.invalid-argument.access-password|\"demo\"|access:create-project|{\"domain\":\"demo-owned.test\",\"login\":\"pwstaff\",\"password\":\"secret123\"}"
+    "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
   local c extra
@@ -193,6 +209,13 @@ for f in sorted(root.glob("*.json")):
             site["disk"] = {"bytes": 1048576, "checked_at": "2026-01-01T00:00:00Z"}
         if site.get("last_backup"):
             site["last_backup"] = "2026-01-01T00:00:00"
+        if site.get("last_verify"):
+            site["last_verify"].update(at="2026-01-01T00:00:00Z", backup="20260101-000000")
+        backups = site.get("backups") if isinstance(site.get("backups"), dict) else {}
+        if backups.get("last_verify"):
+            backups["last_verify"].update(at="2026-01-01T00:00:00Z", backup="20260101-000000")
+        if (site.get("certificate") or {}).get("last_renew"):
+            site["certificate"]["last_renew"]["at"] = "2026-01-01T00:00:00Z"
     for owner in (data.get("isolation") or {}).get("owners", []):
         if owner.get("sites_disk_bytes") is not None:
             owner["sites_disk_bytes"] = 1048576 * len([s for s in sites if s.get("owner") == owner["name"]])
@@ -201,6 +224,8 @@ for f in sorted(root.glob("*.json")):
                     memory={"total_bytes": 4294967296, "used_bytes": 1073741824},
                     swap={"total_bytes": 0, "used_bytes": 0}, checked_at="2026-01-01T00:00:00Z",
                     disk=[{"mount": "/", "total_bytes": 42949672960, "used_bytes": 10737418240}])
+    for access in data.get("accesses", []) if isinstance(data.get("accesses"), list) else []:
+        access["created_at"] = "2026-01-01T00:00:00"
     for db in data.get("databases", []) if isinstance(data.get("databases"), list) else []:
         if db.get("size_bytes") is not None:
             db["size_bytes"] = 16384

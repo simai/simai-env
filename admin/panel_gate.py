@@ -61,6 +61,7 @@ BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 MATCH = re.compile(r"^[ -~]{1,200}$")
+ACCESS_LOGIN = re.compile(r"^(?!site-)[a-z][a-z0-9-]{2,31}$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -104,7 +105,8 @@ ALLOW = {
     "site:deploy": ({"domain": DOMAIN, "git": GIT_URL, "ref": GIT_REF, "migrate": YES_NO, "keep": KEEP},
                     {"domain"}, "action"),
     "site:add": ({"domain": DOMAIN, "profile": PROFILE, "php": PHP, "owner": OWNER, "create-db": YES_NO,
-                  "db-engine": ENGINE, "redirect-to": ORIGIN, "redirect-code": CODE, "redirect-path": KEEP_DROP},
+                  "db-engine": ENGINE, "redirect-to": ORIGIN, "redirect-code": CODE, "redirect-path": KEEP_DROP,
+                  "backup": YES_NO},
                  {"domain", "profile"}, "action"),
     "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
                     {"domain"}, "action"),
@@ -125,7 +127,7 @@ ALLOW = {
     # Stage 9: backups, PHP, metrics, databases.
     "backup:data-restore": ({"domain": DOMAIN, "backup": BACKUP, "db": YES_NO, "files": YES_NO},
                             {"domain", "backup"}, "action"),
-    "backup:data-schedule": ({"domain": DOMAIN, "enabled": YES_NO, "time": CLOCK, "keep": KEEP_DAYS},
+    "backup:data-schedule": ({"domain": DOMAIN, "enabled": YES_NO, "time": CLOCK, "keep": KEEP_DAYS, "verify": YES_NO},
                              {"domain"}, "action"),
     "backup:data-verify": ({"domain": DOMAIN, "backup": BACKUP}, {"domain", "backup"}, "action"),
     "php:extensions": ({"php": PHP}, {"php"}, "read"),
@@ -136,6 +138,14 @@ ALLOW = {
     "site:db-rotate": ({"domain": DOMAIN}, {"domain"}, "action"),
     "db:list": ({}, set(), "read"),
     "self:metrics": ({}, set(), "read"),
+    # Stage 3.4: SFTP accounts of a site, key only: no password is ever set or shown.
+    "access:list": ({"domain": DOMAIN}, set(), "read"),
+    "access:create-project": ({"domain": DOMAIN, "login": ACCESS_LOGIN, "pubkey": PUBKEY},
+                              {"domain", "login", "pubkey"}, "action"),
+    "access:add-key": ({"login": ACCESS_LOGIN, "pubkey": PUBKEY}, {"login", "pubkey"}, "action"),
+    "access:disable": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
+    "access:enable": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
+    "access:remove": ({"login": ACCESS_LOGIN}, {"login"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -151,6 +161,8 @@ CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the fo
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file"}  # passed to the command as a file
 ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
+ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
+BY_LOGIN = {"access:add-key", "access:disable", "access:enable", "access:remove"}  # scope from the account
 
 
 class Refused(Exception):
@@ -424,6 +436,17 @@ def owned(owner, domain):
     return domain in owned_domains(owner)
 
 
+def access_domain(login):
+    """Site of a project SFTP account, from its root-owned metadata; None for others."""
+    try:
+        lines = (ACCESS_DIR / f"{login}.env").read_text().splitlines()
+    except OSError:
+        raise Refused("unknown_access")
+    meta = dict(line.split("=", 1) for line in lines if "=" in line)
+    meta = {k: v.strip().strip('"') for k, v in meta.items()}
+    return meta.get("DOMAIN") if meta.get("TYPE") == "project" else None
+
+
 def allowed_commands(owner):
     return sorted(c for c in ALLOW if owner is None or c not in ADMIN_ONLY)
 
@@ -455,6 +478,13 @@ def main():
                 raise Refused("bad_request")  # nothing may follow a request without an archive
         if owner is not None and "domain" in args and command != "site:add" and not owned(owner, args["domain"]):
             raise Refused("owner_scope")
+        if command in BY_LOGIN:
+            domain = access_domain(args["login"])
+            if domain is None:
+                raise Refused("not_allowed")  # only a site's SFTP accounts, not global ones
+            if owner is not None and not owned(owner, domain):
+                raise Refused("owner_scope")
+            entry["domain"] = domain
         kind = ALLOW[command][2]
         if kind == "job":
             answer.update(status="ok", kind="result", data=job_answer(command, args, owner))
@@ -484,6 +514,9 @@ def main():
             data = result["data"]
             if owner is not None and command in HOST_COMMANDS:
                 data = owner_view(data, owner)
+            if owner is not None and command == "access:list":
+                mine = owned_domains(owner)
+                data["accesses"] = [a for a in data.get("accesses", []) if a.get("domain") in mine]
             if owner is not None and command == "db:list":
                 mine = owned_domains(owner)
                 data["databases"] = [d for d in data.get("databases", []) if d.get("site") in mine]

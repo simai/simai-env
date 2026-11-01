@@ -466,7 +466,8 @@ panel_status_handler() {
   fi
   ui_result_table "Panel|${domain}" "Source|$(panel_state_get SOURCE)" "Version|$(panel_state_get VERSION)" "Pinned|$(panel_release_get VERSION)" "Runs as|$(panel_state_get PANEL_USER)" \
     "Installed|$(panel_state_get INSTALLED_AT)" "Release|$(sed -n 's/^CURRENT=//p' "$(site_sites_config_dir)/${domain}/deploy.env" 2>/dev/null | tail -n1)" \
-    "Gateway|$([[ -x "$SIMAI_PANEL_GATE" ]] && echo enabled || echo missing)"
+    "Gateway|$([[ -x "$SIMAI_PANEL_GATE" ]] && echo enabled || echo missing)" \
+    "Scheduler|$([[ -f "/etc/cron.d/$(project_slug_from_domain "$domain")" ]] && echo "every minute" || echo "off (set \"scheduler\": true in the build's .simai/app.json)")"
 }
 
 register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "domain" "version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"

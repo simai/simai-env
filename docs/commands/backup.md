@@ -40,7 +40,8 @@ non-zero. A failed off-site copy keeps the local backup and exits non-zero.
 ```bash
 sudo /root/simai-env/simai-admin.sh backup data-verify --path /var/backups/simai/example.com/20260921-033000 --restore-test yes
 ```
-Checks checksums and archive integrity. `--restore-test yes` imports the dump
+Checks checksums and archive integrity; `--domain D --backup NAME|latest`
+finds the backup by name. `--restore-test yes` imports the dump
 into a temporary database and drops it afterwards. Run it regularly: an
 untested backup is not a backup.
 
@@ -50,7 +51,12 @@ sudo /root/simai-env/simai-admin.sh backup data-schedule --domain example.com --
 sudo /root/simai-env/simai-admin.sh backup data-schedule --domain example.com --enabled no
 ```
 Writes `/etc/cron.d/simai-backup-<slug>`; output goes to
-`/var/log/simai-backup.log`.
+`/var/log/simai-backup.log`. `--verify yes` checks the newest copy after each
+successful scheduled backup (`data-verify --backup latest --restore-test
+auto`: with a restore test when the copy has a plain dump). The result of a
+check by name is kept in `/var/lib/simai-env/backup-verify/<domain>.json` and
+shows as `last_verify {at, ok, backup, restore_test}` in `self describe` and
+`site describe`. New sites get a schedule by default (`site add --backup`).
 
 ## data-restore
 ```bash

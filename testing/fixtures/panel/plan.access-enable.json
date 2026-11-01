@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.access-enable",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "access:enable",
+    "args": {
+      "login": "demo-staff"
+    },
+    "target": "host",
+    "description": "Enable access",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

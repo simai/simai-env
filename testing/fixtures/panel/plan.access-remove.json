@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.access-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "access:remove",
+    "args": {
+      "login": "demo-staff"
+    },
+    "target": "host",
+    "description": "Remove access",
+    "effects": "delete",
+    "lock": "host",
+    "applied": false
+  }
+}

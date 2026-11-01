@@ -66,6 +66,15 @@ Notes:
 - Standard certs renew through webroot as before.
 - Wildcard certs issued through automatic DNS providers renew through the stored DNS challenge settings.
 - Wildcard certs issued through `manual` DNS challenge must be re-issued manually.
+- The result is recorded as the certificate's `last_renew {at, ok}` in `site describe`.
+
+## renew-due
+Run by `/etc/cron.d/simai-certbot` twice a day: renews every certificate in
+`/etc/letsencrypt/renewal/` that is due, one at a time, and records a failure
+against its certificate in `/var/lib/simai-env/ssl-renew/<name>.json`. The
+certbot deploy hook `simai-record-renewal` records each successful renewal,
+also those made by `certbot.timer`. `self migrate` moves older hosts to this
+cron.
 
 ## install (custom cert)
 Install your own certificate and key.

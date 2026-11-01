@@ -17,16 +17,17 @@
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261101001459",
-      "previous": "20261101001458-initial",
-      "deployed_at": "2026-11-01T00:14:59Z",
+      "current": "20261101151756",
+      "previous": "20261101151755-initial",
+      "deployed_at": "2026-11-01T15:17:56Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],
     "service": null,
     "scheduler": false,
-    "backup_schedule": false,
+    "backup_schedule": true,
     "last_backup": null,
+    "last_verify": null,
     "adopted": null,
     "answers": {
       "http": 200,
@@ -39,8 +40,14 @@
     },
     "manifest": null,
     "backups": {
-      "schedule": null,
-      "items": []
+      "schedule": {
+        "time": "03:30",
+        "keep": "7",
+        "dest": "/var/backups/simai",
+        "verify": false
+      },
+      "items": [],
+      "last_verify": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-static-test.error.log",

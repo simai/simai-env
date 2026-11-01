@@ -1,5 +1,8 @@
 # Releases
 
+- [v1.30.0](v1.30.0.md) — SFTP accounts by key in the panel gateway, a
+  check after each scheduled backup, a daily backup for new sites,
+  certificate renewal results.
 - [v1.29.0](v1.29.0.md) — a static site switches to profile node in place
   (`site set-profile`), keeping its releases.
 - [v1.28.0](v1.28.0.md) — backups, PHP settings, server metrics and

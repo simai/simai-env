@@ -530,6 +530,7 @@ site_add_transaction_reset() {
   SITE_ADD_TX_DB_USER=""
   SITE_ADD_TX_ACCESS_CREATED=0
   SITE_ADD_TX_ACCESS_LOGIN=""
+  SITE_ADD_TX_BACKUP_CREATED=0
   SITE_ADD_TX_SITE_USER_CREATED=0
   SITE_ADD_TX_OWNER_ASSIGNED=0
   SITE_ADD_TX_PROFILE_ALLOWLIST_CHANGED=0
@@ -551,6 +552,7 @@ site_add_transaction_rollback() {
   fi
   [[ "${SITE_ADD_TX_QUEUE_CREATED:-0}" -eq 1 ]] && remove_queue_unit "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
   [[ "${SITE_ADD_TX_CRON_CREATED:-0}" -eq 1 ]] && remove_cron_file "$SITE_ADD_TX_PROJECT" >/dev/null 2>&1 || true
+  [[ "${SITE_ADD_TX_BACKUP_CREATED:-0}" -eq 1 ]] && rm -f -- "/etc/cron.d/simai-backup-$(project_slug_from_domain "$SITE_ADD_TX_DOMAIN")"
   [[ "${SITE_ADD_TX_NGINX_CREATED:-0}" -eq 1 ]] && remove_nginx_site "$SITE_ADD_TX_DOMAIN" >/dev/null 2>&1 || true
   if [[ "${SITE_ADD_TX_POOL_CREATED:-0}" -eq 1 && -n "${SITE_ADD_TX_PHP:-}" ]]; then
     remove_php_pool_version "$SITE_ADD_TX_PROJECT" "$SITE_ADD_TX_PHP" >/dev/null 2>&1 || true
@@ -629,6 +631,8 @@ site_add_handler_impl() {
   local access_create="${PARSED_ARGS[access-create]:-}"
   local access_login="${PARSED_ARGS[access-login]:-}"
   local access_password="${PARSED_ARGS[access-password]:-}"
+  local backup_default="${PARSED_ARGS[backup]:-yes}"
+  [[ "${backup_default,,}" == yes || "${backup_default,,}" == no ]] || { error "--backup must be yes or no"; return 1; }
   local bitrix_files="${PARSED_ARGS["bitrix-files"]:-none}"
   local target_domain="${PARSED_ARGS[target-domain]:-}" target_path="" target_project="" target_php=""
   frame_policy=$(site_frame_policy_normalize "$frame_policy") || return 1
@@ -1321,6 +1325,17 @@ site_add_handler_impl() {
   fi
 
   [[ -n "$site_owner" ]] && site_owner_link_site "$site_owner" "$domain" "$path"
+  # A new site gets the daily data backup with its defaults (backup data-schedule).
+  local backup_summary="off"
+  if [[ "${backup_default,,}" == yes && "$profile" != redirect && "${PROFILE_IS_ALIAS:-no}" != "yes" ]]; then
+    if ( backup_data_schedule_handler --domain "$domain" --enabled yes ) >>"$LOG_FILE" 2>&1; then
+      SITE_ADD_TX_BACKUP_CREATED=1
+      backup_summary="daily at 03:30, keep 7 (simai-admin.sh backup data-schedule)"
+    else
+      backup_summary="failed"
+      warn "Could not schedule the daily backup; run: simai-admin.sh backup data-schedule --domain ${domain}"
+    fi
+  fi
   info "Site added: domain=${domain}, project=${project}, path=${path}, php=${php_version}, profile=${profile}"
   local primary_ip=""
   if [[ "$host_mode" == "wildcard" ]]; then
@@ -1353,6 +1368,7 @@ site_add_handler_impl() {
     echo "PHP-FPM pool: /etc/php/${php_version}/fpm/pool.d/${project}.conf"
   fi
   echo "Cron file   : ${cron_summary}"
+  echo "Backups     : ${backup_summary}"
   if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
     echo "Queue unit  : ${queue_summary}"
   fi
@@ -1684,6 +1700,8 @@ site_remove_handler() {
 
   progress_step "Removing PHP/queue resources (profile-aware)"
   local removed_queue=0 removed_cron=0
+  # The daily backup schedule goes with the site; backups already taken stay.
+  rm -f -- "/etc/cron.d/simai-backup-$(project_slug_from_domain "$domain")"
   if [[ "$is_alias" == "yes" ]]; then
     info "Profile is alias; skipping PHP/cron/queue removal"
   else
@@ -2294,7 +2312,7 @@ site_info_handler() {
   fi
 }
 
-register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= owner= db-engine= app-port= redirect-to= redirect-code= redirect-path=" "menu:internal-confirm"
+register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= backup= owner= db-engine= app-port= redirect-to= redirect-code= redirect-path=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
 register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"

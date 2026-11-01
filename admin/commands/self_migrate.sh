@@ -149,10 +149,17 @@ self_migrate_confirmed_schedules() {
 # certbot.timer did not reload nginx.
 self_migrate_certbot_hook() {
   [[ -d /etc/letsencrypt/live ]] || return 0
-  SITE_CERTBOT_HOOK_CREATED=0
+  SITE_CERTBOT_HOOK_CREATED=0 SITE_CERTBOT_RECORD_CREATED=0
   ensure_certbot_reload_hook || { warn "Could not install the certbot nginx reload hook"; return 0; }
   if [[ "$SITE_CERTBOT_HOOK_CREATED" == 1 ]]; then
     SELF_MIGRATE_CHANGES+=("certbot reloads nginx after every renewal")
+  fi
+  if [[ "$SITE_CERTBOT_RECORD_CREATED" == 1 ]]; then
+    SELF_MIGRATE_CHANGES+=("certificate renewals are recorded for site describe")
+  fi
+  # Earlier cron renewed all certificates at once without a per-certificate result.
+  if [[ -f /etc/cron.d/simai-certbot ]] && ! grep -qs 'ssl renew-due' /etc/cron.d/simai-certbot; then
+    ensure_certbot_cron && SELF_MIGRATE_CHANGES+=("certificate renewal cron records each result")
   fi
   return 0
 }

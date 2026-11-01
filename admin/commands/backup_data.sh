@@ -6,6 +6,7 @@
 
 BACKUP_DATA_DEFAULT_DEST="${SIMAI_BACKUP_DEST:-/var/backups/simai}"
 BACKUP_DATA_LOG="/var/log/simai-backup.log"
+BACKUP_DATA_VERIFY_STATE="${SIMAI_BACKUP_VERIFY_STATE:-/var/lib/simai-env/backup-verify}"
 
 backup_data_validate_keep() {
   local keep="$1"
@@ -136,8 +137,14 @@ backup_data_schedule_keep() {
 
 backup_data_resolve() {
   local domain="$1" name="$2" dest
+  if [[ "$name" == latest ]]; then
+    name=$(while IFS= read -r dest; do
+      [[ -n "$dest" && -d "${dest%/}/${domain}" ]] && ls -1 "${dest%/}/${domain}"
+    done < <(backup_data_dests "$domain" | sort -u) | grep -E '^[0-9]{8}-[0-9]{6}$' | sort | tail -n1)
+    [[ -n "$name" ]] || { error "No backups of ${domain} yet"; return 1; }
+  fi
   if [[ ! "$name" =~ ^[0-9]{8}-[0-9]{6}$ ]]; then
-    error "--backup must be a backup name like 20260101-033000"
+    error "--backup must be a backup name like 20260101-033000, or latest"
     return 1
   fi
   while IFS= read -r dest; do
@@ -262,15 +269,30 @@ backup_data_handler() {
   ui_kv "Verify" "simai-admin.sh backup data-verify --path ${dir} --restore-test yes --confirm yes"
 }
 
+# A check of a site's backup by name (the panel, the schedule) is remembered as
+# the site's last_verify; checks of a bare --path are not.
 backup_data_verify_handler() {
   parse_kv_args "$@"
-  local dir="${PARSED_ARGS[path]:-}" restore_test="${PARSED_ARGS[restore-test]:-no}"
-  local domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[backup]:-}"
+  local dir="${PARSED_ARGS[path]:-}" domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[backup]:-}"
+  local restore_test="${PARSED_ARGS[restore-test]:-no}" rc=0
   if [[ -z "$dir" && -n "$domain" && -n "$name" ]]; then
     validate_domain "$domain" "allow" || return 1
     dir=$(backup_data_resolve "$domain" "$name") || return 1
+    backup_data_verify_dir "$dir" "$restore_test" || rc=$?
+    install -d -m 0755 "$BACKUP_DATA_VERIFY_STATE" &&
+      printf '{"at":"%s","ok":%s,"backup":"%s","restore_test":%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        "$([[ $rc -eq 0 ]] && echo true || echo false)" "$(basename "$dir")" \
+        "$([[ "${restore_test,,}" == no ]] && echo false || echo true)" >"${BACKUP_DATA_VERIFY_STATE}/${domain}.json"
+    return "$rc"
   fi
   [[ -n "$dir" ]] || { error "Give --path, or --domain with --backup"; return 1; }
+  backup_data_verify_dir "$dir" "$restore_test"
+}
+
+# restore-test: yes (fails without a plain dump), auto (tests when there is
+# one; the daily schedule uses it) or no.
+backup_data_verify_dir() {
+  local dir="$1" restore_test="$2"
   validate_path "$dir" || return 1
   [[ -f "${dir}/SHA256SUMS" ]] || { error "SHA256SUMS not found in ${dir}"; return 1; }
   ui_header "SIMAI ENV · Verify data backup"
@@ -284,6 +306,7 @@ backup_data_verify_handler() {
     tar -tzf "${dir}/files.tar.gz" >/dev/null || { error "files.tar.gz is corrupt"; return 1; }
     echo "PASS files.tar.gz integrity"
   fi
+  [[ "${restore_test,,}" == auto && -f "${dir}/db.sql.gz" ]] && restore_test=yes
   if [[ "${restore_test,,}" == "yes" ]]; then
     [[ -f "${dir}/db.sql.gz" ]] || { error "No plain db.sql.gz to test (encrypted or files-only backup)"; return 1; }
     local scratch engine
@@ -323,7 +346,7 @@ backup_data_verify_handler() {
 backup_data_schedule_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" enabled="${PARSED_ARGS[enabled]:-yes}"
-  local at="${PARSED_ARGS[time]:-03:30}" keep="${PARSED_ARGS[keep]:-7}"
+  local at="${PARSED_ARGS[time]:-03:30}" keep="${PARSED_ARGS[keep]:-7}" verify="${PARSED_ARGS[verify]:-no}"
   local dest="${PARSED_ARGS[dest]:-$BACKUP_DATA_DEFAULT_DEST}"
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
@@ -342,13 +365,18 @@ backup_data_schedule_handler() {
     error "--time must be HH:MM"
     return 1
   fi
-  local hh="${BASH_REMATCH[1]#0}" mm="${BASH_REMATCH[2]#0}"
+  [[ "${verify,,}" == yes || "${verify,,}" == no ]] || { error "--verify must be yes or no"; return 1; }
+  local hh="${BASH_REMATCH[1]#0}" mm="${BASH_REMATCH[2]#0}" check=""
+  # The check runs only after a successful backup, on that newest copy.
+  [[ "${verify,,}" == yes ]] && printf -v check ' && %q backup data-verify --domain %q --backup latest --restore-test auto --confirm yes >>%s 2>&1' \
+    "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" "$BACKUP_DATA_LOG"
   {
     printf '# simai-managed backup domain=%s\n' "$domain"
-    printf '%s %s * * * root %q backup data --domain %q --keep %q --dest %q --confirm yes >>%s 2>&1\n' \
-      "${mm:-0}" "${hh:-0}" "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" "$keep" "$dest" "$BACKUP_DATA_LOG"
+    printf '%s %s * * * root %q backup data --domain %q --keep %q --dest %q --confirm yes >>%s 2>&1%s\n' \
+      "${mm:-0}" "${hh:-0}" "${SIMAI_ENV_ROOT}/simai-admin.sh" "$domain" "$keep" "$dest" "$BACKUP_DATA_LOG" "$check"
   } >"${cron}.tmp" && chmod 0644 "${cron}.tmp" && mv -f "${cron}.tmp" "$cron" || return 1
-  ui_result_table "Domain|${domain}" "Schedule|daily at ${at}" "Keep|${keep}" "Destination|${dest}" "Log|${BACKUP_DATA_LOG}"
+  ui_result_table "Domain|${domain}" "Schedule|daily at ${at}" "Keep|${keep}" "Check after backup|${verify,,}" \
+    "Destination|${dest}" "Log|${BACKUP_DATA_LOG}"
   ui_next_steps
   ui_kv "Off-site copy" "set SIMAI_BACKUP_OFFSITE=user@host:/path in /etc/simai-env.conf"
 }
@@ -424,5 +452,5 @@ backup_data_restore_handler() {
 
 register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to=" "tier:advanced"
 register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "" "path= domain= backup= restore-test=" "tier:advanced effects:read"
-register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest=" "tier:advanced"
+register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest= verify=" "tier:advanced"
 register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= confirm=" "tier:advanced"

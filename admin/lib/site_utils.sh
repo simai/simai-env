@@ -2392,9 +2392,34 @@ ensure_ssl_dir() {
 # certbot renews from two places: this cron (with its own --deploy-hook) and
 # the distribution's certbot.timer (without one). A deploy hook in
 # renewal-hooks reloads nginx after every renewal, whichever ran it.
+SITE_SSL_RENEW_STATE="${SIMAI_SSL_RENEW_STATE:-/var/lib/simai-env/ssl-renew}"
+
+# The last renewal of a certificate, for site describe: {at, ok}.
+ssl_record_renewal() {
+  local name="$1" ok="$2"
+  install -d -m 0755 "$SITE_SSL_RENEW_STATE" || return 1
+  printf '{"at":"%s","ok":%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ok" >"${SITE_SSL_RENEW_STATE}/${name}.json"
+}
+
+ensure_certbot_record_hook() {
+  local hook=/etc/letsencrypt/renewal-hooks/deploy/simai-record-renewal
+  [[ -x "$hook" ]] && return 0
+  install -d -m 0755 "$(dirname "$hook")" || return 1
+  cat >"$hook" <<EOF || return 1
+#!/bin/sh
+# simai-env: remember a successful renewal for site describe.
+mkdir -p ${SITE_SSL_RENEW_STATE}
+printf '{"at":"%s","ok":true}\\n' "\$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"${SITE_SSL_RENEW_STATE}/\$(basename "\$RENEWED_LINEAGE").json"
+EOF
+  chmod 0755 "$hook"
+  # shellcheck disable=SC2034 # read by self_migrate_certbot_hook
+  SITE_CERTBOT_RECORD_CREATED=1
+}
+
 ensure_certbot_reload_hook() {
   local dir=/etc/letsencrypt/renewal-hooks/deploy hook
   hook="${dir}/simai-reload-nginx"
+  ensure_certbot_record_hook || warn "Could not install the certbot renewal record hook"
   [[ -x "$hook" ]] && return 0
   install -d -m 0755 "$dir" || return 1
   printf '#!/bin/sh\n# simai-env: load renewed certificates.\nnginx -t -q && systemctl reload nginx\n' >"$hook" || return 1
@@ -2403,15 +2428,18 @@ ensure_certbot_reload_hook() {
   SITE_CERTBOT_HOOK_CREATED=1
 }
 
+# Renewals go one certificate at a time through ssl renew-due, so a failed
+# renewal is recorded for the certificate it belongs to.
 ensure_certbot_cron() {
   local cron_file="/etc/cron.d/simai-certbot"
   ensure_certbot_reload_hook || warn "Could not install the certbot nginx reload hook"
-  if [[ -f "$cron_file" ]]; then
+  if grep -qs 'ssl renew-due' "$cron_file"; then
     return 0
   fi
-  cat >"$cron_file" <<'EOF'
+  cat >"$cron_file" <<EOF
 SHELL=/bin/bash
-0 3,15 * * * root certbot renew --quiet --deploy-hook "systemctl reload nginx"
+# simai-managed: certificate renewal, each result recorded for site describe
+0 3,15 * * * root SIMAI_ADMIN_MENU=0 ${SIMAI_ENV_ROOT}/simai-admin.sh ssl renew-due --confirm yes >/dev/null 2>&1
 EOF
 }
 

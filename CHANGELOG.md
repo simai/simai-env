@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 1.30.0 - 2026-11-01
+
+- Panel gateway, stage 10: a site's SFTP accounts, key only:
+  `access:list`, `access:create-project {domain, login, pubkey}`,
+  `access:add-key`, `access:disable`, `access:enable`, `access:remove`. The
+  gateway takes the site from the account and checks the owner; global
+  accounts and passwords stay with the administrator.
+- `access create-project --pubkey-file` creates an account with no password;
+  `access enable` keeps such an account key-only. `access list` answers JSON.
+  Files uploaded by a project account are granted to the user the site runs
+  as; an isolated site no longer grants the shared account.
+- `backup data-schedule --verify yes` checks the newest copy after each
+  scheduled backup. Checks by name are kept as the site's `last_verify` in
+  `self describe` and `site describe`. `backup data-verify` takes `--backup
+  latest` and `--restore-test auto`.
+- `site add --backup yes|no`, default yes: a new site gets the daily data
+  backup. `site remove` drops the site's backup schedule (backups stay).
+- Certificate renewals: `ssl renew-due`, run by `/etc/cron.d/simai-certbot`,
+  renews one certificate at a time and records failures; a certbot deploy
+  hook records successes. `site describe` shows `certificate.last_renew`.
+  `self migrate` moves older hosts to the new cron and hook.
+- `panel status` shows whether the panel's scheduler entry is installed.
+- Recorded panel answers: set 6.
+
 ## 1.29.0 - 2026-11-01
 
 - New: `site set-profile --domain D --profile node` turns a deployed static

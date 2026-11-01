@@ -857,9 +857,11 @@ ssl_renew_handler() {
     renew_cmd=(certbot certonly --cert-name "$domain" --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
   fi
   if ! run_long "Renewing certificate for ${domain}" "${renew_cmd[@]}"; then
+    ssl_record_renewal "$domain" false || true
     error "Renew failed for ${domain}; see ${LOG_FILE}"
     return 1
   fi
+  ssl_record_renewal "$domain" true || true
   local hardened
   if hardened=$(site_nginx_hardening_upgrade "/etc/nginx/sites-available/${domain}.conf") && [[ -n "$hardened" ]]; then
     info "nginx config updated: ${hardened}"
@@ -868,6 +870,27 @@ ssl_renew_handler() {
   os_svc_reload nginx >>"$LOG_FILE" 2>&1 || true
   echo "Renewed certificate for ${domain}"
   progress_done "Done"
+}
+
+# From cron (ensure_certbot_cron): renews every certificate that is due, one
+# at a time, and records a failure against its certificate. Successful
+# renewals are recorded by the certbot deploy hook.
+ssl_renew_due_handler() {
+  parse_kv_args "$@"
+  command -v certbot >/dev/null 2>&1 || { error "certbot is not installed"; return 1; }
+  local conf name checked=0 failed=0
+  for conf in /etc/letsencrypt/renewal/*.conf; do
+    [[ -f "$conf" ]] || continue
+    name=$(basename "$conf" .conf)
+    checked=$((checked + 1))
+    if ! certbot renew --cert-name "$name" --quiet --no-random-sleep-on-renew >>"$LOG_FILE" 2>&1; then
+      failed=$((failed + 1))
+      ssl_record_renewal "$name" false || true
+      warn "Renewal failed for ${name}; see ${LOG_FILE}"
+    fi
+  done
+  ui_result_table "Certificates|${checked}" "Failed|${failed}"
+  (( failed == 0 ))
 }
 
 ssl_remove_handler() {
@@ -1112,6 +1135,7 @@ ssl_list_handler() {
 register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging= wildcard= dns-provider= dns-credentials= wildcard-domain="
 register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect= hsts="
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
+register_cmd "ssl" "renew-due" "Renew all certificates that are due and record each result" "ssl_renew_due_handler" "" "" "tier:advanced"
 register_cmd "ssl" "remove" "Disable SSL and optionally delete cert" "ssl_remove_handler" "" "domain= delete-cert= confirm="
 register_cmd "ssl" "status" "Show SSL status for domain" "ssl_status_handler" "" "domain=" "effects:read"
 register_cmd "ssl" "list" "List SSL status for sites" "ssl_list_handler" "" "" "effects:read"

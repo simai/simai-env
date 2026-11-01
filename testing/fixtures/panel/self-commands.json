@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 189,
+    "count": 191,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -64,7 +64,8 @@
           "--login"
         ],
         "optional": {
-          "--password": null
+          "--password": null,
+          "--pubkey-file": null
         },
         "flags": [
           "menu:internal-confirm"
@@ -315,7 +316,8 @@
           "--enabled": null,
           "--time": null,
           "--keep": null,
-          "--dest": null
+          "--dest": null,
+          "--verify": null
         },
         "flags": [
           "tier:advanced"
@@ -3123,6 +3125,7 @@
           "--access-login": null,
           "--access-password": null,
           "--bitrix-files": null,
+          "--backup": null,
           "--owner": null,
           "--db-engine": null,
           "--app-port": null,
@@ -4180,6 +4183,34 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh site set-profile",
+        "description": "Change a site's profile between static and node, keeping its releases (plan unless --confirm yes)",
+        "required": [
+          "--domain",
+          "--profile"
+        ],
+        "optional": {
+          "--app-port": null,
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh site usage-set",
         "description": "Set user-facing site usage class",
         "required": [],
@@ -4339,6 +4370,27 @@
         "authorization": "root",
         "confirmation": "required",
         "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh ssl renew-due",
+        "description": "Renew all certificates that are due and record each result",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

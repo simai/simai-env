@@ -33,12 +33,41 @@ access_print_list() {
   printf "%s\n" "$sep"
 }
 
+# Machine-readable list for the panel gateway: no passwords, no keys.
+access_list_json() {
+  local login
+  for login in "$@"; do
+    access_load_metadata "$login" || continue
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$login" "${ACCESS_META[TYPE]:-}" "${ACCESS_META[DOMAIN]:-}" \
+      "${ACCESS_META[ENABLED]:-}" "${ACCESS_META[AUTH_MODE]:-}" "${ACCESS_META[CREATED_AT]:-}"
+  done | python3 -c '
+import json, sys
+rows = []
+for line in sys.stdin:
+    login, kind, domain, enabled, auth, created = line.rstrip("\n").split("\t")
+    rows.append({"login": login, "type": kind, "domain": domain or None, "enabled": enabled == "yes",
+                 "auth": auth, "sftp_path": "/site" if kind == "project" else None, "created_at": created or None})
+json.dump({"schema": "simai-access/1", "accesses": rows}, sys.stdout)
+print()'
+}
+
 access_list_handler() {
   parse_kv_args "$@"
   local scope="${PARSED_ARGS[scope]:-}"
   local domain="${PARSED_ARGS[domain]:-}"
   local -a logins=() filtered=()
   mapfile -t logins < <(access_list_logins)
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    local login
+    for login in "${logins[@]}"; do
+      access_load_metadata "$login" || continue
+      [[ -n "$scope" && "${ACCESS_META[SCOPE]:-}" != "$scope" ]] && continue
+      [[ -n "$domain" && "${ACCESS_META[DOMAIN]:-}" != "$domain" ]] && continue
+      filtered+=("$login")
+    done
+    access_list_json "${filtered[@]}"
+    return 0
+  fi
   if [[ ${#logins[@]} -eq 0 ]]; then
     ui_result_info "No access entries found."
     return 0
@@ -306,7 +335,7 @@ access_create_project_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   local login="${PARSED_ARGS[login]:-}"
-  local password="${PARSED_ARGS[password]:-}"
+  local password="${PARSED_ARGS[password]:-}" key_file="${PARSED_ARGS[pubkey-file]:-}" pubkey=""
   if [[ -z "$domain" && "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     mapfile -t _sites < <(list_sites)
     if [[ ${#_sites[@]} -eq 0 ]]; then
@@ -324,6 +353,14 @@ access_create_project_handler() {
   if ! validate_domain "$domain" "allow"; then return 1; fi
   require_site_exists "$domain" || return 1
   access_validate_login "$login" || return 1
+  # With a public key the account has no password at all (the panel creates
+  # accounts this way, so no password is ever shown or sent).
+  if [[ -n "$key_file" ]]; then
+    [[ -z "$password" ]] || { error "Give --password or --pubkey-file, not both"; return 1; }
+    [[ -f "$key_file" ]] || { error "Public key file not found: ${key_file}"; return 1; }
+    pubkey=$(grep -E '^(ssh-(rsa|ed25519)|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com) ' "$key_file" | head -n 1 || true)
+    [[ -n "$pubkey" ]] && ssh-keygen -l -f /dev/stdin <<<"$pubkey" >/dev/null 2>&1 || { error "No valid SSH public key in ${key_file}"; return 1; }
+  fi
   access_ensure_prereqs || return 1
   ensure_user || return 1
   if access_exists "$login"; then
@@ -349,15 +386,25 @@ access_create_project_handler() {
     create_choice=$(select_from_list "Create project file access ${login} for ${domain}?" "no" "no" "yes")
     [[ "$create_choice" == "yes" ]] || { command_cancelled; return $?; }
   fi
-  [[ -z "$password" ]] && password="$(access_generate_password)"
+  local auth_mode=password
+  if [[ -n "$pubkey" ]]; then
+    auth_mode=key
+  elif [[ -z "$password" ]]; then
+    password="$(access_generate_password)"
+  fi
   access_ensure_project_group || return 1
   access_write_sshd_snippet || return 1
   local jail_root
   jail_root=$(access_project_jail_root "$login")
   access_create_system_user "$login" "$jail_root" "$SIMAI_ACCESS_GROUP_PROJECT" || return 1
-  access_set_password "$login" "$password" || return 1
-  access_grant_project_acl "$login" "$root" || return 1
+  if [[ "$auth_mode" == password ]]; then
+    access_set_password "$login" "$password" || return 1
+  fi
+  access_grant_project_acl "$login" "$root" "$(site_effective_user "${SITE_META[project]:-$(project_slug_from_domain "$domain")}")" || return 1
   access_mount_project_root "$login" "$root" || return 1
+  if [[ "$auth_mode" == key ]]; then
+    access_install_pubkey "$login" "$pubkey" || return 1
+  fi
   local site_dir mount_unit
   site_dir=$(access_project_site_dir "$login")
   mount_unit=$(access_mount_unit_name "$site_dir")
@@ -371,19 +418,13 @@ access_create_project_handler() {
     "JAIL_PATH|${jail_root}" \
     "MOUNT_UNIT|${mount_unit}" \
     "ENABLED|yes" \
-    "AUTH_MODE|password" \
+    "AUTH_MODE|${auth_mode}" \
     "CREATED_AT|${now}" \
     "UPDATED_AT|${now}"
-  ui_result_table \
-    "Login|${login}" \
-    "Type|project" \
-    "Domain|${domain}" \
-    "Root path|${root}" \
-    "Chroot|${jail_root}" \
-    "SFTP path|/site" \
-    "Auth mode|password" \
-    "Password|${password}" \
-    "SSHD mode|internal-sftp (chroot)"
+  local -a rows=("Login|${login}" "Type|project" "Domain|${domain}" "Root path|${root}" "Chroot|${jail_root}"
+    "SFTP path|/site" "Auth mode|${auth_mode}")
+  [[ "$auth_mode" == password ]] && rows+=("Password|${password}")
+  ui_result_table "${rows[@]}" "SSHD mode|internal-sftp (chroot)"
   ui_next_steps \
     "Connect: sftp ${login}@<server>" \
     "Navigate: cd /site" \
@@ -450,7 +491,11 @@ access_enable_handler() {
       return 1
     fi
   fi
-  usermod -U -e "" "$login"
+  if [[ "${ACCESS_META[AUTH_MODE]:-password}" == key ]]; then
+    usermod -e "" "$login" || return 1  # no password to unlock
+  else
+    usermod -U -e "" "$login"
+  fi
   local now
   now=$(date +"%Y-%m-%dT%H:%M:%S")
   access_write_metadata "$login" \
@@ -598,7 +643,7 @@ register_cmd "access" "list" "List managed file accesses" "access_list_handler" 
 register_cmd "access" "show" "Show access details" "access_show_handler" "login" "" "effects:read"
 register_cmd "access" "doctor" "Check managed access security baseline" "access_doctor_handler" "" "strict=no" "effects:read"
 register_cmd "access" "create-global" "Create global SFTP access" "access_create_global_handler" "login" "password=" "menu:internal-confirm"
-register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password=" "menu:internal-confirm"
+register_cmd "access" "create-project" "Create project SFTP access" "access_create_project_handler" "domain login" "password= pubkey-file=" "menu:internal-confirm"
 register_cmd "access" "disable" "Disable access" "access_disable_handler" "login" "" "menu:internal-confirm"
 register_cmd "access" "enable" "Enable access" "access_enable_handler" "login" "" "menu:internal-confirm"
 register_cmd "access" "reset-password" "Reset access password" "access_reset_password_handler" "login" "password=" "menu:confirm"

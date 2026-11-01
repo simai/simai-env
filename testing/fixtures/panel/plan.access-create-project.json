@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.access-create-project",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "access:create-project",
+    "args": {
+      "domain": "demo-owned.test",
+      "login": "demo-staff2",
+      "pubkey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureKeyFixtureKeyFixtureKeyFixtureKeyFixt staff@example"
+    },
+    "target": "demo-owned.test",
+    "description": "Create project SFTP access",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

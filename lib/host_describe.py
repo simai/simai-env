@@ -148,7 +148,18 @@ def certificate(domain: str) -> dict | None:
         "not_after": not_after.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "days_left": (not_after - datetime.now(timezone.utc)).days,
         "auto_renew": (Path("/etc/letsencrypt/renewal") / f"{domain}.conf").is_file(),
+        "last_renew": last_renew(domain),
     }
+
+
+def last_renew(domain: str) -> dict | None:
+    """Last renewal of the site's certificate: the certbot hook and ssl renew-due write it."""
+    state = Path(os.environ.get("SIMAI_SSL_RENEW_STATE", "/var/lib/simai-env/ssl-renew")) / f"{domain}.json"
+    try:
+        data = json.loads(state.read_text())
+    except (OSError, ValueError):
+        return None
+    return {"at": data.get("at"), "ok": data.get("ok") is True} if isinstance(data, dict) else None
 
 
 def backups(domain: str, project: str) -> dict:
@@ -159,7 +170,8 @@ def backups(domain: str, project: str) -> dict:
         line = next(l for l in cron.read_text().splitlines() if l and not l.startswith("#"))
         fields = line.split()
         opts = dict(zip(fields[::1], fields[1::1]))
-        schedule = {"time": f"{int(fields[1]):02d}:{int(fields[0]):02d}", "keep": opts.get("--keep"), "dest": opts.get("--dest")}
+        schedule = {"time": f"{int(fields[1]):02d}:{int(fields[0]):02d}", "keep": opts.get("--keep"), "dest": opts.get("--dest"),
+                    "verify": "data-verify" in fields}
         if schedule["dest"]:
             dests.add(schedule["dest"])
     except (OSError, StopIteration, ValueError, IndexError):
@@ -181,7 +193,20 @@ def backups(domain: str, project: str) -> dict:
                 "checksums": (d / "SHA256SUMS").is_file(),
                 "encrypted": any(f.name.endswith(".age") for f in files),
             })
-    return {"schedule": schedule, "items": items}
+    return {"schedule": schedule, "items": items, "last_verify": last_verify(domain)}
+
+
+def last_verify(domain: str) -> dict | None:
+    """Result of the last check of a named backup (backup data-verify --domain)."""
+    state = Path(os.environ.get("SIMAI_BACKUP_VERIFY_STATE", "/var/lib/simai-env/backup-verify")) / f"{domain}.json"
+    try:
+        data = json.loads(state.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {"at": data.get("at"), "ok": data.get("ok") is True, "backup": data.get("backup"),
+            "restore_test": data.get("restore_test") is True}
 
 
 def last_backup(domain: str, project: str) -> str | None:
@@ -244,6 +269,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "scheduler": (Path("/etc/cron.d") / project).is_file(),
         "backup_schedule": (Path("/etc/cron.d") / f"simai-backup-{project}").is_file(),
         "last_backup": last_backup(domain, project),
+        "last_verify": last_verify(domain),
         "adopted": kv_file(STATE / "sites" / domain / "app.env").get("ADOPTED_AT"),
     }
     known = (status if status is not None else site_status()).get(domain) or {}

@@ -8,7 +8,8 @@
     "args": {
       "domain": "demo-php.test",
       "time": "03:30",
-      "keep": "14"
+      "keep": "14",
+      "verify": "yes"
     },
     "target": "demo-php.test",
     "description": "Enable or disable the daily data backup for a site",

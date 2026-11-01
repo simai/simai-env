@@ -362,11 +362,15 @@ access_mount_project_root() {
   mount --bind "$project_path" "$site_dir"
 }
 
+# app_user: the user the site runs as, so the application can still change
+# files the access account uploads. An isolated site (an owner or site-*)
+# grants only its own user, never the shared account.
 access_grant_project_acl() {
-  local login="$1" project_path="$2"
+  local login="$1" project_path="$2" app_user="${3:-$SIMAI_USER}"
+  local -a acl=(-m "u:${login}:rwX" -m "u:${app_user}:rwX") dacl=(-m "d:u:${login}:rwX" -m "d:u:${app_user}:rwX")
   access_grant_traverse_acl "$login" "$project_path"
-  setfacl -R -m "u:${login}:rwX" -m "u:${SIMAI_USER}:rwX" "$project_path"
-  find "$project_path" -type d -print0 2>/dev/null | xargs -0 -r setfacl -m "d:u:${login}:rwX" -m "d:u:${SIMAI_USER}:rwX"
+  setfacl -R "${acl[@]}" "$project_path"
+  find "$project_path" -type d -print0 2>/dev/null | xargs -0 -r setfacl "${dacl[@]}"
 }
 
 access_create_system_user() {

@@ -12,7 +12,9 @@ published build pinned in `admin/panel-release.env`, `install.sh
 --with-panel`, 1.26.0), stage 8 (site answers, disk and last backup in
 the host description; `owner:block|unblock`, 1.27.0), stage 9 (restore,
 verify and schedule backups, PHP settings and extensions, server metrics,
-databases, a log filter, the command list in `self:describe`, 1.28.0).
+databases, a log filter, the command list in `self:describe`, 1.28.0),
+stage 10 (a site's SFTP accounts by key, a check after each scheduled backup,
+a daily backup for new sites, the last certificate renewal, 1.30.0).
 
 ## Installation
 
@@ -162,9 +164,11 @@ may call (an owner's list leaves out administrator commands). The panel shows
 an action only when the server lists it.
 
 `site:describe` (and each site in `self:describe`) carries `certificate`:
-the names, issuer, `not_after`, `days_left` and `auto_renew` of the
-certificate nginx serves, or `null`. `site:describe` also carries `backups`:
-the daily schedule (`time`, `keep`, `dest`) and every data backup directory
+the names, issuer, `not_after`, `days_left`, `auto_renew` and `last_renew
+{at, ok}` (the last renewal, `null` before the first) of the certificate nginx
+serves, or `null`. Every site also has `last_verify {at, ok, backup,
+restore_test}`, the last check of one of its backups, or `null`. `site:describe` also carries `backups`:
+the daily schedule (`time`, `keep`, `dest`, `verify`), `last_verify` and every data backup directory
 with `created_at`, `size_bytes`, `parts` (`db`, `files`, `config`),
 `checksums` and `encrypted`. `logs:nginx {domain, kind: access|error,
 lines: 1-1000, match}` answers `simai-log-tail/1` with the last lines; with
@@ -179,6 +183,7 @@ Stage 9 reads:
 | `php:extensions {php}` | `simai-php-extensions/1`: `extensions [{name, enabled}]`, from what PHP-FPM of that version loads and the packaged ones it does not |
 | `site:php-ini-list {domain}` | `simai-php-ini/1`: `settings [{key, value, source: site}]`, the site's own settings, and `editable`: the keys the panel may set |
 | `db:list` | `simai-databases/1`: `databases [{name, engine, site, size_bytes, users}]` of the sites; an owner gets only their sites' databases; no host, no passwords |
+| `access:list {domain}` | `simai-access/1`: `accesses [{login, type, domain, enabled, auth, sftp_path, created_at}]`; an owner gets only their sites' accounts, never global ones; no passwords, no keys (stage 10) |
 
 ## Actions and jobs
 
@@ -223,6 +228,21 @@ Stage 9 actions:
   is rebuilt and workers restart. The password is never in an answer or a
   log. A database dump to keep is `backup:data {domain, files: no}`.
 
+Stage 10 actions:
+
+- `backup:data-schedule` takes `verify: yes|no`: after each successful
+  scheduled backup the server checks that newest copy, with a restore test
+  when it has a plain dump; the result is the site's `last_verify`.
+- `site:add` takes `backup: yes|no`, default `yes`: the new site gets the
+  daily backup at 03:30, keeping 7 (not for redirect sites).
+- `access:create-project {domain, login, pubkey}`: an SFTP account for one
+  site, chrooted to it (the site is `/site`), that logs in only with the key.
+  No password is set, and `password` is not an argument. `access:add-key
+  {login, pubkey}`, `access:disable`, `access:enable`, `access:remove
+  {login}` work on a site's accounts only: the gateway finds the site from
+  the account (`unknown_access` for an unknown login, `not_allowed` for a
+  global account) and checks that an owner owns it (`owner_scope`).
+
 ## Allowlist
 
 The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
@@ -252,7 +272,10 @@ action, job). Everything else is refused.
 - stage 9 (1.28.0): `backup:data-restore`, `backup:data-verify`,
   `backup:data-schedule`, `php:extensions`, `site:php-ini-list`,
   `site:php-ini-set`, `site:php-ini-unset`, `site:db-rotate`, `db:list`,
-  `self:metrics` (administrator only), `logs:nginx` with `match`.
+  `self:metrics` (administrator only), `logs:nginx` with `match`;
+- stage 10 (1.30.0): `access:list`, `access:create-project`,
+  `access:add-key`, `access:disable`, `access:enable`, `access:remove`;
+  `backup:data-schedule` with `verify`; `site:add` with `backup`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -268,7 +291,8 @@ Interactive and operator-only commands (menus, `self bootstrap`,
 stand (`testing/stand/stand.sh record`): host description (also an owner's
 view), command registry, `site describe` and `site doctor` for demo sites,
 plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
-refusal per site action of stage 9. Set 5 since 1.28.0. The panel's fixture driver replays them, and
+refusal per site action of stage 9, the SFTP account list and plans of stage
+10. Set 6 since 1.30.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

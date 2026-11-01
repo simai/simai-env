@@ -81,4 +81,17 @@ hook=/etc/letsencrypt/renewal-hooks/deploy/simai-reload-nginx
 [[ -x $hook ]] && grep -q "reload nginx" $hook && grep -q "certbot reloads nginx" /tmp/h-mig && ok "migrate installs the certbot reload hook" || { bad "certbot hook"; tail -5 /tmp/h-mig; }
 sh $hook && ok "reload hook runs" || bad "reload hook failed"
 cli self migrate --confirm yes 2>&1 | grep -q "certbot reloads nginx" && bad "hook migration not idempotent" || ok "hook migration is idempotent"
+# Certificate renewals: one at a time through ssl renew-due, each result recorded.
+printf 'SHELL=/bin/bash\n0 3,15 * * * root certbot renew --quiet --deploy-hook "systemctl reload nginx"\n' >/etc/cron.d/simai-certbot
+rm -f /etc/letsencrypt/renewal-hooks/deploy/simai-record-renewal
+cli self migrate --confirm yes >/tmp/h-mig2 2>&1
+grep -q 'ssl renew-due' /etc/cron.d/simai-certbot && grep -q "renewal cron records each result" /tmp/h-mig2 && ok "migrate moves the renewal cron to renew-due" || { bad "renewal cron"; tail -5 /tmp/h-mig2; }
+rec=/etc/letsencrypt/renewal-hooks/deploy/simai-record-renewal
+renew_ok() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ok"])' "/var/lib/simai-env/ssl-renew/$1.json" 2>/dev/null; }
+[[ -x $rec ]] && RENEWED_LINEAGE=/etc/letsencrypt/live/good.test sh $rec && [[ "$(renew_ok good.test)" == True ]] && ok "a renewal is recorded by the certbot hook" || bad "record hook"
+mkdir -p /etc/letsencrypt/renewal /root/fakebin; touch /etc/letsencrypt/renewal/good.test.conf /etc/letsencrypt/renewal/bad.test.conf
+printf '#!/bin/sh\ncase "$*" in *bad.test*) exit 1 ;; esac\nexit 0\n' >/root/fakebin/certbot; chmod +x /root/fakebin/certbot
+PATH=/root/fakebin:$PATH cli ssl renew-due --confirm yes >/tmp/h-rd 2>&1 && bad "renew-due hid a failure" || ok "renew-due reports a failed renewal"
+[[ "$(renew_ok bad.test)" == False && "$(renew_ok good.test)" == True ]] && ok "the failure is recorded for its certificate only" || bad "renew state: bad=$(renew_ok bad.test) good=$(renew_ok good.test)"
+rm -f /etc/letsencrypt/renewal/*.test.conf
 echo "failures=$fails"; exit $fails

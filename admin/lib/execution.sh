@@ -61,7 +61,8 @@ command_effect() {
     observer:status|self:version|self:auto-update-status) command_arg_yes refresh "$@" && effect='write' ;;
     site:drift) command_arg_yes fix "$@" && effect='write' ;;
     backup:import) command_arg_yes apply "$@" && effect='write' ;;
-    backup:data-verify) command_arg_yes restore-test "$@" && effect='write' ;;
+    backup:data-verify)
+      case "$(command_arg restore-test "$@")" in [Yy][Ee][Ss]|[Aa][Uu][Tt][Oo]) effect='write' ;; esac ;;
   esac
   printf '%s\n' "$effect"
 }

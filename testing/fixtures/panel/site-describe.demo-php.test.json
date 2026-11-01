@@ -26,8 +26,14 @@
     "workers": [],
     "service": null,
     "scheduler": false,
-    "backup_schedule": false,
+    "backup_schedule": true,
     "last_backup": "2026-01-01T00:00:00",
+    "last_verify": {
+      "at": "2026-01-01T00:00:00Z",
+      "ok": true,
+      "backup": "20260101-000000",
+      "restore_test": true
+    },
     "adopted": null,
     "answers": {
       "http": 200,
@@ -40,12 +46,17 @@
     },
     "manifest": null,
     "backups": {
-      "schedule": null,
+      "schedule": {
+        "time": "03:30",
+        "keep": "7",
+        "dest": "/var/backups/simai",
+        "verify": false
+      },
       "items": [
         {
-          "path": "/var/backups/simai/demo-php.test/20261101-001500",
-          "created_at": "2026-11-01T00:15:00",
-          "size_bytes": 4346,
+          "path": "/var/backups/simai/demo-php.test/20261101-151759",
+          "created_at": "2026-11-01T15:17:59",
+          "size_bytes": 4345,
           "parts": [
             "config",
             "db",
@@ -54,7 +65,13 @@
           "checksums": true,
           "encrypted": false
         }
-      ]
+      ],
+      "last_verify": {
+        "at": "2026-01-01T00:00:00Z",
+        "ok": true,
+        "backup": "20260101-000000",
+        "restore_test": true
+      }
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-php-test.error.log",

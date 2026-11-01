@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.27.0",
+      "version": "1.30.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -58,8 +58,9 @@
         "workers": [],
         "service": null,
         "scheduler": false,
-        "backup_schedule": false,
+        "backup_schedule": true,
         "last_backup": null,
+        "last_verify": null,
         "adopted": null,
         "answers": {
           "http": 200,
@@ -94,8 +95,14 @@
         "workers": [],
         "service": null,
         "scheduler": false,
-        "backup_schedule": false,
+        "backup_schedule": true,
         "last_backup": "2026-01-01T00:00:00",
+        "last_verify": {
+          "at": "2026-01-01T00:00:00Z",
+          "ok": true,
+          "backup": "20260101-000000",
+          "restore_test": true
+        },
         "adopted": null,
         "answers": {
           "http": 200,
@@ -126,6 +133,7 @@
         "scheduler": false,
         "backup_schedule": false,
         "last_backup": null,
+        "last_verify": null,
         "adopted": null,
         "answers": {
           "http": 301,
@@ -151,16 +159,17 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261101001459",
-          "previous": "20261101001458-initial",
-          "deployed_at": "2026-11-01T00:14:59Z",
+          "current": "20261101151756",
+          "previous": "20261101151755-initial",
+          "deployed_at": "2026-11-01T15:17:56Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
         "service": null,
         "scheduler": false,
-        "backup_schedule": false,
+        "backup_schedule": true,
         "last_backup": null,
+        "last_verify": null,
         "adopted": null,
         "answers": {
           "http": 200,
@@ -180,6 +189,12 @@
     },
     "gate": {
       "commands": [
+        "access:add-key",
+        "access:create-project",
+        "access:disable",
+        "access:enable",
+        "access:list",
+        "access:remove",
         "backup:data",
         "backup:data-restore",
         "backup:data-schedule",

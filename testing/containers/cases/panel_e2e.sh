@@ -227,6 +227,62 @@ a=$(gate "$(req null logs:nginx '{"domain":"open.test","match":"needle-9"}')")
 [[ "$(field 'len(d["data"]["lines"]) >= 1 and all("needle-9" in l for l in d["data"]["lines"])' <<<"$a")" == True ]] && ok "log filter" || bad "log match: ${a:0:300}"
 refused invalid_argument "$(req null logs:nginx '{"domain":"open.test","match":"a\nb"}')" "log filter with a new line"
 
+# Stage 10 (1.30.0): backups by default and checked on schedule, certificate
+# renewals, and a site's SFTP accounts (key only).
+[[ -f /etc/cron.d/simai-backup-open-test ]] && ok "a new site gets the daily backup" || bad "no default backup schedule"
+cli site add --domain nobk.test --profile static --backup no --confirm yes >/dev/null 2>&1
+[[ -d /home/simai/www/nobk.test && ! -f /etc/cron.d/simai-backup-nobk-test ]] && ok "backup no skips the schedule" || bad "backup no"
+cli site add --domain gone.test --profile static --confirm yes >/dev/null 2>&1
+cli site remove --domain gone.test --remove-files yes --confirm yes >/dev/null 2>&1
+[[ ! -f /etc/cron.d/simai-backup-gone-test ]] && ok "removing a site drops its backup schedule" || bad "backup cron left after site remove"
+job_ok '"acme"' "$(creq '"acme"' backup:data-schedule '{"domain":"db.test","time":"02:30","keep":"14","verify":"yes"}')" && ok "schedule with a check" || bad "schedule verify job"
+[[ "$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')" | field 'd["data"]["backups"]["schedule"]["verify"]')" == True ]] && ok "the check is in the site card" || bad "schedule verify flag"
+bash -c "$(grep -v '^#' /etc/cron.d/simai-backup-db-test | cut -d' ' -f7-)" && ok "the scheduled line runs" || bad "scheduled line failed: $(tail -3 /var/log/simai-backup.log)"
+a=$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')")
+[[ "$(field 'd["data"]["backups"]["last_verify"]["ok"] and d["data"]["backups"]["last_verify"]["restore_test"] and d["data"]["backups"]["last_verify"]["backup"] == d["data"]["backups"]["items"][0]["path"].rsplit("/", 1)[1]' <<<"$a")" == True ]] && ok "the newest copy was checked with a restore test" || bad "last_verify: $(field 'd["data"]["backups"]' <<<"$a")"
+[[ "$(gate "$(req '"acme"' self:describe '{}')" | field '[s["last_verify"]["ok"] for s in d["data"]["sites"] if s["domain"] == "db.test"]')" == "[True]" ]] && ok "the check result is in the site list" || bad "last_verify in the list"
+grep -q 'restore-test auto' /etc/cron.d/simai-backup-db-test && ok "a site without a database is checked without a restore test" || bad "verify mode"
+
+C=/root/tls; mkdir -p $C
+openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=open.test" -addext "subjectAltName=DNS:open.test" -keyout $C/key.pem -out $C/cert.pem >/dev/null 2>&1
+cli ssl install --domain open.test --cert $C/cert.pem --key $C/key.pem --confirm yes >/dev/null 2>&1
+[[ "$(gate "$(req null site:describe '{"domain":"open.test"}')" | field 'd["data"]["certificate"]["last_renew"]')" == None ]] && ok "no renewal recorded yet" || bad "last_renew before"
+mkdir -p /var/lib/simai-env/ssl-renew; printf '{"at":"2026-11-01T03:00:00Z","ok":false}\n' >/var/lib/simai-env/ssl-renew/open.test.json
+[[ "$(gate "$(req null site:describe '{"domain":"open.test"}')" | field 'd["data"]["certificate"]["last_renew"]')" == "{'at': '2026-11-01T03:00:00Z', 'ok': False}" ]] && ok "a failed renewal is in the certificate facts" || bad "last_renew"
+
+command -v sshd >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq openssh-server >/dev/null 2>&1; }
+systemctl start ssh
+ssh-keygen -q -t ed25519 -N '' -f /root/staff; ssh-keygen -q -t ed25519 -N '' -f /root/staff2
+staff=$(cat /root/staff.pub); staff2=$(cat /root/staff2.pub)
+sftpk() { sftp -i "$1" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o LogLevel=ERROR -b - "$2@127.0.0.1"; }
+[[ "$(gate "$(req '"acme"' access:create-project "{\"domain\":\"db.test\",\"login\":\"dbstaff\",\"pubkey\":\"${staff}\"}")" | field 'd["kind"]')" == plan ]] && ok "SFTP account plan" || bad "access plan"
+job_ok '"acme"' "$(creq '"acme"' access:create-project "{\"domain\":\"db.test\",\"login\":\"dbstaff\",\"pubkey\":\"${staff}\"}")" && ok "owner creates an SFTP account" || bad "access create job"
+[[ "$(getent shadow dbstaff | cut -d: -f2)" == '!'* ]] && ok "the account has no password" || bad "password set: $(getent shadow dbstaff | cut -d: -f2 | head -c 3)"
+a=$(gate "$(req '"acme"' access:list '{}')")
+[[ "$(field '[(x["login"], x["domain"], x["auth"], x["enabled"], x["sftp_path"]) for x in d["data"]["accesses"]]' <<<"$a")" == "[('dbstaff', 'db.test', 'key', True, '/site')]" ]] && ok "owner lists the site's SFTP accounts" || bad "access list: ${a:0:300}"
+printf 'put /etc/hostname /site/up.txt\nls /site\n' | sftpk /root/staff dbstaff >/tmp/sftp1 2>&1 && grep -q up.txt /tmp/sftp1 && ok "SFTP with the key into the site" || bad "sftp: $(tail -3 /tmp/sftp1)"
+sudo -u acme cat /home/simai/www/db.test/up.txt >/dev/null && ok "the site reads an uploaded file" || bad "uploaded file not readable by the site"
+getfacl -p /home/simai/www/db.test 2>/dev/null | grep -q '^user:simai:' && bad "the shared account got access to an isolated site" || ok "no shared-account access to the isolated site"
+refused owner_scope "$(req '"acme"' access:create-project "{\"domain\":\"open.test\",\"login\":\"x-staff\",\"pubkey\":\"${staff}\"}")" "owner creates an account on another site"
+refused invalid_argument "$(req '"acme"' access:create-project '{"domain":"db.test","login":"pwstaff","password":"secret123"}')" "an account with a password"
+refused invalid_argument "$(req '"acme"' access:create-project '{"domain":"db.test","login":"nokey"}')" "an account without a key"
+refused invalid_argument "$(req '"acme"' access:disable '{"login":"site-db-test"}')" "a site user as login"
+refused unknown_access "$(req null access:disable '{"login":"nobody1"}')" "an unknown login"
+cli access create-global --login globstaff --confirm yes >/dev/null 2>&1
+refused not_allowed "$(req null access:disable '{"login":"globstaff"}')" "a global account through the panel"
+[[ "$(gate "$(req null access:list '{}')" | field 'sorted(x["login"] for x in d["data"]["accesses"])')" == "['dbstaff', 'globstaff']" ]] && ok "admin lists every account" || bad "admin access list"
+[[ "$(gate "$(req '"acme"' access:list '{}')" | field 'len(d["data"]["accesses"])')" == 1 ]] && ok "owner does not see global accounts" || bad "owner sees global"
+job_ok '"acme"' "$(creq '"acme"' access:disable '{"login":"dbstaff"}')" && ok "owner disables the account" || bad "access disable"
+printf 'ls /site\n' | sftpk /root/staff dbstaff >/dev/null 2>&1 && bad "a disabled account still connects" || ok "a disabled account cannot connect"
+job_ok '"acme"' "$(creq '"acme"' access:enable '{"login":"dbstaff"}')" && ok "owner enables the account" || bad "access enable"
+printf 'ls /site\n' | sftpk /root/staff dbstaff >/dev/null 2>&1 && ok "the key works again" || bad "enabled key-only account cannot connect"
+job_ok '"acme"' "$(creq '"acme"' access:add-key "{\"login\":\"dbstaff\",\"pubkey\":\"${staff2}\"}")" && ok "owner adds a key" || bad "access add-key"
+printf 'ls /site\n' | sftpk /root/staff2 dbstaff >/dev/null 2>&1 && ok "the second key connects" || bad "second key"
+job_ok '"acme"' "$(creq '"acme"' access:remove '{"login":"dbstaff"}')" && ok "owner removes the account" || bad "access remove"
+! getent passwd dbstaff >/dev/null && ok "the account is gone" || bad "dbstaff still exists"
+grep -rqF -- "${staff#* }" /var/log/simai-panel-gate.log && bad "a key reached the gate log" || ok "keys are not in the gate log"
+cli access remove --login globstaff --confirm yes >/dev/null 2>&1
+
 # Site answers, disk and the last backup in one self:describe (stage 2 list).
 cli self status-refresh --confirm yes >/dev/null 2>&1 && ok "self status-refresh" || bad "status-refresh"
 a=$(gate "$(req null self:describe '{}')")

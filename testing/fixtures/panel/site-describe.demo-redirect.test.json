@@ -22,6 +22,7 @@
     "scheduler": false,
     "backup_schedule": false,
     "last_backup": null,
+    "last_verify": null,
     "adopted": null,
     "answers": {
       "http": 301,
@@ -35,7 +36,8 @@
     "manifest": null,
     "backups": {
       "schedule": null,
-      "items": []
+      "items": [],
+      "last_verify": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-redirect-test.error.log",

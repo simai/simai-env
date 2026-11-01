@@ -20,8 +20,9 @@
     "workers": [],
     "service": null,
     "scheduler": false,
-    "backup_schedule": false,
+    "backup_schedule": true,
     "last_backup": null,
+    "last_verify": null,
     "adopted": null,
     "answers": {
       "http": 200,
@@ -34,8 +35,14 @@
     },
     "manifest": null,
     "backups": {
-      "schedule": null,
-      "items": []
+      "schedule": {
+        "time": "03:30",
+        "keep": "7",
+        "dest": "/var/backups/simai",
+        "verify": false
+      },
+      "items": [],
+      "last_verify": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-owned-test.error.log",
