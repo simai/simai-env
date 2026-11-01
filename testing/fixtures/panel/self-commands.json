@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 187,
+    "count": 189,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -280,10 +280,13 @@
         "command": "simai-admin.sh backup data-restore",
         "description": "Restore a site database and stage its files from a data backup",
         "required": [
-          "--domain",
-          "--path"
+          "--domain"
         ],
         "optional": {
+          "--path": null,
+          "--backup": null,
+          "--db": null,
+          "--files": null,
           "--confirm": null
         },
         "flags": [
@@ -333,10 +336,11 @@
       {
         "command": "simai-admin.sh backup data-verify",
         "description": "Verify a data backup (checksums, archives, optional restore test)",
-        "required": [
-          "--path"
-        ],
+        "required": [],
         "optional": {
+          "--path": null,
+          "--domain": null,
+          "--backup": null,
           "--restore-test": null
         },
         "flags": [
@@ -1309,7 +1313,8 @@
         "optional": {
           "--domain": null,
           "--kind": null,
-          "--lines": "${LOGS_DEFAULT_LINES}"
+          "--lines": "${LOGS_DEFAULT_LINES}",
+          "--match": null
         },
         "flags": [
           "effects:read"
@@ -1803,6 +1808,29 @@
         "effects": "write",
         "authorization": "root",
         "confirmation": "required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh php extensions",
+        "description": "List PHP-FPM extensions of a PHP version: loaded and available",
+        "required": [
+          "--php"
+        ],
+        "optional": {},
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
         "lock": "none",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
@@ -2473,6 +2501,28 @@
         "required": [],
         "optional": {},
         "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self metrics",
+        "description": "Show current CPU load, memory, swap and disk use",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
           "effects:read"
         ],
         "effects": "read",

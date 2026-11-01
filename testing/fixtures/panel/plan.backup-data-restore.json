@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.backup-data-restore",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "backup:data-restore",
+    "args": {
+      "domain": "demo-php.test",
+      "backup": "20260101-000000",
+      "files": "no"
+    },
+    "target": "demo-php.test",
+    "description": "Restore a site database and stage its files from a data backup",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

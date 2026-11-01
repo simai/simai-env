@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 1.28.0 - 2026-11-01
+
+- Panel gateway, stage 9: `backup:data-restore`, `backup:data-verify` and
+  `backup:data-schedule` by backup name; `php:extensions`,
+  `site:php-ini-list|set|unset` with an allowlist of keys and values;
+  `self:metrics` (administrator only); `db:list`; `site:db-rotate`;
+  `logs:nginx` with `match`. `self:describe` lists the commands the panel
+  user may call (`gate.commands`).
+- `backup data-restore` takes `--backup NAME`, `--db` and `--files`; before
+  replacing the database it takes an ordinary backup of the current one
+  instead of a separate `pre-restore-*.sql.gz` dump, so it can be restored
+  back the same way. `backup data-verify` takes `--domain` with `--backup`.
+- `backup data` without `--keep` keeps as many backups as the site's
+  schedule does (7 without a schedule), and never writes into an existing
+  backup made in the same second.
+- New: `self metrics`, `php extensions --php V`. `db list`, `site
+  php-ini-list` and `logs nginx` answer JSON with `--output json`.
+- `site db-rotate` keeps the owner and mode of the site's `.env`, rebuilds a
+  cached Laravel config and restarts the workers, so the site keeps working
+  with the new password.
+- Recorded panel answers: set 5.
+
 ## 1.27.0 - 2026-11-01
 
 - Each site in `self describe` and `site describe` shows whether it answers

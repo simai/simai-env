@@ -116,17 +116,51 @@ backup_data_write_checksums() {
   (cd "$dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | xargs -r sha256sum >SHA256SUMS)
 }
 
+# Backup directories live under the default destination or the one the
+# site's schedule writes to; a backup is named by its directory.
+backup_data_dests() {
+  local domain="$1" slug cron
+  printf '%s\n' "$BACKUP_DATA_DEFAULT_DEST"
+  slug=$(project_slug_from_domain "$domain")
+  cron="/etc/cron.d/simai-backup-${slug}"
+  [[ -f "$cron" ]] && grep -v '^#' "$cron" | grep -o -- '--dest [^ ]*' | head -n1 | cut -d' ' -f2
+  return 0
+}
+
+backup_data_schedule_keep() {
+  local cron
+  cron="/etc/cron.d/simai-backup-$(project_slug_from_domain "$1")"
+  [[ -f "$cron" ]] && grep -v '^#' "$cron" | grep -o -- '--keep [0-9]*' | head -n1 | cut -d' ' -f2
+  return 0
+}
+
+backup_data_resolve() {
+  local domain="$1" name="$2" dest
+  if [[ ! "$name" =~ ^[0-9]{8}-[0-9]{6}$ ]]; then
+    error "--backup must be a backup name like 20260101-033000"
+    return 1
+  fi
+  while IFS= read -r dest; do
+    [[ -n "$dest" && -d "${dest%/}/${domain}/${name}" ]] && { printf '%s\n' "${dest%/}/${domain}/${name}"; return 0; }
+  done < <(backup_data_dests "$domain" | sort -u)
+  error "Backup ${name} of ${domain} not found"
+  return 1
+}
+
 backup_data_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
   local dest="${PARSED_ARGS[dest]:-$BACKUP_DATA_DEFAULT_DEST}"
-  local keep="${PARSED_ARGS[keep]:-7}"
+  local keep="${PARSED_ARGS[keep]:-}"
   local with_db="${PARSED_ARGS[db]:-yes}" with_files="${PARSED_ARGS[files]:-yes}"
   local offsite="${PARSED_ARGS[offsite]:-${SIMAI_BACKUP_OFFSITE:-}}"
   local encrypt_to="${PARSED_ARGS[encrypt-to]:-${SIMAI_BACKUP_AGE_RECIPIENT:-}}"
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
+  # Without --keep a manual backup keeps as many as the site's schedule does.
+  [[ -n "$keep" ]] || keep=$(backup_data_schedule_keep "$domain")
+  keep="${keep:-7}"
   backup_data_validate_keep "$keep" || return 1
   backup_data_validate_dest "$dest" || return 1
   backup_data_validate_offsite "$offsite" || return 1
@@ -164,6 +198,11 @@ backup_data_handler() {
   exec 8>"${domain_dir}/.lock"
   flock -n 8 || { error "Another backup of ${domain} is running"; return 1; }
   ts=$(date +%Y%m%d-%H%M%S)
+  # Names are per second: never write into an existing backup.
+  while [[ -e "${domain_dir}/${ts}" ]]; do
+    sleep 1
+    ts=$(date +%Y%m%d-%H%M%S)
+  done
   dir="${domain_dir}/${ts}"
   install -d -m 0700 "$dir" || return 1
 
@@ -198,7 +237,7 @@ backup_data_handler() {
     return 1
   fi
   chmod -R go-rwx "$dir"
-  backup_data_prune "$domain_dir" "$keep"
+  [[ "${BACKUP_DATA_NO_PRUNE:-0}" == 1 ]] || backup_data_prune "$domain_dir" "$keep"
 
   local offsite_state="not configured"
   if [[ -n "$offsite" ]]; then
@@ -226,7 +265,12 @@ backup_data_handler() {
 backup_data_verify_handler() {
   parse_kv_args "$@"
   local dir="${PARSED_ARGS[path]:-}" restore_test="${PARSED_ARGS[restore-test]:-no}"
-  require_args "path" || return 1
+  local domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[backup]:-}"
+  if [[ -z "$dir" && -n "$domain" && -n "$name" ]]; then
+    validate_domain "$domain" "allow" || return 1
+    dir=$(backup_data_resolve "$domain" "$name") || return 1
+  fi
+  [[ -n "$dir" ]] || { error "Give --path, or --domain with --backup"; return 1; }
   validate_path "$dir" || return 1
   [[ -f "${dir}/SHA256SUMS" ]] || { error "SHA256SUMS not found in ${dir}"; return 1; }
   ui_header "SIMAI ENV · Verify data backup"
@@ -312,34 +356,48 @@ backup_data_schedule_handler() {
 backup_data_restore_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}" dir="${PARSED_ARGS[path]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
-  require_args "domain path" || return 1
+  local name="${PARSED_ARGS[backup]:-}" want_db="${PARSED_ARGS[db]:-yes}" want_files="${PARSED_ARGS[files]:-yes}"
+  require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
+  if [[ -z "$dir" ]]; then
+    [[ -n "$name" ]] || { error "Give --path or --backup"; return 1; }
+    dir=$(backup_data_resolve "$domain" "$name") || return 1
+  fi
   validate_path "$dir" || return 1
+  [[ "${want_db,,}" == yes || "${want_db,,}" == no ]] || { error "--db must be yes or no"; return 1; }
+  [[ "${want_files,,}" == yes || "${want_files,,}" == no ]] || { error "--files must be yes or no"; return 1; }
   backup_data_verify_handler --path "$dir" >/dev/null || { error "Backup failed verification; nothing restored"; return 1; }
   read_site_metadata "$domain" || return 1
   local db_name="" entry
   while IFS= read -r entry; do
     [[ "${entry%%|*}" == DB_NAME ]] && db_name="${entry#*|}"
   done < <(read_site_db_env "$domain" || true)
+  local do_db=no do_files=no
+  [[ "${want_db,,}" == yes && -f "${dir}/db.sql.gz" && -n "$db_name" ]] && do_db=yes
+  [[ "${want_files,,}" == yes && -f "${dir}/files.tar.gz" ]] && do_files=yes
+  if [[ "$do_db" == no && "$do_files" == no ]]; then
+    error "Nothing to restore: the backup has no plain database dump or files archive for the parts asked"
+    return 1
+  fi
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
-    [[ -f "${dir}/db.sql.gz" && -n "$db_name" ]] && echo "  - dump current ${db_name}, then import ${dir}/db.sql.gz into it"
-    [[ -f "${dir}/files.tar.gz" ]] && echo "  - extract files into ${SITE_META[root]}.restore-<timestamp> for review"
+    [[ "$do_db" == yes ]] && echo "  - back up the current database ${db_name} as a new backup, then replace it with ${dir}/db.sql.gz"
+    [[ "$do_files" == yes ]] && echo "  - extract files into ${SITE_META[root]}.restore-<timestamp> for review; live files are not replaced"
     echo "Rerun with --confirm yes to apply."
     return 0
   fi
   ui_header "SIMAI ENV · Restore data backup"
-  if [[ -f "${dir}/db.sql.gz" && -n "$db_name" ]]; then
+  if [[ "$do_db" == yes ]]; then
     db_validate_db_name "$db_name" || return 1
-    local safety
-    safety="$(dirname "$dir")/pre-restore-$(date +%Y%m%d-%H%M%S).sql.gz"
-    local engine
+    # The current state becomes an ordinary backup next to the restored one,
+    # so it can be restored back the same way; nothing is pruned meanwhile.
+    info "Backing up the current database before the restore"
+    BACKUP_DATA_NO_PRUNE=1 backup_data_handler --domain "$domain" --dest "$(dirname "$(dirname "$dir")")" \
+      --db yes --files no || { error "Backup of the current state failed; nothing restored"; return 1; }
+    local engine rc=0
     engine=$(site_db_engine "$domain")
-    backup_data_dump_db "$db_name" "$safety" "$engine" || { error "Safety dump failed; nothing restored"; return 1; }
-    chmod 0600 "$safety"
-    info "Safety dump of current database: ${safety}"
-    local rc=0
+    [[ "$engine" == pgsql ]] || mysql_root_detect_cli || return 1
     if [[ "$engine" == pgsql ]]; then
       pgsql_restore_gz "$db_name" "${dir}/db.sql.gz" || rc=$?
     elif [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
@@ -348,12 +406,12 @@ backup_data_restore_handler() {
       gzip -dc "${dir}/db.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$db_name" 2>>"$LOG_FILE" || rc=$?
     fi
     if (( rc != 0 )); then
-      error "Database import failed. Restore the previous state from ${safety}."
+      error "Database import failed. Restore the backup taken just before it to return to the previous state."
       return 1
     fi
-    echo "Database ${db_name} restored"
+    echo "Database ${db_name} restored from $(basename "$dir")"
   fi
-  if [[ -f "${dir}/files.tar.gz" ]]; then
+  if [[ "$do_files" == yes ]]; then
     local staging
     staging="${SITE_META[root]}.restore-$(date +%Y%m%d-%H%M%S)"
     install -d -m 0750 "$staging" || return 1
@@ -365,6 +423,6 @@ backup_data_restore_handler() {
 }
 
 register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to=" "tier:advanced"
-register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "path" "restore-test=" "tier:advanced effects:read"
+register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "" "path= domain= backup= restore-test=" "tier:advanced effects:read"
 register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest=" "tier:advanced"
-register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain path" "confirm=" "tier:advanced"
+register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= confirm=" "tier:advanced"

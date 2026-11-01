@@ -1,0 +1,12 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-db-list.owner-demo",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-databases/1",
+    "databases": []
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

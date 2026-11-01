@@ -166,6 +166,67 @@ job_ok null "$(creq null site:remove '{"domain":"new.test","remove-files":"yes"}
 [[ -f /etc/nginx/sites-available/new.test.conf ]] && bad "site still configured" || ok "site removed"
 job_ok null "$(creq null owner:remove '{"name":"beta"}')" && ok "owner remove job" || bad "owner remove"
 
+# Stage 9: capabilities, metrics, PHP, backups, databases and a log filter.
+a=$(gate "$(req null self:describe '{}')")
+[[ "$(field '"self:metrics" in d["data"]["gate"]["commands"] and "backup:data-restore" in d["data"]["gate"]["commands"]' <<<"$a")" == True ]] && ok "the gate lists its commands" || bad "gate commands: $(field 'd["data"].get("gate")' <<<"$a")"
+a=$(gate "$(req '"acme"' self:describe '{}')")
+[[ "$(field '"self:metrics" not in d["data"]["gate"]["commands"] and "site:php-ini-set" in d["data"]["gate"]["commands"]' <<<"$a")" == True ]] && ok "an owner's list leaves out admin commands" || bad "owner gate commands"
+a=$(gate "$(req null self:metrics '{}')")
+[[ "$(field 'd["data"]["cpu"]["cores"] > 0 and d["data"]["memory"]["total_bytes"] > 0 and len(d["data"]["disk"]) > 0' <<<"$a")" == True ]] && ok "server metrics" || bad "metrics: ${a:0:300}"
+refused not_allowed "$(req '"acme"' self:metrics '{}')" "owner reads host metrics"
+a=$(gate "$(req '"acme"' php:extensions '{"php":"8.3"}')")
+[[ "$(field '{e["name"]: e["enabled"] for e in d["data"]["extensions"]}.get("mbstring")' <<<"$a")" == True ]] && ok "PHP extensions" || bad "extensions: ${a:0:300}"
+
+service mysql start >/dev/null 2>&1 || true
+cli site add --domain db.test --profile generic --php 8.3 --create-db yes --owner acme --confirm yes >/dev/null 2>&1
+dbn=$(sed -n 's/^DB_NAME=//p' /etc/simai-env/sites/db.test/db.env)
+mysql -uroot -e "CREATE TABLE \`${dbn}\`.t (id INT PRIMARY KEY); INSERT INTO \`${dbn}\`.t VALUES (1);"
+rows() { mysql -uroot -N -e "SELECT COUNT(*) FROM \`${dbn}\`.t"; }
+
+[[ "$(gate "$(req '"acme"' site:php-ini-set '{"domain":"db.test","name":"memory_limit","value":"256M"}')" | field 'd["kind"]')" == plan ]] && ok "php ini plan" || bad "php ini plan"
+job_ok '"acme"' "$(creq '"acme"' site:php-ini-set '{"domain":"db.test","name":"memory_limit","value":"256M"}')" && ok "owner sets a PHP setting" || bad "php-ini-set job"
+a=$(gate "$(req '"acme"' site:php-ini-list '{"domain":"db.test"}')")
+[[ "$(field 'd["data"]["settings"] == [{"key": "memory_limit", "value": "256M", "source": "site"}] and "upload_max_filesize" in d["data"]["editable"]' <<<"$a")" == True ]] && ok "PHP settings listed" || bad "php-ini-list: ${a:0:300}"
+grep -q 'php_admin_value\[memory_limit\] = 256M' /etc/php/8.3/fpm/pool.d/db-test.conf && ok "the setting reached the pool" || bad "pool: $(grep -c memory_limit /etc/php/8.3/fpm/pool.d/db-test.conf 2>&1)"
+refused invalid_argument "$(req '"acme"' site:php-ini-set '{"domain":"db.test","name":"open_basedir","value":"/"}')" "a PHP setting outside the list"
+refused invalid_argument "$(req '"acme"' site:php-ini-set '{"domain":"db.test","name":"memory_limit","value":"99G"}')" "a value outside the rule"
+job_ok '"acme"' "$(creq '"acme"' site:php-ini-unset '{"domain":"db.test","name":"memory_limit"}')" && ok "owner removes a PHP setting" || bad "php-ini-unset job"
+[[ "$(gate "$(req '"acme"' site:php-ini-list '{"domain":"db.test"}')" | field 'd["data"]["settings"]')" == "[]" ]] && ok "no PHP settings left" || bad "php-ini-list after unset"
+
+job_ok '"acme"' "$(creq '"acme"' backup:data '{"domain":"db.test","files":"no"}')" && ok "database backup" || bad "db backup"
+bk=$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')" | field 'd["data"]["backups"]["items"][0]["path"].rsplit("/", 1)[1]')
+[[ "$(gate "$(req '"acme"' backup:data-verify "{\"domain\":\"db.test\",\"backup\":\"${bk}\"}")" | field 'd["kind"]')" == plan ]] && ok "verify plan" || bad "verify plan"
+a=$(gate "$(creq '"acme"' backup:data-verify "{\"domain\":\"db.test\",\"backup\":\"${bk}\"}")"); j=$(field 'd["job_id"]' <<<"$a")
+[[ "$(wait_job '"acme"' "$j")" == succeeded ]] && gate "$(req '"acme"' job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"])' | grep -q 'PASS restore test' && ok "verify with a restore test" || bad "verify job"
+sleep 1; mysql -uroot -e "INSERT INTO \`${dbn}\`.t VALUES (2);"
+a=$(gate "$(req '"acme"' backup:data-restore "{\"domain\":\"db.test\",\"backup\":\"${bk}\",\"files\":\"no\"}")")
+[[ "$(field 'd["kind"]' <<<"$a")" == plan ]] && ok "restore plan" || bad "restore plan: $a"
+job_ok '"acme"' "$(creq '"acme"' backup:data-restore "{\"domain\":\"db.test\",\"backup\":\"${bk}\",\"files\":\"no\"}")" && ok "restore job" || bad "restore job"
+[[ "$(rows)" == 1 ]] && ok "the database is back to the backup" || bad "rows after restore: $(rows)"
+[[ "$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')" | field 'len(d["data"]["backups"]["items"])')" == 2 ]] && ok "the state before the restore is a new backup" || bad "safety backup not listed"
+refused invalid_argument "$(req '"acme"' backup:data-restore '{"domain":"db.test","backup":"../x"}')" "bad backup name"
+refused owner_scope "$(req '"acme"' backup:data-restore "{\"domain\":\"open.test\",\"backup\":\"${bk}\"}")" "owner restores another site"
+job_ok '"acme"' "$(creq '"acme"' backup:data-schedule '{"domain":"db.test","time":"02:30","keep":"14"}')" && ok "backup schedule job" || bad "schedule job"
+[[ "$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')" | field 'd["data"]["backups"]["schedule"]["time"] + "/" + d["data"]["backups"]["schedule"]["keep"]')" == "02:30/14" ]] && ok "the schedule is in the site card" || bad "schedule"
+refused invalid_argument "$(req '"acme"' backup:data-schedule '{"domain":"db.test","keep":"365"}')" "keep beyond 90"
+
+a=$(gate "$(req null db:list '{}')")
+[[ "$(field '[(x["engine"], isinstance(x["size_bytes"], int)) for x in d["data"]["databases"] if x["site"] == "db.test"]' <<<"$a")" == "[('mysql', True)]" ]] && ok "database list" || bad "db:list: ${a:0:300}"
+a=$(gate "$(req '"acme"' db:list '{}')")
+[[ "$(field 'sorted({x["site"] for x in d["data"]["databases"]})' <<<"$a")" == "['db.test']" ]] && ok "owner sees only own databases" || bad "owner db:list: ${a:0:300}"
+grep -qi pass <<<"$a" && bad "database list mentions a password" || ok "no passwords in the database list"
+envf=/home/simai/www/db.test/.env; before=$(stat -c '%U:%G %a' "$envf" 2>/dev/null)
+job_ok '"acme"' "$(creq '"acme"' site:db-rotate '{"domain":"db.test"}')" && ok "owner rotates the database password" || bad "db-rotate job"
+newpass=$(sed -n 's/^DB_PASS=//p' /etc/simai-env/sites/db.test/db.env)
+grep -q "^DB_PASSWORD=\"\{0,1\}${newpass}" "$envf" && ok "the new password is in .env" || bad "env not updated"
+[[ -z "$before" || "$(stat -c '%U:%G %a' "$envf")" == "$before" ]] && ok ".env keeps its owner" || bad ".env owner: $before -> $(stat -c '%U:%G %a' "$envf")"
+grep -rqF -- "$newpass" /var/lib/simai-env/panel-jobs /var/log/simai-panel-gate.log && bad "the password leaked into a log" || ok "the password is in no job log"
+
+curl -s -o /dev/null -H 'Host: open.test' http://127.0.0.1/needle-9 >/dev/null
+a=$(gate "$(req null logs:nginx '{"domain":"open.test","match":"needle-9"}')")
+[[ "$(field 'len(d["data"]["lines"]) >= 1 and all("needle-9" in l for l in d["data"]["lines"])' <<<"$a")" == True ]] && ok "log filter" || bad "log match: ${a:0:300}"
+refused invalid_argument "$(req null logs:nginx '{"domain":"open.test","match":"a\nb"}')" "log filter with a new line"
+
 # Site answers, disk and the last backup in one self:describe (stage 2 list).
 cli self status-refresh --confirm yes >/dev/null 2>&1 && ok "self status-refresh" || bad "status-refresh"
 a=$(gate "$(req null self:describe '{}')")

@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-php-ini-unset",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:php-ini-unset",
+    "args": {
+      "domain": "demo-owned.test",
+      "name": "memory_limit"
+    },
+    "target": "demo-owned.test",
+    "description": "Remove per-site PHP ini override",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

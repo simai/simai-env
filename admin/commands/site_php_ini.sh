@@ -186,6 +186,15 @@ site_php_ini_list_handler() {
   require_site_exists "$domain" || return 1
   local entries=()
   mapfile -t entries < <(read_site_php_ini_overrides "$domain")
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    printf '%s\n' "${entries[@]}" | python3 -c '
+import json, sys
+rows = [l.rstrip("\n").split("|", 1) for l in sys.stdin if "|" in l]
+json.dump({"schema": "simai-php-ini/1", "domain": sys.argv[1],
+           "settings": [{"key": k, "value": v, "source": "site"} for k, v in sorted(rows)]}, sys.stdout)
+print()' "$domain"
+    return 0
+  fi
   if [[ ${#entries[@]} -eq 0 ]]; then
     info "No overrides set for ${domain}"
     return 0

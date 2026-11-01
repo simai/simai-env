@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.backup-data-schedule",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "backup:data-schedule",
+    "args": {
+      "domain": "demo-php.test",
+      "time": "03:30",
+      "keep": "14"
+    },
+    "target": "demo-php.test",
+    "description": "Enable or disable the daily data backup for a site",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

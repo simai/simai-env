@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.backup-data-verify",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "backup:data-verify",
+    "args": {
+      "domain": "demo-php.test",
+      "backup": "20260101-000000"
+    },
+    "target": "demo-php.test",
+    "description": "Verify a data backup (checksums, archives, optional restore test)",
+    "effects": "write",
+    "lock": "none",
+    "applied": false
+  }
+}

@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.26.1",
+      "version": "1.27.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -57,7 +57,46 @@
           "checked_at": "2026-01-01T00:00:00Z"
         }
       }
-    ]
+    ],
+    "gate": {
+      "commands": [
+        "backup:data",
+        "backup:data-restore",
+        "backup:data-schedule",
+        "backup:data-verify",
+        "cron:add",
+        "cron:remove",
+        "db:list",
+        "job:cancel",
+        "job:list",
+        "job:log",
+        "job:status",
+        "logs:nginx",
+        "php:extensions",
+        "queue:restart",
+        "self:commands",
+        "self:describe",
+        "site:add",
+        "site:db-create",
+        "site:db-drop",
+        "site:db-rotate",
+        "site:deploy",
+        "site:deploy-rollback",
+        "site:describe",
+        "site:doctor",
+        "site:php-ini-list",
+        "site:php-ini-set",
+        "site:php-ini-unset",
+        "site:redirect-add",
+        "site:redirect-remove",
+        "site:remove",
+        "site:service-restart",
+        "site:set-php",
+        "ssl:letsencrypt",
+        "ssl:remove",
+        "ssl:renew"
+      ]
+    }
   },
   "command_status": "success",
   "operation_id": "fixture"

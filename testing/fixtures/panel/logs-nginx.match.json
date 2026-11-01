@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-logs-nginx.match",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-log-tail/1",
+    "domain": "demo-static.test",
+    "kind": "access",
+    "file": "/var/log/nginx/demo-static-test.access.log",
+    "lines": [
+      "127.0.0.1 - - [01/Jan/2026:00:00:00 +0000] \"GET / HTTP/1.1\" 200 21 \"-\" \"curl/8.5.0\"",
+      "127.0.0.1 - - [01/Jan/2026:00:00:00 +0000] \"GET / HTTP/1.1\" 200 21 \"-\" \"simai-site-status\""
+    ],
+    "match": "GET"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

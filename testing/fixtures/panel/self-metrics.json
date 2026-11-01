@@ -1,0 +1,33 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-self-metrics",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-host-metrics/1",
+    "cpu": {
+      "cores": 2,
+      "load1": 0.1,
+      "load5": 0.1,
+      "load15": 0.1
+    },
+    "memory": {
+      "total_bytes": 4294967296,
+      "used_bytes": 1073741824
+    },
+    "swap": {
+      "total_bytes": 0,
+      "used_bytes": 0
+    },
+    "disk": [
+      {
+        "mount": "/",
+        "total_bytes": 42949672960,
+        "used_bytes": 10737418240
+      }
+    ],
+    "checked_at": "2026-01-01T00:00:00Z"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

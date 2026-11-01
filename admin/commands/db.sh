@@ -240,7 +240,41 @@ db_status_handler() {
   fi
 }
 
+# Site databases as JSON: name, engine, site, size and user; never passwords.
+db_list_json() {
+  local domain entry name user engine size
+  for domain in $(list_sites); do
+    name="" user=""
+    while IFS= read -r entry; do
+      case "${entry%%|*}" in
+        DB_NAME) name="${entry#*|}" ;;
+        DB_USER) user="${entry#*|}" ;;
+      esac
+    done < <(read_site_db_env "$domain" 2>/dev/null || true)
+    [[ -n "$name" ]] && db_validate_db_name "$name" 2>/dev/null || continue
+    engine=$(site_db_engine "$domain")
+    if [[ "$engine" == pgsql ]]; then
+      size=$(pgsql_query "SELECT pg_database_size('${name}')" 2>/dev/null || true)
+    else
+      size=$(mysql_root_query_stdin "SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema='${name}';" 2>/dev/null || true)
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$domain" "$name" "$engine" "$user" "${size//[^0-9]/}"
+  done | python3 -c '
+import json, sys
+rows = []
+for line in sys.stdin:
+    site, name, engine, user, size = line.rstrip("\n").split("\t")
+    rows.append({"name": name, "engine": engine, "site": site, "size_bytes": int(size) if size else None,
+                 "users": [user] if user else []})
+json.dump({"schema": "simai-databases/1", "databases": rows}, sys.stdout)
+print()'
+}
+
 db_list_handler() {
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    db_list_json
+    return
+  fi
   ui_header "SIMAI ENV · Database list"
   if ! mysql_root_detect_cli; then
     return 1

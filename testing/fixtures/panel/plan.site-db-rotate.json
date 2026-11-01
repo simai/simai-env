@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-db-rotate",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:db-rotate",
+    "args": {
+      "domain": "demo-php.test"
+    },
+    "target": "demo-php.test",
+    "description": "Rotate DB user password for a site",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

@@ -31,6 +31,33 @@ php_list_handler() {
   printf "%s\n" "$border"
 }
 
+# Extensions PHP-FPM of one version loads, and the packaged ones it does not.
+php_extensions_handler() {
+  parse_kv_args "$@"
+  local php_version="${PARSED_ARGS[php]:-}"
+  require_args "php" || return 1
+  [[ "$php_version" =~ ^[5-9]\.[0-9]$ && -d "/etc/php/${php_version}" ]] || { error "PHP ${php_version} is not installed"; return 1; }
+  local fpm="/usr/sbin/php-fpm${php_version}"
+  [[ -x "$fpm" ]] || { error "php-fpm${php_version} not found"; return 1; }
+  "$fpm" -m 2>/dev/null | python3 -c '
+import json, os, sys
+loaded = set()
+for line in sys.stdin:
+    line = line.strip()
+    if line and not line.startswith("["):
+        loaded.add("opcache" if line == "Zend OPcache" else line.lower())
+mods = "/etc/php/%s/mods-available" % sys.argv[1]
+available = {f[:-4].lower() for f in (os.listdir(mods) if os.path.isdir(mods) else []) if f.endswith(".ini")}
+rows = [{"name": n, "enabled": n in loaded} for n in sorted(loaded | available)]
+if sys.argv[2] == "json":
+    json.dump({"schema": "simai-php-extensions/1", "php": sys.argv[1], "extensions": rows}, sys.stdout)
+    print()
+else:
+    for r in rows:
+        print("%-24s %s" % (r["name"], "enabled" if r["enabled"] else "available"))
+' "$php_version" "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
 php_reload_handler() {
   parse_kv_args "$@"
   local php_version="${PARSED_ARGS[php]:-}"
@@ -179,5 +206,6 @@ php_install_handler() {
 }
 
 register_cmd "php" "list" "List installed PHP versions and FPM status" "php_list_handler" "" "" "effects:read"
+register_cmd "php" "extensions" "List PHP-FPM extensions of a PHP version: loaded and available" "php_extensions_handler" "php" "" "effects:read"
 register_cmd "php" "reload" "Reload or restart PHP-FPM for version" "php_reload_handler" "" "php=" "menu:confirm"
 register_cmd "php" "install" "Install a PHP version (FPM/CLI + base extensions)" "php_install_handler" "" "php= include-common= confirm=" "menu:internal-confirm"

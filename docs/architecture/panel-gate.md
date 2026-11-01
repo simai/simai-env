@@ -10,7 +10,9 @@ panel, 1.23.0), stage 6 (the build installed through `site adopt` with a
 health check, `panel update`, test `panel_install_e2e`, 1.25.0), stage 7 (the
 published build pinned in `admin/panel-release.env`, `install.sh
 --with-panel`, 1.26.0), stage 8 (site answers, disk and last backup in
-the host description; `owner:block|unblock`, 1.27.0).
+the host description; `owner:block|unblock`, 1.27.0), stage 9 (restore,
+verify and schedule backups, PHP settings and extensions, server metrics,
+databases, a log filter, the command list in `self:describe`, 1.28.0).
 
 ## Installation
 
@@ -155,13 +157,28 @@ so a description never waits for sites. Each owner in `isolation.owners` has
 `blocked`, `blocked_at` and `sites_disk_bytes` (the sum of the owner's sites,
 `null` while one is not measured yet).
 
+`self:describe` also carries `gate.commands`: the commands this panel user
+may call (an owner's list leaves out administrator commands). The panel shows
+an action only when the server lists it.
+
 `site:describe` (and each site in `self:describe`) carries `certificate`:
 the names, issuer, `not_after`, `days_left` and `auto_renew` of the
 certificate nginx serves, or `null`. `site:describe` also carries `backups`:
 the daily schedule (`time`, `keep`, `dest`) and every data backup directory
 with `created_at`, `size_bytes`, `parts` (`db`, `files`, `config`),
 `checksums` and `encrypted`. `logs:nginx {domain, kind: access|error,
-lines: 1-1000}` answers `simai-log-tail/1` with the last lines.
+lines: 1-1000, match}` answers `simai-log-tail/1` with the last lines; with
+`match` (a fixed string, printable ASCII, up to 200 characters) the last
+matching lines among the last 20000 lines of the file.
+
+Stage 9 reads:
+
+| Command | Answer |
+| --- | --- |
+| `self:metrics` | `simai-host-metrics/1`: `cpu {cores, load1, load5, load15}`, `memory` and `swap` `{total_bytes, used_bytes}`, `disk [{mount, total_bytes, used_bytes}]`, `checked_at`; administrator only |
+| `php:extensions {php}` | `simai-php-extensions/1`: `extensions [{name, enabled}]`, from what PHP-FPM of that version loads and the packaged ones it does not |
+| `site:php-ini-list {domain}` | `simai-php-ini/1`: `settings [{key, value, source: site}]`, the site's own settings, and `editable`: the keys the panel may set |
+| `db:list` | `simai-databases/1`: `databases [{name, engine, site, size_bytes, users}]` of the sites; an owner gets only their sites' databases; no host, no passwords |
 
 ## Actions and jobs
 
@@ -183,6 +200,28 @@ human output and exit code are in `/var/lib/simai-env/panel-jobs/<job_id>/`
 | `job:list` | the last 100 jobs |
 
 An owner sees and controls only jobs started as that owner.
+
+Stage 9 actions:
+
+- `backup:data-restore {domain, backup, db, files}`: `backup` is a backup
+  name (the last part of a `backups.items[].path`). The job verifies the
+  backup, then backs up the current database as a new, ordinary backup (it
+  shows in `backups` and can be restored the same way; nothing is pruned),
+  then replaces the database. Files are extracted next to the site
+  (`<root>.restore-<time>`) for review; the live files are not replaced.
+- `backup:data-verify {domain, backup}`: checksums, archives and a restore
+  test of the dump into a scratch database; the result is the job state and
+  the `PASS` lines of `job:log`.
+- `backup:data-schedule {domain, enabled, time, keep: 1-90}`. A manual
+  `backup:data` keeps as many backups as the schedule does.
+- `site:php-ini-set {domain, name, value}` and `site:php-ini-unset {domain,
+  name}`: only the keys in `editable`, each with its own value rule (sizes
+  like `256M`, seconds, `on|off`, a time zone); the setting is applied to the
+  site's pool at once.
+- `site:db-rotate {domain}`: a new database password, written only to the
+  site's `.env` (which keeps its owner) and `db.env`; a cached Laravel config
+  is rebuilt and workers restart. The password is never in an answer or a
+  log. A database dump to keep is `backup:data {domain, files: no}`.
 
 ## Allowlist
 
@@ -209,7 +248,11 @@ action, job). Everything else is refused.
 - stage 8 (1.27.0): `owner:block {name}`, `owner:unblock {name}`. Blocking
   expires the owner's account (SSH and SFTP stop, open sessions end) and
   refuses every request made as that owner (`owner_blocked`); the owner's
-  sites keep serving.
+  sites keep serving;
+- stage 9 (1.28.0): `backup:data-restore`, `backup:data-verify`,
+  `backup:data-schedule`, `php:extensions`, `site:php-ini-list`,
+  `site:php-ini-set`, `site:php-ini-unset`, `site:db-rotate`, `db:list`,
+  `self:metrics` (administrator only), `logs:nginx` with `match`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -224,7 +267,8 @@ Interactive and operator-only commands (menus, `self bootstrap`,
 `testing/fixtures/panel/` holds gateway answers recorded from the local
 stand (`testing/stand/stand.sh record`): host description (also an owner's
 view), command registry, `site describe` and `site doctor` for demo sites,
-and two refusals. The panel's fixture driver replays them, and
+plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
+refusal per site action of stage 9. Set 5 since 1.28.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

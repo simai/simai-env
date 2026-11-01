@@ -1,0 +1,29 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-php-ini-list.demo-owned.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-php-ini/1",
+    "domain": "demo-owned.test",
+    "settings": [],
+    "editable": [
+      "date.timezone",
+      "default_socket_timeout",
+      "display_errors",
+      "log_errors",
+      "max_execution_time",
+      "max_file_uploads",
+      "max_input_time",
+      "max_input_vars",
+      "memory_limit",
+      "output_buffering",
+      "post_max_size",
+      "session.gc_maxlifetime",
+      "short_open_tag",
+      "upload_max_filesize"
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

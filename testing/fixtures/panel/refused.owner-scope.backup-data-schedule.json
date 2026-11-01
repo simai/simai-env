@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.owner-scope.backup-data-schedule",
+  "status": "refused",
+  "reason": "owner_scope"
+}

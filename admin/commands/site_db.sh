@@ -264,6 +264,29 @@ site_db_drop_handler() {
   echo "Database resources dropped for ${domain}"
 }
 
+site_db_run_as() {
+  local user="$1" dir="$2"
+  shift 2
+  sudo -u "$user" -H bash -c 'cd "$1" && shift && exec "$@"' _ "$dir" "$@"
+}
+
+# A Laravel config cache keeps the old password: rebuild it, then let workers
+# reconnect.
+site_db_rotate_reload_app() {
+  local domain="$1" root="$2" app user php_bin
+  app="$root"
+  [[ -L "${root}/current" ]] && app="${root}/current"
+  [[ -f "${app}/artisan" ]] || return 0
+  user=$(site_effective_user "${SITE_META[project]:-$(project_slug_from_domain "$domain")}")
+  php_bin=$(resolve_php_bin "${SITE_META[php]:-}")
+  [[ -n "$user" && -n "$php_bin" ]] || return 0
+  if [[ -f "${app}/bootstrap/cache/config.php" ]]; then
+    site_db_run_as "$user" "$app" "$php_bin" artisan config:cache >>"$LOG_FILE" 2>&1 \
+      || warn "config:cache failed; run it as ${user} to use the new password"
+  fi
+  site_db_run_as "$user" "$app" "$php_bin" artisan queue:restart >>"$LOG_FILE" 2>&1 || true
+}
+
 site_db_rotate_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -365,8 +388,15 @@ site_db_rotate_handler() {
     export_choice=$(select_from_list "Update project .env with the new password?" "yes" "yes" "no")
   fi
   if [[ "$export_choice" == "yes" ]]; then
+    local env_owner=""
+    [[ -f "${project_root}/.env" ]] && env_owner=$(stat -c '%U:%G %a' "${project_root}/.env")
     if site_db_export_to_env "$domain" "$project_root" ".env"; then
+      # Keep the owner the application reads .env as.
+      if [[ -n "$env_owner" ]]; then
+        chown "${env_owner% *}" "${project_root}/.env" && chmod "${env_owner##* }" "${project_root}/.env"
+      fi
       echo "Project .env updated: ${project_root}/.env"
+      site_db_rotate_reload_app "$domain" "$project_root"
     else
       error "Password rotated, but failed to update ${project_root}/.env; the application cannot connect until it is updated."
       return 1

@@ -46,6 +46,7 @@ logs_nginx_handler() {
   local domain="${PARSED_ARGS[domain]:-}"
   local kind="${PARSED_ARGS[kind]:-access}"
   local lines="${PARSED_ARGS[lines]:-$LOGS_DEFAULT_LINES}"
+  local match="${PARSED_ARGS[match]:-}"
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "$domain" ]]; then
     mapfile -t _sites < <(list_sites)
@@ -84,12 +85,22 @@ logs_nginx_handler() {
   fi
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
     [[ "$lines" =~ ^[0-9]+$ ]] && (( lines >= 1 && lines <= 1000 )) || { error "--lines must be 1-1000"; return 1; }
-    tail -n "$lines" "$file" | python3 -c '
+    # With --match: the last matching lines (fixed string) among the last
+    # LOGS_MATCH_SCAN lines of the file.
+    if [[ -n "$match" ]]; then
+      tail -n "${LOGS_MATCH_SCAN:-20000}" "$file" | { grep -F -- "$match" || true; } | tail -n "$lines"
+    else
+      tail -n "$lines" "$file"
+    fi | python3 -c '
 import json, sys
 rows = [l.rstrip("\n") for l in sys.stdin.buffer.read().decode("utf-8", "replace").splitlines()]
 json.dump({"schema": "simai-log-tail/1", "domain": sys.argv[1], "kind": sys.argv[2], "file": sys.argv[3],
-           "lines": rows}, sys.stdout, ensure_ascii=False)
-print()' "$domain" "$kind" "$file"
+           "lines": rows, **({"match": sys.argv[4]} if sys.argv[4] else {})}, sys.stdout, ensure_ascii=False)
+print()' "$domain" "$kind" "$file" "$match"
+    return 0
+  fi
+  if [[ -n "$match" ]]; then
+    tail -n "${LOGS_MATCH_SCAN:-20000}" "$file" | { grep -F -- "$match" || true; } | tail -n "$lines"
     return 0
   fi
   logs_tail_file "$file" "$lines"
@@ -98,5 +109,5 @@ print()' "$domain" "$kind" "$file"
 register_cmd "logs" "admin" "Tail simai-admin log" "logs_admin_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
 register_cmd "logs" "env" "Tail installer log" "logs_env_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
 register_cmd "logs" "audit" "Tail audit log" "logs_audit_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
-register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=\${LOGS_DEFAULT_LINES}" "effects:read"
+register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=\${LOGS_DEFAULT_LINES} match=" "effects:read"
 register_cmd "logs" "letsencrypt" "Tail Let's Encrypt log" "logs_letsencrypt_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"

@@ -1,10 +1,18 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 4,
+  "set_version": 5,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.26.1",
+  "simai_env": "1.28.0",
   "files": {
+    "db-list.json": {
+      "sha256": "3b4b486e888f2683b8c96262731ee000faa7e8e5d1b326fba8243a6cf93d71bc",
+      "status": "ok"
+    },
+    "db-list.owner-demo.json": {
+      "sha256": "cfa14c916cc5c718987d410161e987db36bcc126e91a405e4247505a9cff048e",
+      "status": "ok"
+    },
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
       "status": "ok"
@@ -19,6 +27,26 @@
     },
     "logs-nginx.demo-static.test.json": {
       "sha256": "0b63a27ac6674b67521c4171c24504fd65d9b1fa3c72f4770ba979f998f77373",
+      "status": "ok"
+    },
+    "logs-nginx.match.json": {
+      "sha256": "53510436eff73f579e59f80f1e53f020afb6a3cdae906afe904f2b9e7428c629",
+      "status": "ok"
+    },
+    "php-extensions.json": {
+      "sha256": "dc5506aa56ad97d4167c8a41520e9d5612de7f502c4a08f0078f55c3efc6b90d",
+      "status": "ok"
+    },
+    "plan.backup-data-restore.json": {
+      "sha256": "64850d8b5a574f515eb6597b24ed4764d0034b67546d18cada02f8a4f7fa7c7e",
+      "status": "ok"
+    },
+    "plan.backup-data-schedule.json": {
+      "sha256": "98c5060700ab976bd73d8c4f03bd0e54395384d1f68c2619649d87f4627b9170",
+      "status": "ok"
+    },
+    "plan.backup-data-verify.json": {
+      "sha256": "e56d4bea0092df1a83c351de4e7aa9fb09fe9367756aced6fb714f686a2f0507",
       "status": "ok"
     },
     "plan.backup-data.json": {
@@ -41,13 +69,29 @@
       "sha256": "a74e86ae7c087d56e255eeb571da5a2c32d7c09cd220e76e86eaeca7775bfb13",
       "status": "ok"
     },
+    "plan.site-db-rotate.json": {
+      "sha256": "4aee0d8a00a05d8b77beb33eeebc735f7af8b6ea2e382dacdbc1389a029c1ba7",
+      "status": "ok"
+    },
     "plan.site-deploy-git.json": {
       "sha256": "a0f0072af2d932ef9aa66a204d390730d5dc10179a2bb8cfffd34eb8704fc691",
+      "status": "ok"
+    },
+    "plan.site-php-ini-set.json": {
+      "sha256": "4f6905de9dfb1673dae4ee0ee2859adef893e5fed7a0f9a4f0f864dacea9b3b3",
+      "status": "ok"
+    },
+    "plan.site-php-ini-unset.json": {
+      "sha256": "13646cc19a15c2a2560953f99decb0a147160d6f2f71a37805478bd462b3a5cc",
       "status": "ok"
     },
     "plan.site-set-php.json": {
       "sha256": "aba65c453fa369808e07962f3ee4e36c7da14285b2404e6cf5bd12c131f9e9dc",
       "status": "ok"
+    },
+    "refused.invalid-argument.php-ini-key.json": {
+      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
     },
     "refused.not-allowed.json": {
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
@@ -57,20 +101,56 @@
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
       "status": "refused"
     },
+    "refused.owner-admin-only.metrics.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-scope.backup-data-restore.json": {
+      "sha256": "f0bcf18193ff06fc3c1c216ff621ebc411b38643e2d0b04472748590536b4a3c",
+      "status": "refused"
+    },
+    "refused.owner-scope.backup-data-schedule.json": {
+      "sha256": "a4b261d95f496c42a2e37f5967aa8977ef8f27b62f4d21a9fb7e98c4aa952363",
+      "status": "refused"
+    },
+    "refused.owner-scope.backup-data-verify.json": {
+      "sha256": "4d91b0970ded72bdd8b7a96aae379f289917d455a9605463f0ab2920c7b20976",
+      "status": "refused"
+    },
     "refused.owner-scope.json": {
       "sha256": "e8d9aba7b4164fefc3e9b0aabd3c95973f080127a553a41b230c273537d7a12c",
       "status": "refused"
     },
+    "refused.owner-scope.site-db-rotate.json": {
+      "sha256": "6c757a2388d73453c32299b66920ebde638ba4f900e9972e3445daf07015f0e2",
+      "status": "refused"
+    },
+    "refused.owner-scope.site-php-ini-list.json": {
+      "sha256": "96de89c80b1fc7b883ae8156cc8073fe69faacf8ecf7bf184338c1b7b2e81d90",
+      "status": "refused"
+    },
+    "refused.owner-scope.site-php-ini-set.json": {
+      "sha256": "15d012b12e1a015037ddc2d3ae47297a105f7de451e48fddc62342001e5ffdd3",
+      "status": "refused"
+    },
+    "refused.owner-scope.site-php-ini-unset.json": {
+      "sha256": "32349f5549a1065851173f70516008b6c1db48a50462d0df320db0ade8d709b9",
+      "status": "refused"
+    },
     "self-commands.json": {
-      "sha256": "d3573b43b044ee98f11917fbb55cc02929eee3328317602207d5b8a98ba106e0",
+      "sha256": "d42edac06d2c7933702e8ff803a600e029ae9af16055e241bb6db193f21e39f3",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "e8b9b78b7deccb5ec6373aa623c636c01457d13a129b70b7ec7f6fff8aed241e",
+      "sha256": "fe4a822af676f36d271889b4c69390eb09fd1a231f8ca9f9e2b03025f329ba8e",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "978c6051b5e3e118ec68765f5e6eaa7f9dbd9e8c9232a4d3937149e3e5d5a615",
+      "sha256": "810f07519faca481f0230d7bd96f67c8c949a9a685347cf763ad3668b9c79a91",
+      "status": "ok"
+    },
+    "self-metrics.json": {
+      "sha256": "674e2b649363107a7afd72ba73a5ea3edd5e323ac134318acab7c538c027ecf6",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {
@@ -78,7 +158,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "a3058ae78bd1ea270c53f5a2ab1bf7925351c0d4f3bd927fee53c3533d9860d7",
+      "sha256": "8da7f8f90fbdc8b461fe6decc2c9232952f78a791d0d1b81d5b27cd89a913840",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -86,7 +166,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "c990a9b521ff2ab3260368b68bfb33b11980cba97b80dcdc3fdc8a089864edf7",
+      "sha256": "6f3d390ec99caf7916aafaa18a77a44d986e0734e465cb481c472f15da063953",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {
@@ -103,6 +183,10 @@
     },
     "site-doctor.demo-static.test.json": {
       "sha256": "aed260e50358996ddd6503d4a53034a68588b4062c1208d9f82cf817e3854387",
+      "status": "ok"
+    },
+    "site-php-ini-list.demo-owned.test.json": {
+      "sha256": "be563e6373e550268cc109dbe98b26bcb0a7dc775abb876a0ea7eb2f9a49f12e",
       "status": "ok"
     }
   }

@@ -1,0 +1,22 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-db-list",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-databases/1",
+    "databases": [
+      {
+        "name": "demo_php_test",
+        "engine": "mysql",
+        "site": "demo-php.test",
+        "size_bytes": 16384,
+        "users": [
+          "demo_php_test"
+        ]
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

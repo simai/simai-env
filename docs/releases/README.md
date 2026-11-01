@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.28.0](v1.28.0.md) — backups, PHP settings, server metrics and
+  databases in the panel gateway.
 - [v1.27.0](v1.27.0.md) — site answers, disk and last backup in the host
   description; blocking owners.
 - [v1.26.1](v1.26.1.md) — the panel installs on a new server; the installer

@@ -78,8 +78,14 @@ self_ai_catalog_handler() {
   self_commands_handler | python3 "${SIMAI_ENV_ROOT}/lib/ai_catalog.py" "$(cat "${SIMAI_ENV_ROOT}/VERSION")"
 }
 
+self_metrics_handler() {
+  parse_kv_args "$@"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/host_metrics.py" "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
 register_cmd "self" "describe" "Describe this host for humans and AI agents (JSON)" "self_describe_handler" "" "" "tier:advanced effects:read"
 register_cmd "site" "describe" "Describe one site: layout, database, workers, how-to (JSON)" "site_describe_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "self" "commands" "List every command with its options (JSON)" "self_commands_handler" "" "" "tier:advanced effects:read"
+register_cmd "self" "metrics" "Show current CPU load, memory, swap and disk use" "self_metrics_handler" "" "" "tier:advanced effects:read"
 register_cmd "self" "status-refresh" "Check whether sites answer and measure their disk use, for self describe" "self_status_refresh_handler" "" "" "tier:advanced lock:none"
 register_cmd "self" "ai-catalog" "Generate AI First 1.0.0 discovery for the read-only pilot (JSON)" "self_ai_catalog_handler" "" "" "tier:advanced effects:read"

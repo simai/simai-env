@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-php-ini-set",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:php-ini-set",
+    "args": {
+      "domain": "demo-owned.test",
+      "name": "memory_limit",
+      "value": "256M"
+    },
+    "target": "demo-owned.test",
+    "description": "Set per-site PHP ini override (stored; optional apply)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

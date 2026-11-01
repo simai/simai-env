@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=4
+FIXTURE_SET=5
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -99,6 +99,8 @@ record() {
   in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
   # The site answers show one backup, also on a freshly created stand.
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
+  local bk
+  bk=$(in_stand bash -c 'ls -1 /var/backups/simai/demo-php.test | grep -E "^[0-9]{8}-[0-9]{6}$" | tail -n1')
   # name, owner (JSON), command, args (JSON)
   local -a requests=(
     "self-describe|null|self:describe|{}"
@@ -115,7 +117,30 @@ record() {
     "plan.owner-block|null|owner:block|{\"name\":\"demo\"}"
     "plan.site-add-laravel|null|site:add|{\"domain\":\"app.test\",\"profile\":\"laravel\"}"
     "logs-nginx.demo-static.test|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\"}"
+    "logs-nginx.match|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\",\"match\":\"GET\"}"
+    "self-metrics|null|self:metrics|{}"
+    "refused.owner-admin-only.metrics|\"demo\"|self:metrics|{}"
+    "php-extensions|null|php:extensions|{\"php\":\"${PHP}\"}"
+    "site-php-ini-list.demo-owned.test|\"demo\"|site:php-ini-list|{\"domain\":\"demo-owned.test\"}"
+    "plan.site-php-ini-set|\"demo\"|site:php-ini-set|{\"domain\":\"demo-owned.test\",\"name\":\"memory_limit\",\"value\":\"256M\"}"
+    "plan.site-php-ini-unset|\"demo\"|site:php-ini-unset|{\"domain\":\"demo-owned.test\",\"name\":\"memory_limit\"}"
+    "refused.invalid-argument.php-ini-key|\"demo\"|site:php-ini-set|{\"domain\":\"demo-owned.test\",\"name\":\"open_basedir\",\"value\":\"/\"}"
+    "db-list|null|db:list|{}"
+    "db-list.owner-demo|\"demo\"|db:list|{}"
+    "plan.site-db-rotate|null|site:db-rotate|{\"domain\":\"demo-php.test\"}"
+    "plan.backup-data-restore|null|backup:data-restore|{\"domain\":\"demo-php.test\",\"backup\":\"${bk}\",\"files\":\"no\"}"
+    "plan.backup-data-verify|null|backup:data-verify|{\"domain\":\"demo-php.test\",\"backup\":\"${bk}\"}"
+    "plan.backup-data-schedule|null|backup:data-schedule|{\"domain\":\"demo-php.test\",\"time\":\"03:30\",\"keep\":\"14\"}"
   )
+  # An owner is refused on another owner's site, for every site command.
+  local c extra
+  for c in site:php-ini-list site:php-ini-set site:php-ini-unset site:db-rotate backup:data-restore backup:data-verify backup:data-schedule; do
+    extra=""
+    [[ "$c" == site:php-ini-set ]] && extra=',"name":"memory_limit","value":"256M"'
+    [[ "$c" == site:php-ini-unset ]] && extra=',"name":"memory_limit"'
+    [[ "$c" == backup:data-restore || "$c" == backup:data-verify ]] && extra=",\"backup\":\"${bk}\""
+    requests+=("refused.owner-scope.${c/:/-}|\"demo\"|${c}|{\"domain\":\"demo-php.test\"${extra}}")
+  done
   local d
   for d in demo-static.test demo-php.test demo-owned.test demo-redirect.test; do
     requests+=("site-describe.${d}|null|site:describe|{\"domain\":\"${d}\"}")
@@ -171,6 +196,16 @@ for f in sorted(root.glob("*.json")):
     for owner in (data.get("isolation") or {}).get("owners", []):
         if owner.get("sites_disk_bytes") is not None:
             owner["sites_disk_bytes"] = 1048576 * len([s for s in sites if s.get("owner") == owner["name"]])
+    if data.get("schema") == "simai-host-metrics/1":
+        data.update(cpu={"cores": 2, "load1": 0.1, "load5": 0.1, "load15": 0.1},
+                    memory={"total_bytes": 4294967296, "used_bytes": 1073741824},
+                    swap={"total_bytes": 0, "used_bytes": 0}, checked_at="2026-01-01T00:00:00Z",
+                    disk=[{"mount": "/", "total_bytes": 42949672960, "used_bytes": 10737418240}])
+    for db in data.get("databases", []) if isinstance(data.get("databases"), list) else []:
+        if db.get("size_bytes") is not None:
+            db["size_bytes"] = 16384
+    if isinstance(data.get("args"), dict) and "backup" in data["args"]:
+        data["args"]["backup"] = "20260101-000000"
     if "job_id" in d:
         d["job_id"] = "0" * 24
     if "job_id" in data:

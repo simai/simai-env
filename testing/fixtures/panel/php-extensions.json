@@ -1,0 +1,206 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-php-extensions",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-php-extensions/1",
+    "php": "8.3",
+    "extensions": [
+      {
+        "name": "calendar",
+        "enabled": true
+      },
+      {
+        "name": "cgi-fcgi",
+        "enabled": true
+      },
+      {
+        "name": "core",
+        "enabled": true
+      },
+      {
+        "name": "ctype",
+        "enabled": true
+      },
+      {
+        "name": "curl",
+        "enabled": true
+      },
+      {
+        "name": "date",
+        "enabled": true
+      },
+      {
+        "name": "dom",
+        "enabled": true
+      },
+      {
+        "name": "exif",
+        "enabled": true
+      },
+      {
+        "name": "ffi",
+        "enabled": true
+      },
+      {
+        "name": "fileinfo",
+        "enabled": true
+      },
+      {
+        "name": "filter",
+        "enabled": true
+      },
+      {
+        "name": "ftp",
+        "enabled": true
+      },
+      {
+        "name": "gettext",
+        "enabled": true
+      },
+      {
+        "name": "hash",
+        "enabled": true
+      },
+      {
+        "name": "iconv",
+        "enabled": true
+      },
+      {
+        "name": "intl",
+        "enabled": true
+      },
+      {
+        "name": "json",
+        "enabled": true
+      },
+      {
+        "name": "libxml",
+        "enabled": true
+      },
+      {
+        "name": "mbstring",
+        "enabled": true
+      },
+      {
+        "name": "mysqli",
+        "enabled": true
+      },
+      {
+        "name": "mysqlnd",
+        "enabled": true
+      },
+      {
+        "name": "opcache",
+        "enabled": true
+      },
+      {
+        "name": "openssl",
+        "enabled": true
+      },
+      {
+        "name": "pcre",
+        "enabled": true
+      },
+      {
+        "name": "pdo",
+        "enabled": true
+      },
+      {
+        "name": "pdo_mysql",
+        "enabled": true
+      },
+      {
+        "name": "phar",
+        "enabled": true
+      },
+      {
+        "name": "posix",
+        "enabled": true
+      },
+      {
+        "name": "random",
+        "enabled": true
+      },
+      {
+        "name": "readline",
+        "enabled": true
+      },
+      {
+        "name": "reflection",
+        "enabled": true
+      },
+      {
+        "name": "session",
+        "enabled": true
+      },
+      {
+        "name": "shmop",
+        "enabled": true
+      },
+      {
+        "name": "simplexml",
+        "enabled": true
+      },
+      {
+        "name": "sockets",
+        "enabled": true
+      },
+      {
+        "name": "sodium",
+        "enabled": true
+      },
+      {
+        "name": "spl",
+        "enabled": true
+      },
+      {
+        "name": "standard",
+        "enabled": true
+      },
+      {
+        "name": "sysvmsg",
+        "enabled": true
+      },
+      {
+        "name": "sysvsem",
+        "enabled": true
+      },
+      {
+        "name": "sysvshm",
+        "enabled": true
+      },
+      {
+        "name": "tokenizer",
+        "enabled": true
+      },
+      {
+        "name": "xml",
+        "enabled": true
+      },
+      {
+        "name": "xmlreader",
+        "enabled": true
+      },
+      {
+        "name": "xmlwriter",
+        "enabled": true
+      },
+      {
+        "name": "xsl",
+        "enabled": true
+      },
+      {
+        "name": "zip",
+        "enabled": true
+      },
+      {
+        "name": "zlib",
+        "enabled": true
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}
