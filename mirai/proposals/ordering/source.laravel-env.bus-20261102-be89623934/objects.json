@@ -1,0 +1,146 @@
+[
+  {
+    "id": "object.laravel-env.observation.be89623934.panel-status",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: panel-status",
+    "predicate": "source_reports",
+    "value": "Status: stage 1 (read-only, 1.20.0) and stage 2 (certificates, backups and\nlogs in the answers; plans, confirmed actions as jobs, 1.21.0) are\nimplemented in `admin/panel_gate.py`, `panel gate-enable|gate-disable|\ngate-status`, test `panel_e2e`. Creating and deleting sites, databases and\nowners are the next stages.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/architecture/panel-gate.md#chars=0-315"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.08b39808e0e91ebe.2",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:e0e91ebe7018a85d311c1f016a6cd6798c91ab88b203f5b10f55ed37a36fe2e1",
+        "start": 0,
+        "end": 315,
+        "quote": "Status: stage 1 (read-only, 1.20.0) and stage 2 (certificates, backups and\nlogs in the answers; plans, confirmed actions as jobs, 1.21.0) are\nimplemented in `admin/panel_gate.py`, `panel gate-enable|gate-disable|\ngate-status`, test `panel_e2e`. Creating and deleting sites, databases and\nowners are the next stages."
+      }
+    ],
+    "assertion_id": "assertion.dfa8f631096f6c20b0ffdcec7edef6343eb6446d5060f3e0716d642a37d0c4d1"
+  },
+  {
+    "id": "object.laravel-env.observation.be89623934.release-data",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: release-data",
+    "predicate": "source_reports",
+    "value": "- **Data a panel shows.** `site describe` and `self describe` now include the\n  certificate nginx serves for each site: names, issuer, expiry, days left,\n  auto-renewal. `site describe` lists the site's data backups (date, size,\n  parts, checksums, encryption) and their daily schedule.\n  `logs nginx --output json` returns the last lines as data.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md#chars=0-347"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.97332308b54fd7bd.5",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md",
+        "content_digest": "sha256:b54fd7bd37b8d0c901f45d7a5d97f7cb6a8ef6447319c52a1aa7ada099fa49c4",
+        "start": 0,
+        "end": 347,
+        "quote": "- **Data a panel shows.** `site describe` and `self describe` now include the\n  certificate nginx serves for each site: names, issuer, expiry, days left,\n  auto-renewal. `site describe` lists the site's data backups (date, size,\n  parts, checksums, encryption) and their daily schedule.\n  `logs nginx --output json` returns the last lines as data."
+      }
+    ],
+    "assertion_id": "assertion.6b7dd5f51888eb3fd94fb50239d0b04a5ecff5b5e643ed8c17b8ee55d9582421"
+  },
+  {
+    "id": "object.laravel-env.observation.be89623934.release-jobs",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: release-jobs",
+    "predicate": "source_reports",
+    "value": "- **Actions with a plan.** Through the gateway an action first answers what\n  it would do. With `confirm` it starts as a job: a transient systemd unit\n  that outlives the panel, with status, a live log with a cursor,\n  cancellation and a list of recent jobs. Owners act and see jobs only on\n  their own sites.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md#chars=348-657"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.97332308b54fd7bd.5",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md",
+        "content_digest": "sha256:b54fd7bd37b8d0c901f45d7a5d97f7cb6a8ef6447319c52a1aa7ada099fa49c4",
+        "start": 348,
+        "end": 657,
+        "quote": "- **Actions with a plan.** Through the gateway an action first answers what\n  it would do. With `confirm` it starts as a job: a transient systemd unit\n  that outlives the panel, with status, a live log with a cursor,\n  cancellation and a list of recent jobs. Owners act and see jobs only on\n  their own sites."
+      }
+    ],
+    "assertion_id": "assertion.5b2177527c08a67c7c5c067aad6f6bf823d0a3b22f197e388a0d306a3bd4752e"
+  },
+  {
+    "id": "object.laravel-env.observation.be89623934.release-actions",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: release-actions",
+    "predicate": "source_reports",
+    "value": "- Actions available: Let's Encrypt certificate and renewal, deploy rollback,\n  data backup, queue worker restart, node service restart.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md#chars=658-793"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.97332308b54fd7bd.5",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md",
+        "content_digest": "sha256:b54fd7bd37b8d0c901f45d7a5d97f7cb6a8ef6447319c52a1aa7ada099fa49c4",
+        "start": 658,
+        "end": 793,
+        "quote": "- Actions available: Let's Encrypt certificate and renewal, deploy rollback,\n  data backup, queue worker restart, node service restart."
+      }
+    ],
+    "assertion_id": "assertion.e5db5fff5e0b99f2ce978990c4ca4ea541b7de7c847379b5286727cb3cc8814e"
+  },
+  {
+    "id": "object.laravel-env.observation.be89623934.release-compatibility",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: release-compatibility",
+    "predicate": "source_reports",
+    "value": "Command-line use is unchanged; the new fields are additions to the JSON.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md#chars=0-72"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.973323087fd85cba.6",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md",
+        "content_digest": "sha256:7fd85cbaa2c16eeac15e7b43e6215c4975a274a248fcd749dfd354f0c474c125",
+        "start": 0,
+        "end": 72,
+        "quote": "Command-line use is unchanged; the new fields are additions to the JSON."
+      }
+    ],
+    "assertion_id": "assertion.5b73f01517605a3d867ffa5593c4167389b9afbbe7bdcd75bb0949315ea91c39"
+  },
+  {
+    "id": "object.laravel-env.observation.be89623934.release-verification",
+    "kind": "documented_historical_observation",
+    "title": "Historical panel release report be89623934: release-verification",
+    "predicate": "source_reports",
+    "value": "- `panel_e2e` (59 checks) on Ubuntu 22.04, 24.04 and 26.04: certificate and\n  backup data, log tails, plans that change nothing, a backup job with its\n  log and cursor, owner scope for actions and jobs, cancelling a running job,\n  plus all stage 1 checks. `static_e2e`, `backup_tests`, `host_e2e` and\n  `adopt_e2e` on all three; `node_e2e` on 24.04 and 26.04 (22.04 ships\n  Node.js 12, older than the test application needs).",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md#chars=0-425"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.973323080997cb2d.10",
+        "source_ref": "repo://laravel-env@be89623934f030da141dbbb67417f2ad7c646de3/docs/releases/v1.21.0.md",
+        "content_digest": "sha256:0997cb2d09cd03288d63b8effeba085c5cade54edad9e9f4bb214ca8b9852795",
+        "start": 0,
+        "end": 425,
+        "quote": "- `panel_e2e` (59 checks) on Ubuntu 22.04, 24.04 and 26.04: certificate and\n  backup data, log tails, plans that change nothing, a backup job with its\n  log and cursor, owner scope for actions and jobs, cancelling a running job,\n  plus all stage 1 checks. `static_e2e`, `backup_tests`, `host_e2e` and\n  `adopt_e2e` on all three; `node_e2e` on 24.04 and 26.04 (22.04 ships\n  Node.js 12, older than the test application needs)."
+      }
+    ],
+    "assertion_id": "assertion.e6fb856a059c8eff2c2b08b2cf6267456fb07aa7274d1734f7669a6b612f6ef3"
+  }
+]
