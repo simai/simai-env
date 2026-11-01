@@ -180,6 +180,23 @@ app_port_set() {
   chmod 0640 "$file"
 }
 
+# STATIC_RELEASES=yes in service.env: the site was converted from profile
+# static (site set-profile) and still serves releases without a service.
+app_static_releases_enabled() {
+  grep -qx 'STATIC_RELEASES=yes' "$(app_service_env_file "$1")" 2>/dev/null
+}
+
+# A release runs a service when its manifest has node.start.
+app_release_runs_service() {
+  python3 -c 'import json, sys
+try:
+    m = json.load(open(sys.argv[1] + "/.simai/app.json"))
+except (OSError, ValueError):
+    sys.exit(1)
+n = m.get("node") if isinstance(m, dict) else None
+sys.exit(0 if isinstance(n, dict) and n.get("start") else 1)' "$1"
+}
+
 app_service_unit_name() {
   printf 'simai-app-%s.service\n' "$1"
 }
@@ -279,7 +296,9 @@ app_routes_render() {
   routes=$(app_routes_file "$domain"); maps=$(app_routes_maps_file "$project")
   install -d -m 0755 "$(dirname "$routes")" || return 1
   tmp_r=$(mktemp) && tmp_m=$(mktemp) || return 1
-  if ! out=$(python3 "${SIMAI_ENV_ROOT}/lib/app_routes.py" "$release_dir" "$project" "$port" "$root" "$release_id" "$tmp_r" "$tmp_m" 2>&1); then
+  local static_releases=no
+  app_static_releases_enabled "$domain" && static_releases=yes
+  if ! out=$(SIMAI_APP_STATIC_RELEASES="$static_releases" python3 "${SIMAI_ENV_ROOT}/lib/app_routes.py" "$release_dir" "$project" "$port" "$root" "$release_id" "$tmp_r" "$tmp_m" 2>&1); then
     rm -f "$tmp_r" "$tmp_m"
     error "${out:-routes could not be rendered}"
     return 1

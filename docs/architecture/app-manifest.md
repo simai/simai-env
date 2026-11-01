@@ -73,6 +73,17 @@ for ACME challenges. `site deploy` then:
 }
 ```
 
+### Converted static sites
+
+`site set-profile --profile node` turns a deployed static site into a service
+site without a new release; its `service.env` then also holds
+`STATIC_RELEASES=yes`. On such a site a release whose manifest has neither
+`static` nor `node` (its earlier static releases, which carry index.html at
+their top) is served by nginx exactly as on profile `static`, rooted at
+`current`, and no service runs for it. The first release with `node.start`
+and `static.root` takes over on deploy; `deploy-rollback` to a static release
+stops the service again. See `docs/commands/site.md` (set-profile).
+
 ## Static root with service routes (play-style apps)
 
 A node site whose release carries a static build and an API adds `static`:

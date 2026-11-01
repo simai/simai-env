@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.29.0 - 2026-11-01
+
+- New: `site set-profile --domain D --profile node` turns a deployed static
+  site into a node site (static root plus a service) without a new release:
+  a port in `service.env`, the vhost from `nginx-node.conf` with the same
+  certificate, redirects and path rules, `public/` as the ACME directory
+  node sites keep. `current` and every release stay; until a release brings
+  `node.start`, nginx serves `current` the way the static profile does, with
+  one reload and no gap. Plan unless `--confirm yes`; a busy port or a
+  failing `nginx -t`/reload restores the previous vhost, routes, port record
+  and symlink. `--profile static` switches back while `current` is a static
+  release.
+- `site deploy-rollback` to a static release of such a site serves it again
+  and stops the service; a failed first node release returns to the static
+  release instead of a proxy to a stopped service.
+- New container case `profile_e2e`.
+
 ## 1.28.0 - 2026-11-01
 
 - Panel gateway, stage 9: `backup:data-restore`, `backup:data-verify` and

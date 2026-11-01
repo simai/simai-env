@@ -163,6 +163,37 @@ runs `simai-app-<project>.service` from `current` (restarted on failure and
 on boot) and returns to the previous release when the health check fails.
 Details: `docs/architecture/app-manifest.md`.
 
+### From static to node (`set-profile`)
+
+A static site that grows an API keeps its releases and its address:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site set-profile --domain D --profile node              # plan only
+sudo /root/simai-env/simai-admin.sh site set-profile --domain D --profile node --confirm yes  # optional --app-port 3189
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git URL --ref TAG --confirm yes  # first node release
+```
+
+The switch allocates a port (`service.env`, with `STATIC_RELEASES=yes`),
+renders the vhost from `nginx-node.conf` with the same certificate, HTTPS
+redirect, HSTS, path redirects and path rules, and after one nginx reload
+turns `public/` from the symlink to `current` into the directory node sites
+keep for ACME challenges. `current`, `releases/` and their files do not
+change, and no service runs yet: until a release brings `node.start`, nginx
+serves `current` the way the static profile does (`/dir/` → `dir/index.html`,
+`/page` → `page.html`, `404.html`, static caching and font CORS). Any failure
+(busy port, `nginx -t`, reload) puts back the previous vhost, routes, port
+record and symlink.
+
+Requirements: profile `static` with `public/` and the release layout (deploy
+the site once with `site deploy`), the `node` profile enabled.
+
+`site deploy-rollback --release <static release>` serves an earlier static
+release again and stops the service. While `current` is such a release,
+`site set-profile --profile static` switches back: `public/` becomes the
+symlink again (only empty directories are removed; a file there stops the
+switch), the port, routes and the service unit are removed, releases and
+`shared/` stay.
+
 ## describe
 JSON for people and AI agents: layout, database engine (no secrets), user,
 release, workers, logs, validated manifest and ready-to-run commands.

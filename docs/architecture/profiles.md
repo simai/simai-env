@@ -8,8 +8,13 @@ Profiles describe site types in a single registry (`profiles/*.profile.sh`) and 
 - **alias**: Points to an existing site; no PHP/DB resources of its own; allows aliasing to another root/target.
 - **wordpress**: PHP WordPress site; DB required; cron supported (`wp-cron.php`); healthcheck enabled.
 - **bitrix**: PHP 1C-Bitrix site; DB required; cron supported (`cron_events.php`); healthcheck enabled.
+- **node**: long-running service behind nginx (`simai-app-<project>.service` on a local port from `/etc/simai-env/sites/<domain>/service.env`); no PHP; the release manifest describes the service and, optionally, a static root with routes to it (`docs/architecture/app-manifest.md`); `public/` stays outside releases for ACME challenges.
+- **redirect**: whole-domain redirect to another origin (`--redirect-to`, `--redirect-code`, `--redirect-path`); answers ACME challenges.
 
-All profiles use `<project-root>/public` as web root. Each profile declares the nginx template (`PROFILE_NGINX_TEMPLATE`), healthcheck mode (`PROFILE_HEALTHCHECK_MODE`), and any required markers (`PROFILE_REQUIRED_MARKERS`) that must exist before applying the profile. Definition files are declarative (`PROFILE_` variables only) and live in `profiles/<id>.profile.sh`. The admin menu reads available profiles from this registry.
+## Changing a site's profile
+- `site set-profile --domain D --profile node|static` switches a deployed static site to node and back, keeping `current`, every release and `shared/`; it prints a plan unless `--confirm yes` and restores the previous vhost, routes, port record and `public/` symlink when any step fails. Other profile changes are not supported; see `docs/commands/site.md`.
+
+All profiles use `<project-root>/public` as web root (static sites with releases: a symlink to `current`). Each profile declares the nginx template (`PROFILE_NGINX_TEMPLATE`), healthcheck mode (`PROFILE_HEALTHCHECK_MODE`), and any required markers (`PROFILE_REQUIRED_MARKERS`) that must exist before applying the profile. Definition files are declarative (`PROFILE_` variables only) and live in `profiles/<id>.profile.sh`. The admin menu reads available profiles from this registry.
 
 ## Profile activation
 - Active profiles are listed in `/etc/simai-env/profiles.enabled` (one ID per line; comments allowed). If the file is missing, legacy mode treats all profiles as enabled.

@@ -226,7 +226,7 @@ deploy_activate_service() {
   if [[ -n "$previous_link" && "$previous_link" != "releases/${release_id}" && -d "${root}/${previous_link}" ]]; then
     ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
     app_routes_apply "$domain" "$project" "$port" "$root" "${root}/${previous_link}" "$(basename "$previous_link")" || warn "Routes of ${previous_link} could not be restored"
-    if [[ -f "${root}/${previous_link}/.simai/app.json" ]]; then
+    if app_release_runs_service "${root}/${previous_link}"; then
       systemctl restart "$unit" >/dev/null 2>&1 || true
       if app_health_wait "$port" "${APP_HEALTH_PATH:-/}" "${APP_HEALTH_TIMEOUT:-120}"; then
         warn "Returned to ${previous_link}; it passes its health check"
@@ -234,12 +234,27 @@ deploy_activate_service() {
         warn "Returned to ${previous_link}, but it does not pass its health check either"
       fi
     else
-      # The first release replaced an empty site: nothing to run.
+      # The first release replaced an empty site or a static release
+      # (site set-profile): nothing to run.
       systemctl stop "$unit" >/dev/null 2>&1 || true
-      warn "Returned to ${previous_link} (no application); ${unit} stopped"
+      warn "Returned to ${previous_link} (no service); ${unit} stopped"
     fi
   fi
   return 1
+}
+
+# Switches a node site back to one of its static releases (kept from before
+# site set-profile): routes serve the release, the service stops.
+deploy_activate_static_release() {
+  local domain="$1" root="$2" release_id="$3" project="$4" previous_link port
+  port=$(app_port_get "$domain")
+  previous_link=$(readlink "${root}/current")
+  ln -sfn "releases/${release_id}" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current" || return 1
+  if ! app_routes_apply "$domain" "$project" "$port" "$root" "${root}/releases/${release_id}" "$release_id"; then
+    [[ -n "$previous_link" ]] && ln -sfn "$previous_link" "${root}/current.tmp" && mv -Tf "${root}/current.tmp" "${root}/current"
+    return 1
+  fi
+  systemctl stop "$(app_service_unit_name "$project")" >/dev/null 2>&1 || true
 }
 
 # First deploy of a static site: the current document root becomes release
@@ -564,7 +579,11 @@ site_deploy_rollback_handler() {
     echo "Rerun with --confirm yes to apply."
     return 0
   fi
-  if [[ -n "$(app_port_get "$domain")" ]]; then
+  if [[ -n "$(app_port_get "$domain")" ]] && ! app_release_runs_service "${root}/releases/${to}" && app_static_releases_enabled "$domain"; then
+    # A static release of a site converted to profile node: nginx serves it,
+    # the service stops.
+    deploy_activate_static_release "$domain" "$root" "$to" "$project" || return 1
+  elif [[ -n "$(app_port_get "$domain")" ]]; then
     app_manifest_load "${root}/releases/${to}" || return 1
     deploy_activate_service "$domain" "$root" "$to" "$project" || return 1
   elif [[ "${SITE_META[profile]}" == static ]]; then

@@ -35,6 +35,7 @@ containers and internet access (packages, Composer, Laravel).
 | `pg_e2e` | PostgreSQL engine: site lifecycle, rotation, backup/restore, MySQL site untouched |
 | `adopt_e2e` | `site adopt` on a real Laravel 13 app with PostgreSQL: requirements, migrations, workers, long job across `queue:restart`, describe output |
 | `deploy_e2e` | releases: layout conversion, failed deploy, archive with checksum, rollback, retention (run after `adopt_e2e`) |
+| `profile_e2e` | `site set-profile` static → node → static: plan, busy port, nginx failure rollback, static pages and HTTPS kept, first node release with `/api/`, `shared/state` in the file backup, rollback to the static release |
 
 `deploy_e2e` reuses the site created by `adopt_e2e`, so run them in that order
 (the default list does).

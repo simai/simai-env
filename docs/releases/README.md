@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.29.0](v1.29.0.md) — a static site switches to profile node in place
+  (`site set-profile`), keeping its releases.
 - [v1.28.0](v1.28.0.md) — backups, PHP settings, server metrics and
   databases in the panel gateway.
 - [v1.27.0](v1.27.0.md) — site answers, disk and last backup in the host
