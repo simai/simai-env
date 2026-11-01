@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.32.0](v1.32.0.md) — safe update of simai-env and the panel from the
+  panel: a plan first, site checks after, rollback.
 - [v1.31.0](v1.31.0.md) — server alerts to a webhook or Telegram, and the
   load history, kept by the server itself.
 - [v1.30.0](v1.30.0.md) — SFTP accounts by key in the panel gateway, a

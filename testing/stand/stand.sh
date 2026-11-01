@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=7
+FIXTURE_SET=8
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -116,7 +116,7 @@ record() {
     "self-describe.owner-demo|\"demo\"|self:describe|{}"
     "self-commands|null|self:commands|{}"
     "refused.owner-scope|\"demo\"|site:describe|{\"domain\":\"demo-php.test\"}"
-    "refused.not-allowed|null|self:update|{}"
+    "refused.not-allowed|null|self:bootstrap|{}"
     "plan.backup-data|null|backup:data|{\"domain\":\"demo-owned.test\",\"db\":\"no\"}"
     "plan.site-add|null|site:add|{\"domain\":\"new.test\",\"profile\":\"static\"}"
     "plan.site-deploy-git|null|site:deploy|{\"domain\":\"demo-static.test\",\"git\":\"https://github.com/example/site\",\"ref\":\"v1.0.0\"}"
@@ -158,6 +158,10 @@ record() {
     "refused.owner-admin-only.alerts-channel|\"demo\"|self:alerts-channel|{\"kind\":\"off\"}"
     "self-metrics-history|null|self:metrics-history|{\"period\":\"day\"}"
     "refused.owner-admin-only.metrics-history|\"demo\"|self:metrics-history|{\"period\":\"week\"}"
+    "self-update-plan.env|null|self:update-plan|{\"target\":\"env\"}"
+    "self-update-plan.panel|null|self:update-plan|{\"target\":\"panel\"}"
+    "plan.self-update|null|self:update|{\"target\":\"env\"}"
+    "refused.owner-admin-only.update|\"demo\"|self:update|{\"target\":\"env\"}"
     "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
@@ -252,6 +256,11 @@ for f in sorted(root.glob("*.json")):
         data["points"] = [{"at": "2026-01-01T00:00:00Z", "load1": 0.1, "cpu_cores": 2, "memory_used_bytes": 1073741824,
                            "memory_total_bytes": 4294967296, "swap_used_bytes": 0,
                            "disk": [{"mount": "/", "used_bytes": 10737418240, "total_bytes": 42949672960}]}]
+    for plan in (data, data.get("update") if isinstance(data.get("update"), dict) else {}):
+        if plan.get("schema") == "simai-update-plan/1" and plan.get("target") == "env":
+            # The update channel answers whatever is published today.
+            plan.update(available="9.9.0", update_available=True, blocked=None,
+                        notes=[{"version": "9.9.0", "text": "- An example release note."}])
     if "job_id" in d:
         d["job_id"] = "0" * 24
     if "job_id" in data:

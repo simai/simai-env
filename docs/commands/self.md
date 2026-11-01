@@ -60,10 +60,25 @@ Behavior:
 - runs strict smoke checks before and after activation; a post-activation failure automatically restores the previous tree and returns a non-zero status
 - keeps the timestamped recovery archive after a successful update
 - reloads the menu automatically when the command is run from menu mode
+- `--check-sites yes` asks every site before and after the update (its health path through nginx, any status below 500 counts as answering); if a site that answered stops, the previous tree is restored from the pre-update archive and the command fails. Host migrations the new release applied are not undone
+- `--target panel` updates the Larena Panel build instead (the same as `panel update`: data backup, deploy, health check, rollback)
 
 Typical use:
 ```bash
-sudo /root/simai-env/simai-admin.sh self update
+sudo /root/simai-env/simai-admin.sh self update-plan
+sudo /root/simai-env/simai-admin.sh self update --check-sites yes --confirm yes
+```
+
+## update-plan
+Show what `self update --target env|panel` would do, without changing
+anything: the installed and the available version, the release notes in
+between (the remote CHANGELOG), what is backed up, what restarts, which
+sites are checked after, and how it rolls back. For `panel` the available
+version is the build this simai-env release pins. `--output json` answers
+`simai-update-plan/1`.
+
+```bash
+sudo /root/simai-env/simai-admin.sh self update-plan --target panel
 ```
 
 ## supply-chain-doctor

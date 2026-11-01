@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.32.0 - 2026-11-02
+
+- `self update --check-sites yes` notes which sites answer, updates, and
+  asks them again; if a site that answered stops, the previous toolkit comes
+  back from the pre-update archive and the command fails. `self update
+  --target panel` updates the panel build (`panel update`).
+- New: `self update-plan [--target env|panel]`: installed and available
+  version, release notes in between, backup, restarts, checked sites,
+  rollback (`simai-update-plan/1`).
+- Panel gateway: `self:update-plan {target}` and `self:update {target}`,
+  administrator only. The update plan carries the update details; the job
+  always checks the sites and cannot be cancelled midway
+  (`not_cancellable`).
+- Recorded panel answers: set 8.
+
 ## 1.31.0 - 2026-11-01
 
 - Server watch: the five-minute `self status-refresh` also keeps an alert

@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 196,
+    "count": 197,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -3171,9 +3171,12 @@
       },
       {
         "command": "simai-admin.sh self update",
-        "description": "Update simai-env/admin scripts",
+        "description": "Update simai-env (--target env) or the panel build (--target panel); --check-sites yes rolls back if a site stops answering",
         "required": [],
-        "optional": {},
+        "optional": {
+          "--target": null,
+          "--check-sites": null
+        },
         "flags": [
           "menu:confirm"
         ],
@@ -3181,6 +3184,29 @@
         "authorization": "root",
         "confirmation": "required",
         "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh self update-plan",
+        "description": "Show what an update changes: versions, release notes, what restarts, which sites are checked",
+        "required": [],
+        "optional": {
+          "--target": null
+        },
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

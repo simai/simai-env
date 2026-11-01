@@ -261,7 +261,47 @@ self_post_update_smoke() {
   return 0
 }
 
+# Sites that answer (any status below 500), one "domain<TAB>status" per line.
+self_update_site_answers() {
+  python3 -I "${SCRIPT_DIR}/lib/site_status.py" --answers 2>/dev/null \
+    | awk -F '\t' '$2 > 0 && $2 < 500 {print $1}' | sort
+}
+
+# Puts the toolkit back from the updater's pre-update archive. Host
+# migrations the new release applied are not undone.
+self_update_restore_tree() {
+  local archive="$1" parent base stage failed
+  parent=$(dirname "$SCRIPT_DIR"); base=$(basename "$SCRIPT_DIR")
+  stage="${parent}/.${base}.stage.restore-$$"; failed="${parent}/.${base}.failed.restore-$$"
+  [[ -f "$archive" ]] || { error "The pre-update archive is missing; cannot restore"; return 1; }
+  mkdir "$stage" && tar -xzf "$archive" -C "$stage" || { rm -rf -- "$stage"; error "Cannot unpack ${archive}"; return 1; }
+  bash -n "${stage}/simai-admin.sh" || { rm -rf -- "$stage"; error "The pre-update archive is damaged"; return 1; }
+  mv -- "$SCRIPT_DIR" "$failed" || { rm -rf -- "$stage"; return 1; }
+  if ! mv -- "$stage" "$SCRIPT_DIR"; then
+    mv -- "$failed" "$SCRIPT_DIR"
+    error "Cannot put the previous release back; the new one stays"
+    return 1
+  fi
+  rm -rf -- "$failed"
+}
+
+# --target panel updates the panel build (panel update); --target env (the
+# default) the toolkit. --check-sites yes asks every site before and after
+# and puts the previous toolkit back if a site that answered stops.
 self_update_handler() {
+  parse_kv_args "$@"
+  local target="${PARSED_ARGS[target]:-env}" check_sites="${PARSED_ARGS[check-sites]:-no}"
+  case "$target" in
+    panel) panel_update_handler; return $? ;;
+    env) ;;
+    *) error "--target must be env or panel"; return 1 ;;
+  esac
+  [[ "$check_sites" =~ ^(yes|no)$ ]] || { error "--check-sites must be yes or no"; return 1; }
+  local -a answered=()
+  if [[ "$check_sites" == yes ]]; then
+    mapfile -t answered < <(self_update_site_answers)
+    info "Sites answering before the update: ${#answered[@]}"
+  fi
   local updater="${SCRIPT_DIR}/update.sh"
   if [[ ! -f "$updater" ]]; then
     error "Updater not found at ${updater}"
@@ -277,11 +317,14 @@ self_update_handler() {
   cp "${SCRIPT_DIR}/lib/platform.sh" "${updater_tmp}/lib/platform.sh"
   cp "${SCRIPT_DIR}/lib/update_channel.sh" "${updater_tmp}/lib/update_channel.sh"
   chmod +x "${updater_tmp}/update.sh"
-  if ! INSTALL_DIR="${SCRIPT_DIR}" "${updater_tmp}/update.sh"; then
+  local updater_out="${updater_tmp}/out" archive
+  INSTALL_DIR="${SCRIPT_DIR}" "${updater_tmp}/update.sh" 2>&1 | tee "$updater_out"
+  if (( PIPESTATUS[0] != 0 )); then
     rm -rf "$updater_tmp"
     progress_done "Update failed"
     return 1
   fi
+  archive=$(sed -n 's/^Pre-update backup created: //p' "$updater_out" | tail -n1)
   rm -rf "$updater_tmp"
   # The updater replaced the toolkit directory; leave the deleted one so the
   # smoke check and nested commands do not start from a missing directory.
@@ -294,6 +337,25 @@ self_update_handler() {
   # Host migrations must come from the freshly installed code, not from the
   # handler already loaded in this process.
   SIMAI_ADMIN_MENU=0 bash "${SCRIPT_DIR}/simai-admin.sh" self migrate --confirm yes || warn "Post-update host migrations reported problems"
+  if (( ${#answered[@]} )); then
+    local -a stopped=()
+    local tries
+    # PHP-FPM and nginx may still be reloading; ask a few times before judging.
+    for tries in 1 2 3; do
+      mapfile -t stopped < <(comm -23 <(printf '%s\n' "${answered[@]}") <(self_update_site_answers))
+      (( ${#stopped[@]} )) || break
+      (( tries < 3 )) && sleep 5
+    done
+    if (( ${#stopped[@]} )); then
+      error "Sites stopped answering after the update: ${stopped[*]}"
+      if self_update_restore_tree "$archive"; then
+        error "Rolled back to the previous simai-env release (host migrations are not undone)"
+      fi
+      progress_done "Update rolled back"
+      return 1
+    fi
+    info "All ${#answered[@]} sites still answer"
+  fi
   self_auto_update_check_now "yes" || true
   progress_done "Update completed"
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
@@ -776,6 +838,46 @@ EOF
   sshd -t || return 1
   systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
   self_ssh_hardening_doctor_handler
+}
+
+# What `self update --target T` would do, without doing it. The env target
+# asks the update channel for the remote VERSION and CHANGELOG (nothing is
+# written); the panel target compares the installed build with the one this
+# release pins.
+self_update_plan_handler() {
+  parse_kv_args "$@"
+  local target="${PARSED_ARGS[target]:-env}" current="" available="" notes_url="" blocked="" domain="" changelog
+  changelog=$(mktemp) || return 1
+  case "$target" in
+    env)
+      local url
+      current=$(self_local_version)
+      url=$(self_remote_version_url 2>/dev/null || true)
+      [[ -n "$url" ]] && available=$(curl -fsSL --max-time 10 "$url" 2>/dev/null | head -c 64 | tr -d '[:space:]')
+      [[ "$available" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || available=$(self_auto_update_state_get remote_version 2>/dev/null || true)
+      [[ "$available" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { available=""; blocked="remote_unavailable"; }
+      if [[ -n "$available" && -n "$url" ]]; then
+        curl -fsSL --max-time 10 "${url%/VERSION}/CHANGELOG.md" 2>/dev/null | head -c 500000 >"$changelog" || true
+      fi
+      notes_url="${REPO_URL:-https://github.com/simai/simai-env}/blob/main/CHANGELOG.md"
+      ;;
+    panel)
+      domain=$(panel_state_get PANEL_DOMAIN)
+      current=$(panel_state_get VERSION)
+      available=$(panel_release_get VERSION)
+      if [[ -z "$domain" ]]; then blocked="not_installed"
+      elif [[ "$(panel_state_get SOURCE)" != build ]]; then blocked="placeholder"
+      fi
+      [[ -n "$available" ]] && notes_url="https://github.com/simai/larena-env/releases/tag/v${available}"
+      ;;
+    *) rm -f -- "$changelog"; error "--target must be env or panel"; return 1 ;;
+  esac
+  local rc=0
+  TARGET="$target" CURRENT="$current" AVAILABLE="$available" NOTES_URL="$notes_url" BLOCKED="$blocked" \
+    DOMAIN="$domain" CHANGELOG_FILE="$changelog" STATUS_FILE="${SIMAI_SITE_STATUS:-/var/lib/simai-env/site-status.json}" \
+    OUTPUT="${SIMAI_COMMAND_OUTPUT:-human}" python3 -I "${SIMAI_ENV_ROOT}/lib/update_plan.py" || rc=$?
+  rm -f -- "$changelog"
+  return "$rc"
 }
 
 self_version_handler() {
@@ -1702,7 +1804,8 @@ self_site_review_status_handler() {
   ui_kv "Open health review" "simai-admin.sh self health-review-status"
 }
 
-register_cmd "self" "update" "Update simai-env/admin scripts" "self_update_handler" "" "" "menu:confirm"
+register_cmd "self" "update" "Update simai-env (--target env) or the panel build (--target panel); --check-sites yes rolls back if a site stops answering" "self_update_handler" "" "target= check-sites=" "menu:confirm"
+register_cmd "self" "update-plan" "Show what an update changes: versions, release notes, what restarts, which sites are checked" "self_update_plan_handler" "" "target=" "effects:read"
 register_cmd "self" "version" "Show local and cached remote simai-env version" "self_version_handler" "" "refresh=no" "effects:read"
 register_cmd "self" "supply-chain-doctor" "Check self-update/install supply-chain safety" "self_supply_chain_doctor_handler" "" "" "effects:read"
 register_cmd "self" "admin-mode-status" "Show admin access mode and user roles" "self_admin_mode_status_handler" "" "login=" "effects:read"

@@ -4,6 +4,7 @@ how much disk it uses. Run every few minutes by cron as root; host_describe.py
 reads the file, so self describe never waits for sites.
 
 Usage: site_status.py [--disk-every MINUTES]
+       site_status.py --answers   (print "domain<TAB>status" now, write nothing)
 
 The answer is the HTTP status of the site's health path (.simai/app.json
 health.path, else /) asked through nginx on 127.0.0.1, without following
@@ -76,6 +77,12 @@ def disk(root: Path) -> int | None:
 
 
 def main() -> int:
+    if sys.argv[1:] == ["--answers"]:
+        # self update compares these before and after it replaces the toolkit.
+        for domain, meta in sites().items():
+            code = probe(domain, health_path(Path(meta["root"])))
+            print(f"{domain}\t{code if code is not None else 0}")
+        return 0
     every = 60
     if len(sys.argv) == 3 and sys.argv[1] == "--disk-every" and sys.argv[2].isdigit():
         every = int(sys.argv[2])

@@ -46,7 +46,7 @@ a=$(gate "$(req '"acme"' site:describe '{"domain":"open.test"}')")
 
 # Refusals.
 refused() { local a; a=$(gate "$2"); [[ "$(field 'd["status"]+":"+d["reason"]' <<<"$a")" == "refused:$1" ]] && ok "refused $1: $3" || bad "$3: $a"; }
-refused not_allowed "$(req null self:update '{}')" "host update"
+refused not_allowed "$(req null self:bootstrap '{}')" "host repair"
 refused not_allowed "$(req null db:drop '{}')" "database server command"
 refused not_allowed "$(req null access:reset-password '{}')" "operator command"
 refused invalid_argument "$(req null site:describe '{"domain":"x.test; id"}')" "shell metacharacters"
@@ -357,6 +357,62 @@ a=$(gate "$(req null self:metrics-history '{"period":"day"}')")
 [[ "$(field 'd["data"]["step_seconds"] == 300 and len(d["data"]["points"]) >= 3 and d["data"]["points"][-1]["memory_total_bytes"] > 0' <<<"$a")" == True ]] && ok "a day of 5-minute load points" || bad "history day: ${a:0:300}"
 [[ "$(gate "$(req null self:metrics-history '{"period":"week"}')" | field 'd["data"]["step_seconds"] == 3600 and len(d["data"]["points"]) >= 1')" == True ]] && ok "a week of hourly points" || bad "history week"
 refused not_allowed "$(req '"acme"' self:metrics-history '{"period":"day"}')" "an owner reads the host history"
+
+# Safe update (1.32.0): a plan with versions and checks, then a job that puts
+# the previous toolkit back when a site stops answering. A stand-in updater
+# replaces the network download: it archives the tree like update.sh and
+# changes VERSION; with /root/break-sites it also stops PHP-FPM.
+long_job() { local s _; for _ in {1..180}; do s=$(gate "$(req null job:status "{\"job_id\":\"$1\"}")" | field 'd["data"]["state"]'); [[ "$s" != running ]] && { echo "$s"; return; }; sleep 1; done; echo timeout; }
+cp update.sh /root/update.sh.real
+cat > update.sh <<'UPD'
+#!/usr/bin/env bash
+set -e
+mkdir -p /root/simai-backups
+a="/root/simai-backups/simai-env-preupdate-test-$$.tar.gz"
+tar -czf "$a" -C "$INSTALL_DIR" .
+echo "Pre-update backup created: $a"
+[[ -f /root/slow-update ]] && sleep 6
+echo 9.9.9 > "$INSTALL_DIR/VERSION"
+[[ -f /root/break-sites ]] && systemctl stop 'php*-fpm.service'
+echo "Version: old -> 9.9.9"
+UPD
+chmod +x update.sh
+before=$(cat VERSION)
+python3 -I lib/site_status.py >/dev/null 2>&1
+a=$(gate "$(req null self:update-plan '{"target":"env"}')")
+[[ "$(field 'd["data"]["schema"] == "simai-update-plan/1" and d["data"]["current"] == "'"$before"'" and d["data"]["restarts"] == []' <<<"$a")" == True ]] && ok "update plan for simai-env" || bad "env plan: ${a:0:400}"
+[[ "$(field '"open.test" in d["data"]["checks"]' <<<"$a")" == True ]] && ok "the plan lists the sites it checks" || bad "plan checks: $(field 'd["data"]["checks"]' <<<"$a")"
+a=$(gate "$(req null self:update-plan '{"target":"panel"}')")
+[[ "$(field 'd["data"]["blocked"]' <<<"$a")" == not_installed ]] && ok "panel plan without a panel says so" || bad "panel plan: ${a:0:300}"
+a=$(gate "$(req null self:update '{"target":"env"}')")
+[[ "$(field 'd["kind"] == "plan" and d["data"]["args"]["target"] == "env" and d["data"]["update"]["target"] == "env"' <<<"$a")" == True ]] && ok "update answers a plan with the update details" || bad "update plan: ${a:0:400}"
+[[ "$(cat VERSION)" == "$before" ]] && ok "the plan changed nothing" || bad "plan applied"
+refused not_allowed "$(req '"acme"' self:update-plan '{"target":"env"}')" "an owner reads the update plan"
+refused not_allowed "$(req '"acme"' self:update '{"target":"env"}')" "an owner updates the host"
+refused invalid_argument "$(req null self:update '{"target":"all"}')" "an unknown update target"
+
+j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
+[[ "$(long_job "$j")" == succeeded && "$(cat VERSION)" == 9.9.9 ]] && ok "update job replaces the toolkit" || { bad "update job: $(cat VERSION)"; gate "$(req null job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"][-15:])'; }
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'still answer' && ok "the job checked the sites after the update" || bad "no site check in the log"
+echo "$before" > VERSION
+
+touch /root/slow-update
+j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
+sleep 2
+refused not_cancellable "$(req null job:cancel "{\"job_id\":\"$j\"}")" "cancelling an update midway"
+rm -f /root/slow-update
+[[ "$(long_job "$j")" == succeeded ]] && ok "the update finished after the refused cancel" || bad "update after cancel"
+echo "$before" > VERSION
+
+touch /root/break-sites
+j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
+[[ "$(long_job "$j")" == failed ]] && ok "an update that breaks sites fails" || bad "broken update state"
+cd /root/simai-env  # the rollback put a new directory in place of the one this shell stood in
+[[ "$(cat VERSION)" == "$before" ]] && ok "the previous toolkit is back" || bad "not rolled back: $(cat VERSION)"
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'stopped answering after the update: .*open.test' && ok "the log names the sites that stopped" || bad "rollback log"
+rm -f /root/break-sites
+for u in $(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}'); do systemctl start "$u" >/dev/null 2>&1; done
+cp /root/update.sh.real update.sh
 
 # Blocking an owner: no SSH or panel access, the sites keep serving.
 refused not_allowed "$(req '"acme"' owner:block '{"name":"acme"}')" "an owner cannot block"

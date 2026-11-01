@@ -162,7 +162,10 @@ cli panel install --domain $P --confirm yes >/tmp/pr2 2>&1 && ok "panel install 
 cli panel status 2>&1 | grep -q 'Version.*1\.0\.0' && ok "status shows the version" || bad "status version: $(cli panel status 2>&1 | tail -8)"
 cli panel update --confirm yes 2>&1 | grep -q 'nothing to do' && ok "update at the pinned version does nothing" || bad "update same version"
 pin 2.0.0 "$s7"
-cli panel update --confirm yes >/tmp/pr3 2>&1 && ok "update moves to the newly pinned version" || { bad "pinned update"; tail -5 /tmp/pr3; }
+up=$(cli self update-plan --target panel --output json 2>/dev/null)
+[[ "$(python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["current"], d["available"], d["update_available"], d["checks"])' <<<"$up")" == "1.0.0 2.0.0 True ['${P}']" ]] && ok "update plan: installed and pinned versions, the checked panel" || bad "panel update plan: ${up:0:300}"
+# self update --target panel is the panel's own path (the gateway's self:update).
+cli self update --target panel --confirm yes >/tmp/pr3 2>&1 && ok "update moves to the newly pinned version" || { bad "pinned update"; tail -5 /tmp/pr3; }
 [[ "$(page '')" == panel-r2 ]] && cli panel status 2>&1 | grep -q 'Version.*2\.0\.0' && ok "the new version is served and recorded" || bad "after pinned update: $(page '' | head -c 120)"
 pin 1.0.0 "$s6"
 cli panel update --confirm yes >/dev/null 2>&1 && bad "update stepped back to an older pin" || ok "update never steps back by itself"

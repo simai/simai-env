@@ -68,6 +68,7 @@ CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-
                             r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
 PERIOD = re.compile(r"^(day|week|month)$")
+UPDATE_TARGET = re.compile(r"^(env|panel)$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -158,6 +159,9 @@ ALLOW = {
     "self:alerts-channel": ({"kind": CHANNEL_KIND, "target": CHANNEL_TARGET, "token": TG_TOKEN}, {"kind"}, "action"),
     "self:alerts-test": ({}, set(), "action"),
     "self:metrics-history": ({"period": PERIOD}, set(), "read"),
+    # 1.32.0: safe update of simai-env or the panel build, with a plan first.
+    "self:update-plan": ({"target": UPDATE_TARGET}, {"target"}, "read"),
+    "self:update": ({"target": UPDATE_TARGET}, {"target"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -165,11 +169,13 @@ ALLOW = {
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
 ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics",
-              "self:alerts-channel", "self:alerts-test", "self:metrics-history"}
+              "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
-          "site:php-ini-unset": {"apply": "yes"}}
+          "site:php-ini-unset": {"apply": "yes"}, "self:update": {"check-sites": "yes"}}
+# Stopping these midway could leave the toolkit or the panel half replaced.
+NO_CANCEL = {"self:update"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file"}  # passed to the command as a file
@@ -301,9 +307,13 @@ def plan(command, args, attachment=None):
         return None
     entry = registry_entry(command)
     shown = {k: ("(stored)" if k in SECRET_ARGS else v) for k, v in args.items()}
-    return {"command": command, "args": shown, "target": result.get("target"),
-            "description": entry.get("description"), "effects": result.get("effects"),
-            "lock": entry.get("lock"), "applied": False}
+    answer = {"command": command, "args": shown, "target": result.get("target"),
+              "description": entry.get("description"), "effects": result.get("effects"),
+              "lock": entry.get("lock"), "applied": False}
+    if command == "self:update":
+        # Versions, release notes, what restarts and which sites are checked.
+        answer["update"] = (run("self:update-plan", {"target": args["target"]}) or {}).get("data")
+    return answer
 
 
 # Jobs: a confirmed action runs as a transient systemd unit, so it survives
@@ -437,6 +447,8 @@ def job_answer(command, args, owner):
         return {"job_id": job_id, "state": job_state(job_id)["state"], "lines": chunk, "next": after + len(chunk)}
     if job_state(job_id)["state"] != "running":
         raise Refused("not_running")
+    if (read_job(job_id) or {}).get("command") in NO_CANCEL:
+        raise Refused("not_cancellable")
     (job_dir(job_id) / "cancelled").write_text(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()) + "\n")
     subprocess.run(["systemctl", "stop", unit_name(job_id)], capture_output=True, env=ENV, timeout=60)
     return job_state(job_id)

@@ -1,0 +1,22 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-self-update-plan.panel",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-update-plan/1",
+    "target": "panel",
+    "current": null,
+    "available": "0.2.0",
+    "update_available": false,
+    "blocked": "not_installed",
+    "notes": [],
+    "notes_url": "https://github.com/simai/larena-env/releases/tag/v0.2.0",
+    "backup": null,
+    "restarts": [],
+    "checks": [],
+    "rollback": "the previous panel release, if the new one does not answer its health path; the database is not rolled back"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

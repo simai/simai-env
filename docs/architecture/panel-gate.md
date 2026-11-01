@@ -266,6 +266,28 @@ docs/commands/self.md):
   `simai-metrics-history/1`, 5-minute points for a day, hourly for a week or
   a month, 30 days back.
 
+Safe update (1.32.0), administrator only:
+
+- `self:update-plan {target: env|panel}` answers `simai-update-plan/1`:
+  `{target, current, available, update_available, blocked, notes [{version,
+  text}], notes_url, backup, restarts, checks, rollback}`. For `env`,
+  `available` comes from the update channel and `notes` are the CHANGELOG
+  sections between the two versions; `checks` are the sites that answered
+  in the last status run, `restarts` is empty (sites keep running). For
+  `panel`, `available` is the build this simai-env release pins; `blocked`
+  is `not_installed` or `placeholder` when there is nothing to update.
+  `remote_unavailable` means the update channel did not answer.
+- `self:update {target}` (action). Its plan carries the same data under
+  `update`. The job, for `env`: notes which sites answer, replaces the
+  toolkit (the updater keeps an archive of the previous one), runs host
+  migrations, asks the sites again, and if a site that answered stops it
+  puts the previous toolkit back and fails. Host migrations are not undone.
+  For `panel`: a data backup of the panel, the deploy, a health check, and
+  `site deploy-rollback` when the new release does not answer; the database
+  is not rolled back. The job outlives the gateway itself being replaced;
+  follow it with `job:status` and `job:log`. `job:cancel` answers
+  `not_cancellable`: stopping midway could leave a half-replaced tree.
+
 ## Allowlist
 
 The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
@@ -300,7 +322,8 @@ action, job). Everything else is refused.
   `access:add-key`, `access:disable`, `access:enable`, `access:remove`;
   `backup:data-schedule` with `verify`; `site:add` with `backup`;
 - 1.31.0: `self:alerts`, `self:alerts-ack`, `self:alerts-channel`,
-  `self:alerts-test`, `self:metrics-history`.
+  `self:alerts-test`, `self:metrics-history`;
+- 1.32.0: `self:update-plan`, `self:update`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -317,8 +340,9 @@ stand (`testing/stand/stand.sh record`): host description (also an owner's
 view), command registry, `site describe` and `site doctor` for demo sites,
 plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
 refusal per site action of stage 9, the SFTP account list and plans of stage
-10, the alert list with one planted alert and the load history. Set 7 since
-1.31.0. The panel's fixture driver replays them, and
+10, the alert list with one planted alert, the load history, and the update
+plans (the remote version and notes of the `env` plan are pinned). Set 8
+since 1.32.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

@@ -1,0 +1,41 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.self-update",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "self:update",
+    "args": {
+      "target": "env"
+    },
+    "target": "host",
+    "description": "Update simai-env (--target env) or the panel build (--target panel); --check-sites yes rolls back if a site stops answering",
+    "effects": "write",
+    "lock": "host",
+    "applied": false,
+    "update": {
+      "schema": "simai-update-plan/1",
+      "target": "env",
+      "current": "1.32.0",
+      "available": "9.9.0",
+      "update_available": true,
+      "blocked": null,
+      "notes": [
+        {
+          "version": "9.9.0",
+          "text": "- An example release note."
+        }
+      ],
+      "notes_url": "https://github.com/simai/simai-env/blob/main/CHANGELOG.md",
+      "backup": "simai-env scripts (/root/simai-backups)",
+      "restarts": [],
+      "checks": [
+        "demo-owned.test",
+        "demo-php.test",
+        "demo-redirect.test",
+        "demo-static.test"
+      ],
+      "rollback": "the previous simai-env release, from the archive taken before the update, if a checked site stops answering; host migrations are not undone"
+    }
+  }
+}
