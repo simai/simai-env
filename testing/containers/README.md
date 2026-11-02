@@ -14,7 +14,10 @@ testing/containers/run.sh adopt_e2e deploy_e2e # named cases, in order
 
 Each case prints `PASS`/`FAIL` lines and ends with `failures=<n>`; the runner
 exits non-zero when a case fails. Requirements: Docker with privileged
-containers and internet access (packages, Composer, Laravel).
+containers and internet access (packages, Composer, Laravel). Cases with node
+sites take Node.js from the distribution when it is 18 or newer, and from the
+pinned NodeSource repository otherwise (Ubuntu 22.04), through
+`testing/containers/node_runtime.sh`.
 
 | Case | What it covers |
 | --- | --- |
