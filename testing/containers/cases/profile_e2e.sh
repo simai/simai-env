@@ -21,9 +21,8 @@ wait_get() { local _; for _ in {1..40}; do [[ "$(get "$1")" == "$2" ]] && return
 pages() { printf '%s|%s|%s|%s|%s|%s\n' "$(get /)" "$(get /dir/)" "$(get /page)" "$(code /dir)" "$(code /missing):$(get /missing)" "$(get /200-only)"; }
 tree_sum() { (cd "$P/releases" && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum; find . -printf '%U:%G %m %p\n' | sort | sha256sum) | tr '\n' ' '; }
 
-if ! command -v npm >/dev/null 2>&1; then
-  apt-get install -y -qq nodejs npm >/dev/null 2>&1 || { echo "FAIL nodejs install"; exit 1; }
-fi
+source testing/containers/node_runtime.sh
+e2e_ensure_node 18 || { echo "FAIL nodejs install"; exit 1; }
 
 # A static artifact as CI builds it (GitHub Pages layout).
 mk_static() {

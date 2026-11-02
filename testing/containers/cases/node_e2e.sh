@@ -13,9 +13,8 @@ D=svc.test; P=/home/simai/www/$D
 page() { curl -s --max-time 5 -H "Host: $D" "http://127.0.0.1${1:-/}"; }
 
 apt-get remove -y -qq tree >/dev/null 2>&1
-if ! command -v npm >/dev/null 2>&1; then
-  apt-get install -y -qq nodejs npm >/dev/null 2>&1 || { echo "FAIL nodejs install"; exit 1; }
-fi
+source testing/containers/node_runtime.sh
+e2e_ensure_node 18 || { echo "FAIL nodejs install"; exit 1; }
 
 # A minimal service: answers with its release label, writes into a shared
 # cache, and fails its health check when BROKEN exists in the release.
