@@ -1,0 +1,74 @@
+[
+  {
+    "id": "object.laravel-env.observation.89fe535be8.font-policy",
+    "kind": "documented_historical_observation",
+    "title": "Static font CORS documentation 89fe535be8: font-policy",
+    "predicate": "source_reports",
+    "value": "`nginx-static.conf` sends `Access-Control-Allow-Origin: *` on fonts (`woff`, `woff2`, `ttf`, `otf`, `eot`) only, so pages in sandboxed frames (origin `null`) can load them, as on GitHub Pages; `self migrate` adds that location to sites rendered before 1.24.0.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/architecture/templates.md#chars=704-963"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.027c52d986eea094.3",
+        "source_ref": "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/architecture/templates.md",
+        "content_digest": "sha256:86eea0945c06035d65a1674c0d0f3e71c83291b970af230604ce42d6909ddfd2",
+        "start": 704,
+        "end": 963,
+        "quote": "`nginx-static.conf` sends `Access-Control-Allow-Origin: *` on fonts (`woff`, `woff2`, `ttf`, `otf`, `eot`) only, so pages in sandboxed frames (origin `null`) can load them, as on GitHub Pages; `self migrate` adds that location to sites rendered before 1.24.0."
+      }
+    ],
+    "assertion_id": "assertion.6ad9f8e2a6f49568356963af411063b8c590607578b4b30f9e08200d44675ee8"
+  },
+  {
+    "id": "object.laravel-env.observation.89fe535be8.migration",
+    "kind": "documented_historical_observation",
+    "title": "Static font CORS documentation 89fe535be8: migration",
+    "predicate": "source_reports",
+    "value": "`self update` runs `self migrate`, which adds the font location to static\nsites rendered by earlier versions (a backup of each config is kept next to\nit, and the old config is restored if `nginx -t` fails).",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/releases/v1.24.0.md#chars=0-206"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.23598c8a9cecb856.7",
+        "source_ref": "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/releases/v1.24.0.md",
+        "content_digest": "sha256:9cecb856ed35f06334e69cd8e96827a7b77bbef56e02fb598b9b9dd2a328b4be",
+        "start": 0,
+        "end": 206,
+        "quote": "`self update` runs `self migrate`, which adds the font location to static\nsites rendered by earlier versions (a backup of each config is kept next to\nit, and the old config is restored if `nginx -t` fails)."
+      }
+    ],
+    "assertion_id": "assertion.3145a72276285ced9992d11d27805d9f3062bec1d0cf06b6cfb19053dbf8eee7"
+  },
+  {
+    "id": "object.laravel-env.observation.89fe535be8.reported-verification",
+    "kind": "documented_historical_observation",
+    "title": "Static font CORS documentation 89fe535be8: reported-verification",
+    "predicate": "source_reports",
+    "value": "`static_e2e` (68 checks): the header on fonts with `Origin: null`, nosniff\n  and immutable caching on fonts, 404 for a missing font, no CORS header on\n  other files, the migration of an older config and its idempotency.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/releases/v1.24.0.md#chars=2-221"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.23598c8a730525e4.9",
+        "source_ref": "repo://laravel-env@89fe535be8fd8e39f87e8b84b56cbce09caa0081/docs/releases/v1.24.0.md",
+        "content_digest": "sha256:730525e4739d7289663a0d1b4bca4f92a13c46263338f714f1d3aa94b3004a65",
+        "start": 2,
+        "end": 221,
+        "quote": "`static_e2e` (68 checks): the header on fonts with `Origin: null`, nosniff\n  and immutable caching on fonts, 404 for a missing font, no CORS header on\n  other files, the migration of an older config and its idempotency."
+      }
+    ],
+    "assertion_id": "assertion.1688b726d336b55701d3e7b507d5502d96a21d177c479ed9e90bb1a22c289088"
+  }
+]
