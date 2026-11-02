@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.cron-job-disable",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "cron:job-disable",
+    "args": {
+      "id": "a1b2c3d4"
+    },
+    "target": "host",
+    "description": "Disable a cron job (kept, not run)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

@@ -186,6 +186,21 @@ access_grant_traverse_acl() {
   setfacl -m "u:${login}:--x" "/home" 2>/dev/null || true
 }
 
+# Drops every entry granted to the login under path and on its parents. Runs
+# before userdel: an entry left behind names a free uid, and the next account
+# created with that uid (a site user) would inherit access to every site.
+access_revoke_acl() {
+  local login="$1" path="$2" current
+  [[ -n "$login" && -d "$path" ]] || return 0
+  setfacl -R -x "u:${login}" "$path" 2>/dev/null || true
+  find "$path" -type d -print0 2>/dev/null | xargs -0 -r setfacl -x "d:u:${login}" 2>/dev/null || true
+  current=$(dirname "$path")
+  while [[ -n "$current" && "$current" != "/" && "$current" != "." ]]; do
+    setfacl -x "u:${login}" "$current" 2>/dev/null || true
+    current=$(dirname "$current")
+  done
+}
+
 access_grant_global_acl() {
   local login="$1"
   access_grant_traverse_acl "$login" "$WWW_ROOT"
@@ -379,7 +394,8 @@ access_create_system_user() {
     error "User ${login} already exists"
     return 1
   fi
-  useradd -M -d "$home" -g "$group" -s /usr/sbin/nologin "$login"
+  useradd -M -d "$home" -g "$group" -s /usr/sbin/nologin "$login" || return 1
+  account_drop_stale_acl "$login"
 }
 
 access_set_password() {

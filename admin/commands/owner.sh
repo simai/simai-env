@@ -85,6 +85,7 @@ owner_create_handler() {
     useradd --create-home --home-dir "/home/${name}" --shell /bin/bash --user-group \
       --groups "$SIMAI_OWNERS_GROUP" "$name" || { error "Failed to create owner ${name}"; return 1; }
     passwd -l "$name" >/dev/null 2>&1 || true
+    account_drop_stale_acl "$name"
   fi
   chmod 0750 "/home/${name}"
   # nginx serves the owner's files through the owner's group.

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.34.0 - 2026-11-02
+
+- New site cron jobs: `cron list`, `cron job-add --domain D --schedule
+  '*/5 * * * *' --command '...'`, `cron job-remove`, `cron job-enable`,
+  `cron job-disable` (by `--id`) and `cron job-runs --id ID` (last runs with
+  exit code and output tail). Jobs run as the site user in the site
+  directory, never overlap, and keep their last 50 runs
+  (`simai-cron-jobs/1`, `simai-cron-runs/1`).
+- `site remove` removes the site's jobs and run records; `site isolate`
+  moves the jobs to the new user.
+- Panel gateway: `cron:list`, `cron:job-add`, `cron:job-remove`,
+  `cron:job-enable`, `cron:job-disable`, `cron:job-runs`, for owners on their
+  own sites; an unknown job id is refused (`unknown_cron_job`).
+- Fix: `access remove` left the account's access entries on the site
+  directories. The next account created with the same uid (often a new site
+  user) could read and write every site. Removal now drops them, and a new
+  site user, owner or SFTP account drops entries left by older versions.
+- Recorded panel answers: set 10.
+
 ## 1.33.0 - 2026-11-02
 
 - New `service list`, `service restart`, `service reload`, `service log` for

@@ -73,6 +73,10 @@ SERVICE = re.compile(r"^(nginx|mysql|mariadb|postgresql|redis-server|cron|php[5-
 PORT = re.compile(r"^[1-9][0-9]{0,4}$")
 UPSTREAM_PATH = re.compile(r"^/[A-Za-z0-9._~/-]{0,200}$")
 BITRIX_FILES = re.compile(r"^(none|setup|restore)$")
+CRON_ID = re.compile(r"^[a-f0-9]{8}$")
+CRON_SCHEDULE = re.compile(r"^[0-9*/,-]{1,40}( [0-9*/,-]{1,40}){4}$")  # checked fully by the command
+CRON_COMMAND = re.compile(r"^[!-,.-~][ -~]{0,999}$")
+LIMIT = re.compile(r"^(?:[1-9]|[1-4][0-9]|50)$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -173,6 +177,14 @@ ALLOW = {
     "service:restart": ({"name": SERVICE}, {"name"}, "action"),
     "service:reload": ({"name": SERVICE}, {"name"}, "action"),
     "self:profiles": ({}, set(), "read"),
+    # 1.34.0: a site's own cron jobs, run as the site user.
+    "cron:list": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "cron:job-add": ({"domain": DOMAIN, "schedule": CRON_SCHEDULE, "command": CRON_COMMAND},
+                     {"domain", "schedule", "command"}, "action"),
+    "cron:job-remove": ({"id": CRON_ID}, {"id"}, "action"),
+    "cron:job-enable": ({"id": CRON_ID}, {"id"}, "action"),
+    "cron:job-disable": ({"id": CRON_ID}, {"id"}, "action"),
+    "cron:job-runs": ({"id": CRON_ID, "limit": LIMIT}, {"id"}, "read"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -196,6 +208,8 @@ ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts
 ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
 ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
 BY_LOGIN = {"access:add-key", "access:disable", "access:enable", "access:remove"}  # scope from the account
+BY_CRON_ID = {"cron:job-remove", "cron:job-enable", "cron:job-disable", "cron:job-runs"}  # scope from the job
+CRON_JOBS = Path(os.environ.get("SIMAI_CRON_JOBS_DIR", "/etc/simai-env/cron-jobs"))
 
 
 class Refused(Exception):
@@ -491,6 +505,18 @@ def load_alerts():
         return {}
 
 
+def cron_domain(job_id):
+    """The site a cron job belongs to, from root's job lists."""
+    for f in CRON_JOBS.glob("*/jobs.json"):
+        try:
+            jobs = json.loads(f.read_text()).get("jobs", [])
+        except (OSError, ValueError, AttributeError):
+            continue
+        if any(isinstance(j, dict) and j.get("id") == job_id for j in jobs):
+            return f.parent.name
+    return None
+
+
 def access_domain(login):
     """Site of a project SFTP account, from its root-owned metadata; None for others."""
     try:
@@ -537,6 +563,13 @@ def main():
             domain = access_domain(args["login"])
             if domain is None:
                 raise Refused("not_allowed")  # only a site's SFTP accounts, not global ones
+            if owner is not None and not owned(owner, domain):
+                raise Refused("owner_scope")
+            entry["domain"] = domain
+        if command in BY_CRON_ID:
+            domain = cron_domain(args["id"])
+            if domain is None:
+                raise Refused("unknown_cron_job")
             if owner is not None and not owned(owner, domain):
                 raise Refused("owner_scope")
             entry["domain"] = domain

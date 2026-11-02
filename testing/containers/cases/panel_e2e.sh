@@ -282,6 +282,10 @@ job_ok '"acme"' "$(creq '"acme"' access:remove '{"login":"dbstaff"}')" && ok "ow
 ! getent passwd dbstaff >/dev/null && ok "the account is gone" || bad "dbstaff still exists"
 grep -rqF -- "${staff#* }" /var/log/simai-panel-gate.log && bad "a key reached the gate log" || ok "keys are not in the gate log"
 cli access remove --login globstaff --confirm yes >/dev/null 2>&1
+# A removed account leaves no entry behind: the next user with its uid would
+# inherit access to every site.
+gacl=$(getfacl -Rcp /home/simai/www 2>/dev/null | grep -E '^(default:)?user:[0-9]+:' | sort -u)
+[[ -z "$gacl" ]] && ok "removed accounts leave no access entries on the sites" || bad "stale entries: ${gacl}"
 
 # Site answers, disk and the last backup in one self:describe (stage 2 list).
 cli self status-refresh --confirm yes >/dev/null 2>&1 && ok "self status-refresh" || bad "status-refresh"
@@ -399,6 +403,42 @@ j=$(gate "$(creq null site:add '{"domain":"px3.test","profile":"proxy","upstream
 refused invalid_argument "$(req null site:add '{"domain":"px4.test","profile":"proxy","upstream-port":"8080","upstream-host":"10.0.0.1"}')" "a proxy to another host"
 job_ok null "$(creq null site:remove '{"domain":"px.test","remove-files":"yes"}')" && job_ok null "$(creq null site:remove '{"domain":"px2.test","remove-files":"yes"}')" && [[ ! -f /etc/simai-env/sites/px.test/proxy.env ]] && ok "proxy sites are removed with their settings" || bad "proxy remove"
 kill "$uppid" 2>/dev/null
+
+# A site's own cron jobs (1.34.0): run as the site user in the site directory.
+a=$(gate "$(creq '"acme"' cron:job-add '{"domain":"acme.test","schedule":"*/5 * * * *","command":"echo hello-$(id -un) in $(pwd); echo 50% done"}')"); j=$(field 'd.get("job_id","")' <<<"$a")
+[[ "$(wait_job '"acme"' "$j")" == succeeded ]] && ok "owner adds a cron job" || bad "cron job-add: $a"
+a=$(gate "$(req '"acme"' cron:list '{"domain":"acme.test"}')")
+cid=$(field 'd["data"]["jobs"][0]["id"]' <<<"$a")
+[[ "$(field 'd["data"]["jobs"][0]["schedule"] + "|" + str(d["data"]["jobs"][0]["enabled"])' <<<"$a")" == "*/5 * * * *|True" ]] && ok "the list shows the job" || bad "cron list: ${a:0:300}"
+line=$(grep -v '^#' /etc/cron.d/simai-jobs-acme-test 2>/dev/null | grep "$cid")
+cuser=$(awk '{print $6}' <<<"$line")
+[[ -n "$cuser" && "$cuser" != root && "$line" == *"/usr/local/lib/simai-env/cron-job-run acme.test ${cid}" ]] && ok "the cron line runs the wrapper as ${cuser}, never root" || bad "cron line: ${line}"
+[[ "$(stat -c '%U %a' /etc/simai-env/cron-jobs/acme.test/jobs.json)" == "root 600" ]] && ok "the job list is root-only" || bad "jobs.json mode"
+grep -q '50%' /etc/cron.d/simai-jobs-acme-test && bad "the command reached the cron line" || ok "the command stays out of the cron line"
+sudo -u "$cuser" /usr/local/lib/simai-env/cron-job-run acme.test "$cid"
+a=$(gate "$(req '"acme"' cron:job-runs "{\"id\":\"${cid}\"}")")
+[[ "$(field 'd["data"]["runs"][0]["exit_code"]' <<<"$a")" == 0 && "$(field 'd["data"]["runs"][0]["output"][0]' <<<"$a")" == "hello-${cuser} in /home/simai/www/acme.test" ]] && ok "a run is recorded with its output, as the site user in the site directory" || bad "runs: ${a:0:400}"
+[[ "$(gate "$(req '"acme"' cron:list '{"domain":"acme.test"}')" | field 'd["data"]["jobs"][0]["last_run"]["exit_code"]')" == 0 ]] && ok "the list shows the last run" || bad "last run"
+a=$(gate "$(creq '"acme"' cron:job-add '{"domain":"acme.test","schedule":"0 3 * * *","command":"echo failing; exit 3"}')"); j=$(field 'd.get("job_id","")' <<<"$a"); wait_job '"acme"' "$j" >/dev/null
+fid=$(gate "$(req '"acme"' cron:list '{"domain":"acme.test"}')" | field '[x["id"] for x in d["data"]["jobs"] if "exit 3" in x["command"]][0]')
+sudo -u "$cuser" /usr/local/lib/simai-env/cron-job-run acme.test "$fid"
+[[ "$(gate "$(req '"acme"' cron:job-runs "{\"id\":\"${fid}\"}")" | field 'd["data"]["runs"][0]["exit_code"]')" == 3 ]] && ok "a failing run keeps its exit code" || bad "failing run"
+job_ok '"acme"' "$(creq '"acme"' cron:job-disable "{\"id\":\"${cid}\"}")" && ! grep -q "$cid" /etc/cron.d/simai-jobs-acme-test && ok "a disabled job leaves the cron file" || bad "disable"
+job_ok '"acme"' "$(creq '"acme"' cron:job-enable "{\"id\":\"${cid}\"}")" && grep -q "$cid" /etc/cron.d/simai-jobs-acme-test && ok "and comes back when enabled" || bad "enable"
+j=$(gate "$(creq '"acme"' cron:job-add '{"domain":"acme.test","schedule":"61 * * * *","command":"true"}')" | field 'd["job_id"]')
+[[ "$(wait_job '"acme"' "$j")" == failed ]] && ok "an impossible schedule fails" || bad "schedule 61"
+refused invalid_argument "$(req '"acme"' cron:job-add '{"domain":"acme.test","schedule":"* * * * *","command":"-rf /"}')" "a command that starts with a dash"
+refused invalid_argument "$(req '"acme"' cron:job-add '{"domain":"acme.test","schedule":"@reboot","command":"true"}')" "a schedule that is not five fields"
+refused owner_scope "$(req '"acme"' cron:job-add '{"domain":"open.test","schedule":"* * * * *","command":"true"}')" "an owner adds a job to another site"
+cli cron job-add --domain open.test --schedule '0 1 * * *' --command 'true' --confirm yes >/dev/null 2>&1
+oid=$(python3 -c 'import json;print(json.load(open("/etc/simai-env/cron-jobs/open.test/jobs.json"))["jobs"][0]["id"])')
+refused owner_scope "$(req '"acme"' cron:job-runs "{\"id\":\"${oid}\"}")" "an owner reads another site's job"
+refused owner_scope "$(req '"acme"' cron:job-remove "{\"id\":\"${oid}\"}")" "an owner removes another site's job"
+refused unknown_cron_job "$(req null cron:job-runs '{"id":"00000000"}')" "an unknown job"
+job_ok '"acme"' "$(creq '"acme"' cron:job-remove "{\"id\":\"${fid}\"}")" && [[ ! -e /var/lib/simai-env/cron-runs/acme.test/${fid}.jsonl ]] && ok "removing a job drops its records" || bad "job remove"
+cli site remove --domain open.test --remove-files yes --confirm yes >/dev/null 2>&1
+[[ ! -e /etc/simai-env/cron-jobs/open.test && ! -e /etc/cron.d/simai-jobs-open-test ]] && ok "a removed site takes its cron jobs along" || bad "jobs after site remove"
+cli site add --domain open.test --profile generic --php 8.3 --create-db no --confirm yes >/dev/null 2>&1
 
 # Safe update (1.32.0): a plan with versions and checks, then a job that puts
 # the previous toolkit back when a site stops answering. A stand-in updater

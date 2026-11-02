@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=9
+FIXTURE_SET=10
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -103,6 +103,17 @@ record() {
   in_stand bash -c 'mkdir -p /var/lib/simai-env/backup-runs && echo "{\"at\":\"2026-01-01T00:00:00Z\",\"ok\":false}" >/var/lib/simai-env/backup-runs/demo-owned.test.json'
   in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
   in_stand /root/simai-env/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1
+  # One cron job of the owner's site with a fixed id and one recorded run.
+  docker exec -i "$NAME" bash -s <<'CRON'
+f=/etc/simai-env/cron-jobs/demo-owned.test/jobs.json
+mkdir -p "$(dirname "$f")" && chmod 0711 "$(dirname "$f")"
+printf '{"jobs":[{"id":"a1b2c3d4","schedule":"*/10 * * * *","command":"php artisan app:sync --quiet","enabled":true,"created_at":"2026-01-01T00:00:00Z"}]}' >"$f"; chmod 0600 "$f"
+/root/simai-env/simai-admin.sh cron job-enable --id a1b2c3d4 --confirm yes >/dev/null 2>&1
+u=$(awk '/a1b2c3d4/ {print $6}' /etc/cron.d/simai-jobs-demo-owned-test)
+mkdir -p /var/lib/simai-env/cron-runs/demo-owned.test
+printf '{"started_at":"2026-01-01T00:00:00Z","finished_at":"2026-01-01T00:00:02Z","exit_code":0,"output":["Synced 12 records."]}\n' >/var/lib/simai-env/cron-runs/demo-owned.test/a1b2c3d4.jsonl
+chown -R "$u" /var/lib/simai-env/cron-runs/demo-owned.test
+CRON
   # The site answers show one backup, also on a freshly created stand.
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
   local bk
@@ -163,6 +174,13 @@ record() {
     "plan.self-update|null|self:update|{\"target\":\"env\"}"
     "refused.owner-admin-only.update|\"demo\"|self:update|{\"target\":\"env\"}"
     "service-list|null|service:list|{}"
+    "cron-list.demo-owned.test|\"demo\"|cron:list|{\"domain\":\"demo-owned.test\"}"
+    "cron-job-runs|\"demo\"|cron:job-runs|{\"id\":\"a1b2c3d4\"}"
+    "plan.cron-job-add|\"demo\"|cron:job-add|{\"domain\":\"demo-owned.test\",\"schedule\":\"0 3 * * *\",\"command\":\"php artisan backup:clean\"}"
+    "plan.cron-job-disable|\"demo\"|cron:job-disable|{\"id\":\"a1b2c3d4\"}"
+    "plan.cron-job-remove|\"demo\"|cron:job-remove|{\"id\":\"a1b2c3d4\"}"
+    "refused.owner-scope.cron-job-add|\"demo\"|cron:job-add|{\"domain\":\"demo-php.test\",\"schedule\":\"0 3 * * *\",\"command\":\"true\"}"
+    "refused.unknown-cron-job|null|cron:job-runs|{\"id\":\"00000000\"}"
     "service-log.nginx|null|service:log|{\"name\":\"nginx\",\"lines\":\"20\"}"
     "plan.service-restart|null|service:restart|{\"name\":\"nginx\"}"
     "plan.service-reload|null|service:reload|{\"name\":\"nginx\"}"

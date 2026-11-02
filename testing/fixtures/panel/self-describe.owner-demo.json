@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.33.0",
+      "version": "1.34.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -72,6 +72,12 @@
         "backup:data-schedule",
         "backup:data-verify",
         "cron:add",
+        "cron:job-add",
+        "cron:job-disable",
+        "cron:job-enable",
+        "cron:job-remove",
+        "cron:job-runs",
+        "cron:list",
         "cron:remove",
         "db:list",
         "job:cancel",

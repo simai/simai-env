@@ -1713,6 +1713,8 @@ site_remove_handler() {
   local removed_queue=0 removed_cron=0
   # The daily backup schedule goes with the site; backups already taken stay.
   rm -f -- "/etc/cron.d/simai-backup-$(project_slug_from_domain "$domain")"
+  # So do its own cron jobs and their run records.
+  python3 -I "${SIMAI_ENV_ROOT}/lib/cron_jobs.py" purge "$domain" "$(project_slug_from_domain "$domain")" || true
   if [[ "$is_alias" == "yes" ]]; then
     info "Profile is alias; skipping PHP/cron/queue removal"
   else

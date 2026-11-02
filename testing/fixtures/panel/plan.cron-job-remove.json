@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.cron-job-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "cron:job-remove",
+    "args": {
+      "id": "a1b2c3d4"
+    },
+    "target": "host",
+    "description": "Remove a cron job and its run records",
+    "effects": "delete",
+    "lock": "host",
+    "applied": false
+  }
+}

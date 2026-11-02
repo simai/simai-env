@@ -562,6 +562,11 @@ access_remove_handler() {
     }
   fi
   if id -u "$login" >/dev/null 2>&1; then
+    if [[ "${ACCESS_META[TYPE]:-}" == "global" ]]; then
+      access_revoke_acl "$login" "$WWW_ROOT"
+    elif [[ -n "${ACCESS_META[ROOT_PATH]:-}" ]]; then
+      access_revoke_acl "$login" "${ACCESS_META[ROOT_PATH]}"
+    fi
     userdel "$login" 2>/dev/null || userdel -r "$login" 2>/dev/null || true
   fi
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then

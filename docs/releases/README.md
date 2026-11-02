@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.34.0](v1.34.0.md) — site cron jobs with run records, from the CLI and
+  the panel.
 - [v1.33.0](v1.33.0.md) — host services, site profiles for the wizard, a
   reverse proxy profile, Bitrix sites from the panel, Larena Panel 0.3.0.
 - [v1.32.0](v1.32.0.md) — safe update of simai-env and the panel from the

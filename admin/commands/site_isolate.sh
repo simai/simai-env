@@ -170,6 +170,10 @@ site_isolate_handler() {
     warn "nginx -t failed; reload nginx after fixing its config so it can read ${root}"
   fi
   [[ -f "$cron_file" ]] && reload_cron_daemon
+  # The site's own cron jobs run as the new user from the next minute.
+  if [[ -f "/etc/simai-env/cron-jobs/${domain}/jobs.json" ]]; then
+    cron_jobs_apply "$domain" || warn "Cron jobs of ${domain} still name ${from}; run: simai-admin.sh cron list --domain ${domain}"
+  fi
   if [[ -n "$queue_unit" ]]; then
     os_svc_daemon_reload || true
     local worker_unit

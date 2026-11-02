@@ -372,6 +372,15 @@ site_ensure_opcache_isolation() {
   chmod 0644 "$conf"
 }
 
+# A new account must not inherit what a removed one with the same uid was
+# granted (entries left by an older access remove).
+account_drop_stale_acl() {
+  local user="$1"
+  getfacl -cp "$WWW_ROOT" 2>/dev/null | grep -q "^\(default:\)\?user:${user}:" || return 0
+  warn "Dropping access entries left on ${WWW_ROOT} for the reused uid of ${user}"
+  access_revoke_acl "$user" "$WWW_ROOT"
+}
+
 site_user_create() {
   local project="$1" user home registry
   validate_project_slug "$project" || return 1
@@ -383,6 +392,7 @@ site_user_create() {
       return 1
     }
     passwd -l "$user" >/dev/null 2>&1 || true
+    account_drop_stale_acl "$user"
   fi
   install -d -m 0755 -o root -g root /var/lib/simai-env/site-homes
   install -d -m 0700 -o "$user" -g "$user" "$home" || return 1

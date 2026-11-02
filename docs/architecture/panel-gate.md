@@ -308,6 +308,22 @@ Host services and site profiles (1.33.0):
   `profile: bitrix` with `bitrix-files: none|setup|restore`. A profile the
   administrator has not enabled fails the job.
 
+Site cron jobs (1.34.0):
+
+- `cron:list {domain}` (`simai-cron-jobs/1`: `domain, jobs [{id, schedule,
+  command, enabled, created_at, last_run {started_at, finished_at,
+  exit_code} | null}]`), `cron:job-runs {id, limit}` (`simai-cron-runs/1`:
+  `id, domain, runs [{started, finished, exit_code, output}]`, newest first,
+  `output` holds the last 50 lines).
+- `cron:job-add {domain, schedule, command}`, `cron:job-remove {id}`,
+  `cron:job-enable {id}`, `cron:job-disable {id}` (actions). `schedule` is
+  five cron fields, `command` one printable line up to 1000 characters that
+  does not start with `-`. Jobs run as the site user in the site directory
+  (`current/` for sites with releases); a run still going makes the next
+  one skip. At most 50 jobs per site.
+- Owners manage jobs of their own sites. A job id that does not exist is
+  refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
+
 ## Allowlist
 
 The allowlist is the `ALLOW` table in `admin/panel_gate.py`: each command
@@ -345,7 +361,9 @@ action, job). Everything else is refused.
   `self:alerts-test`, `self:metrics-history`;
 - 1.32.0: `self:update-plan`, `self:update`;
 - 1.33.0: `service:list`, `service:log`, `service:restart`, `service:reload`,
-  `self:profiles`; `site:add` with profiles `proxy` and `bitrix`.
+  `self:profiles`; `site:add` with profiles `proxy` and `bitrix`;
+- 1.34.0: `cron:list`, `cron:job-add`, `cron:job-remove`, `cron:job-enable`,
+  `cron:job-disable`, `cron:job-runs`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
