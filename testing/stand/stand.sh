@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=12
+FIXTURE_SET=13
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -204,6 +204,12 @@ FW
     "refused.owner-admin-only.firewall-status|\"demo\"|firewall:status|{}"
     "refused.invalid-argument.panel-access|null|panel:access|{\"allow\":\"192.0.2.10; deny all\"}"
     "ssl-dns-status|null|ssl:dns-status|{}"
+    "php-list|null|php:list|{}"
+    "plan.php-install|null|php:install|{\"php\":\"8.4\"}"
+    "plan.php-remove|null|php:remove|{\"php\":\"8.4\"}"
+    "plan.php-extension|null|php:extension|{\"php\":\"8.3\",\"name\":\"imagick\",\"enabled\":\"yes\"}"
+    "plan.php-update|null|php:update|{\"php\":\"8.3\"}"
+    "refused.owner-admin-only.php-list|\"demo\"|php:list|{}"
     "plan.ssl-dns-credentials|null|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"token\":\"cfStandStandStandStandStandStand1234\"}"
     "plan.ssl-letsencrypt-dns|null|ssl:letsencrypt|{\"domain\":\"demo-php.test\",\"email\":\"ops@example.com\",\"challenge\":\"dns\"}"
     "refused.owner-admin-only.ssl-dns-credentials|\"demo\"|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"remove\":\"yes\"}"

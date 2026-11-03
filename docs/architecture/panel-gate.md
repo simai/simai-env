@@ -324,6 +324,17 @@ Site cron jobs (1.34.0):
 - Owners manage jobs of their own sites. A job id that does not exist is
   refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
 
+PHP as software of the host (1.37.0), administrator only:
+
+- `php:list` (`simai-php/1`): `native, versions [{version, fpm_active, sites,
+  native, cli_default, package_version, updates, removable}], installable`.
+- Actions: `php:install {php, include-common}`, `php:remove {php}` (fails
+  while a site uses the version, and for the system and `php` command
+  versions), `php:extension {php, name, enabled}` (turning on installs the
+  package), `php:update {php}` (fixes within the version; the job fails and
+  names sites that stopped answering). `php:extensions` stays a read for
+  everyone.
+
 DNS-01 certificates through Cloudflare (1.36.0):
 
 - `ssl:dns-credentials {provider: cloudflare, token | remove: yes}`,
@@ -405,7 +416,9 @@ action, job). Everything else is refused.
   `firewall:block`, `firewall:unblock`, `panel:access`, `change:confirm`,
   `change:status`; `job:status` with `result`;
 - 1.36.0: `ssl:dns-credentials`, `ssl:dns-status`; `ssl:letsencrypt` with
-  `challenge` and `wildcard`.
+  `challenge` and `wildcard`;
+- 1.37.0: `php:list`, `php:install`, `php:remove`, `php:extension`,
+  `php:update`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -426,8 +439,9 @@ refusal per site action of stage 9, the SFTP account list and plans of stage
 plans (the remote version and notes of the `env` plan are pinned), the
 service list and log, the site profiles, a site's cron jobs and runs with one
 planted job, the firewall with one rule, one block and a confirmed change,
-and the DNS provider status with plans for a token and a DNS certificate.
-Set 12 since 1.36.0. The panel's fixture driver replays them, and
+the DNS provider status with plans for a token and a DNS certificate, and
+the PHP versions with plans for installing, removing and updating.
+Set 13 since 1.37.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

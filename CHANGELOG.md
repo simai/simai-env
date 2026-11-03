@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 1.37.0 - 2026-11-04
+
+- PHP as software of the host. `php list` shows the sites on each version,
+  waiting package updates and the versions apt can install (`--output json`,
+  `simai-php/1`).
+- New `php remove --php X`: only a version no site uses, and never the system
+  version or the one behind the `php` command.
+- New `php extension --php X --name N --enabled yes|no`: turns an extension
+  on or off for PHP-FPM, installs its package when needed, puts the previous
+  state back when PHP-FPM rejects the change.
+- New `php update --php X`: package fixes within the version; PHP-FPM is
+  tested and restarted, and the sites on that version are asked before and
+  after.
+- Panel gateway: `php:list`, `php:install`, `php:remove`, `php:extension`,
+  `php:update`, administrator only.
+- Tests: `php_e2e`; `host_e2e` no longer depends on the cases before it.
+- Recorded panel answers: set 13.
+
 ## 1.36.0 - 2026-11-03
 
 - `ssl letsencrypt --challenge dns`: a certificate through a DNS TXT record,

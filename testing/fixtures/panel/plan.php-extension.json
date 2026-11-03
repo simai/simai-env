@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.php-extension",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "php:extension",
+    "args": {
+      "php": "8.3",
+      "name": "imagick",
+      "enabled": "yes"
+    },
+    "target": "host",
+    "description": "Turn a PHP-FPM extension on or off (installs its package when needed)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

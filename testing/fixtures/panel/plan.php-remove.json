@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.php-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "php:remove",
+    "args": {
+      "php": "8.4"
+    },
+    "target": "host",
+    "description": "Remove a PHP version that no site, the system or the php command uses",
+    "effects": "delete",
+    "lock": "host",
+    "applied": false
+  }
+}

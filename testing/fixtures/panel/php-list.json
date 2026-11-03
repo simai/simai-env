@@ -1,0 +1,28 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-php-list",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-php/1",
+    "native": "8.3",
+    "versions": [
+      {
+        "version": "8.3",
+        "fpm_active": true,
+        "sites": [
+          "demo-owned.test",
+          "demo-php.test"
+        ],
+        "native": true,
+        "cli_default": true,
+        "package_version": "8.3.6-0ubuntu0.24.04.13",
+        "updates": [],
+        "removable": false
+      }
+    ],
+    "installable": []
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

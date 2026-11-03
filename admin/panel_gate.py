@@ -67,6 +67,7 @@ CHANNEL_KIND = re.compile(r"^(webhook|telegram|off)$")
 CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~/%?&=+:@-]{0,500})?|"
                             r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
+PHP_EXT = re.compile(r"^[a-z0-9_]{2,32}$")
 CF_TOKEN = re.compile(r"^[A-Za-z0-9_-]{30,64}$")
 CHALLENGE = re.compile(r"^(http|dns)$")
 DNS_PROVIDER = re.compile(r"^cloudflare$")
@@ -160,6 +161,11 @@ ALLOW = {
                              {"domain"}, "action"),
     "backup:data-verify": ({"domain": DOMAIN, "backup": BACKUP}, {"domain", "backup"}, "action"),
     "php:extensions": ({"php": PHP}, {"php"}, "read"),
+    "php:list": ({}, set(), "read"),
+    "php:install": ({"php": PHP, "include-common": YES_NO}, {"php"}, "action"),
+    "php:remove": ({"php": PHP}, {"php"}, "action"),
+    "php:extension": ({"php": PHP, "name": PHP_EXT, "enabled": YES_NO}, {"php", "name", "enabled"}, "action"),
+    "php:update": ({"php": PHP}, {"php"}, "action"),
     "site:php-ini-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:php-ini-set": ({"domain": DOMAIN, "name": INI_KEY, "value": INI_VALUE}, {"domain", "name", "value"},
                          "action"),
@@ -216,7 +222,8 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
               "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
-              "change:confirm", "change:status", "ssl:dns-credentials"}
+              "change:confirm", "change:status", "ssl:dns-credentials",
+              "php:list", "php:install", "php:remove", "php:extension", "php:update"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.37.0](v1.37.0.md) — PHP versions as software: install, remove,
+  extensions and updates, from the CLI and the panel.
 - [v1.36.0](v1.36.0.md) — certificates through Cloudflare DNS, before the
   domain points at the server.
 - [v1.35.0](v1.35.0.md) — firewall rules, address blocks and panel access by

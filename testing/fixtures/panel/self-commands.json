@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 220,
+    "count": 223,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -2207,6 +2207,31 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh php extension",
+        "description": "Turn a PHP-FPM extension on or off (installs its package when needed)",
+        "required": [
+          "--php",
+          "--name",
+          "--enabled"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh php extensions",
         "description": "List PHP-FPM extensions of a PHP version: loaded and available",
         "required": [
@@ -2284,6 +2309,52 @@
         },
         "flags": [
           "menu:confirm"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh php remove",
+        "description": "Remove a PHP version that no site, the system or the php command uses",
+        "required": [
+          "--php"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh php update",
+        "description": "Install package updates of one PHP version and check its sites",
+        "required": [
+          "--php"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
         ],
         "effects": "write",
         "authorization": "root",

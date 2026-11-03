@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.php-install",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "php:install",
+    "args": {
+      "php": "8.4"
+    },
+    "target": "host",
+    "description": "Install a PHP version (FPM/CLI + base extensions)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}
