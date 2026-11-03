@@ -68,6 +68,8 @@ CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-
                             r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
 PHP_EXT = re.compile(r"^[a-z0-9_]{2,32}$")
+SOFTWARE = re.compile(r"^(node|redis|postgresql)$")
+MAJOR = re.compile(r"^[0-9]{2}$")
 CF_TOKEN = re.compile(r"^[A-Za-z0-9_-]{30,64}$")
 CHALLENGE = re.compile(r"^(http|dns)$")
 DNS_PROVIDER = re.compile(r"^cloudflare$")
@@ -166,6 +168,10 @@ ALLOW = {
     "php:remove": ({"php": PHP}, {"php"}, "action"),
     "php:extension": ({"php": PHP, "name": PHP_EXT, "enabled": YES_NO}, {"php", "name", "enabled"}, "action"),
     "php:update": ({"php": PHP}, {"php"}, "action"),
+    "software:list": ({}, set(), "read"),
+    "software:refresh": ({}, set(), "action"),
+    "software:update": ({"security-only": YES_NO}, set(), "action"),
+    "software:install": ({"name": SOFTWARE, "version": MAJOR}, {"name"}, "action"),
     "site:php-ini-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:php-ini-set": ({"domain": DOMAIN, "name": INI_KEY, "value": INI_VALUE}, {"domain", "name", "value"},
                          "action"),
@@ -223,7 +229,8 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
               "change:confirm", "change:status", "ssl:dns-credentials",
-              "php:list", "php:install", "php:remove", "php:extension", "php:update"}
+              "php:list", "php:install", "php:remove", "php:extension", "php:update",
+              "software:list", "software:refresh", "software:update", "software:install"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
@@ -375,6 +382,9 @@ def plan(command, args, attachment=None):
     if command == "self:update":
         # Versions, release notes, what restarts and which sites are checked.
         answer["update"] = (run("self:update-plan", {"target": args["target"]}) or {}).get("data")
+    elif command == "software:update":
+        # The packages waiting in the apt index and whether a reboot is pending.
+        answer["update"] = ((run("software:list", {}) or {}).get("data") or {}).get("system")
     return answer
 
 

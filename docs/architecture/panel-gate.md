@@ -324,6 +324,20 @@ Site cron jobs (1.34.0):
 - Owners manage jobs of their own sites. A job id that does not exist is
   refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
 
+Server software (1.38.0), administrator only:
+
+- `software:list` (`simai-software/1`): `components [{name, package,
+  installed, version, candidate, update, service, active, installable}]`
+  (`node` also lists its `sites`), `system {updates, security, packages
+  [{name, from, to, security}], kept_back, reboot_required, reboot_packages,
+  index_age_seconds}`.
+- Actions: `software:refresh` (the apt index), `software:update
+  {security-only}` (its plan carries `update`: the `system` part of the
+  list; the job fails and names sites that stopped answering or a rejected
+  nginx or PHP-FPM configuration), `software:install {name: node|redis|
+  postgresql, version}` (a Node.js major change is refused while node sites
+  exist).
+
 PHP as software of the host (1.37.0), administrator only:
 
 - `php:list` (`simai-php/1`): `native, versions [{version, fpm_active, sites,
@@ -418,7 +432,9 @@ action, job). Everything else is refused.
 - 1.36.0: `ssl:dns-credentials`, `ssl:dns-status`; `ssl:letsencrypt` with
   `challenge` and `wildcard`;
 - 1.37.0: `php:list`, `php:install`, `php:remove`, `php:extension`,
-  `php:update`.
+  `php:update`;
+- 1.38.0: `software:list`, `software:refresh`, `software:update`,
+  `software:install`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -440,8 +456,9 @@ plans (the remote version and notes of the `env` plan are pinned), the
 service list and log, the site profiles, a site's cron jobs and runs with one
 planted job, the firewall with one rule, one block and a confirmed change,
 the DNS provider status with plans for a token and a DNS certificate, and
-the PHP versions with plans for installing, removing and updating.
-Set 13 since 1.37.0. The panel's fixture driver replays them, and
+the PHP versions with plans for installing, removing and updating, and the
+server software with plans for a system update and an install.
+Set 14 since 1.38.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

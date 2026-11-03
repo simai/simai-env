@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.software-install",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "software:install",
+    "args": {
+      "name": "redis"
+    },
+    "target": "host",
+    "description": "Install Node.js, Redis or PostgreSQL",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

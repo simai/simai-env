@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 1.38.0 - 2026-11-04
+
+- Server software. New `software list`: nginx, the MySQL server, PostgreSQL,
+  Redis, Node.js and certbot with installed and candidate versions, and the
+  waiting system updates with security ones, kept-back packages and whether a
+  reboot is pending (`--output json`, `simai-software/1`).
+- New `software refresh` (the apt index) and `software update
+  [--security-only yes]`: upgrades installed packages only, keeps changed
+  configuration files, tests nginx and PHP-FPM and asks every site before
+  and after; a site that stops answering fails the command with its name.
+- New `software install --name node|redis|postgresql [--version V]`. Node.js
+  comes from the pinned NodeSource repository; a major change is refused
+  while node sites exist.
+- Panel gateway: `software:list`, `software:refresh`, `software:update`,
+  `software:install`, administrator only.
+- Tests: `software_e2e`.
+- Recorded panel answers: set 14.
+
 ## 1.37.0 - 2026-11-04
 
 - PHP as software of the host. `php list` shows the sites on each version,

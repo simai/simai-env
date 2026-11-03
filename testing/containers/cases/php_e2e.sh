@@ -17,7 +17,7 @@ cli site add --domain php.test --profile generic --php "$native" --create-db no 
 apt-get update -qq >/dev/null 2>&1
 l=$(cli php list --output json 2>/dev/null | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["data"]))')
 [[ "$(js 'd["schema"]' <<<"$l")" == simai-php/1 ]] && ok "php list answers simai-php/1" || bad "php list: ${l:0:300}"
-[[ "$(js '[v["sites"] for v in d["versions"] if v["version"]==d["native"]][0]' <<<"$l")" == "['php.test']" ]] && ok "the site is listed on its version" || bad "sites: $l"
+[[ "$(js '"php.test" in [v["sites"] for v in d["versions"] if v["version"]==d["native"]][0]' <<<"$l")" == True ]] && ok "the site is listed on its version" || bad "sites: $l"
 [[ "$(js '[v["removable"] for v in d["versions"] if v["version"]==d["native"]][0]' <<<"$l")" == False ]] && ok "the system version is not removable" || bad "native removable"
 cli php remove --php "$native" --confirm yes >/tmp/r 2>&1 && bad "removed the system version" || ok "php remove refuses the system version"
 

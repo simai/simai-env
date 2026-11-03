@@ -1,0 +1,33 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.software-update",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "software:update",
+    "args": {
+      "security-only": "yes"
+    },
+    "target": "host",
+    "description": "Install waiting system package updates and check every site",
+    "effects": "write",
+    "lock": "host",
+    "applied": false,
+    "update": {
+      "updates": 1,
+      "security": 1,
+      "packages": [
+        {
+          "name": "libpcre2-8-0",
+          "from": "10.42-4ubuntu2.1",
+          "to": "10.42-4ubuntu2.2",
+          "security": true
+        }
+      ],
+      "kept_back": [],
+      "reboot_required": false,
+      "reboot_packages": [],
+      "index_age_seconds": 16487
+    }
+  }
+}

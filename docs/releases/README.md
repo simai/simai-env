@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.38.0](v1.38.0.md) — server software and system updates with a site
+  check; Node.js, Redis and PostgreSQL installs.
 - [v1.37.0](v1.37.0.md) — PHP versions as software: install, remove,
   extensions and updates, from the CLI and the panel.
 - [v1.36.0](v1.36.0.md) — certificates through Cloudflare DNS, before the
