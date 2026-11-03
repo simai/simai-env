@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 10,
+  "set_version": 11,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.34.0",
+  "simai_env": "1.35.0",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -11,6 +11,10 @@
     },
     "access-list.owner-demo.json": {
       "sha256": "8b259e5767480085c5da8dca373f861cb9a4348377a0af0797b3ff881c367989",
+      "status": "ok"
+    },
+    "change-status.json": {
+      "sha256": "9c1d34b00e8e440582a5cde02e32f37c05f3c468ed571544fb7fdea6bb7ce42f",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -29,6 +33,10 @@
       "sha256": "cfa14c916cc5c718987d410161e987db36bcc126e91a405e4247505a9cff048e",
       "status": "ok"
     },
+    "firewall-status.json": {
+      "sha256": "f32927aeb8487c14a52231014d5abf0eb173d830aa2ef8a4d64d6b70f10cceb7",
+      "status": "ok"
+    },
     "job-log.json": {
       "sha256": "f4de9d29d20ad970c6f560ea27aab1f07725eda858d824b1c1435384e9f1daee",
       "status": "ok"
@@ -38,7 +46,7 @@
       "status": "ok"
     },
     "job-status.json": {
-      "sha256": "d82428f26593b72236eddb838eaacc696378695eb7a3ccb0148820ff76ecd5b0",
+      "sha256": "52f36baa3731980c07fdbfc7a56ee285fed975628a5494b271c4174fc21f3b07",
       "status": "ok"
     },
     "logs-nginx.demo-static.test.json": {
@@ -89,6 +97,10 @@
       "sha256": "de23cf2ece8df5d4dd3db2a513fba0a6cd83531b52064072bf51e7ad7a485c93",
       "status": "ok"
     },
+    "plan.change-confirm.json": {
+      "sha256": "286395caece0129f20c003bd3445c5fbafccef188e09073757cf05f85e776dd8",
+      "status": "ok"
+    },
     "plan.cron-job-add.json": {
       "sha256": "22765817aae8805067dae51a870fff6b24c0b6c9c2aeb54283781e8c3230a0fa",
       "status": "ok"
@@ -101,12 +113,32 @@
       "sha256": "924f3f5e4491a28c2f96992a3a4925d82627f47da2fe4de8efc966b39e339d71",
       "status": "ok"
     },
+    "plan.firewall-block.json": {
+      "sha256": "8eaee8254456a5c57dd5d670a098b3a74e1be99b3580b83e240babd13db17447",
+      "status": "ok"
+    },
+    "plan.firewall-rule-add.json": {
+      "sha256": "49d7dd232e6e3e090af34603ff930f062c14b5da99bad33b83ba3c6e9f6e7153",
+      "status": "ok"
+    },
+    "plan.firewall-rule-remove.json": {
+      "sha256": "2d3be6733d9c99b028233b140584f974b4eefae32a276a9d7994db92fe91b2ec",
+      "status": "ok"
+    },
+    "plan.firewall-unblock.json": {
+      "sha256": "87eff278c962bdc378c293a099b668b6b3106829723a8b94688714aea9a3b033",
+      "status": "ok"
+    },
     "plan.owner-block.json": {
       "sha256": "6db96e1f58d3b95912c28a2d0bbab9700bbbbd96745d4fcff475eb05efe0cafe",
       "status": "ok"
     },
     "plan.owner-create.json": {
       "sha256": "a191e2ef892295d1bb96b04a218956ec87a61f39d43dae5b0600cb52047eb3a4",
+      "status": "ok"
+    },
+    "plan.panel-access.json": {
+      "sha256": "a92b7aa3640403b56be82cf955622920a92b09b6e72fa18b4cc76966632ab12a",
       "status": "ok"
     },
     "plan.self-alerts-ack.json": {
@@ -122,7 +154,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "db2a827e2ae061e7751c7cb300ff827f9d0e8980d20afde0fe473b096358fc26",
+      "sha256": "fef7266ffee7283e9d50c361a62d565683467de2cec11c52d7a54ff0416aa831",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -177,6 +209,10 @@
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
       "status": "refused"
     },
+    "refused.invalid-argument.panel-access.json": {
+      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
+    },
     "refused.invalid-argument.php-ini-key.json": {
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
       "status": "refused"
@@ -190,6 +226,10 @@
       "status": "refused"
     },
     "refused.owner-admin-only.alerts-channel.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-admin-only.firewall-status.json": {
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
       "status": "refused"
     },
@@ -270,15 +310,15 @@
       "status": "ok"
     },
     "self-commands.json": {
-      "sha256": "0678a1c00d12ac00fce7499c2b073fbf0e5fb647e8c1749680baaac25bb216d3",
+      "sha256": "58487a89827fa377aee845bd174e6c01925caf66f3ffee905911a9fc717ac4fa",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "b3f92782cbe0f080123f7f3fb4b374a1ed9aff24be4ddf1f73f6515d86cd3a95",
+      "sha256": "a38ac8606b867346474edcde530184f5640ee32a62e7da386c55354c7d78b61e",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "bd06a1a0d568ece7bb0ef09ab005fad1fccff3e7d4a0d129373e01e4b3ed875e",
+      "sha256": "72da7f0686e152faa6807141d0a21bd01fe6abeadf124fc03a80d87e7c340516",
       "status": "ok"
     },
     "self-metrics-history.json": {
@@ -298,7 +338,7 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "fb7d2e9f8ec107a08b7f418faea78a5a35b8b7ea7b5c4b9bfcddf59f8d40eaeb",
+      "sha256": "5bdd8ac5ea4d9bc59d6ce1b38bce93024f143df1deebed93c4527cf3d5667c75",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
@@ -318,7 +358,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "115a73eb966e7bc88eac349c9a4eb6c053581bdcc8181fc43666f5f2ba4a3f8d",
+      "sha256": "44343e480ee658731257e09d88eaf8dccb8f09272c1854ef3db997ddda6f2e44",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -326,7 +366,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "8a39214eaebb46c35b5bf20a2086b8fa6e6a9c3144824207477608d830138246",
+      "sha256": "5a36fb0d64b4f5a2268bc54f0065f9281fe5f0a68454f650304eed4fa328973f",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {

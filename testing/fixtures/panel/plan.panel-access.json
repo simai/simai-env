@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.panel-access",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "panel:access",
+    "args": {
+      "allow": "192.0.2.10,198.51.100.0/24"
+    },
+    "target": "host",
+    "description": "Let only these addresses open the panel (any, or a comma list; undone unless confirmed)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

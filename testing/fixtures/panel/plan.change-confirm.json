@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.change-confirm",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "change:confirm",
+    "args": {
+      "change_id": "c966b67eb35b"
+    },
+    "target": "host",
+    "description": "Keep a firewall or panel access change before its undo timer runs",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

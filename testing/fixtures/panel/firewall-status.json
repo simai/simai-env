@@ -1,0 +1,78 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-firewall-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-firewall/1",
+    "backend": "ufw",
+    "active": true,
+    "default_incoming": "deny",
+    "ssh_ports": [
+      22
+    ],
+    "rules": [
+      {
+        "id": "8da948cb",
+        "rule": "deny from 203.0.113.7",
+        "action": "deny",
+        "port": null,
+        "proto": null,
+        "from": "203.0.113.7",
+        "direction": "in",
+        "protected": false
+      },
+      {
+        "id": "dbcc1294",
+        "rule": "allow 22/tcp",
+        "action": "allow",
+        "port": "22",
+        "proto": "tcp",
+        "from": "any",
+        "direction": "in",
+        "protected": true
+      },
+      {
+        "id": "548d7fbc",
+        "rule": "allow 80/tcp",
+        "action": "allow",
+        "port": "80",
+        "proto": "tcp",
+        "from": "any",
+        "direction": "in",
+        "protected": true
+      },
+      {
+        "id": "50a13c50",
+        "rule": "allow 443/tcp",
+        "action": "allow",
+        "port": "443",
+        "proto": "tcp",
+        "from": "any",
+        "direction": "in",
+        "protected": true
+      },
+      {
+        "id": "efdea676",
+        "rule": "allow from 192.0.2.10 to any port 3306 proto tcp",
+        "action": "allow",
+        "port": "3306",
+        "proto": "tcp",
+        "from": "192.0.2.10",
+        "direction": "in",
+        "protected": false
+      }
+    ],
+    "blocks": [
+      {
+        "address": "203.0.113.7",
+        "until": null,
+        "created_at": "2026-11-03T08:53:29Z"
+      }
+    ],
+    "panel_access": null,
+    "pending_change": null
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

@@ -30,6 +30,11 @@ self_status_refresh_handler() {
   # Alerts and the load history come from the same run, so they keep working
   # while the panel is closed or down.
   python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" run
+  # Firewall and panel access changes nobody confirmed are undone even when
+  # their timer is gone (after a reboot).
+  if [[ -n "$(python3 -I "${SIMAI_ENV_ROOT}/lib/timed_change.py" expired 2>/dev/null)" || -s /etc/simai-env/firewall/blocks.json ]]; then
+    SIMAI_ADMIN_MENU=0 "${SIMAI_ENV_ROOT}/simai-admin.sh" change expire --confirm yes >/dev/null 2>&1 || true
+  fi
 }
 
 self_profiles_handler() {

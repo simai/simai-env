@@ -313,7 +313,7 @@ Site cron jobs (1.34.0):
 - `cron:list {domain}` (`simai-cron-jobs/1`: `domain, jobs [{id, schedule,
   command, enabled, created_at, last_run {started_at, finished_at,
   exit_code} | null}]`), `cron:job-runs {id, limit}` (`simai-cron-runs/1`:
-  `id, domain, runs [{started, finished, exit_code, output}]`, newest first,
+  `id, domain, runs [{started_at, finished_at, exit_code, output}]`, newest first,
   `output` holds the last 50 lines).
 - `cron:job-add {domain, schedule, command}`, `cron:job-remove {id}`,
   `cron:job-enable {id}`, `cron:job-disable {id}` (actions). `schedule` is
@@ -323,6 +323,32 @@ Site cron jobs (1.34.0):
   one skip. At most 50 jobs per site.
 - Owners manage jobs of their own sites. A job id that does not exist is
   refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
+
+Firewall and panel access (1.35.0), administrator only:
+
+- `firewall:status` (`simai-firewall/1`): `backend, active, default_incoming,
+  ssh_ports, rules [{id, rule, action, port, proto, from, direction,
+  protected}], blocks [{address, until, created_at}], panel_access {domain,
+  allow: "any" | [addresses]} | null, pending_change {change_id, kind, domain,
+  state, summary, created_at, expires_at} | null`.
+- Actions: `firewall:rule-add {port, proto: tcp|udp, from: any|address|CIDR,
+  action: allow|deny}`, `firewall:rule-remove {id}`, `firewall:block
+  {address, ttl}` (seconds, 60-31536000; 0 or none: until unblocked),
+  `firewall:unblock {address}`, `panel:access {allow}` (`"any"`, a list of
+  addresses or CIDR blocks, or the same as a comma list; up to 50).
+- Every one of them is a timed change. When its job succeeds, `job:status`
+  carries `result: {change_id, kind: firewall|panel_access, expires_at}`.
+  Unless `change:confirm {change_id}` comes before `expires_at` (120 s; the
+  panel does not choose the window), the server puts the previous files back
+  by itself. Send the confirm from the page that loaded over the new rules:
+  a panel that locked itself out cannot confirm, and the change is undone.
+  `change:status {change_id}` (`simai-change/1`: `state:
+  pending|confirmed|restored`). Confirming an undone change fails the job.
+- One change of a kind waits at a time: another one fails its job until the
+  first is confirmed or undone. SSH ports, 80 and 443 cannot be denied for
+  everyone, and their allow rules (`protected: true`) cannot be removed; such
+  a job fails and nothing changes.
+- Panel access always lets the host itself and certificate checks through.
 
 ## Allowlist
 
@@ -363,7 +389,10 @@ action, job). Everything else is refused.
 - 1.33.0: `service:list`, `service:log`, `service:restart`, `service:reload`,
   `self:profiles`; `site:add` with profiles `proxy` and `bitrix`;
 - 1.34.0: `cron:list`, `cron:job-add`, `cron:job-remove`, `cron:job-enable`,
-  `cron:job-disable`, `cron:job-runs`.
+  `cron:job-disable`, `cron:job-runs`;
+- 1.35.0: `firewall:status`, `firewall:rule-add`, `firewall:rule-remove`,
+  `firewall:block`, `firewall:unblock`, `panel:access`, `change:confirm`,
+  `change:status`; `job:status` with `result`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -382,7 +411,9 @@ plans of the actions, the stage 9 reads, and refusals, one `owner_scope`
 refusal per site action of stage 9, the SFTP account list and plans of stage
 10, the alert list with one planted alert, the load history, and the update
 plans (the remote version and notes of the `env` plan are pinned), the
-service list and log, and the site profiles. Set 9 since 1.33.0. The panel's fixture driver replays them, and
+service list and log, the site profiles, a site's cron jobs and runs with one
+planted job, and the firewall with one rule, one block and a confirmed change.
+Set 11 since 1.35.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

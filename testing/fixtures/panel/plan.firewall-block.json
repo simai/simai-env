@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.firewall-block",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "firewall:block",
+    "args": {
+      "address": "198.51.100.20",
+      "ttl": "3600"
+    },
+    "target": "host",
+    "description": "Block an address or CIDR block, for --ttl seconds or until unblocked",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

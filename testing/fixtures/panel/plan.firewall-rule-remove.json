@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.firewall-rule-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "firewall:rule-remove",
+    "args": {
+      "id": "0123abcd"
+    },
+    "target": "host",
+    "description": "Remove a firewall rule by id (undone unless confirmed)",
+    "effects": "delete",
+    "lock": "host",
+    "applied": false
+  }
+}

@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.35.0](v1.35.0.md) — firewall rules, address blocks and panel access by
+  address, each undone unless confirmed.
 - [v1.34.0](v1.34.0.md) — site cron jobs with run records, from the CLI and
   the panel.
 - [v1.33.0](v1.33.0.md) — host services, site profiles for the wizard, a

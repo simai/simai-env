@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=10
+FIXTURE_SET=11
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -114,6 +114,18 @@ mkdir -p /var/lib/simai-env/cron-runs/demo-owned.test
 printf '{"started_at":"2026-01-01T00:00:00Z","finished_at":"2026-01-01T00:00:02Z","exit_code":0,"output":["Synced 12 records."]}\n' >/var/lib/simai-env/cron-runs/demo-owned.test/a1b2c3d4.jsonl
 chown -R "$u" /var/lib/simai-env/cron-runs/demo-owned.test
 CRON
+  # The firewall on, one rule from an address and one blocked address, each a
+  # confirmed timed change; the last change answers change-status.
+  docker exec -i "$NAME" bash -s <<'FW'
+cd /root/simai-env
+a() { ./simai-admin.sh "$@" --confirm yes 2>/dev/null | sed -nE 's/^\| Change +\| ([a-f0-9]{12}) .*/\1/p'; }
+./simai-admin.sh self firewall-ensure --confirm yes >/dev/null 2>&1
+ufw show added | grep -q 'port 3306' || { id=$(a firewall rule-add --port 3306 --proto tcp --from 192.0.2.10); ./simai-admin.sh change confirm --id "$id" --confirm yes >/dev/null 2>&1; }
+ufw show added | grep -q 'deny from 203.0.113.7' || { id=$(a firewall block --address 203.0.113.7); ./simai-admin.sh change confirm --id "$id" --confirm yes >/dev/null 2>&1; }
+ls -t /var/lib/simai-env/changes | head -n1 >/root/stand-change-id
+FW
+  local change_id
+  change_id=$(in_stand cat /root/stand-change-id)
   # The site answers show one backup, also on a freshly created stand.
   in_stand bash -c 'ls -d /var/backups/simai/demo-php.test/*/ >/dev/null 2>&1 || /root/simai-env/simai-admin.sh backup data --domain demo-php.test --confirm yes >/dev/null 2>&1'
   local bk
@@ -181,6 +193,16 @@ CRON
     "plan.cron-job-remove|\"demo\"|cron:job-remove|{\"id\":\"a1b2c3d4\"}"
     "refused.owner-scope.cron-job-add|\"demo\"|cron:job-add|{\"domain\":\"demo-php.test\",\"schedule\":\"0 3 * * *\",\"command\":\"true\"}"
     "refused.unknown-cron-job|null|cron:job-runs|{\"id\":\"00000000\"}"
+    "firewall-status|null|firewall:status|{}"
+    "plan.firewall-rule-add|null|firewall:rule-add|{\"port\":\"8080\",\"proto\":\"tcp\",\"from\":\"any\",\"action\":\"allow\"}"
+    "plan.firewall-rule-remove|null|firewall:rule-remove|{\"id\":\"0123abcd\"}"
+    "plan.firewall-block|null|firewall:block|{\"address\":\"198.51.100.20\",\"ttl\":\"3600\"}"
+    "plan.firewall-unblock|null|firewall:unblock|{\"address\":\"203.0.113.7\"}"
+    "plan.panel-access|null|panel:access|{\"allow\":[\"192.0.2.10\",\"198.51.100.0/24\"]}"
+    "plan.change-confirm|null|change:confirm|{\"change_id\":\"${change_id}\"}"
+    "change-status|null|change:status|{\"change_id\":\"${change_id}\"}"
+    "refused.owner-admin-only.firewall-status|\"demo\"|firewall:status|{}"
+    "refused.invalid-argument.panel-access|null|panel:access|{\"allow\":\"192.0.2.10; deny all\"}"
     "service-log.nginx|null|service:log|{\"name\":\"nginx\",\"lines\":\"20\"}"
     "plan.service-restart|null|service:restart|{\"name\":\"nginx\"}"
     "plan.service-reload|null|service:reload|{\"name\":\"nginx\"}"

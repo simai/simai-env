@@ -77,6 +77,14 @@ CRON_ID = re.compile(r"^[a-f0-9]{8}$")
 CRON_SCHEDULE = re.compile(r"^[0-9*/,-]{1,40}( [0-9*/,-]{1,40}){4}$")  # checked fully by the command
 CRON_COMMAND = re.compile(r"^[!-,.-~][ -~]{0,999}$")
 LIMIT = re.compile(r"^(?:[1-9]|[1-4][0-9]|50)$")
+PROTO = re.compile(r"^(tcp|udp)$")
+FW_ACTION = re.compile(r"^(allow|deny)$")
+ADDRESS = re.compile(r"^[0-9A-Fa-f:.]{2,45}(/[0-9]{1,3})?$")  # checked fully by the command
+FROM = re.compile(r"^(any|[0-9A-Fa-f:.]{2,45}(/[0-9]{1,3})?)$")
+ADDRESSES = re.compile(r"^(any|[0-9A-Fa-f:./]{2,49}(,[0-9A-Fa-f:./]{2,49}){0,49})$")
+RULE_ID = re.compile(r"^[a-f0-9]{8}$")
+TTL = re.compile(r"^(?:0|[1-9][0-9]{1,7})$")
+CHANGE_ID = re.compile(r"^[a-f0-9]{12}$")
 INI_VALUE = re.compile(r"^[A-Za-z0-9_./+-]{1,64}$")
 SIZE = r"^(?:[1-9][0-9]{0,3}M|[1-8]G)$"
 SWITCH = r"^(?:on|off)$"
@@ -185,6 +193,14 @@ ALLOW = {
     "cron:job-enable": ({"id": CRON_ID}, {"id"}, "action"),
     "cron:job-disable": ({"id": CRON_ID}, {"id"}, "action"),
     "cron:job-runs": ({"id": CRON_ID, "limit": LIMIT}, {"id"}, "read"),
+    "firewall:status": ({}, set(), "read"),
+    "firewall:rule-add": ({"port": PORT, "proto": PROTO, "from": FROM, "action": FW_ACTION}, {"port", "proto"}, "action"),
+    "firewall:rule-remove": ({"id": RULE_ID}, {"id"}, "action"),
+    "firewall:block": ({"address": ADDRESS, "ttl": TTL}, {"address"}, "action"),
+    "firewall:unblock": ({"address": ADDRESS}, {"address"}, "action"),
+    "panel:access": ({"allow": ADDRESSES}, {"allow"}, "action"),
+    "change:confirm": ({"change_id": CHANGE_ID}, {"change_id"}, "action"),
+    "change:status": ({"change_id": CHANGE_ID}, {"change_id"}, "read"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -193,7 +209,9 @@ ALLOW = {
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
 ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics",
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
-              "service:list", "service:log", "service:restart", "service:reload"}
+              "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
+              "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
+              "change:confirm", "change:status"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
@@ -209,6 +227,8 @@ ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request li
 ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
 BY_LOGIN = {"access:add-key", "access:disable", "access:enable", "access:remove"}  # scope from the account
 BY_CRON_ID = {"cron:job-remove", "cron:job-enable", "cron:job-disable", "cron:job-runs"}  # scope from the job
+RENAMED = {"change_id": "id"}  # the request name and the command's option
+LIST_ARGS = {("panel:access", "allow")}  # may come as a JSON list; the command takes a comma list
 CRON_JOBS = Path(os.environ.get("SIMAI_CRON_JOBS_DIR", "/etc/simai-env/cron-jobs"))
 
 
@@ -251,7 +271,11 @@ def parse(raw):
     if not isinstance(args, dict):
         raise Refused("invalid_argument")
     validators, required, kind = ALLOW[command]
-    for name, value in args.items():
+    for name, value in list(args.items()):
+        if (command, name) in LIST_ARGS and isinstance(value, list):
+            if not value or not all(isinstance(v, str) for v in value):
+                raise Refused("invalid_argument")
+            args[name] = value = ",".join(value)
         if name not in validators or not isinstance(value, str) or not validators[name].match(value):
             raise Refused("invalid_argument")
     if not required <= set(args):
@@ -296,7 +320,7 @@ def argv_for(command, args, files=None):
         if key in FILE_ARGS:
             argv += [f"--{FILE_ARGS[key]}", (files or {}).get(key, "/dev/null")]
         else:
-            argv += [f"--{key}", value]
+            argv += [f"--{RENAMED.get(key, key)}", value]
     for key, value in ((files or {}).get("attachment") or {}).items():
         argv += [f"--{key}", value]
     return argv
@@ -409,7 +433,9 @@ def start_job(req, command, args, stream):
     script = d / "run.sh"
     quoted = " ".join("'" + a.replace("'", "'\\''") + "'" for a in argv_for(command, args, files) + ["--confirm", "yes"])
     # The arguments were validated against strict patterns; quoting keeps them literal.
-    script.write_text(f"#!/bin/bash\n{quoted} </dev/null >{d}/log 2>&1\necho $? >{d}/exit_code\n{cleanup}")
+    # A command may leave a small result for the job (a timed change's id).
+    script.write_text(f"#!/bin/bash\nexport SIMAI_JOB_RESULT={d}/result.json\n"
+                      f"{quoted} </dev/null >{d}/log 2>&1\necho $? >{d}/exit_code\n{cleanup}")
     script.chmod(0o700)
     proc = subprocess.run(["systemd-run", f"--unit={unit_name(job_id)}", "--collect", "--quiet",
                            "--property=Type=exec", *(f"--setenv={k}={v}" for k, v in ENV.items()),
@@ -443,9 +469,15 @@ def job_state(job_id):
         state = "running" if active in ("active", "activating") else "failed"
     else:
         state = "succeeded" if code in (0, 88) else ("busy" if code == 75 else "failed")
+    result = None
+    try:
+        result = json.loads((d / "result.json").read_text()[:4096])
+    except (OSError, ValueError):
+        pass
     return {"job_id": job_id, "state": state, "exit_code": code, "command": meta.get("command"),
             "args": meta.get("args"), "created_at": meta.get("created_at"),
-            "request_id": meta.get("request_id"), "actor": meta.get("actor")}
+            "request_id": meta.get("request_id"), "actor": meta.get("actor"),
+            "result": result if isinstance(result, dict) else None}
 
 
 def job_visible(job_id, owner):

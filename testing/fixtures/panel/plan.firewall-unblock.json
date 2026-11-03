@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.firewall-unblock",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "firewall:unblock",
+    "args": {
+      "address": "203.0.113.7"
+    },
+    "target": "host",
+    "description": "Remove a block of an address",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

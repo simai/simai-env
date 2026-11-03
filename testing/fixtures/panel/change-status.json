@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-change-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-change/1",
+    "change_id": "c966b67eb35b",
+    "kind": "firewall",
+    "domain": null,
+    "state": "confirmed",
+    "created_at": "2026-11-03T08:53:29Z",
+    "expires_at": "2026-11-03T08:55:29Z",
+    "summary": "block 203.0.113.7",
+    "confirmed_at": "2026-11-03T08:53:29Z",
+    "restored_at": null
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

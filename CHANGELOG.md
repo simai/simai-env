@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.35.0 - 2026-11-03
+
+- New `firewall status`, `firewall rule-add`, `firewall rule-remove`,
+  `firewall block`, `firewall unblock` (ufw) and `panel access --allow` (only
+  these addresses open the panel). Every change is timed: unless `change
+  confirm --id` comes within the window (default 120 s), the server puts the
+  previous rules back by itself; a reboot does not keep an unconfirmed change.
+  SSH, HTTP and HTTPS cannot be closed (`simai-firewall/1`, `simai-change/1`).
+- Address blocks can end by themselves (`--ttl`).
+- Every site's nginx file includes `/etc/nginx/simai-access/<project>.conf`
+  (absent unless panel access sets it).
+- Panel gateway: `firewall:*`, `panel:access` (a list or a comma list),
+  `change:confirm`, `change:status`, administrator only. `job:status` carries
+  `result` (`{change_id, kind, expires_at}` for timed changes).
+- Docs: `cron:job-runs` fields are `started_at` and `finished_at`.
+- Recorded panel answers: set 11.
+
 ## 1.34.0 - 2026-11-02
 
 - New site cron jobs: `cron list`, `cron job-add --domain D --schedule
