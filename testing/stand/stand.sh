@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=11
+FIXTURE_SET=12
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -203,6 +203,10 @@ FW
     "change-status|null|change:status|{\"change_id\":\"${change_id}\"}"
     "refused.owner-admin-only.firewall-status|\"demo\"|firewall:status|{}"
     "refused.invalid-argument.panel-access|null|panel:access|{\"allow\":\"192.0.2.10; deny all\"}"
+    "ssl-dns-status|null|ssl:dns-status|{}"
+    "plan.ssl-dns-credentials|null|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"token\":\"cfStandStandStandStandStandStand1234\"}"
+    "plan.ssl-letsencrypt-dns|null|ssl:letsencrypt|{\"domain\":\"demo-php.test\",\"email\":\"ops@example.com\",\"challenge\":\"dns\"}"
+    "refused.owner-admin-only.ssl-dns-credentials|\"demo\"|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"remove\":\"yes\"}"
     "service-log.nginx|null|service:log|{\"name\":\"nginx\",\"lines\":\"20\"}"
     "plan.service-restart|null|service:restart|{\"name\":\"nginx\"}"
     "plan.service-reload|null|service:reload|{\"name\":\"nginx\"}"

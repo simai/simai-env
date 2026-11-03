@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.ssl-letsencrypt-dns",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "ssl:letsencrypt",
+    "args": {
+      "domain": "demo-php.test",
+      "email": "ops@example.com",
+      "challenge": "dns"
+    },
+    "target": "demo-php.test",
+    "description": "Request Let's Encrypt certificate",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

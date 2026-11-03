@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.36.0](v1.36.0.md) — certificates through Cloudflare DNS, before the
+  domain points at the server.
 - [v1.35.0](v1.35.0.md) — firewall rules, address blocks and panel access by
   address, each undone unless confirmed.
 - [v1.34.0](v1.34.0.md) — site cron jobs with run records, from the CLI and

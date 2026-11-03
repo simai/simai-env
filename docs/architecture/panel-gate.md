@@ -324,6 +324,17 @@ Site cron jobs (1.34.0):
 - Owners manage jobs of their own sites. A job id that does not exist is
   refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
 
+DNS-01 certificates through Cloudflare (1.36.0):
+
+- `ssl:dns-credentials {provider: cloudflare, token | remove: yes}`,
+  administrator only. The token travels as a file like other secrets, is
+  stored root-only on the host and is in no job record or log.
+- `ssl:dns-status` (`simai-ssl-dns/1`): `providers [{provider, configured,
+  updated_at, plugin_installed}]`, never the token.
+- `ssl:letsencrypt` takes `challenge: http|dns` and `wildcard: yes|no`;
+  `dns` uses the stored token, so a certificate can be issued before the
+  domain points at the server. Without a stored token the job fails.
+
 Firewall and panel access (1.35.0), administrator only:
 
 - `firewall:status` (`simai-firewall/1`): `backend, active, default_incoming,
@@ -392,7 +403,9 @@ action, job). Everything else is refused.
   `cron:job-disable`, `cron:job-runs`;
 - 1.35.0: `firewall:status`, `firewall:rule-add`, `firewall:rule-remove`,
   `firewall:block`, `firewall:unblock`, `panel:access`, `change:confirm`,
-  `change:status`; `job:status` with `result`.
+  `change:status`; `job:status` with `result`;
+- 1.36.0: `ssl:dns-credentials`, `ssl:dns-status`; `ssl:letsencrypt` with
+  `challenge` and `wildcard`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -412,8 +425,9 @@ refusal per site action of stage 9, the SFTP account list and plans of stage
 10, the alert list with one planted alert, the load history, and the update
 plans (the remote version and notes of the `env` plan are pinned), the
 service list and log, the site profiles, a site's cron jobs and runs with one
-planted job, and the firewall with one rule, one block and a confirmed change.
-Set 11 since 1.35.0. The panel's fixture driver replays them, and
+planted job, the firewall with one rule, one block and a confirmed change,
+and the DNS provider status with plans for a token and a DNS certificate.
+Set 12 since 1.36.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

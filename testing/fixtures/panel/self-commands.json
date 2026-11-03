@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 218,
+    "count": 220,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -4912,6 +4912,54 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh ssl dns-credentials",
+        "description": "Store (or --remove yes) the Cloudflare API token for DNS-01 certificates",
+        "required": [
+          "--provider"
+        ],
+        "optional": {
+          "--token-file": null,
+          "--remove": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh ssl dns-status",
+        "description": "Show whether a DNS-01 provider token is stored (never the token)",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh ssl install",
         "description": "Install custom certificate",
         "required": [],
@@ -4948,6 +4996,7 @@
           "--hsts": null,
           "--staging": null,
           "--wildcard": null,
+          "--challenge": null,
           "--dns-provider": null,
           "--dns-credentials": null,
           "--wildcard-domain": null

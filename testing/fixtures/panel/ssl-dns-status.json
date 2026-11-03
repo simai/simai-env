@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-ssl-dns-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-ssl-dns/1",
+    "providers": [
+      {
+        "provider": "cloudflare",
+        "configured": false,
+        "updated_at": null,
+        "plugin_installed": false
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

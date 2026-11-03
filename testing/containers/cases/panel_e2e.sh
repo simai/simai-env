@@ -508,6 +508,41 @@ cli owner list 2>&1 | grep -q 'acme.*blocked' && ok "owner list shows the block"
 job_ok null "$(creq null owner:unblock '{"name":"acme"}')" && ok "owner unblock job" || bad "owner unblock"
 [[ -z "$(getent shadow acme | cut -d: -f8)" ]] && [[ "$(gate "$(req '"acme"' self:describe '{}')" | field 'd["status"]')" == ok ]] && ok "unblocked owner works again" || bad "after unblock"
 
+# DNS-01 through Cloudflare: the token is stored once, root-only, and never shown.
+cat >/usr/local/bin/certbot <<'SH'
+#!/bin/sh
+echo "$*" >>/root/certbot.args
+case "$1" in
+  plugins) echo "* dns-cloudflare" ;;
+  certonly) mkdir -p /etc/letsencrypt/live/open.test
+    cp /root/tls/cert.pem /etc/letsencrypt/live/open.test/fullchain.pem
+    cp /root/tls/cert.pem /etc/letsencrypt/live/open.test/chain.pem
+    cp /root/tls/key.pem /etc/letsencrypt/live/open.test/privkey.pem ;;
+esac
+exit 0
+SH
+chmod +x /usr/local/bin/certbot; rm -f /root/certbot.args
+cft="cfFakeFakeFakeFakeFakeFakeFakeFake12345"
+refused not_allowed "$(req '"acme"' ssl:dns-credentials "{\"provider\":\"cloudflare\",\"token\":\"${cft}\"}")" "an owner stores a DNS token"
+refused invalid_argument "$(req null ssl:dns-credentials '{"provider":"cloudflare","token":"short"}')" "a malformed DNS token"
+a=$(gate "$(req null ssl:dns-status '{}')")
+[[ "$(field 'd["data"]["providers"][0]["configured"]' <<<"$a")" == False ]] && ok "dns status before a token" || bad "dns status: $a"
+job_ok null "$(creq null ssl:letsencrypt '{"domain":"open.test","email":"ops@example.com","challenge":"dns"}')" && bad "a DNS challenge ran without a token" || ok "a DNS challenge needs a stored token"
+a=$(gate "$(creq null ssl:dns-credentials "{\"provider\":\"cloudflare\",\"token\":\"${cft}\"}")"); j=$(field 'd["job_id"]' <<<"$a")
+[[ "$(wait_job null "$j")" == succeeded ]] && ok "admin stores a Cloudflare token" || bad "dns-credentials job: $a"
+[[ "$(stat -c '%U %a' /etc/simai-env/dns/cloudflare.ini 2>&1)" == "root 600" ]] && grep -qF "dns_cloudflare_api_token = ${cft}" /etc/simai-env/dns/cloudflare.ini && ok "the token file is root-only" || bad "token file: $(stat -c '%U %a' /etc/simai-env/dns/cloudflare.ini 2>&1)"
+grep -rqF -- "$cft" /var/lib/simai-env/panel-jobs /var/log/simai-panel-gate.log && bad "the DNS token is in a job record or log" || ok "the DNS token is in no job record or log"
+a=$(gate "$(req null ssl:dns-status '{}')")
+[[ "$(field 'd["data"]["providers"][0]["configured"]' <<<"$a")" == True ]] && ! grep -qF -- "$cft" <<<"$a" && ok "dns status shows the token is set, not the token" || bad "dns status after: $a"
+a=$(gate "$(creq null ssl:letsencrypt '{"domain":"open.test","email":"ops@example.com","challenge":"dns","staging":"yes"}')"); j=$(field 'd["job_id"]' <<<"$a")
+[[ "$(wait_job null "$j")" == succeeded ]] && ok "letsencrypt with a DNS challenge" || bad "dns letsencrypt job: $(gate "$(req null job:log "{\"job_id\":\"$j\"}")" | head -c 600)"
+grep -q -- 'certonly --cert-name open.test --dns-cloudflare --dns-cloudflare-credentials /etc/simai-env/dns/cloudflare.ini -d open.test ' /root/certbot.args && ! grep -q -- '--webroot' /root/certbot.args && ok "certbot uses the stored token, no webroot" || bad "certbot args: $(cat /root/certbot.args)"
+refused invalid_argument "$(req null ssl:letsencrypt '{"domain":"open.test","email":"ops@example.com","challenge":"tls"}')" "an unknown challenge"
+: >/root/certbot.args
+cli ssl renew --domain open.test --confirm yes >/tmp/p-dnsrenew 2>&1 && grep -q -- '--dns-cloudflare-credentials /etc/simai-env/dns/cloudflare.ini' /root/certbot.args && ! grep -q -- '\*\.open\.test\|--webroot' /root/certbot.args && ok "renewal keeps the DNS challenge" || bad "dns renew: $(tail -3 /tmp/p-dnsrenew) / $(cat /root/certbot.args)"
+job_ok null "$(creq null ssl:dns-credentials '{"provider":"cloudflare","remove":"yes"}')" && [[ ! -f /etc/simai-env/dns/cloudflare.ini ]] && ok "the token can be removed" || bad "dns-credentials remove"
+rm -f /usr/local/bin/certbot /root/certbot.args
+
 # The account has no other way in.
 sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate extra </dev/null >/dev/null 2>&1 && bad "gateway accepted arguments" || ok "gateway takes no arguments"
 sudo -n -u simai-panel sudo -n /root/simai-env/simai-admin.sh self describe >/dev/null 2>&1 && bad "panel account ran simai-admin.sh" || ok "panel account cannot run simai-admin.sh"

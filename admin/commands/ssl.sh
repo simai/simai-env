@@ -110,6 +110,54 @@ ssl_ensure_dns_credentials_file() {
   return 0
 }
 
+# DNS-01 credentials kept on the host (one file per provider, root 0600), so a
+# token is given once and renewals find it. Never printed.
+SIMAI_DNS_CREDENTIALS_DIR="${SIMAI_DNS_CREDENTIALS_DIR:-/etc/simai-env/dns}"
+
+ssl_dns_stored_credentials() { printf '%s/%s.ini\n' "$SIMAI_DNS_CREDENTIALS_DIR" "$1"; }
+
+ssl_dns_credentials_handler() {
+  parse_kv_args "$@"
+  require_args "provider" || return 1
+  local provider="${PARSED_ARGS[provider]}" token_file="${PARSED_ARGS[token-file]:-}" remove="${PARSED_ARGS[remove]:-no}"
+  [[ "$provider" == cloudflare ]] || { error "--provider must be cloudflare"; return 1; }
+  local file token pkg
+  file=$(ssl_dns_stored_credentials "$provider")
+  if [[ "$remove" == yes ]]; then
+    rm -f -- "$file"
+    ui_result_table "Provider|${provider}" "Credentials|removed"
+    return 0
+  fi
+  [[ -n "$token_file" && -f "$token_file" && ! -L "$token_file" ]] || { error "--token-file must be a file with the Cloudflare API token"; return 1; }
+  token=$(head -n1 "$token_file" | tr -d '[:space:]')
+  [[ "$token" =~ ^[A-Za-z0-9_-]{30,64}$ ]] || { error "The file does not hold a Cloudflare API token (30-64 letters, digits, - or _)"; return 1; }
+  pkg=$(ssl_dns_provider_package "$provider")
+  if ! certbot plugins 2>/dev/null | grep -qi "dns-${provider}"; then
+    os_cmd_pkg_install "$pkg"
+    run_long "Installing ${pkg}" "${OS_CMD[@]}" || { error "Could not install ${pkg}"; return 1; }
+  fi
+  install -d -m 0700 -o root -g root "$SIMAI_DNS_CREDENTIALS_DIR" || return 1
+  ( umask 077; printf '# simai-env: Cloudflare API token (Zone:DNS:Edit)\ndns_cloudflare_api_token = %s\n' "$token" >"${file}.tmp" ) || return 1
+  mv -f "${file}.tmp" "$file" && chown root:root "$file" && chmod 0600 "$file" || return 1
+  ui_result_table "Provider|${provider}" "Credentials|stored (${file})" \
+    "Use|simai-admin.sh ssl letsencrypt --domain D --email E --challenge dns --confirm yes"
+}
+
+ssl_dns_status_handler() {
+  parse_kv_args "$@"
+  local file configured=no updated="" plugin=no
+  file=$(ssl_dns_stored_credentials cloudflare)
+  [[ -s "$file" ]] && { configured=yes; updated=$(date -u -r "$file" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true); }
+  command -v certbot >/dev/null 2>&1 && certbot plugins 2>/dev/null | grep -qi dns-cloudflare && plugin=yes
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    printf '{"schema":"simai-ssl-dns/1","providers":[{"provider":"cloudflare","configured":%s,"updated_at":%s,"plugin_installed":%s}]}\n' \
+      "$([[ $configured == yes ]] && echo true || echo false)" "$([[ -n $updated ]] && printf '"%s"' "$updated" || echo null)" \
+      "$([[ $plugin == yes ]] && echo true || echo false)"
+    return 0
+  fi
+  ui_result_table "Provider|cloudflare" "Credentials|${configured}${updated:+ (since ${updated})}" "Certbot plugin|${plugin}"
+}
+
 ssl_dns_resolve_ipv4() {
   local host="$1"
   local ip=""
@@ -310,11 +358,11 @@ ssl_menu_prepare_dns_wildcard() {
 }
 
 ssl_issue_mode_value() {
-  local wildcard="$1"
+  local challenge="$1"
   local dns_provider="$2"
-  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
+  if [[ "$challenge" == "dns" && "$dns_provider" == "manual" ]]; then
     echo "manual-dns"
-  elif [[ "$wildcard" == "yes" ]]; then
+  elif [[ "$challenge" == "dns" ]]; then
     echo "dns"
   else
     echo "webroot"
@@ -444,6 +492,7 @@ ssl_issue_handler() {
   local dns_provider="${PARSED_ARGS[dns-provider]:-}"
   local dns_credentials="${PARSED_ARGS[dns-credentials]:-}"
   local wildcard_domain="${PARSED_ARGS[wildcard-domain]:-}"
+  local challenge="${PARSED_ARGS[challenge]:-http}"
 
   if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
     if [[ -z "$domain" ]]; then
@@ -531,15 +580,25 @@ ssl_issue_handler() {
   email="${PARSED_ARGS[email]:-}"
   wildcard="${PARSED_ARGS[wildcard]:-no}"
   wildcard=$(echo "$wildcard" | tr '[:upper:]' '[:lower:]')
-  if [[ "$wildcard" == "yes" ]]; then
-    wildcard_domain="${PARSED_ARGS[wildcard-domain]:-${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}}"
+  [[ "$challenge" =~ ^(http|dns)$ ]] || { error "--challenge must be http or dns"; return 1; }
+  [[ "$wildcard" == yes ]] && challenge=dns
+  if [[ "$challenge" == dns ]]; then
+    # The stored Cloudflare token unless a provider and file are given.
+    dns_provider="${PARSED_ARGS[dns-provider]:-${dns_provider:-cloudflare}}"
+    if [[ "$dns_provider" == cloudflare && -z "${PARSED_ARGS[dns-credentials]:-$dns_credentials}" ]]; then
+      dns_credentials=$(ssl_dns_stored_credentials cloudflare)
+      [[ -s "$dns_credentials" ]] || { error "No Cloudflare token on this host; store one: simai-admin.sh ssl dns-credentials --provider cloudflare --token-file F --confirm yes"; return 1; }
+    fi
+  fi
+  if [[ "$challenge" == "dns" ]]; then
+    [[ "$wildcard" == yes ]] && wildcard_domain="${PARSED_ARGS[wildcard-domain]:-${SITE_META[wildcard_domain]:-$(site_default_wildcard_domain "$domain")}}"
     dns_provider=$(ssl_dns_provider_normalize "${PARSED_ARGS[dns-provider]:-$dns_provider}") || {
-      error "Wildcard certificate requires --dns-provider cloudflare or --dns-provider manual"
+      error "A DNS challenge requires --dns-provider cloudflare or --dns-provider manual"
       return 1
     }
     dns_credentials="${PARSED_ARGS[dns-credentials]:-$dns_credentials}"
     if [[ "$dns_provider" != "manual" && -z "$dns_credentials" ]]; then
-      error "Wildcard certificate requires --dns-credentials <file>"
+      error "A DNS challenge requires --dns-credentials <file>"
       return 1
     fi
     if [[ "$dns_provider" != "manual" ]] && ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
@@ -575,10 +634,11 @@ ssl_issue_handler() {
   mkdir -p "$webroot"
   progress_step "Preparing ACME webroot at ${webroot}"
 
-  local -a cmd=()
-  if [[ "$wildcard" == "yes" ]]; then
+  local -a cmd=() names=(-d "$domain")
+  [[ "$wildcard" == yes ]] && names+=(-d "$wildcard_domain")
+  if [[ "$challenge" == "dns" ]]; then
     if [[ "$dns_provider" == "manual" ]]; then
-      cmd=(certbot certonly --cert-name "$domain" --manual --preferred-challenges dns --manual-public-ip-logging-ok -d "$domain" -d "$wildcard_domain" --agree-tos -m "$email" --keep-until-expiring)
+      cmd=(certbot certonly --cert-name "$domain" --manual --preferred-challenges dns --manual-public-ip-logging-ok "${names[@]}" --agree-tos -m "$email" --keep-until-expiring)
     else
       local plugin_flag credentials_flag pkg
       plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
@@ -588,14 +648,14 @@ ssl_issue_handler() {
         error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
         return 1
       fi
-      cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" -d "$domain" -d "$wildcard_domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+      cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" "${names[@]}" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
     fi
   else
     cmd=(certbot certonly --cert-name "$domain" --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
   fi
   [[ "$staging" == "yes" ]] && cmd+=(--staging)
   progress_step "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})"
-  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
+  if [[ "$challenge" == "dns" && "$dns_provider" == "manual" ]]; then
     ui_section "Manual DNS challenge"
     echo "Certbot will now show one or more _acme-challenge TXT records."
     echo "Add them at your DNS provider, wait until they resolve, then continue in the same terminal."
@@ -619,7 +679,7 @@ ssl_issue_handler() {
   fi
   ensure_certbot_cron
   local le_mode
-  le_mode=$(ssl_issue_mode_value "$wildcard" "$dns_provider")
+  le_mode=$(ssl_issue_mode_value "$challenge" "$dns_provider")
   ssl_site_write_state "$domain" \
     "SITE_SSL_LE_MODE|${le_mode}" \
     "SITE_SSL_LE_WILDCARD|${wildcard}" \
@@ -644,8 +704,8 @@ ssl_issue_handler() {
     "HSTS|${hsts_display}"
   ui_next_steps
   ui_kv "Check status" "simai-admin.sh ssl status --domain ${domain}"
-  if [[ "$wildcard" == "yes" && "$dns_provider" == "manual" ]]; then
-    ui_kv "Renew cert" "Run the same manual wildcard command again when renewal is needed."
+  if [[ "$challenge" == "dns" && "$dns_provider" == "manual" ]]; then
+    ui_kv "Renew cert" "Run the same manual DNS command again when renewal is needed."
   else
     ui_kv "Renew cert" "simai-admin.sh ssl renew --domain ${domain}"
   fi
@@ -839,11 +899,11 @@ ssl_renew_handler() {
   if [[ "$le_mode" == "manual-dns" || "$dns_provider" == "manual" ]]; then
     error "This certificate was issued with manual DNS challenge. Automatic renewal is not available."
     echo "Re-run manually:"
-    echo "  simai-admin.sh ssl letsencrypt --domain ${domain} --email ${le_email:-<email>} --wildcard yes --dns-provider manual"
+    echo "  simai-admin.sh ssl letsencrypt --domain ${domain} --email ${le_email:-<email>} $([[ "$wildcard" == yes ]] && echo "--wildcard yes" || echo "--challenge dns") --dns-provider manual"
     return 1
   elif [[ "$le_mode" == "dns" || "$wildcard" == "yes" ]]; then
     dns_provider=$(ssl_dns_provider_normalize "$dns_provider") || {
-      error "Stored wildcard renewal provider is unsupported"
+      error "Stored DNS renewal provider is unsupported"
       return 1
     }
     if ! ssl_ensure_dns_credentials_file "$dns_credentials"; then
@@ -852,7 +912,9 @@ ssl_renew_handler() {
     local plugin_flag credentials_flag
     plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
     credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
-    renew_cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" -d "$domain" -d "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}")
+    local -a names=(-d "$domain")
+    [[ "$wildcard" == yes ]] && names+=(-d "${wildcard_domain:-$(site_default_wildcard_domain "$domain")}")
+    renew_cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" "${names[@]}")
   else
     renew_cmd=(certbot certonly --cert-name "$domain" --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
   fi
@@ -1132,7 +1194,9 @@ ssl_list_handler() {
   ui_kv "Issue LE cert" "simai-admin.sh ssl letsencrypt --domain <domain> --email <email>"
 }
 
-register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging= wildcard= dns-provider= dns-credentials= wildcard-domain="
+register_cmd "ssl" "letsencrypt" "Request Let's Encrypt certificate" "ssl_issue_handler" "" "domain= email= redirect= hsts= staging= wildcard= challenge= dns-provider= dns-credentials= wildcard-domain="
+register_cmd "ssl" "dns-credentials" "Store (or --remove yes) the Cloudflare API token for DNS-01 certificates" "ssl_dns_credentials_handler" "provider" "token-file= remove=" "tier:advanced"
+register_cmd "ssl" "dns-status" "Show whether a DNS-01 provider token is stored (never the token)" "ssl_dns_status_handler" "" "" "tier:advanced effects:read"
 register_cmd "ssl" "install" "Install custom certificate" "ssl_install_custom_handler" "" "domain= cert= key= chain= redirect= hsts="
 register_cmd "ssl" "renew" "Renew certificate" "ssl_renew_handler" "" "domain="
 register_cmd "ssl" "renew-due" "Renew all certificates that are due and record each result" "ssl_renew_due_handler" "" "" "tier:advanced"

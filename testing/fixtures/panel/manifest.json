@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 11,
+  "set_version": 12,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.35.0",
+  "simai_env": "1.36.0",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -14,7 +14,7 @@
       "status": "ok"
     },
     "change-status.json": {
-      "sha256": "9c1d34b00e8e440582a5cde02e32f37c05f3c468ed571544fb7fdea6bb7ce42f",
+      "sha256": "a664abe4b4f0eea30d5b637aae9a96fb03e3a0205f2f08d7c582d8c3496726ca",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -34,7 +34,7 @@
       "status": "ok"
     },
     "firewall-status.json": {
-      "sha256": "f32927aeb8487c14a52231014d5abf0eb173d830aa2ef8a4d64d6b70f10cceb7",
+      "sha256": "cb1b7b07f6eb334d7bcacb2a1cb7b50accd059010eff77092233a3b6076e10ff",
       "status": "ok"
     },
     "job-log.json": {
@@ -98,7 +98,7 @@
       "status": "ok"
     },
     "plan.change-confirm.json": {
-      "sha256": "286395caece0129f20c003bd3445c5fbafccef188e09073757cf05f85e776dd8",
+      "sha256": "6781251205a14311ce59300eb3dc3e1e6d8b2d6116b839f83556bf3d93fa6077",
       "status": "ok"
     },
     "plan.cron-job-add.json": {
@@ -154,7 +154,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "fef7266ffee7283e9d50c361a62d565683467de2cec11c52d7a54ff0416aa831",
+      "sha256": "25c9ee8798f09f8bbf0e98f534c4449a4b1c690639a006626c754f5e69bedc02",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -205,6 +205,14 @@
       "sha256": "aba65c453fa369808e07962f3ee4e36c7da14285b2404e6cf5bd12c131f9e9dc",
       "status": "ok"
     },
+    "plan.ssl-dns-credentials.json": {
+      "sha256": "7e8b3bae6490e9131ebab316f21a3821d186fdf55d02180caaab081d56cc1e3d",
+      "status": "ok"
+    },
+    "plan.ssl-letsencrypt-dns.json": {
+      "sha256": "ac44376db53a4ecd758b5de36d49a6a9017d45db71a7fb7b12a490f31a8c0510",
+      "status": "ok"
+    },
     "refused.invalid-argument.access-password.json": {
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
       "status": "refused"
@@ -246,6 +254,10 @@
       "status": "refused"
     },
     "refused.owner-admin-only.service-restart.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-admin-only.ssl-dns-credentials.json": {
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
       "status": "refused"
     },
@@ -310,15 +322,15 @@
       "status": "ok"
     },
     "self-commands.json": {
-      "sha256": "58487a89827fa377aee845bd174e6c01925caf66f3ffee905911a9fc717ac4fa",
+      "sha256": "4090d6c1030a803d832625cadbbae97d753d870a2c8e661bb37dbf8a5dd9f3a7",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "a38ac8606b867346474edcde530184f5640ee32a62e7da386c55354c7d78b61e",
+      "sha256": "119e3799963d6eec782c24e66165564f96fc99b7829d0af3b81f5c98037049cd",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "72da7f0686e152faa6807141d0a21bd01fe6abeadf124fc03a80d87e7c340516",
+      "sha256": "5a86139bb28ba226c95f5b7291009f47006a8d27932ec9bdf9330979e9650c0a",
       "status": "ok"
     },
     "self-metrics-history.json": {
@@ -338,7 +350,7 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "5bdd8ac5ea4d9bc59d6ce1b38bce93024f143df1deebed93c4527cf3d5667c75",
+      "sha256": "e841dbdbe698766bb05d9b03a82df3e1ee07b9abe421a755115454e6a255528d",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
@@ -358,7 +370,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "44343e480ee658731257e09d88eaf8dccb8f09272c1854ef3db997ddda6f2e44",
+      "sha256": "2886ced44f25a8a3d1804195dcd78fa5d4b7848c114ca22e032d49ed6d0fa738",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -366,7 +378,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "5a36fb0d64b4f5a2268bc54f0065f9281fe5f0a68454f650304eed4fa328973f",
+      "sha256": "f66444559a6c953fb9c719f772557bc5d298fb008d75321fb238d43ca785925e",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {
@@ -387,6 +399,10 @@
     },
     "site-php-ini-list.demo-owned.test.json": {
       "sha256": "be563e6373e550268cc109dbe98b26bcb0a7dc775abb876a0ea7eb2f9a49f12e",
+      "status": "ok"
+    },
+    "ssl-dns-status.json": {
+      "sha256": "b1278cbfa749c67e6cc1f83f753cacf1a3f87072b835564d93f49b2e755dc8cb",
       "status": "ok"
     }
   }

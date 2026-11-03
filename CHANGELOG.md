@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.36.0 - 2026-11-03
+
+- `ssl letsencrypt --challenge dns`: a certificate through a DNS TXT record,
+  also for a single domain, so it can be issued before the domain points at
+  the server. Wildcard certificates keep using DNS.
+- New `ssl dns-credentials --provider cloudflare --token-file F` stores the
+  Cloudflare API token once (`/etc/simai-env/dns/cloudflare.ini`, root 0600);
+  DNS challenges and renewals use it. `ssl dns-status` shows whether it is
+  set, never the token (`simai-ssl-dns/1`).
+- Renewal of a non-wildcard DNS certificate keeps the DNS challenge.
+- Panel gateway: `ssl:dns-credentials` (administrator only, the token is a
+  secret), `ssl:dns-status`; `ssl:letsencrypt` takes `challenge` and
+  `wildcard`.
+- Recorded panel answers: set 12.
+
 ## 1.35.0 - 2026-11-03
 
 - New `firewall status`, `firewall rule-add`, `firewall rule-remove`,

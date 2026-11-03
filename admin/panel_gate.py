@@ -67,6 +67,9 @@ CHANNEL_KIND = re.compile(r"^(webhook|telegram|off)$")
 CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-Za-z0-9._~/%?&=+:@-]{0,500})?|"
                             r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
+CF_TOKEN = re.compile(r"^[A-Za-z0-9_-]{30,64}$")
+CHALLENGE = re.compile(r"^(http|dns)$")
+DNS_PROVIDER = re.compile(r"^cloudflare$")
 PERIOD = re.compile(r"^(day|week|month)$")
 UPDATE_TARGET = re.compile(r"^(env|panel)$")
 SERVICE = re.compile(r"^(nginx|mysql|mariadb|postgresql|redis-server|cron|php[5-9]\.[0-9]-fpm)$")
@@ -117,8 +120,10 @@ ALLOW = {
     "site:describe": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:doctor": ({"domain": DOMAIN, "strict": YES_NO, "include-target": YES_NO}, {"domain"}, "read"),
     "logs:nginx": ({"domain": DOMAIN, "kind": KIND, "lines": LINES, "match": MATCH}, {"domain"}, "read"),
-    "ssl:letsencrypt": ({"domain": DOMAIN, "email": EMAIL, "redirect": YES_NO, "hsts": YES_NO, "staging": YES_NO},
-                        {"domain", "email"}, "action"),
+    "ssl:letsencrypt": ({"domain": DOMAIN, "email": EMAIL, "redirect": YES_NO, "hsts": YES_NO, "staging": YES_NO,
+                         "challenge": CHALLENGE, "wildcard": YES_NO}, {"domain", "email"}, "action"),
+    "ssl:dns-credentials": ({"provider": DNS_PROVIDER, "token": CF_TOKEN, "remove": YES_NO}, {"provider"}, "action"),
+    "ssl:dns-status": ({}, set(), "read"),
     "ssl:renew": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:deploy-rollback": ({"domain": DOMAIN}, {"domain"}, "action"),
     "backup:data": ({"domain": DOMAIN, "db": YES_NO, "files": YES_NO}, {"domain"}, "action"),
@@ -211,7 +216,7 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
               "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
-              "change:confirm", "change:status"}
+              "change:confirm", "change:status", "ssl:dns-credentials"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
