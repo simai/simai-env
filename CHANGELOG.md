@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.39.0 - 2026-11-04
+
+- File manager. New `file list|stat|read|cat|write|mkdir|rename|remove
+  --domain D --path P`: inside the site directory, as the site user, never
+  following links; `write` is atomic and takes `--expect-sha256` to refuse
+  overwriting a file changed since it was read.
+- Panel gateway: `file:list`, `file:stat`, `file:read`, `file:write`,
+  `file:mkdir`, `file:rename`, `file:remove`, for owners on their own sites;
+  `file:download` streams the bytes after the answer line (up to 1 GiB).
+- Tests: `file_e2e`.
+- Recorded panel answers: set 15.
+
 ## 1.38.0 - 2026-11-04
 
 - Server software. New `software list`: nginx, the MySQL server, PostgreSQL,

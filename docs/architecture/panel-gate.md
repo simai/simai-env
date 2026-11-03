@@ -15,7 +15,8 @@ verify and schedule backups, PHP settings and extensions, server metrics,
 databases, a log filter, the command list in `self:describe`, 1.28.0),
 stage 10 (a site's SFTP accounts by key, a check after each scheduled backup,
 a daily backup for new sites, the last certificate renewal, 1.30.0), server
-alerts and the load history (1.31.0).
+alerts and the load history (1.31.0), the file manager with downloads
+(1.39.0).
 
 ## Installation
 
@@ -324,6 +325,27 @@ Site cron jobs (1.34.0):
 - Owners manage jobs of their own sites. A job id that does not exist is
   refused `unknown_cron_job`; a job of another owner's site `owner_scope`.
 
+The file manager (1.39.0), for administrators and for owners on their own
+sites (`owner_scope` otherwise). Everything runs as the site user inside the
+site directory; links are never followed (`docs/commands/file.md`):
+
+- Reads: `file:list {domain, path}` (`simai-files/1`), `file:stat {domain,
+  path}` (`simai-file-stat/1`), `file:read {domain, path}` (`simai-file/1`
+  with `sha256` and `content`, UTF-8 up to 1 MiB).
+- Actions: `file:write {domain, path, content, expect-sha256: <sha256>|new|
+  any}` (the content travels in the request, so up to about 60 KB here; a
+  job record keeps only its size, `"(N bytes)"`), `file:mkdir {domain,
+  path}`, `file:rename {domain, path, to}`, `file:remove {domain, path}`.
+  A failed write answers `changed` or `exists` in the job log.
+- `file:download {domain, path}`, a new answer kind: one answer line
+  `{"status": "ok", "kind": "download", "data": {path, size, mtime}}`, then
+  exactly `size` raw bytes, up to 1 GiB. A link, a directory or a missing
+  path is refused (`not_a_file`, `not_found`, `too_large`) with the answer
+  line only. If the file shrank while it was sent, fewer bytes follow; the
+  panel compares the count with `size`.
+- `path` is relative to the site directory: no `..`, no control
+  characters, up to 1024 characters.
+
 Server software (1.38.0), administrator only:
 
 - `software:list` (`simai-software/1`): `components [{name, package,
@@ -434,7 +456,9 @@ action, job). Everything else is refused.
 - 1.37.0: `php:list`, `php:install`, `php:remove`, `php:extension`,
   `php:update`;
 - 1.38.0: `software:list`, `software:refresh`, `software:update`,
-  `software:install`.
+  `software:install`;
+- 1.39.0: `file:list`, `file:stat`, `file:read`, `file:download`,
+  `file:write`, `file:mkdir`, `file:rename`, `file:remove`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -457,8 +481,10 @@ service list and log, the site profiles, a site's cron jobs and runs with one
 planted job, the firewall with one rule, one block and a confirmed change,
 the DNS provider status with plans for a token and a DNS certificate, and
 the PHP versions with plans for installing, removing and updating, and the
-server software with plans for a system update and an install.
-Set 14 since 1.38.0. The panel's fixture driver replays them, and
+server software with plans for a system update and an install, and an
+owner's site files with plans for a write and a removal (downloads are bytes
+and are not recorded).
+Set 15 since 1.39.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

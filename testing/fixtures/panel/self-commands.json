@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 227,
+    "count": 235,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -1318,6 +1318,208 @@
         "authorization": "root",
         "confirmation": "not-required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file cat",
+        "description": "Write the raw bytes of a site file to stdout",
+        "required": [
+          "--domain",
+          "--path"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file list",
+        "description": "List a directory of a site (as the site user, inside the site directory)",
+        "required": [
+          "--domain"
+        ],
+        "optional": {
+          "--path": null
+        },
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file mkdir",
+        "description": "Create a directory in a site",
+        "required": [
+          "--domain",
+          "--path"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file read",
+        "description": "Show a text file of a site (UTF-8, up to 1 MiB)",
+        "required": [
+          "--domain",
+          "--path"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file remove",
+        "description": "Remove a file, a link or a directory with its contents from a site",
+        "required": [
+          "--domain",
+          "--path"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file rename",
+        "description": "Rename or move a file or directory within a site",
+        "required": [
+          "--domain",
+          "--path",
+          "--to"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file stat",
+        "description": "Show one file or directory of a site",
+        "required": [
+          "--domain"
+        ],
+        "optional": {
+          "--path": null
+        },
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file write",
+        "description": "Replace or create a text file of a site from --content-file",
+        "required": [
+          "--domain",
+          "--path",
+          "--content-file"
+        ],
+        "optional": {
+          "--expect-sha256": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

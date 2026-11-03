@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-file-stat.demo-owned.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-file-stat/1",
+    "path": "",
+    "name": "",
+    "type": "dir",
+    "size": 4096,
+    "mtime": 1793748303,
+    "mode": "770"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.39.0](v1.39.0.md) — the file manager: browse, edit, rename, remove and
+  download site files as the site user.
 - [v1.38.0](v1.38.0.md) — server software and system updates with a site
   check; Node.js, Redis and PostgreSQL installs.
 - [v1.37.0](v1.37.0.md) — PHP versions as software: install, remove,

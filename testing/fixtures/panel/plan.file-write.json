@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-write",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:write",
+    "args": {
+      "domain": "demo-owned.test",
+      "path": "public/hello.txt",
+      "content": "(6 bytes)",
+      "expect-sha256": "new"
+    },
+    "target": "demo-owned.test",
+    "description": "Replace or create a text file of a site from --content-file",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

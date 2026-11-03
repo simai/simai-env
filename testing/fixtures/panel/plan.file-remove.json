@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:remove",
+    "args": {
+      "domain": "demo-owned.test",
+      "path": "public/hello.txt"
+    },
+    "target": "demo-owned.test",
+    "description": "Remove a file, a link or a directory with its contents from a site",
+    "effects": "delete",
+    "lock": "site",
+    "applied": false
+  }
+}

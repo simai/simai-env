@@ -70,6 +70,10 @@ TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
 PHP_EXT = re.compile(r"^[a-z0-9_]{2,32}$")
 SOFTWARE = re.compile(r"^(node|redis|postgresql)$")
 MAJOR = re.compile(r"^[0-9]{2}$")
+# A path inside a site directory: no "..", no control characters.
+FILE_PATH = re.compile(r"^(?!.*(?:^|/)\.\.(?:/|$))[^\x00-\x1f\x7f]{0,1024}$")
+CONTENT = re.compile(r"^[^\x00]*$")
+EXPECT = re.compile(r"^(?:[0-9a-f]{64}|new|any)$")
 CF_TOKEN = re.compile(r"^[A-Za-z0-9_-]{30,64}$")
 CHALLENGE = re.compile(r"^(http|dns)$")
 DNS_PROVIDER = re.compile(r"^cloudflare$")
@@ -172,6 +176,16 @@ ALLOW = {
     "software:refresh": ({}, set(), "action"),
     "software:update": ({"security-only": YES_NO}, set(), "action"),
     "software:install": ({"name": SOFTWARE, "version": MAJOR}, {"name"}, "action"),
+    # Stage 6: the file manager, inside the site directory, as the site user.
+    "file:list": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
+    "file:stat": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
+    "file:read": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "read"),
+    "file:download": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "download"),
+    "file:write": ({"domain": DOMAIN, "path": FILE_PATH, "content": CONTENT, "expect-sha256": EXPECT},
+                   {"domain", "path", "content"}, "action"),
+    "file:mkdir": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
+    "file:rename": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
+    "file:remove": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
     "site:php-ini-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:php-ini-set": ({"domain": DOMAIN, "name": INI_KEY, "value": INI_VALUE}, {"domain", "name", "value"},
                          "action"),
@@ -239,8 +253,10 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
 NO_CANCEL = {"self:update"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
-FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file"}  # passed to the command as a file
+FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file"}  # passed as a file
 SECRET_ARGS = {"token"}  # never kept in a job record, and their file goes when the job ends
+BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
+MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
 ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
 ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
@@ -366,6 +382,11 @@ def registry_entry(command):
     return {}
 
 
+def shown_args(args):
+    return {k: "(stored)" if k in SECRET_ARGS else f"({len(v.encode())} bytes)" if k in BULK_ARGS else v
+            for k, v in args.items()}
+
+
 def plan(command, args, attachment=None):
     # Without --confirm only a command that requires confirmation is safe to call.
     if command not in CONDITIONAL and registry_entry(command).get("confirmation") != "required":
@@ -375,7 +396,7 @@ def plan(command, args, attachment=None):
     if result is None or result.get("status") != "planned":
         return None
     entry = registry_entry(command)
-    shown = {k: ("(stored)" if k in SECRET_ARGS else v) for k, v in args.items()}
+    shown = shown_args(args)
     answer = {"command": command, "args": shown, "target": result.get("target"),
               "description": entry.get("description"), "effects": result.get("effects"),
               "lock": entry.get("lock"), "applied": False}
@@ -434,7 +455,7 @@ def start_job(req, command, args, stream):
             if key in args:
                 fd = os.open(d / f"{key}.txt", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(fd, "w") as out:
-                    out.write(args[key] + "\n")
+                    out.write(args[key] if key in BULK_ARGS else args[key] + "\n")
                 files[key] = str(d / f"{key}.txt")
         if req.get("attachment"):
             archive = d / "release.tar.gz"
@@ -444,10 +465,10 @@ def start_job(req, command, args, stream):
     except Refused:
         shutil.rmtree(d, ignore_errors=True)
         raise
-    for key in SECRET_ARGS:
+    for key in SECRET_ARGS | BULK_ARGS:
         if key in files:
             cleanup += f"rm -f {files[key]}\n"
-    shown = {k: ("(stored)" if k in SECRET_ARGS else v) for k, v in args.items()}
+    shown = shown_args(args)
     meta = {"job_id": job_id, "request_id": req["request_id"], "actor": req["actor"], "command": command,
             "args": shown, "attachment": req.get("attachment"),
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
@@ -595,6 +616,44 @@ def log(entry):
         pass
 
 
+def download(args, answer, entry, started):
+    """The answer line, then exactly data.size raw bytes of the file."""
+    result = run("file:stat", args) or {}
+    info = result.get("data") or {}
+    out = sys.stdout.buffer
+    if info.get("type") != "file":
+        answer.update(status="refused", reason="not_a_file" if info else "not_found")
+    elif info.get("size", 0) > MAX_DOWNLOAD:
+        answer.update(status="refused", reason="too_large")
+    else:
+        answer.update(status="ok", kind="download",
+                      data={"path": info["path"], "size": info["size"], "mtime": info.get("mtime")})
+    out.write((json.dumps(answer, ensure_ascii=False) + "\n").encode())
+    out.flush()
+    sent = 0
+    if answer["status"] == "ok":
+        proc = subprocess.Popen(argv_for("file:cat", args), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, env=ENV, cwd="/")
+        left = info["size"]
+        while left:
+            chunk = proc.stdout.read(min(left, 1 << 20))
+            if not chunk:
+                break
+            out.write(chunk)
+            sent += len(chunk)
+            left -= len(chunk)
+        out.flush()
+        proc.stdout.close()
+        proc.kill() if proc.poll() is None else None
+        proc.wait()
+        if sent != info["size"]:
+            answer.update(status="failed", reason="download_short")  # the file changed meanwhile
+    entry.update(status=answer["status"], reason=answer.get("reason"), bytes=sent,
+                 ms=int((time.time() - started) * 1000))
+    log(entry)
+    return 0
+
+
 def main():
     started = time.time()
     stream = sys.stdin.buffer
@@ -634,6 +693,8 @@ def main():
             if not alert.get("domain") or not owned(owner, alert["domain"]):
                 raise Refused("owner_scope")  # host alerts are the administrator's
         kind = ALLOW[command][2]
+        if kind == "download":
+            return download(args, answer, entry, started)
         if kind == "job":
             answer.update(status="ok", kind="result", data=job_answer(command, args, owner))
             raise Done
