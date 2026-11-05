@@ -48,8 +48,9 @@ Checks:
 | `wordpress_core:<domain>` | sites | WordPress older than the current release | how |
 | `vulnerability_scan` | sites | the databases could not be asked yet | `security:scan` |
 
-The score loses points for every open problem: a risk loses 30, 15, 7 or 2
-points by severity, a warning about half of that.
+The score loses points for every kind of open problem: a risk loses 30, 15, 7
+or 2 points by severity, a warning about half of that; the same problem on
+further sites costs one more point each (up to 5).
 
 Serious problems (a risk of high or critical severity) also open
 `security_risk` alerts (`self alerts`), which go to the alert channel.

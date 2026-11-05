@@ -480,8 +480,14 @@ def report(access_file: str, online_mode: str = "") -> dict:
         save(ONLINE, online)
     checks = check_updates() + check_ssh() + check_firewall() + check_panel(access_file) + check_sites(sites)
     checks += check_online(online) if enabled else []
-    lost = sum(WEIGHT[c["severity"]] if c["status"] == "risk" else WEIGHT[c["severity"]] // 2 + 1
-               for c in checks if c["status"] in ("risk", "warn"))
+    # One kind of problem counts once at its worst, plus a point for every
+    # further site with it (up to 5), so many sites do not sink the score.
+    kinds: dict[str, list[int]] = {}
+    for c in checks:
+        if c["status"] in ("risk", "warn"):
+            w = WEIGHT[c["severity"]] if c["status"] == "risk" else WEIGHT[c["severity"]] // 2 + 1
+            kinds.setdefault(c["check"], []).append(w)
+    lost = sum(max(ws) + min(len(ws) - 1, 5) for ws in kinds.values())
     score = max(0, 100 - lost)
     problems = [c for c in checks if c["status"] in ("risk", "warn")]
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}

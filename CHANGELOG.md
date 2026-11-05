@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.45.1 - 2026-11-06
+
+- `security status`: one kind of problem counts once at its worst in the
+  score, plus a point for each further site with it (up to 5), so a server
+  with many sites is not scored near zero for one missing setting.
+
 ## 1.45.0 - 2026-11-06
 
 - Security center. `security status` checks the server and its sites by
