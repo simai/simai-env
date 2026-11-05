@@ -8,86 +8,579 @@
     "components": [
       {
         "name": "nginx",
+        "key": "nginx",
+        "title": "nginx",
+        "purpose": "Web server in front of every site: HTTPS, access rules, static files",
+        "group": "web",
         "package": "nginx",
         "installed": true,
         "version": "1.24.0-2ubuntu7.19",
         "candidate": "1.24.0-2ubuntu7.19",
         "update": false,
         "service": "nginx",
+        "unit": "nginx",
         "active": true,
-        "installable": false
-      },
-      {
-        "name": "mysql",
-        "package": "mysql-server",
-        "installed": true,
-        "version": "8.0.46-0ubuntu0.24.04.4",
-        "candidate": "8.0.46-0ubuntu0.24.04.4",
-        "update": false,
-        "service": "mysql",
-        "active": true,
-        "installable": false
-      },
-      {
-        "name": "postgresql",
-        "package": null,
-        "installed": false,
-        "version": null,
-        "candidate": "16+257build1.1",
-        "update": false,
-        "service": null,
-        "active": null,
-        "installable": true
-      },
-      {
-        "name": "redis",
-        "package": null,
-        "installed": false,
-        "version": null,
-        "candidate": "5:7.0.15-1ubuntu0.24.04.5",
-        "update": false,
-        "service": null,
-        "active": null,
-        "installable": true
-      },
-      {
-        "name": "node",
-        "package": null,
-        "installed": false,
-        "version": null,
-        "candidate": "18.19.1+dfsg-6ubuntu5",
-        "update": false,
-        "service": null,
-        "active": null,
-        "installable": true,
+        "state": "running",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": {
+          "code": "required_by_env",
+          "text": "nginx is part of simai-env"
+        },
+        "remove_blocked": {
+          "code": "required_by_env",
+          "text": "nginx is part of simai-env"
+        },
+        "how": null,
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [],
         "sites": []
       },
       {
-        "name": "certbot",
-        "package": "certbot",
-        "installed": true,
-        "version": "2.9.0-1",
-        "candidate": "2.9.0-1",
-        "update": false,
-        "service": null,
-        "active": null,
-        "installable": false
-      },
-      {
         "name": "apache",
+        "key": "apache",
+        "title": "Apache",
+        "purpose": "Serves PHP sites that rely on .htaccess, behind nginx (site apache)",
+        "group": "web",
         "package": null,
         "installed": false,
         "version": null,
         "candidate": "2.4.58-1ubuntu8.17",
         "update": false,
         "service": null,
+        "unit": "apache2",
         "active": null,
-        "installable": false
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Apache is not installed"
+        },
+        "how": "apache",
+        "packages": [
+          "apache2"
+        ],
+        "php_extensions": [],
+        "keeps": [
+          "/etc/apache2"
+        ],
+        "sites": []
+      },
+      {
+        "name": "certbot",
+        "key": "certbot",
+        "title": "Certbot",
+        "purpose": "Gets and renews free Let's Encrypt certificates",
+        "group": "security",
+        "package": "certbot",
+        "installed": true,
+        "version": "2.9.0-1",
+        "candidate": "2.9.0-1",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "installed",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": true,
+        "install_blocked": {
+          "code": "installed",
+          "text": "Certbot is installed"
+        },
+        "remove_blocked": null,
+        "how": "apt",
+        "packages": [
+          "certbot"
+        ],
+        "php_extensions": [],
+        "keeps": [
+          "/etc/letsencrypt"
+        ],
+        "sites": []
+      },
+      {
+        "name": "fail2ban",
+        "key": "fail2ban",
+        "title": "Fail2ban",
+        "purpose": "Bans addresses that keep failing to sign in over SSH",
+        "group": "security",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "1.0.2-3ubuntu0.1",
+        "update": false,
+        "service": null,
+        "unit": "fail2ban",
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Fail2ban is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "fail2ban"
+        ],
+        "php_extensions": [],
+        "keeps": [
+          "/etc/fail2ban"
+        ],
+        "sites": []
+      },
+      {
+        "name": "mysql",
+        "key": "mysql",
+        "title": "MySQL",
+        "purpose": "Database server for most sites",
+        "group": "databases",
+        "package": "mysql-server",
+        "installed": true,
+        "version": "8.0.46-0ubuntu0.24.04.4",
+        "candidate": "8.0.46-0ubuntu0.24.04.4",
+        "update": false,
+        "service": "mysql",
+        "unit": "mysql",
+        "active": true,
+        "state": "running",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": {
+          "code": "required_by_env",
+          "text": "MySQL is part of simai-env"
+        },
+        "remove_blocked": {
+          "code": "required_by_env",
+          "text": "MySQL is part of simai-env"
+        },
+        "how": null,
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": [
+          "demo-php.test"
+        ]
+      },
+      {
+        "name": "postgresql",
+        "key": "postgresql",
+        "title": "PostgreSQL",
+        "purpose": "Database server for sites that choose PostgreSQL",
+        "group": "databases",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "16+257build1.1",
+        "update": false,
+        "service": null,
+        "unit": "postgresql",
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "PostgreSQL is not installed"
+        },
+        "how": "postgresql",
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [
+          "/var/lib/postgresql",
+          "/etc/postgresql"
+        ],
+        "sites": []
+      },
+      {
+        "name": "redis",
+        "key": "redis",
+        "title": "Redis",
+        "purpose": "In-memory store for cache, sessions and queues",
+        "group": "cache",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "5:7.0.15-1ubuntu0.24.04.5",
+        "update": false,
+        "service": null,
+        "unit": "redis-server",
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Redis is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "redis-server"
+        ],
+        "php_extensions": [
+          "php-redis"
+        ],
+        "keeps": [
+          "/var/lib/redis",
+          "/etc/redis"
+        ],
+        "sites": []
+      },
+      {
+        "name": "memcached",
+        "key": "memcached",
+        "title": "Memcached",
+        "purpose": "In-memory cache for applications that use it",
+        "group": "cache",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "1.6.24-1ubuntu0.3",
+        "update": false,
+        "service": null,
+        "unit": "memcached",
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Memcached is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "memcached"
+        ],
+        "php_extensions": [
+          "php-memcached"
+        ],
+        "keeps": [
+          "/etc/memcached.conf"
+        ],
+        "sites": []
+      },
+      {
+        "name": "php",
+        "key": "php",
+        "title": "PHP",
+        "purpose": "PHP versions for sites; managed in the PHP section",
+        "group": "languages",
+        "package": "php-fpm",
+        "installed": true,
+        "version": null,
+        "candidate": null,
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "installed",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": {
+          "code": "managed_elsewhere",
+          "text": "PHP versions are managed in the PHP section"
+        },
+        "remove_blocked": {
+          "code": "managed_elsewhere",
+          "text": "PHP versions are removed in the PHP section"
+        },
+        "how": null,
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "node",
+        "key": "node",
+        "title": "Node.js",
+        "purpose": "JavaScript runtime for node sites and front-end builds",
+        "group": "languages",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "18.19.1+dfsg-6ubuntu5",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Node.js is not installed"
+        },
+        "how": "node",
+        "packages": [
+          "nodejs"
+        ],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "composer",
+        "key": "composer",
+        "title": "Composer",
+        "purpose": "PHP dependency manager used by deploys",
+        "group": "languages",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": null,
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": {
+          "code": "required_by_env",
+          "text": "Composer is part of simai-env"
+        },
+        "remove_blocked": {
+          "code": "required_by_env",
+          "text": "Composer is part of simai-env"
+        },
+        "how": null,
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "git",
+        "key": "git",
+        "title": "Git",
+        "purpose": "Fetches site code for deploys",
+        "group": "tools",
+        "package": "git",
+        "installed": true,
+        "version": "1:2.43.0-1ubuntu7.4",
+        "candidate": "1:2.43.0-1ubuntu7.4",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "installed",
+        "installable": false,
+        "can_install": false,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": {
+          "code": "required_by_env",
+          "text": "Git is part of simai-env"
+        },
+        "remove_blocked": {
+          "code": "required_by_env",
+          "text": "Git is part of simai-env"
+        },
+        "how": null,
+        "packages": [],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "imagemagick",
+        "key": "imagemagick",
+        "title": "ImageMagick",
+        "purpose": "Image processing for applications (PHP imagick)",
+        "group": "tools",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "8:6.9.12.98+dfsg1-5.2build2",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "ImageMagick is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "imagemagick"
+        ],
+        "php_extensions": [
+          "php-imagick"
+        ],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "jpegoptim",
+        "key": "jpegoptim",
+        "title": "jpegoptim",
+        "purpose": "Makes JPEG images smaller without visible loss",
+        "group": "tools",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "1.4.7-1",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "jpegoptim is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "jpegoptim"
+        ],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "optipng",
+        "key": "optipng",
+        "title": "OptiPNG",
+        "purpose": "Makes PNG images smaller without loss",
+        "group": "tools",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "0.7.8+ds-1build2",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "OptiPNG is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "optipng"
+        ],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "ffmpeg",
+        "key": "ffmpeg",
+        "title": "FFmpeg",
+        "purpose": "Converts and processes video and audio",
+        "group": "tools",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "7:6.1.1-3ubuntu5",
+        "update": false,
+        "service": null,
+        "unit": null,
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "FFmpeg is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "ffmpeg"
+        ],
+        "php_extensions": [],
+        "keeps": [],
+        "sites": []
+      },
+      {
+        "name": "supervisor",
+        "key": "supervisor",
+        "title": "Supervisor",
+        "purpose": "Keeps long-running processes alive (simai-env uses systemd for its own)",
+        "group": "tools",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "4.2.5-1ubuntu0.1",
+        "update": false,
+        "service": null,
+        "unit": "supervisor",
+        "active": null,
+        "state": "not_installed",
+        "installable": true,
+        "can_install": true,
+        "can_update": false,
+        "can_remove": false,
+        "install_blocked": null,
+        "remove_blocked": {
+          "code": "not_installed",
+          "text": "Supervisor is not installed"
+        },
+        "how": "apt",
+        "packages": [
+          "supervisor"
+        ],
+        "php_extensions": [],
+        "keeps": [
+          "/etc/supervisor"
+        ],
+        "sites": []
       }
     ],
     "system": {
-      "updates": 4,
-      "security": 3,
+      "updates": 5,
+      "security": 4,
       "packages": [
         {
           "name": "libapt-pkg6.0t64",
@@ -108,6 +601,12 @@
           "security": true
         },
         {
+          "name": "ca-certificates",
+          "from": "20260816ubuntu0.24.04.1",
+          "to": "20260816ubuntu0.24.04.2",
+          "security": true
+        },
+        {
           "name": "libsqlite3-0",
           "from": "3.45.1-1ubuntu2.8",
           "to": "3.45.1-1ubuntu2.9",
@@ -117,7 +616,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 22394
+      "index_age_seconds": 3349
     }
   },
   "command_status": "success",

@@ -68,7 +68,7 @@ CHANNEL_TARGET = re.compile(r"^(https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?(/[A-
                             r"-?[0-9]{1,20}|@[A-Za-z0-9_]{5,32})$")
 TG_TOKEN = re.compile(r"^[0-9]{5,12}:[A-Za-z0-9_-]{30,64}$")
 PHP_EXT = re.compile(r"^[a-z0-9_]{2,32}$")
-SOFTWARE = re.compile(r"^(node|redis|postgresql)$")
+SOFTWARE = re.compile(r"^(node|redis|postgresql|apache|certbot|fail2ban|memcached|imagemagick|jpegoptim|optipng|ffmpeg|supervisor)$")
 MAJOR = re.compile(r"^[0-9]{2}$")
 # A path inside a site directory: no "..", no control characters.
 FILE_PATH = re.compile(r"^(?!.*(?:^|/)\.\.(?:/|$))[^\x00-\x1f\x7f]{0,1024}$")
@@ -176,6 +176,7 @@ ALLOW = {
     "software:refresh": ({}, set(), "action"),
     "software:update": ({"security-only": YES_NO}, set(), "action"),
     "software:install": ({"name": SOFTWARE, "version": MAJOR}, {"name"}, "action"),
+    "software:remove": ({"name": SOFTWARE}, {"name"}, "action"),
     # Stage 6: the file manager, inside the site directory, as the site user.
     "file:list": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
     "file:stat": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
@@ -251,7 +252,7 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
               "change:confirm", "change:status", "ssl:dns-credentials",
               "php:list", "php:install", "php:remove", "php:extension", "php:update",
-              "software:list", "software:refresh", "software:update", "software:install",
+              "software:list", "software:refresh", "software:update", "software:install", "software:remove",
               "site:nginx-custom", "site:nginx-custom-show", "site:apache"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
@@ -414,6 +415,11 @@ def plan(command, args, attachment=None):
     elif command == "software:update":
         # The packages waiting in the apt index and whether a reboot is pending.
         answer["update"] = ((run("software:list", {}) or {}).get("data") or {}).get("system")
+    elif command in ("software:install", "software:remove"):
+        # The program: state, packages, PHP extensions, what removal keeps,
+        # and why the action would be refused (install_blocked/remove_blocked).
+        rows = ((run("software:list", {}) or {}).get("data") or {}).get("components") or []
+        answer["software"] = next((r for r in rows if r.get("key") == args["name"]), None)
     return answer
 
 

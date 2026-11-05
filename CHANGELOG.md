@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.43.0 - 2026-11-05
+
+- Server programs as a catalogue. `software list` lists 17 programs (web
+  server, Apache, Certbot, Fail2ban, MySQL, PostgreSQL, Redis, Memcached,
+  PHP, Node.js, Composer, Git, ImageMagick, jpegoptim, OptiPNG, FFmpeg,
+  Supervisor) with a title, purpose, group, state and the actions allowed,
+  and the reason when one is not (`required_by_env`, `used_by_sites` with
+  the sites, `has_certificates`, ...).
+- `software install` installs every program from the catalogue (with its
+  PHP extension for every PHP-FPM version) and updates an installed one.
+- New `software remove`: `apt-get remove`, configuration and data stay;
+  refused while sites need the program and when apt would take a package
+  the server needs.
+- Panel gateway: `software:remove`; the plans of `software:install` and
+  `software:remove` carry the program's catalogue row.
+- Recorded panel answers: set 20.
+
 ## 1.42.1 - 2026-11-05
 
 - `self update-plan` answers codes next to its texts, so the panel can

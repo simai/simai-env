@@ -391,6 +391,14 @@ Server software (1.38.0), administrator only:
   nginx or PHP-FPM configuration), `software:install {name: node|redis|
   postgresql, version}` (a Node.js major change is refused while node sites
   exist).
+- Since 1.43.0 `software:list` is a catalogue of programs with `key, title,
+  purpose, group, state, can_install, can_update, can_remove,
+  install_blocked, remove_blocked, packages, php_extensions, keeps, sites`
+  (see `docs/commands/software.md`). `software:install {name, version}`
+  takes every installable key and updates an installed program;
+  `software:remove {name}` is new. The plans of both carry `software`: the
+  program's catalogue row, so the panel can say what is installed or
+  removed, what is kept, and why the job would be refused.
 
 PHP as software of the host (1.37.0), administrator only:
 
@@ -493,7 +501,8 @@ action, job). Everything else is refused.
   `file:write`, `file:mkdir`, `file:rename`, `file:remove`;
 - 1.40.0: `file:upload`, `file:archive`, `file:extract`;
 - 1.41.0: `site:nginx-custom`, `site:nginx-custom-show`;
-- 1.42.0: `site:apache`.
+- 1.42.0: `site:apache`;
+- 1.43.0: `software:remove`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

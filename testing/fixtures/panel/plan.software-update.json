@@ -14,8 +14,8 @@
     "lock": "host",
     "applied": false,
     "update": {
-      "updates": 4,
-      "security": 3,
+      "updates": 5,
+      "security": 4,
       "packages": [
         {
           "name": "libapt-pkg6.0t64",
@@ -36,6 +36,12 @@
           "security": true
         },
         {
+          "name": "ca-certificates",
+          "from": "20260816ubuntu0.24.04.1",
+          "to": "20260816ubuntu0.24.04.2",
+          "security": true
+        },
+        {
           "name": "libsqlite3-0",
           "from": "3.45.1-1ubuntu2.8",
           "to": "3.45.1-1ubuntu2.9",
@@ -45,7 +51,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 22398
+      "index_age_seconds": 3352
     }
   }
 }

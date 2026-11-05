@@ -18,7 +18,20 @@ cli site add --domain soft.test --profile generic --php "$native" --create-db no
 apt-get update -qq >/dev/null 2>&1
 l=$(cli software list --output json 2>/dev/null)
 [[ "$(js 'd["data"]["schema"]' <<<"$l")" == simai-software/1 ]] && ok "software list answers simai-software/1" || bad "software list: ${l:0:300}"
-[[ "$(js '[c["name"] for c in d["data"]["components"]]' <<<"$l")" == "['nginx', 'mysql', 'postgresql', 'redis', 'node', 'certbot', 'apache']" ]] && ok "the components are listed" || bad "components: ${l:0:300}"
+[[ "$(js '[c["key"] for c in d["data"]["components"]]' <<<"$l")" == "['nginx', 'apache', 'certbot', 'fail2ban', 'mysql', 'postgresql', 'redis', 'memcached', 'php', 'node', 'composer', 'git', 'imagemagick', 'jpegoptim', 'optipng', 'ffmpeg', 'supervisor']" ]] && ok "the catalogue lists the programs" || bad "components: ${l:0:300}"
+[[ "$(js 'all(set(("title","purpose","group","state","can_install","can_update","can_remove","install_blocked","remove_blocked","keeps","sites")) <= set(c) for c in d["data"]["components"])' <<<"$l")" == True ]] && ok "every program has its state and actions" || bad "fields"
+[[ "$(comp nginx remove_blocked)" == *required_by_env* && "$(comp php remove_blocked)" == *managed_elsewhere* && "$(comp mysql can_install)" == False ]] && ok "simai-env's own programs cannot be removed" || bad "protected: $(comp nginx remove_blocked)"
+cli software remove --name nginx --confirm yes >/tmp/x 2>&1 && bad "nginx removed" || { dpkg -l nginx | grep -q '^ii' && ok "removing nginx is refused" || bad "nginx gone"; }
+
+# Memcached: install with the PHP extension, then remove keeping its configuration.
+[[ "$(comp memcached can_install)" == True && "$(comp memcached group)" == cache ]] && ok "Memcached can be installed" || bad "memcached installable"
+cli software install --name memcached --confirm yes >/tmp/m 2>&1 && systemctl is-active --quiet memcached && "php-fpm${native}" -m | grep -qx memcached \
+  && [[ "$(comp memcached state)" == running ]] && ok "Memcached is installed and running with php${native}-memcached" || { bad "memcached install"; tail -5 /tmp/m; }
+cli software remove --name memcached >/tmp/m 2>&1; grep -q 'configuration and data stay' /tmp/m && dpkg -l memcached | grep -q '^ii' && ok "remove without confirm is a plan" || { bad "remove plan"; tail -3 /tmp/m; }
+cli software remove --name memcached --confirm yes >/tmp/m 2>&1 && ! dpkg -l memcached 2>/dev/null | grep -q '^ii' && [[ -f /etc/memcached.conf && "$(comp memcached state)" == not_installed ]] \
+  && ok "Memcached is removed and its configuration kept" || { bad "memcached remove"; tail -5 /tmp/m; }
+cli software remove --name memcached --confirm yes >/dev/null 2>&1 && bad "removed twice" || ok "removing what is not installed is refused"
+cli software install --name jpegoptim --confirm yes >/dev/null 2>&1 && command -v jpegoptim >/dev/null && ok "a tool installs" || bad "jpegoptim"
 [[ "$(js 'type(d["data"]["system"]["updates"]).__name__' <<<"$l")" == int ]] && ok "system updates are counted" || bad "system: ${l:0:300}"
 
 # Redis: a plan first, then the install with the PHP extension.
@@ -43,6 +56,8 @@ if command -v node >/dev/null 2>&1; then
   other=$([[ "$major" == 22 ]] && echo 20 || echo 22)
   cli software install --name node --version "$other" --confirm yes >/tmp/n 2>&1 && bad "changed Node.js under a node site" \
     || { grep -q 'nodeapp.test' /tmp/n && node -v | grep -q "^v${major}\." && ok "a major change names the node site and keeps Node.js ${major}" || bad "node refusal: $(tail -2 /tmp/n)"; }
+  cli software remove --name node --confirm yes >/tmp/n 2>&1 && bad "removed Node.js under a node site" \
+    || { grep -q 'nodeapp.test' /tmp/n && command -v node >/dev/null && ok "removing Node.js names the node site and keeps it" || bad "node remove: $(tail -2 /tmp/n)"; }
   rm -f /etc/nginx/sites-available/nodeapp.test.conf
 fi
 
@@ -65,6 +80,9 @@ a=$(gate "$(req null software:list '{}')")
 [[ "$(gate "$(req '"acme"' software:update '{}')" | js 'd["reason"]')" == not_allowed ]] && ok "an owner cannot update the system" || bad "owner software:update"
 a=$(gate "$(req null software:update '{"security-only":"yes"}')")
 [[ "$(js 'd["kind"]' <<<"$a")" == plan && "$(js '"updates" in d["data"]["update"]' <<<"$a")" == True ]] && ok "software:update plan carries the waiting updates" || bad "update plan: ${a:0:300}"
+a=$(gate "$(req null software:remove '{"name":"redis"}')")
+[[ "$(js 'd["kind"] == "plan" and d["data"]["software"]["key"] == "redis" and d["data"]["software"]["can_remove"]' <<<"$a")" == True ]] && ok "software:remove plan carries the program" || bad "remove plan: ${a:0:300}"
+[[ "$(gate "$(req '"acme"' software:remove '{"name":"redis"}')" | js 'd["reason"]')" == not_allowed ]] && ok "an owner cannot remove programs" || bad "owner remove"
 [[ "$(gate "$(req null software:install '{"name":"x;id"}')" | js 'd["reason"]')" == invalid_argument ]] && ok "a component name with shell characters is refused" || bad "install validation"
 a=$(gate "$(req null software:refresh '{}' 1)"); j=$(js 'd["job_id"]' <<<"$a")
 for _ in {1..120}; do s=$(gate "$(req null job:status "{\"job_id\":\"$j\"}")" | js 'd["data"]["state"]'); [[ "$s" != running ]] && break; sleep 1; done

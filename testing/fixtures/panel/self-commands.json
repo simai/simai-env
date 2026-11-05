@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 241,
+    "count": 242,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -5343,7 +5343,7 @@
       },
       {
         "command": "simai-admin.sh software install",
-        "description": "Install Node.js, Redis or PostgreSQL",
+        "description": "Install a program from the catalogue (software list), or update it when installed",
         "required": [
           "--name"
         ],
@@ -5370,7 +5370,7 @@
       },
       {
         "command": "simai-admin.sh software list",
-        "description": "Show server software (web server, databases, Redis, Node.js) and waiting system updates",
+        "description": "Show the catalogue of server programs (state, actions) and waiting system updates",
         "required": [],
         "optional": {},
         "flags": [
@@ -5399,6 +5399,32 @@
           "tier:advanced"
         ],
         "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh software remove",
+        "description": "Remove a program (configuration and data stay); refused while sites need it",
+        "required": [
+          "--name"
+        ],
+        "optional": {
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "delete",
         "authorization": "root",
         "confirmation": "required",
         "lock": "host",

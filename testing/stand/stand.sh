@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=19
+FIXTURE_SET=20
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -213,6 +213,7 @@ FW
     "software-list|null|software:list|{}"
     "plan.software-update|null|software:update|{\"security-only\":\"yes\"}"
     "plan.software-install|null|software:install|{\"name\":\"redis\"}"
+    "plan.software-remove|null|software:remove|{\"name\":\"memcached\"}"
     "refused.owner-admin-only.software-list|\"demo\"|software:list|{}"
     "file-list.demo-owned.test|\"demo\"|file:list|{\"domain\":\"demo-owned.test\"}"
     "file-stat.demo-owned.test|\"demo\"|file:stat|{\"domain\":\"demo-owned.test\"}"

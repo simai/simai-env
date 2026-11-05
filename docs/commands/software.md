@@ -8,17 +8,31 @@ the whole system. PHP versions have their own group (`php list`, `php
 install`, `php update`, see `php.md`).
 
 ## list
-Show the components and the waiting system updates. The apt index is as
-fresh as the last refresh (`software refresh`; `index_age_seconds` says how
-old it is).
+Show the catalogue of server programs and the waiting system updates. The
+apt index is as fresh as the last refresh (`software refresh`;
+`index_age_seconds` says how old it is).
+
+The catalogue (1.43.0): `nginx`, `apache`, `certbot`, `fail2ban`, `mysql`
+(Percona, MySQL or MariaDB, whichever is installed), `postgresql`, `redis`,
+`memcached`, `php` (managed in the `php` group), `node`, `composer`, `git`,
+`imagemagick`, `jpegoptim`, `optipng`, `ffmpeg`, `supervisor`. Groups:
+`web`, `security`, `databases`, `cache`, `languages`, `tools`.
 
 `--output json` answers `simai-software/1`:
 
-- `components [{name, package, installed, version, candidate, update,
-  service, active, installable}]` for `nginx`, `mysql` (Percona, MySQL or
-  MariaDB, whichever is installed), `postgresql`, `redis`, `node` (also
-  `sites`: the sites with the node profile) and `certbot`. `installable`
-  means `software install` can add it.
+- `components [...]`, one per program:
+  - `key` (also `name`), `title`, `purpose` (one line, English), `group`
+  - `installed`, `package`, `version`, `candidate`, `update`, `service`,
+    `active`, `state: running|stopped|installed|not_installed`
+  - `can_install`, `can_update`, `can_remove`; `install_blocked` and
+    `remove_blocked` are `null` or `{code, text}` with codes
+    `required_by_env` (part of simai-env), `managed_elsewhere` (PHP),
+    `installed`, `not_installed`, `unavailable` (not in the repositories),
+    `used_by_sites` (with `sites`), `has_certificates` (with `count`)
+  - `packages` (what install and remove act on), `php_extensions` (installed
+    with it for every PHP-FPM version), `keeps` (paths removal keeps),
+    `sites` (sites that need it: node, apache, postgresql, mysql), `how`
+  - `installable`: the same as `can_install` (kept for older panels)
 - `system {updates, security, packages [{name, from, to, security}],
   kept_back, reboot_required, reboot_packages, index_age_seconds}`.
 
@@ -62,23 +76,56 @@ sudo /root/simai-env/simai-admin.sh software update --security-only yes --confir
 ```
 
 ## install
-Install a component that is not on the server.
+Install a program from the catalogue, or update it when it is installed and
+a newer version is waiting.
 
 Options:
-- `--name node|redis|postgresql` (required)
+- `--name <key>` (required): `node`, `redis`, `postgresql`, `apache`,
+  `certbot`, `fail2ban`, `memcached`, `imagemagick`, `jpegoptim`,
+  `optipng`, `ffmpeg`, `supervisor`
 - `--version <major>`: Node.js major version (default `22`) or PostgreSQL
   major version (another than the Ubuntu one adds the signed PGDG
-  repository); Redis takes no version
+  repository); other programs take no version
 - `--confirm yes`: without it the command prints a plan
 
 Behavior:
-- `redis`: `redis-server` from Ubuntu, listening on localhost, and
-  `php<ver>-redis` for every installed PHP-FPM version
+- programs from Ubuntu are installed with `apt-get install`, changed
+  configuration files kept; their service is started; `redis`,
+  `memcached` and `imagemagick` also get `php<ver>-redis`,
+  `php<ver>-memcached`, `php<ver>-imagick` for every PHP-FPM version
+- an installed program with an update waiting is upgraded alone
+  (`--only-upgrade`)
+- `apache`: listens on `127.0.0.1:8088` only; sites move to it with
+  `site apache`
 - `node`: Node.js from the NodeSource repository with its signing key pinned
   by fingerprint. There is one Node.js per server: changing the major version
   is refused while sites with the node profile exist, and names them
 - `postgresql`: the same as `db pgsql-install`
+- refused, with the reason, for what simai-env owns (`nginx`, `mysql`,
+  `composer`, `git`), for PHP (use `php install`) and for what is installed
+  with nothing to update
 
 ```bash
 sudo /root/simai-env/simai-admin.sh software install --name redis --confirm yes
+```
+
+## remove
+Remove a program (1.43.0).
+
+Options:
+- `--name <key>` (required): as for `install`
+- `--confirm yes`: without it the command prints a plan
+
+Behavior:
+- `apt-get remove`: configuration and data stay (`keeps`), so installing it
+  again picks them up; its PHP extensions go with it
+- refused, with the reason and the sites, while sites need it (Node.js
+  under node sites, Apache under sites in Apache mode, PostgreSQL under
+  PostgreSQL sites), Certbot while it renews certificates, and for what
+  simai-env owns
+- refused when apt would also remove a package the server needs (nginx,
+  PHP, database servers, SSH, Git, Certbot and the like)
+
+```bash
+sudo /root/simai-env/simai-admin.sh software remove --name memcached --confirm yes
 ```

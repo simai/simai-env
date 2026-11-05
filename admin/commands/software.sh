@@ -125,50 +125,131 @@ software_install_node() {
   ui_result_table "Node.js|$(node -v 2>/dev/null || echo '?')" "Previous|${current:-none}"
 }
 
-software_install_redis() {
-  local confirm="$1" v
-  if [[ "${confirm,,}" != yes ]]; then
-    if dpkg-query -W -f '${db:Status-Abbrev}' redis-server 2>/dev/null | grep -q '^ii'; then
-      echo "Plan: nothing to do, Redis is installed"
-    else
-      echo "Plan: install redis-server from Ubuntu (listens on localhost only) and php<ver>-redis for every installed PHP-FPM version"
-    fi
-    echo "Rerun with --confirm yes to apply."
-    return 0
+# One field of a catalogue entry (software_state.py entry KEY) held in $SOFTWARE_ENTRY.
+software_field() {
+  python3 -I -c 'import json,sys
+v = json.loads(sys.argv[1])
+for k in sys.argv[2].split("."):
+    v = v.get(k) if isinstance(v, dict) else None
+print(" ".join(v) if isinstance(v, list) else ("" if v is None else v))' "$SOFTWARE_ENTRY" "$1"
+}
+
+software_entry() {
+  [[ "$1" =~ ^[a-z0-9-]{1,32}$ ]] && SOFTWARE_ENTRY=$(software_state entry "$1") || { error "Unknown program: $1 (see software list)"; return 1; }
+}
+
+# Installs the packages of an apt program and its PHP extension for every
+# PHP-FPM version, or upgrades them when the program is installed.
+software_apt_apply() {
+  local mode="$1" title pkgs ext v
+  title=$(software_field title); pkgs=$(software_field packages); ext=$(software_field php_extensions)
+  local -a opts=(-o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold)
+  # shellcheck disable=SC2086 # package lists are words
+  if [[ "$mode" == update ]]; then
+    run_long "Updating ${title}" env DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade "${opts[@]}" $pkgs || return 1
+  else
+    run_long "Installing ${title}" env DEBIAN_FRONTEND=noninteractive apt-get install -y "${opts[@]}" $pkgs || return 1
   fi
-  run_long "Installing redis-server" env DEBIAN_FRONTEND=noninteractive apt-get install -y redis-server || return 1
-  os_svc_enable_now redis-server || true
-  while IFS= read -r v; do
-    [[ -n "$v" ]] || continue
-    if env DEBIAN_FRONTEND=noninteractive apt-get install -y "php${v}-redis" >>"$LOG_FILE" 2>&1; then
-      os_svc_reload_or_restart "php${v}-fpm" >/dev/null 2>&1 || true
+  local service
+  service=$(software_field unit)
+  [[ -z "$service" || "$mode" == update ]] || os_svc_enable_now "$service" >/dev/null 2>&1 || true
+  for v in $ext; do
+    if env DEBIAN_FRONTEND=noninteractive apt-get install -y "${opts[@]}" "$v" >>"$LOG_FILE" 2>&1; then
+      os_svc_reload_or_restart "$(sed -E 's/^php([0-9.]+)-.*/php\1-fpm/' <<<"$v")" >/dev/null 2>&1 || true
     else
-      warn "Could not install php${v}-redis"
+      warn "Could not install ${v}"
     fi
-  done < <(installed_php_versions)
-  ui_result_table "Redis|$(redis-server --version 2>/dev/null | awk '{print $3}' | sed 's/^v=//')" \
-    "Service|$(systemctl is-active redis-server 2>/dev/null || echo unknown)"
+  done
+  SOFTWARE_ENTRY=$(software_state entry "$(software_field key)")
+  ui_result_table "Program|${title}" "Version|$(software_field version)" "State|$(software_field state)"
 }
 
 software_install_handler() {
   parse_kv_args "$@"
   require_args "name" || return 1
   local name="${PARSED_ARGS[name]}" version="${PARSED_ARGS[version]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
+  software_entry "$name" || return 1
+  local title how installed
+  title=$(software_field title); how=$(software_field how); installed=$(software_field installed)
+  # A Node.js major version is its own path (one runtime per server).
+  if [[ "$name" == node && -n "$version" ]]; then software_install_node "$version" "$confirm"; return; fi
+  if [[ "$installed" == True && "$(software_field can_update)" == True ]]; then
+    [[ -z "$version" ]] || { error "--version is for a new installation; ${title} is installed"; return 1; }
+    if [[ "${confirm,,}" != yes ]]; then
+      echo "Plan: update ${title} from $(software_field version) to $(software_field candidate) ($(software_field packages)); changed configuration files are kept"
+      echo "Rerun with --confirm yes to apply."
+      return 0
+    fi
+    software_apt_apply update
+    return
+  fi
+  local why
+  why=$(software_field install_blocked.text)
   case "$name" in
-    node) software_install_node "${version:-22}" "$confirm" ;;
-    redis)
-      [[ -z "$version" ]] || { error "Redis comes from Ubuntu; --version is not used"; return 1; }
-      software_install_redis "$confirm" ;;
+    node) software_install_node "${version:-22}" "$confirm"; return ;;
     postgresql)
+      [[ "$installed" != True ]] || { error "$why"; return 1; }
       local native pgdg=no
       native=$(pgsql_ubuntu_major)
       [[ -n "$version" && "$version" != "$native" ]] && pgdg=yes
-      db_pgsql_install_handler ${version:+--version "$version"} --pgdg "$pgdg" --confirm "$confirm" ;;
-    *) error "--name must be node, redis or postgresql (PHP: simai-admin.sh php install)"; return 1 ;;
+      db_pgsql_install_handler ${version:+--version "$version"} --pgdg "$pgdg" --confirm "$confirm"; return ;;
   esac
+  [[ -z "$why" ]] || { error "$why"; return 1; }
+  [[ -z "$version" ]] || { error "${title} comes from Ubuntu; --version is not used"; return 1; }
+  if [[ "${confirm,,}" != yes ]]; then
+    case "$how" in
+      apache) echo "Plan: install Apache listening on 127.0.0.1:${SIMAI_APACHE_PORT} only; nginx keeps ports 80 and 443; no site changes until site apache" ;;
+      *) echo "Plan: install ${title} from Ubuntu ($(software_field packages))$( [[ -n "$(software_field php_extensions)" ]] && echo " and $(software_field php_extensions)")$( [[ -n "$(software_field unit)" ]] && echo "; starts the $(software_field unit) service")" ;;
+    esac
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  if [[ "$how" == apache ]]; then
+    apache_install || return 1
+    ui_result_table "Program|Apache" "Listens|127.0.0.1:${SIMAI_APACHE_PORT}" "Service|$(systemctl is-active apache2 2>/dev/null || echo unknown)"
+    return
+  fi
+  software_apt_apply install
 }
 
-register_cmd "software" "list" "Show server software (web server, databases, Redis, Node.js) and waiting system updates" "software_list_handler" "" "" "tier:advanced effects:read"
+# Removes a program's packages (apt-get remove: configuration and data stay),
+# refused while sites need it or when apt would take a protected package too.
+software_remove_handler() {
+  parse_kv_args "$@"
+  require_args "name" || return 1
+  local name="${PARSED_ARGS[name]}" confirm="${PARSED_ARGS[confirm]:-no}"
+  software_entry "$name" || return 1
+  local title why removes protected keeps
+  title=$(software_field title); why=$(software_field remove_blocked.text)
+  if [[ -n "$why" ]]; then
+    local sites
+    sites=$(software_field remove_blocked.sites)
+    error "${why}${sites:+: ${sites}}; nothing removed"
+    return 1
+  fi
+  removes=$(software_field removes); protected=$(software_field removes_protected); keeps=$(software_field keeps)
+  if [[ -n "$protected" ]]; then
+    error "Removing ${title} would also remove ${protected}; nothing removed"
+    return 1
+  fi
+  if [[ "${confirm,,}" != yes ]]; then
+    echo "Plan: remove ${title}: ${removes:-$(software_field packages)}"
+    echo "      configuration and data stay${keeps:+ (${keeps})}; installing it again picks them up"
+    [[ -z "$(software_field service)" ]] || echo "      the $(software_field service) service stops"
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  # shellcheck disable=SC2086 # package lists are words
+  run_long "Removing ${title}" env DEBIAN_FRONTEND=noninteractive apt-get remove -y $removes || return 1
+  local v
+  for v in $(software_field php_extensions); do
+    os_svc_reload_or_restart "$(sed -E 's/^php([0-9.]+)-.*/php\1-fpm/' <<<"$v")" >/dev/null 2>&1 || true
+  done
+  ui_result_table "Program|${title}" "Removed|${removes}" "Kept|${keeps:-configuration}"
+}
+
+register_cmd "software" "list" "Show the catalogue of server programs (state, actions) and waiting system updates" "software_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "software" "refresh" "Refresh the apt index so software list shows new updates" "software_refresh_handler" "" "" "tier:advanced"
 register_cmd "software" "update" "Install waiting system package updates and check every site" "software_update_handler" "" "security-only= confirm=" "tier:advanced plan:handler"
-register_cmd "software" "install" "Install Node.js, Redis or PostgreSQL" "software_install_handler" "name" "version= confirm=" "tier:advanced plan:handler"
+register_cmd "software" "install" "Install a program from the catalogue (software list), or update it when installed" "software_install_handler" "name" "version= confirm=" "tier:advanced plan:handler"
+register_cmd "software" "remove" "Remove a program (configuration and data stay); refused while sites need it" "software_remove_handler" "name" "confirm=" "tier:advanced plan:handler"

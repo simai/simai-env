@@ -9,9 +9,46 @@
       "name": "redis"
     },
     "target": "host",
-    "description": "Install Node.js, Redis or PostgreSQL",
+    "description": "Install a program from the catalogue (software list), or update it when installed",
     "effects": "write",
     "lock": "host",
-    "applied": false
+    "applied": false,
+    "software": {
+      "name": "redis",
+      "key": "redis",
+      "title": "Redis",
+      "purpose": "In-memory store for cache, sessions and queues",
+      "group": "cache",
+      "package": null,
+      "installed": false,
+      "version": null,
+      "candidate": "5:7.0.15-1ubuntu0.24.04.5",
+      "update": false,
+      "service": null,
+      "unit": "redis-server",
+      "active": null,
+      "state": "not_installed",
+      "installable": true,
+      "can_install": true,
+      "can_update": false,
+      "can_remove": false,
+      "install_blocked": null,
+      "remove_blocked": {
+        "code": "not_installed",
+        "text": "Redis is not installed"
+      },
+      "how": "apt",
+      "packages": [
+        "redis-server"
+      ],
+      "php_extensions": [
+        "php-redis"
+      ],
+      "keeps": [
+        "/var/lib/redis",
+        "/etc/redis"
+      ],
+      "sites": []
+    }
   }
 }

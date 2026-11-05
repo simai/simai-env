@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.42.1",
+      "version": "1.43.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -163,9 +163,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261105145033",
-          "previous": "20261105145032-initial",
-          "deployed_at": "2026-11-05T14:50:33Z",
+          "current": "20261105195933",
+          "previous": "20261105195932-initial",
+          "deployed_at": "2026-11-05T19:59:33Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -285,6 +285,7 @@
         "software:install",
         "software:list",
         "software:refresh",
+        "software:remove",
         "software:update",
         "ssl:dns-credentials",
         "ssl:dns-status",

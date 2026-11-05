@@ -1,0 +1,53 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.software-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "software:remove",
+    "args": {
+      "name": "memcached"
+    },
+    "target": "host",
+    "description": "Remove a program (configuration and data stay); refused while sites need it",
+    "effects": "delete",
+    "lock": "host",
+    "applied": false,
+    "software": {
+      "name": "memcached",
+      "key": "memcached",
+      "title": "Memcached",
+      "purpose": "In-memory cache for applications that use it",
+      "group": "cache",
+      "package": null,
+      "installed": false,
+      "version": null,
+      "candidate": "1.6.24-1ubuntu0.3",
+      "update": false,
+      "service": null,
+      "unit": "memcached",
+      "active": null,
+      "state": "not_installed",
+      "installable": true,
+      "can_install": true,
+      "can_update": false,
+      "can_remove": false,
+      "install_blocked": null,
+      "remove_blocked": {
+        "code": "not_installed",
+        "text": "Memcached is not installed"
+      },
+      "how": "apt",
+      "packages": [
+        "memcached"
+      ],
+      "php_extensions": [
+        "php-memcached"
+      ],
+      "keeps": [
+        "/etc/memcached.conf"
+      ],
+      "sites": []
+    }
+  }
+}
