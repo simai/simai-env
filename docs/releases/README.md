@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.42.1](v1.42.1.md) — update plan codes for the panel; the panel
+  build's own version.
 - [v1.42.0](v1.42.0.md) — Apache mode for PHP sites that rely on
   `.htaccess`.
 - [v1.41.0](v1.41.0.md) — a site's own nginx directives, undone unless

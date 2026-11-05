@@ -172,6 +172,10 @@ cli panel update --confirm yes >/dev/null 2>&1 && bad "update stepped back to an
 cli panel update --version 1.0.0 --confirm yes >/dev/null 2>&1 && bad "--version without a checksum accepted" || ok "--version needs --sha256"
 cli panel update --version 1.0.0 --sha256 "$s6" --confirm yes >/dev/null 2>&1 && [[ "$(page '')" == panel-r1 ]] && ok "--version with its checksum chooses a version" || bad "--version update: $(page '' | head -c 120)"
 cli panel update --archive /root/build-r2.tgz --sha256 "$s7" --confirm yes >/dev/null 2>&1 && ! cli panel status 2>&1 | grep -q 'Version.*[0-9]\.[0-9]\.[0-9] .*|$' && ok "an archive is not recorded as a version" || bad "archive version"
+# A build installed from its own archive declares its version in panel-build.json.
+r=$(cli site describe --domain $P --output json 2>/dev/null | field 'd["data"]["root"]'); printf '{"version":"2.0.1-dev"}' >"$r/current/panel-build.json"
+[[ "$(cli self update-plan --target panel --output json 2>/dev/null | field 'd["data"]["current"] + " " + str(d["data"]["update_available"]) + " " + d["data"]["restart_items"][0]["kind"] + " " + d["data"]["backup_item"]["kind"] + " " + d["data"]["rollback_kind"]')" == "2.0.1-dev False php_fpm_pool panel_data panel_release" ]] \
+  && ok "the plan compares with the build's own version and answers codes" || bad "build version plan: $(cli self update-plan --target panel --output json 2>/dev/null | head -c 400)"
 cli panel remove --confirm yes >/dev/null 2>&1
 ls /tmp/tmp.*.tar.gz >/dev/null 2>&1 && bad "downloads left in /tmp" || ok "downloads are removed"
 kill "$httpd" 2>/dev/null; unset SIMAI_PANEL_RELEASE

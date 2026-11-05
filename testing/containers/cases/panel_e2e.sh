@@ -462,7 +462,7 @@ chmod +x update.sh
 before=$(cat VERSION)
 python3 -I lib/site_status.py >/dev/null 2>&1
 a=$(gate "$(req null self:update-plan '{"target":"env"}')")
-[[ "$(field 'd["data"]["schema"] == "simai-update-plan/1" and d["data"]["current"] == "'"$before"'" and d["data"]["restarts"] == []' <<<"$a")" == True ]] && ok "update plan for simai-env" || bad "env plan: ${a:0:400}"
+[[ "$(field 'd["data"]["schema"] == "simai-update-plan/1" and d["data"]["current"] == "'"$before"'" and d["data"]["restarts"] == [] and d["data"]["backup_item"]["kind"] == "env_scripts" and d["data"]["rollback_kind"] == "env_release"' <<<"$a")" == True ]] && ok "update plan for simai-env" || bad "env plan: ${a:0:400}"
 [[ "$(field '"open.test" in d["data"]["checks"]' <<<"$a")" == True ]] && ok "the plan lists the sites it checks" || bad "plan checks: $(field 'd["data"]["checks"]' <<<"$a")"
 a=$(gate "$(req null self:update-plan '{"target":"panel"}')")
 [[ "$(field 'd["data"]["blocked"]' <<<"$a")" == not_installed ]] && ok "panel plan without a panel says so" || bad "panel plan: ${a:0:300}"

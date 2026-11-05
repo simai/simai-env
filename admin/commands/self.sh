@@ -864,6 +864,7 @@ self_update_plan_handler() {
     panel)
       domain=$(panel_state_get PANEL_DOMAIN)
       current=$(panel_state_get VERSION)
+      [[ -n "$current" ]] || current=$(panel_build_version "$domain")
       available=$(panel_release_get VERSION)
       if [[ -z "$domain" ]]; then blocked="not_installed"
       elif [[ "$(panel_state_get SOURCE)" != build ]]; then blocked="placeholder"

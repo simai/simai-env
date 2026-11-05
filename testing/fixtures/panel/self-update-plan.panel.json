@@ -15,7 +15,10 @@
     "backup": null,
     "restarts": [],
     "checks": [],
-    "rollback": "the previous panel release, if the new one does not answer its health path; the database is not rolled back"
+    "rollback": "the previous panel release, if the new one does not answer its health path; the database is not rolled back",
+    "backup_item": null,
+    "restart_items": [],
+    "rollback_kind": "panel_release"
   },
   "command_status": "success",
   "operation_id": "fixture"

@@ -15,6 +15,22 @@ SIMAI_PANEL_GATE_LOG="${SIMAI_PANEL_GATE_LOG:-/var/log/simai-panel-gate.log}"
 SIMAI_PANEL_STATE="${SIMAI_PANEL_STATE:-/etc/simai-env/panel.env}"
 SIMAI_PANEL_RELEASE="${SIMAI_PANEL_RELEASE:-${SIMAI_ENV_ROOT}/admin/panel-release.env}"
 
+# The version a panel build declares in panel-build.json (written by the
+# build, so read strictly): for builds installed from their own archive.
+panel_build_version() {
+  local domain="$1" root file
+  [[ -n "$domain" ]] || return 0
+  root=$(sed -n 's/^# simai-root: *//p' "/etc/nginx/sites-available/${domain}.conf" 2>/dev/null | head -n1)
+  file="${root}/current/panel-build.json"
+  [[ -n "$root" && -f "$file" && ! -L "$file" ]] || return 0
+  python3 -I -c 'import json,re,sys
+try:
+    v = json.load(open(sys.argv[1])).get("version", "")
+except Exception:
+    v = ""
+print(v if isinstance(v, str) and re.fullmatch(r"\d{1,4}\.\d{1,4}\.\d{1,4}(-[A-Za-z0-9.]{1,32})?", v) else "")' "$file" 2>/dev/null || true
+}
+
 panel_state_get() {
   [[ -f "$SIMAI_PANEL_STATE" ]] || return 0
   sed -n "s/^${1}=//p" "$SIMAI_PANEL_STATE" | tail -n1

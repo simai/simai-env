@@ -278,6 +278,12 @@ Safe update (1.32.0), administrator only:
   `panel`, `available` is the build this simai-env release pins; `blocked`
   is `not_installed` or `placeholder` when there is nothing to update.
   `remote_unavailable` means the update channel did not answer.
+  Since 1.42.1 the answer also carries codes for the panel to translate (the
+  texts stay for older panels): `backup_item {kind: env_scripts|panel_data,
+  path}` (null when nothing is backed up), `restart_items [{kind:
+  php_fpm_pool|queue_workers|service, target}]` and `rollback_kind:
+  env_release|panel_release`. For a panel installed from its own archive,
+  `current` is the `version` of the build's `panel-build.json`.
 - `self:update {target}` (action). Its plan carries the same data under
   `update`. The job, for `env`: notes which sites answer, replaces the
   toolkit (the updater keeps an archive of the previous one), runs host

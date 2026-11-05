@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 1.42.1 - 2026-11-05
+
+- `self update-plan` answers codes next to its texts, so the panel can
+  show them in the reader's language: `backup_item {kind, path}`,
+  `restart_items [{kind, target}]`, `rollback_kind`.
+- For a panel installed from its own archive, `self update-plan --target
+  panel` compares with the version the build declares in
+  `panel-build.json`, so an older pinned build is no longer offered as an
+  update.
+- Recorded panel answers: set 19.
+
 ## 1.42.0 - 2026-11-05
 
 - Apache mode for PHP sites that rely on `.htaccess`. New `site apache

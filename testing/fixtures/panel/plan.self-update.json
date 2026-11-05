@@ -16,7 +16,7 @@
     "update": {
       "schema": "simai-update-plan/1",
       "target": "env",
-      "current": "1.42.0",
+      "current": "1.42.1",
       "available": "9.9.0",
       "update_available": true,
       "blocked": null,
@@ -35,7 +35,13 @@
         "demo-redirect.test",
         "demo-static.test"
       ],
-      "rollback": "the previous simai-env release, from the archive taken before the update, if a checked site stops answering; host migrations are not undone"
+      "rollback": "the previous simai-env release, from the archive taken before the update, if a checked site stops answering; host migrations are not undone",
+      "backup_item": {
+        "kind": "env_scripts",
+        "path": "/root/simai-backups"
+      },
+      "restart_items": [],
+      "rollback_kind": "env_release"
     }
   }
 }
