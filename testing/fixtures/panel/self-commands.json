@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 240,
+    "count": 241,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -4179,6 +4179,33 @@
         "authorization": "root",
         "confirmation": "required",
         "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site apache",
+        "description": "Serve a PHP site through Apache behind nginx (.htaccess), or back on nginx only",
+        "required": [
+          "--domain",
+          "--enable"
+        ],
+        "optional": {
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

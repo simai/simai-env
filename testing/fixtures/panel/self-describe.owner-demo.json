@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.41.0",
+      "version": "1.42.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -36,6 +36,7 @@
         "ssl": "none",
         "certificate": null,
         "frame_policy": "same-origin",
+        "web_server": "nginx",
         "runs_as": "demo",
         "owner": "demo",
         "database": null,

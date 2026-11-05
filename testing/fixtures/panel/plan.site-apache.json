@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-apache",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:apache",
+    "args": {
+      "domain": "demo-php.test",
+      "enable": "yes"
+    },
+    "target": "demo-php.test",
+    "description": "Serve a PHP site through Apache behind nginx (.htaccess), or back on nginx only",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

@@ -18,7 +18,7 @@ cli site add --domain soft.test --profile generic --php "$native" --create-db no
 apt-get update -qq >/dev/null 2>&1
 l=$(cli software list --output json 2>/dev/null)
 [[ "$(js 'd["data"]["schema"]' <<<"$l")" == simai-software/1 ]] && ok "software list answers simai-software/1" || bad "software list: ${l:0:300}"
-[[ "$(js '[c["name"] for c in d["data"]["components"]]' <<<"$l")" == "['nginx', 'mysql', 'postgresql', 'redis', 'node', 'certbot']" ]] && ok "the components are listed" || bad "components: ${l:0:300}"
+[[ "$(js '[c["name"] for c in d["data"]["components"]]' <<<"$l")" == "['nginx', 'mysql', 'postgresql', 'redis', 'node', 'certbot', 'apache']" ]] && ok "the components are listed" || bad "components: ${l:0:300}"
 [[ "$(js 'type(d["data"]["system"]["updates"]).__name__' <<<"$l")" == int ]] && ok "system updates are counted" || bad "system: ${l:0:300}"
 
 # Redis: a plan first, then the install with the PHP extension.

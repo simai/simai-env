@@ -257,6 +257,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "ssl": meta.get("ssl"),
         "certificate": certificate(domain),
         "frame_policy": meta.get("frame-policy", "same-origin"),
+        "web_server": "apache" if kv_file(STATE / "sites" / domain / "web.env").get("BACKEND") == "apache" else "nginx",
         "runs_as": runs_as or "simai (shared, not isolated)",
         "owner": owner,
         "database": {"engine": db.get("DB_ENGINE"), "name": db.get("DB_NAME"), "user": db.get("DB_USER"),
@@ -282,6 +283,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         info["backups"] = backups(domain, project)
         info["logs"] = {
             "nginx_error": f"/var/log/nginx/{project}.error.log",
+            **({"apache_error": f"/var/log/apache2/{project}.error.log"} if info["web_server"] == "apache" else {}),
             "php_fpm": f"/var/log/php{meta.get('php')}-fpm-{project}.log",
             "app": str(root / "storage" / "logs"),
             "workers": [f"journalctl -u {w['unit']}" for w in workers],

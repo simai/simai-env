@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.42.0 - 2026-11-05
+
+- Apache mode for PHP sites that rely on `.htaccess`. New `site apache
+  --domain D --enable yes|no`: nginx stays in front (HTTPS, access rules,
+  own directives) and passes the site to Apache on `127.0.0.1:8088`, which
+  reads `.htaccess` and runs PHP through the site's own PHP-FPM pool.
+  Apache is installed on first use and never listens outside the host. If
+  Apache rejects the configuration or the site stops answering, everything
+  is put back. `site set-php`, HTTPS changes and site removal keep both
+  servers in step. `site describe` shows `web_server`; `software list`
+  shows Apache.
+- Panel gateway: `site:apache`, administrator only.
+- Tests: `apache_e2e`.
+- Recorded panel answers: set 18.
+
 ## 1.41.0 - 2026-11-05
 
 - A site's own nginx directives. New `site nginx-custom --domain D

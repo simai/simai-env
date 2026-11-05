@@ -12,6 +12,7 @@
     "ssl": "none",
     "certificate": null,
     "frame_policy": "same-origin",
+    "web_server": "nginx",
     "runs_as": "site-demo-php-test",
     "owner": null,
     "database": {
@@ -54,9 +55,9 @@
       },
       "items": [
         {
-          "path": "/var/backups/simai/demo-php.test/20261105-014919",
-          "created_at": "2026-11-05T01:49:19",
-          "size_bytes": 4377,
+          "path": "/var/backups/simai/demo-php.test/20261105-093148",
+          "created_at": "2026-11-05T09:31:48",
+          "size_bytes": 4379,
           "parts": [
             "config",
             "db",

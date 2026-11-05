@@ -1400,6 +1400,12 @@ create_nginx_site() {
   if [[ ! "$template_id" =~ ^[a-z0-9-]+$ ]]; then
     template_id="unknown"
   fi
+  # Apache mode (site apache): nginx proxies the site to Apache on 127.0.0.1.
+  local web_backend=nginx
+  if declare -F site_web_backend >/dev/null && [[ "$(site_web_backend "$domain")" == apache ]] && apache_profile_supported "$template_id"; then
+    web_backend=apache
+    template_path="${SCRIPT_DIR}/templates/nginx-apache.conf"
+  fi
   local doc_root
   doc_root=$(site_compute_doc_root "$project_path" "$public_dir") || return 1
   local acme_root
@@ -1478,7 +1484,8 @@ create_nginx_site() {
       -e "s#{{REDIRECT_SUFFIX}}#${redirect_suffix}#g" \
       -e "s#{{UPSTREAM_PORT}}#${upstream_port}#g" \
       -e "s#{{UPSTREAM_PATH}}#${upstream_path:-/}#g" \
-      -e "s#{{WEBSOCKETS}}#${websockets}#g" "$template_path"
+      -e "s#{{WEBSOCKETS}}#${websockets}#g" \
+      -e "s#{{APACHE_PORT}}#${SIMAI_APACHE_PORT:-8088}#g" "$template_path"
   } > "$site_available"
   local frame_tmp
   frame_tmp=$(mktemp)
@@ -1564,6 +1571,12 @@ create_nginx_site() {
   fi
   ensure_nginx_catchall
   ensure_nginx_static_maps
+  if [[ "$web_backend" == apache ]]; then
+    if ! apache_site_render "$domain" "$project" "$doc_root" "$php_version" "$php_socket_project" "$host_mode" "$wildcard_domain" || ! apache_reload; then
+      restore_nginx_backup "$site_available" "$site_enabled" "$backup"
+      return 1
+    fi
+  fi
   local nginx_test_output
   if ! nginx_test_output=$(nginx -t 2>&1); then
     echo "$nginx_test_output" >>"$LOG_FILE"
@@ -1578,6 +1591,9 @@ create_nginx_site() {
   fi
   echo "$nginx_test_output" >>"$LOG_FILE"
   os_svc_reload_or_restart nginx || true
+  if [[ "$web_backend" == nginx ]] && declare -F apache_site_remove >/dev/null; then
+    apache_site_remove "$project"  # back from Apache mode
+  fi
 }
 
 site_runtime_nginx_block_render() {
@@ -1807,6 +1823,9 @@ remove_nginx_site() {
   os_svc_reload nginx || true
   fi
   [[ -z "$custom" ]] || rm -f -- "$custom"  # the site's own directives go with it
+  if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F apache_site_remove >/dev/null; then
+    apache_site_remove "$project"
+  fi
   [[ -z "$backup" ]] || rm -f -- "$backup"
 }
 
@@ -2189,6 +2208,11 @@ nginx_patch_php_socket() {
   if ! grep -q "${new_socket}" "$cfg"; then
     error "Failed to update PHP socket to ${new_socket} in ${cfg}"
     return 1
+  fi
+  if declare -F apache_site_patch_socket >/dev/null; then
+    local project
+    project=$(sed -n 's/^# simai-project: *//p' "$cfg" | head -n1)
+    [[ ! "$project" =~ ^[a-z0-9-]+$ ]] || apache_site_patch_socket "$project" "$new_php" "$socket_project" || return 1
   fi
 }
 

@@ -366,6 +366,12 @@ A site's own nginx directives (1.41.0), administrator only:
   carries `change_id` and `expires_at`, and the change is undone after two
   minutes unless `change:confirm {change_id}` keeps it.
 
+Apache mode (1.42.0), administrator only:
+
+- `site:apache {domain, enable: yes|no}`: an action; the job fails, with
+  nothing changed, when Apache rejects the configuration or the site stops
+  answering. `site:describe` shows `web_server`.
+
 Server software (1.38.0), administrator only:
 
 - `software:list` (`simai-software/1`): `components [{name, package,
@@ -480,7 +486,8 @@ action, job). Everything else is refused.
 - 1.39.0: `file:list`, `file:stat`, `file:read`, `file:download`,
   `file:write`, `file:mkdir`, `file:rename`, `file:remove`;
 - 1.40.0: `file:upload`, `file:archive`, `file:extract`;
-- 1.41.0: `site:nginx-custom`, `site:nginx-custom-show`.
+- 1.41.0: `site:nginx-custom`, `site:nginx-custom-show`;
+- 1.42.0: `site:apache`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

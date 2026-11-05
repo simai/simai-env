@@ -72,6 +72,17 @@
         "service": null,
         "active": null,
         "installable": false
+      },
+      {
+        "name": "apache",
+        "package": null,
+        "installed": false,
+        "version": null,
+        "candidate": "2.4.58-1ubuntu8.17",
+        "update": false,
+        "service": null,
+        "active": null,
+        "installable": false
       }
     ],
     "system": {
@@ -106,7 +117,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 12448
+      "index_age_seconds": 3254
     }
   },
   "command_status": "success",

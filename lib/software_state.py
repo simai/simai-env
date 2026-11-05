@@ -25,6 +25,7 @@ COMPONENTS = [
     ("redis", ["redis-server"], "redis-server", True),
     ("node", ["nodejs"], None, True),
     ("certbot", ["certbot"], None, False),
+    ("apache", ["apache2"], "apache2", False),  # added by site apache
 ]
 
 

@@ -514,6 +514,36 @@ Show a site's own directives. `--output json` answers `simai-nginx-custom/1`:
 `domain, file, present, included, content, sha256, pending_change
 {change_id, expires_at}`.
 
+## apache
+Serve a PHP site (profiles `generic`, `laravel`, `wordpress`, `bitrix`)
+through Apache, for applications that rely on `.htaccess`, or put it back on
+nginx only.
+
+Options:
+- `--domain <domain>` (required)
+- `--enable yes|no` (required)
+- `--confirm yes`; without it only the plan is shown
+
+Behavior:
+- the first time, Apache is installed listening on `127.0.0.1:8088` only;
+  nginx keeps ports 80 and 443
+- nginx stays in front: HTTPS, access rules, own directives, ACME and the
+  health check; every other request goes to Apache, including static files,
+  so `.htaccess` rules apply to them
+- Apache reads `.htaccess` (`AllowOverride All`) and runs PHP through the
+  site's own PHP-FPM pool, so the PHP version, the pool user and PHP
+  settings do not change; `site set-php` updates both servers
+- the client address and scheme come from nginx (`mod_remoteip`,
+  `HTTPS=on` only when nginx served HTTPS); a client cannot fake them
+- Apache's vhost is `/etc/apache2/sites-available/simai-<project>.conf`,
+  its error log `/var/log/apache2/<project>.error.log`; unknown names get
+  403 from Apache
+- if Apache rejects the configuration, or the site answered before and no
+  longer does, everything is put back
+- `--enable no` removes the site's Apache vhost (Apache stays installed);
+  removing the site does the same
+- `site describe` shows `web_server: apache|nginx`
+
 ## Per-site PHP ini overrides
 - Overrides are stored at `/etc/simai-env/sites/<domain>/php.ini` and applied as a managed pool block `simai-site-ini-*` (profile-managed `simai-profile-ini-*` stays last and has higher priority).
 - Commands:

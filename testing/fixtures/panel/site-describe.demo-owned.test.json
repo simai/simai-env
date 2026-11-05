@@ -12,6 +12,7 @@
     "ssl": "none",
     "certificate": null,
     "frame_policy": "same-origin",
+    "web_server": "nginx",
     "runs_as": "demo",
     "owner": "demo",
     "database": null,

@@ -238,6 +238,7 @@ ALLOW = {
     "change:status": ({"change_id": CHANGE_ID}, {"change_id"}, "read"),
     "site:nginx-custom": ({"domain": DOMAIN, "content": CONTENT}, {"domain", "content"}, "action"),
     "site:nginx-custom-show": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "site:apache": ({"domain": DOMAIN, "enable": YES_NO}, {"domain", "enable"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -251,7 +252,7 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "change:confirm", "change:status", "ssl:dns-credentials",
               "php:list", "php:install", "php:remove", "php:extension", "php:update",
               "software:list", "software:refresh", "software:update", "software:install",
-              "site:nginx-custom", "site:nginx-custom-show"}
+              "site:nginx-custom", "site:nginx-custom-show", "site:apache"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

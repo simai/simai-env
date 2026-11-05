@@ -12,14 +12,15 @@
     "ssl": "none",
     "certificate": null,
     "frame_policy": "same-origin",
+    "web_server": "nginx",
     "runs_as": "site-demo-static-test",
     "owner": null,
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261105014912",
-      "previous": "20261105014911-initial",
-      "deployed_at": "2026-11-05T01:49:12Z",
+      "current": "20261105093136",
+      "previous": "20261105093135-initial",
+      "deployed_at": "2026-11-05T09:31:36Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],

@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=17
+FIXTURE_SET=18
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -223,6 +223,7 @@ FW
     "site-nginx-custom-show.demo-php.test|null|site:nginx-custom-show|{\"domain\":\"demo-php.test\"}"
     "plan.site-nginx-custom|null|site:nginx-custom|{\"domain\":\"demo-php.test\",\"content\":\"client_max_body_size 64m;\\n\"}"
     "refused.owner-admin-only.site-nginx-custom-show|\"demo\"|site:nginx-custom-show|{\"domain\":\"demo-owned.test\"}"
+    "plan.site-apache|null|site:apache|{\"domain\":\"demo-php.test\",\"enable\":\"yes\"}"
     "refused.owner-scope.file-list|\"demo\"|file:list|{\"domain\":\"demo-php.test\"}"
     "refused.invalid-argument.file-read|null|file:read|{\"domain\":\"demo-owned.test\",\"path\":\"../etc/passwd\"}"
     "plan.ssl-dns-credentials|null|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"token\":\"cfStandStandStandStandStandStand1234\"}"
