@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=15
+FIXTURE_SET=16
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -218,6 +218,8 @@ FW
     "file-stat.demo-owned.test|\"demo\"|file:stat|{\"domain\":\"demo-owned.test\"}"
     "plan.file-write|\"demo\"|file:write|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\",\"content\":\"hello\\n\",\"expect-sha256\":\"new\"}"
     "plan.file-remove|\"demo\"|file:remove|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\"}"
+    "plan.file-extract|\"demo\"|file:extract|{\"domain\":\"demo-owned.test\",\"path\":\"public/site.zip\",\"to\":\"public\"}"
+    "plan.file-archive|\"demo\"|file:archive|{\"domain\":\"demo-owned.test\",\"path\":\"public\",\"to\":\"public.zip\"}"
     "refused.owner-scope.file-list|\"demo\"|file:list|{\"domain\":\"demo-php.test\"}"
     "refused.invalid-argument.file-read|null|file:read|{\"domain\":\"demo-owned.test\",\"path\":\"../etc/passwd\"}"
     "plan.ssl-dns-credentials|null|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"token\":\"cfStandStandStandStandStandStand1234\"}"

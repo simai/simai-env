@@ -79,6 +79,27 @@ file_write_handler() {
   file_show write "${PARSED_ARGS[path]}" "$expect" <"$src"
 }
 
+# Put an uploaded file (any bytes, up to 1 GiB) at --path; --sha256 is
+# checked before anything is written.
+file_upload_handler() {
+  file_prepare "$@" && require_args "path source sha256" || return 1
+  local expect="${PARSED_ARGS[expect-sha256]:-new}" src="${PARSED_ARGS[source]}" sum="${PARSED_ARGS[sha256]}"
+  [[ "$expect" =~ ^([0-9a-f]{64}|new|any)$ ]] || { error "--expect-sha256 must be a sha256, new or any"; return 1; }
+  [[ "$sum" =~ ^[0-9a-f]{64}$ ]] || { error "--sha256 must be a sha256"; return 1; }
+  [[ -f "$src" && ! -L "$src" ]] || { error "--source must be a file"; return 1; }
+  [[ "$(sha256sum "$src" | cut -d' ' -f1)" == "$sum" ]] || { error "The upload does not match --sha256"; return 1; }
+  file_show put "${PARSED_ARGS[path]}" "$expect" <"$src"
+}
+
+file_archive_handler() { file_prepare "$@" && require_args "path to" && file_show archive "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}"; }
+
+file_extract_handler() {
+  file_prepare "$@" && require_args "path to" || return 1
+  local overwrite="${PARSED_ARGS[overwrite]:-no}"
+  [[ "$overwrite" =~ ^(yes|no)$ ]] || { error "--overwrite must be yes or no"; return 1; }
+  file_show extract "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}" "$overwrite"
+}
+
 file_mkdir_handler() { file_prepare "$@" && require_args "path" && file_show mkdir "${PARSED_ARGS[path]}"; }
 file_rename_handler() { file_prepare "$@" && require_args "path to" && file_show rename "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}"; }
 file_remove_handler() { file_prepare "$@" && require_args "path" && file_show remove "${PARSED_ARGS[path]}"; }
@@ -88,6 +109,9 @@ register_cmd "file" "stat" "Show one file or directory of a site" "file_stat_han
 register_cmd "file" "read" "Show a text file of a site (UTF-8, up to 1 MiB)" "file_read_handler" "domain path" "" "tier:advanced effects:read"
 register_cmd "file" "cat" "Write the raw bytes of a site file to stdout" "file_cat_handler" "domain path" "" "tier:advanced effects:read"
 register_cmd "file" "write" "Replace or create a text file of a site from --content-file" "file_write_handler" "domain path content-file" "expect-sha256=" "tier:advanced"
+register_cmd "file" "upload" "Put an uploaded file into a site (up to 1 GiB, checked against --sha256)" "file_upload_handler" "domain path source sha256" "expect-sha256=" "tier:advanced"
+register_cmd "file" "archive" "Pack a file or directory of a site into a new .tar.gz, .tgz, .tar or .zip" "file_archive_handler" "domain path to" "" "tier:advanced"
+register_cmd "file" "extract" "Unpack an archive of a site into a directory (files and directories only)" "file_extract_handler" "domain path to" "overwrite=" "tier:advanced"
 register_cmd "file" "mkdir" "Create a directory in a site" "file_mkdir_handler" "domain path" "" "tier:advanced"
 register_cmd "file" "rename" "Rename or move a file or directory within a site" "file_rename_handler" "domain path to" "" "tier:advanced"
 register_cmd "file" "remove" "Remove a file, a link or a directory with its contents from a site" "file_remove_handler" "domain path" "" "tier:advanced"

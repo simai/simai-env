@@ -186,6 +186,10 @@ ALLOW = {
     "file:mkdir": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
     "file:rename": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
     "file:remove": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
+    "file:upload": ({"domain": DOMAIN, "path": FILE_PATH, "expect-sha256": EXPECT}, {"domain", "path"}, "action"),
+    "file:archive": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
+    "file:extract": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH, "overwrite": YES_NO},
+                     {"domain", "path", "to"}, "action"),
     "site:php-ini-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:php-ini-set": ({"domain": DOMAIN, "name": INI_KEY, "value": INI_VALUE}, {"domain", "name", "value"},
                          "action"),
@@ -258,7 +262,7 @@ SECRET_ARGS = {"token"}  # never kept in a job record, and their file goes when 
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
-ATTACHMENT = {"site:deploy"}  # may carry a release archive after the request line
+ATTACHMENT = {"site:deploy": "archive", "file:upload": "source"}  # bytes after the request line; their option
 ACCESS_DIR = Path(os.environ.get("SIMAI_ACCESS_DIR", "/etc/simai-env/access"))
 BY_LOGIN = {"access:add-key", "access:disable", "access:enable", "access:remove"}  # scope from the account
 BY_CRON_ID = {"cron:job-remove", "cron:job-enable", "cron:job-disable", "cron:job-runs"}  # scope from the job
@@ -327,7 +331,7 @@ def parse(raw):
             raise Refused("invalid_argument")
         if "git" in args or "ref" in args:
             raise Refused("invalid_argument")  # an archive or a git ref, not both
-    elif command in ATTACHMENT and "git" not in args:
+    elif command in ATTACHMENT and ("git" not in args or command != "site:deploy"):
         raise Refused("invalid_argument")
     if command == "site:deploy" and ("git" in args) != ("ref" in args):
         raise Refused("invalid_argument")
@@ -391,7 +395,7 @@ def plan(command, args, attachment=None):
     # Without --confirm only a command that requires confirmation is safe to call.
     if command not in CONDITIONAL and registry_entry(command).get("confirmation") != "required":
         return None
-    files = {"attachment": {"archive": "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
+    files = {"attachment": {ATTACHMENT[command]: "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
     result = run(command, args, files)
     if result is None or result.get("status") != "planned":
         return None
@@ -458,9 +462,9 @@ def start_job(req, command, args, stream):
                     out.write(args[key] if key in BULK_ARGS else args[key] + "\n")
                 files[key] = str(d / f"{key}.txt")
         if req.get("attachment"):
-            archive = d / "release.tar.gz"
+            archive = d / ("release.tar.gz" if command == "site:deploy" else "upload.bin")
             receive_attachment(archive, req["attachment"], stream)
-            files["attachment"] = {"archive": str(archive), "sha256": req["attachment"]["sha256"]}
+            files["attachment"] = {ATTACHMENT[command]: str(archive), "sha256": req["attachment"]["sha256"]}
             cleanup = f"rm -f {archive}\n"
     except Refused:
         shutil.rmtree(d, ignore_errors=True)

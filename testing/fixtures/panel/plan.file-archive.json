@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-archive",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:archive",
+    "args": {
+      "domain": "demo-owned.test",
+      "path": "public",
+      "to": "public.zip"
+    },
+    "target": "demo-owned.test",
+    "description": "Pack a file or directory of a site into a new .tar.gz, .tgz, .tar or .zip",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

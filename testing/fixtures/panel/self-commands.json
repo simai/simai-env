@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 235,
+    "count": 238,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -1328,6 +1328,31 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh file archive",
+        "description": "Pack a file or directory of a site into a new .tar.gz, .tgz, .tar or .zip",
+        "required": [
+          "--domain",
+          "--path",
+          "--to"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh file cat",
         "description": "Write the raw bytes of a site file to stdout",
         "required": [
@@ -1343,6 +1368,33 @@
         "authorization": "root",
         "confirmation": "not-required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file extract",
+        "description": "Unpack an archive of a site into a directory (files and directories only)",
+        "required": [
+          "--domain",
+          "--path",
+          "--to"
+        ],
+        "optional": {
+          "--overwrite": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",
@@ -1493,6 +1545,34 @@
         "authorization": "root",
         "confirmation": "not-required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh file upload",
+        "description": "Put an uploaded file into a site (up to 1 GiB, checked against --sha256)",
+        "required": [
+          "--domain",
+          "--path",
+          "--source",
+          "--sha256"
+        ],
+        "optional": {
+          "--expect-sha256": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

@@ -82,6 +82,40 @@ aroot=$(cli site describe --domain acme-files.test --output json 2>/dev/null | j
 jd=/var/lib/simai-env/panel-jobs/$j
 grep -q '"content": "(11 bytes)"' "$jd/job.json" && [[ ! -e "$jd/content.txt" ]] && ok "the job keeps the content size only" || bad "job record: $(cat "$jd/job.json" 2>/dev/null | head -c 300)"
 
+# Uploads, archives and extraction.
+head -c 2500000 /dev/urandom >/tmp/up.bin; usum=$(sha256sum /tmp/up.bin | cut -d' ' -f1)
+python3 - "$usum" <<'PY' >/tmp/upreq
+import json, sys
+req = {"schema": "simai-panel-request/1", "request_id": "r1", "actor": {"user": "admin@x", "owner": None},
+       "command": "file:upload", "args": {"domain": "files.test", "path": "up.bin"}, "confirm": True,
+       "attachment": {"sha256": sys.argv[1], "size": 2500000}}
+sys.stdout.write(json.dumps(req) + "\n")
+PY
+cat /tmp/up.bin >>/tmp/upreq
+a=$(sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate </tmp/upreq); j=$(js 'd["job_id"]' <<<"$a")
+for _ in {1..60}; do s=$(gate "$(req null job:status "{\"job_id\":\"$j\"}")" | js 'd["data"]["state"]'); [[ "$s" != running ]] && break; sleep 1; done
+[[ "$s" == succeeded ]] && cmp -s /tmp/up.bin "$root/up.bin" && [[ "$(stat -c %U "$root/up.bin")" == "$user" ]] && ok "file:upload puts the exact bytes as the site user" || bad "upload job: $s $a"
+[[ ! -e "/var/lib/simai-env/panel-jobs/$j/upload.bin" ]] && ok "the uploaded copy leaves the job directory" || bad "upload copy kept"
+cli file upload --domain files.test --path up.bin --source /tmp/up.bin --sha256 "$usum" --confirm yes >/dev/null 2>&1 && bad "an upload replaced a file by default" || ok "an upload does not replace a file unless asked"
+cli file upload --domain files.test --path up2.bin --source /tmp/up.bin --sha256 "$(printf '0%.0s' {1..64})" --confirm yes >/dev/null 2>&1 && bad "a wrong sha256 uploaded" || ok "an upload with a wrong sha256 is refused"
+mkdir -p "$root/pack/sub"; echo a >"$root/pack/a.txt"; echo b >"$root/pack/sub/b.txt"; ln -sfn /etc "$root/pack/esc"; chown -R "$user" "$root/pack"
+for ext in zip tar.gz; do
+  cli file archive --domain files.test --path pack --to "pack.${ext}" --confirm yes >/dev/null 2>&1 && [[ -s "$root/pack.${ext}" ]] && ok "archive packs into .${ext}" || bad "archive ${ext}"
+  cli file extract --domain files.test --path "pack.${ext}" --to "out-${ext}" --confirm yes >/tmp/o 2>&1 && cmp -s "$root/pack/sub/b.txt" "$root/out-${ext}/pack/sub/b.txt" \
+    && [[ ! -e "$root/out-${ext}/pack/esc" ]] && ok "extract unpacks .${ext} without its links" || { bad "extract ${ext}"; tail -2 /tmp/o; }
+  cli file extract --domain files.test --path "pack.${ext}" --to "out-${ext}" --confirm yes >/dev/null 2>&1 && bad "extract overwrote by default" || ok "extract does not overwrite unless asked"
+done
+cli file archive --domain files.test --path pack --to pack/inner.zip --confirm yes >/dev/null 2>&1 && bad "packed an archive into itself" || ok "an archive cannot go inside what it packs"
+python3 - "$root/evil.tgz" <<'PY'
+import io, sys, tarfile
+with tarfile.open(sys.argv[1], "w:gz") as t:
+    i = tarfile.TarInfo("../escaped.txt"); i.size = 1; t.addfile(i, io.BytesIO(b"x"))
+PY
+chown "$user" "$root/evil.tgz"
+cli file extract --domain files.test --path evil.tgz --to out-evil --confirm yes >/tmp/o 2>&1 && bad "extracted an entry with .." \
+  || { grep -q bad_archive /tmp/o && [[ ! -e "$(dirname "$root")/escaped.txt" ]] && ok "an entry leading outside is refused" || bad "evil: $(tail -1 /tmp/o)"; }
+[[ "$(gate "$(req null file:extract '{"domain":"files.test","path":"pack.zip","to":"out-g"}')" | js 'd["kind"]')" == plan ]] && ok "file:extract answers a plan" || bad "extract plan"
+
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 cli site remove --domain acme-files.test --remove-files yes --confirm yes >/dev/null 2>&1
 cli owner remove --name acme --confirm yes >/dev/null 2>&1

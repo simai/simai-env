@@ -16,7 +16,7 @@ databases, a log filter, the command list in `self:describe`, 1.28.0),
 stage 10 (a site's SFTP accounts by key, a check after each scheduled backup,
 a daily backup for new sites, the last certificate renewal, 1.30.0), server
 alerts and the load history (1.31.0), the file manager with downloads
-(1.39.0).
+(1.39.0), uploads and archives (1.40.0).
 
 ## Installation
 
@@ -337,6 +337,15 @@ site directory; links are never followed (`docs/commands/file.md`):
   job record keeps only its size, `"(N bytes)"`), `file:mkdir {domain,
   path}`, `file:rename {domain, path, to}`, `file:remove {domain, path}`.
   A failed write answers `changed` or `exists` in the job log.
+- `file:upload {domain, path, expect-sha256: new|any|<sha256>}` (1.40.0)
+  carries the file after the request line like `site:deploy`:
+  `"attachment": {"sha256", "size"}`, then exactly `size` bytes, up to 1 GiB.
+  It never replaces a file unless `expect-sha256` says so, and the job's copy
+  is removed when the job ends.
+- `file:archive {domain, path, to}` (`.zip`, `.tar.gz`, `.tgz`, `.tar`; links
+  stored, never followed) and `file:extract {domain, path, to, overwrite}`
+  (files and directories only; an entry leading outside refuses the whole
+  archive) (1.40.0).
 - `file:download {domain, path}`, a new answer kind: one answer line
   `{"status": "ok", "kind": "download", "data": {path, size, mtime}}`, then
   exactly `size` raw bytes, up to 1 GiB. A link, a directory or a missing
@@ -458,7 +467,8 @@ action, job). Everything else is refused.
 - 1.38.0: `software:list`, `software:refresh`, `software:update`,
   `software:install`;
 - 1.39.0: `file:list`, `file:stat`, `file:read`, `file:download`,
-  `file:write`, `file:mkdir`, `file:rename`, `file:remove`.
+  `file:write`, `file:mkdir`, `file:rename`, `file:remove`;
+- 1.40.0: `file:upload`, `file:archive`, `file:extract`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -482,9 +492,9 @@ planted job, the firewall with one rule, one block and a confirmed change,
 the DNS provider status with plans for a token and a DNS certificate, and
 the PHP versions with plans for installing, removing and updating, and the
 server software with plans for a system update and an install, and an
-owner's site files with plans for a write and a removal (downloads are bytes
-and are not recorded).
-Set 15 since 1.39.0. The panel's fixture driver replays them, and
+owner's site files with plans for a write, a removal, an archive and an
+extraction (downloads and uploads are bytes and are not recorded).
+Set 16 since 1.40.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.40.0 - 2026-11-05
+
+- File manager, part 2. New `file upload` (any file up to 1 GiB, checked
+  against its sha256, never replacing a file unless asked), `file archive`
+  (`.zip`, `.tar.gz`, `.tgz`, `.tar`; links stored, never followed) and
+  `file extract` (files and directories only; an entry leading outside the
+  destination refuses the archive; limits on entries and size; no overwrite
+  unless asked). All run as the site user inside the site directory.
+- Panel gateway: `file:upload` carries the file after the request line like
+  `site:deploy`; `file:archive`, `file:extract`.
+- Tests: `file_e2e` covers uploads, archives and extraction.
+- Recorded panel answers: set 16.
+
 ## 1.39.0 - 2026-11-04
 
 - File manager. New `file list|stat|read|cat|write|mkdir|rename|remove

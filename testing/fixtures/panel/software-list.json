@@ -75,20 +75,38 @@
       }
     ],
     "system": {
-      "updates": 1,
-      "security": 1,
+      "updates": 4,
+      "security": 3,
       "packages": [
+        {
+          "name": "libapt-pkg6.0t64",
+          "from": "2.8.3",
+          "to": "2.8.4ubuntu0.1",
+          "security": true
+        },
+        {
+          "name": "apt",
+          "from": "2.8.3",
+          "to": "2.8.4ubuntu0.1",
+          "security": true
+        },
         {
           "name": "libpcre2-8-0",
           "from": "10.42-4ubuntu2.1",
           "to": "10.42-4ubuntu2.2",
           "security": true
+        },
+        {
+          "name": "libsqlite3-0",
+          "from": "3.45.1-1ubuntu2.8",
+          "to": "3.45.1-1ubuntu2.9",
+          "security": false
         }
       ],
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 17801
+      "index_age_seconds": 10656
     }
   },
   "command_status": "success",

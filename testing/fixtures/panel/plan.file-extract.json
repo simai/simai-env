@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-extract",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:extract",
+    "args": {
+      "domain": "demo-owned.test",
+      "path": "public/site.zip",
+      "to": "public"
+    },
+    "target": "demo-owned.test",
+    "description": "Unpack an archive of a site into a directory (files and directories only)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}
