@@ -1,0 +1,270 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-security-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-security/1",
+    "checked_at": "2026-11-05T23:40:57Z",
+    "score": 41,
+    "grade": "risk",
+    "summary": {
+      "risk": 1,
+      "warn": 10,
+      "ok": 4,
+      "unknown": 0
+    },
+    "recommendations": [
+      "security_updates",
+      "auto_updates",
+      "ssh_password",
+      "fail2ban",
+      "https:demo-owned.test",
+      "https:demo-php.test",
+      "https:demo-redirect.test",
+      "https:demo-static.test",
+      "backup_storage",
+      "backup_verify:demo-owned.test",
+      "backup_verify:demo-static.test"
+    ],
+    "online": {
+      "enabled": true,
+      "checked_at": "2026-11-05T23:40:03Z",
+      "error": null
+    },
+    "checks": [
+      {
+        "id": "security_updates",
+        "check": "security_updates",
+        "area": "updates",
+        "title": "Security updates",
+        "status": "risk",
+        "severity": "high",
+        "detail": "4 packages have security fixes waiting: apt, ca-certificates, libapt-pkg6.0t64, libpcre2-8-0",
+        "domain": null,
+        "fix": {
+          "command": "software:update",
+          "args": {
+            "security-only": "yes"
+          }
+        },
+        "how": "Install the updates: they close known vulnerabilities (CVE)."
+      },
+      {
+        "id": "auto_updates",
+        "check": "auto_updates",
+        "area": "updates",
+        "title": "Automatic security updates",
+        "status": "warn",
+        "severity": "high",
+        "detail": "security fixes are installed only by hand",
+        "domain": null,
+        "fix": {
+          "command": "security:fix",
+          "args": {
+            "check": "auto_updates"
+          }
+        },
+        "how": "Turn on unattended upgrades so fixes arrive while nobody looks."
+      },
+      {
+        "id": "reboot_required",
+        "check": "reboot_required",
+        "area": "updates",
+        "title": "Restart after updates",
+        "status": "ok",
+        "severity": "medium",
+        "detail": "no restart pending",
+        "domain": null,
+        "fix": null,
+        "how": null
+      },
+      {
+        "id": "ssh_password",
+        "check": "ssh_password",
+        "area": "access",
+        "title": "SSH login by password",
+        "status": "warn",
+        "severity": "high",
+        "detail": "passwords can be guessed: anyone may try them",
+        "domain": null,
+        "fix": null,
+        "how": "Add your SSH key first (owner add-key), then allow keys only."
+      },
+      {
+        "id": "ssh_root",
+        "check": "ssh_root",
+        "area": "access",
+        "title": "SSH login as root",
+        "status": "ok",
+        "severity": "medium",
+        "detail": "root: without-password",
+        "domain": null,
+        "fix": null,
+        "how": null
+      },
+      {
+        "id": "firewall",
+        "check": "firewall",
+        "area": "network",
+        "title": "Firewall",
+        "status": "ok",
+        "severity": "high",
+        "detail": "only allowed ports are open",
+        "domain": null,
+        "fix": null,
+        "how": null
+      },
+      {
+        "id": "fail2ban",
+        "check": "fail2ban",
+        "area": "network",
+        "title": "Blocking of password guessing",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "nobody blocks password guessing",
+        "domain": null,
+        "fix": {
+          "command": "security:fix",
+          "args": {
+            "check": "fail2ban"
+          }
+        },
+        "how": "Install Fail2ban: it bans addresses after failed SSH logins."
+      },
+      {
+        "id": "exposed_services",
+        "check": "exposed_services",
+        "area": "network",
+        "title": "Services open to the network",
+        "status": "ok",
+        "severity": "high",
+        "detail": "databases and caches listen on this server only",
+        "domain": null,
+        "fix": null,
+        "how": null
+      },
+      {
+        "id": "https:demo-owned.test",
+        "check": "https",
+        "area": "sites",
+        "title": "HTTPS",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "the site opens without encryption",
+        "domain": "demo-owned.test",
+        "fix": {
+          "command": "ssl:letsencrypt",
+          "args": {
+            "domain": "demo-owned.test"
+          }
+        },
+        "how": "Issue a free Let's Encrypt certificate (the domain must point to this server)."
+      },
+      {
+        "id": "https:demo-php.test",
+        "check": "https",
+        "area": "sites",
+        "title": "HTTPS",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "the site opens without encryption",
+        "domain": "demo-php.test",
+        "fix": {
+          "command": "ssl:letsencrypt",
+          "args": {
+            "domain": "demo-php.test"
+          }
+        },
+        "how": "Issue a free Let's Encrypt certificate (the domain must point to this server)."
+      },
+      {
+        "id": "https:demo-redirect.test",
+        "check": "https",
+        "area": "sites",
+        "title": "HTTPS",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "the site opens without encryption",
+        "domain": "demo-redirect.test",
+        "fix": {
+          "command": "ssl:letsencrypt",
+          "args": {
+            "domain": "demo-redirect.test"
+          }
+        },
+        "how": "Issue a free Let's Encrypt certificate (the domain must point to this server)."
+      },
+      {
+        "id": "https:demo-static.test",
+        "check": "https",
+        "area": "sites",
+        "title": "HTTPS",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "the site opens without encryption",
+        "domain": "demo-static.test",
+        "fix": {
+          "command": "ssl:letsencrypt",
+          "args": {
+            "domain": "demo-static.test"
+          }
+        },
+        "how": "Issue a free Let's Encrypt certificate (the domain must point to this server)."
+      },
+      {
+        "id": "backup_verify:demo-owned.test",
+        "check": "backup_verify",
+        "area": "backups",
+        "title": "Backup checked",
+        "status": "warn",
+        "severity": "low",
+        "detail": "no backup was checked in the last month",
+        "domain": "demo-owned.test",
+        "fix": {
+          "command": "backup:data-schedule",
+          "args": {
+            "domain": "demo-owned.test",
+            "enabled": "yes",
+            "verify": "yes"
+          }
+        },
+        "how": "Let every scheduled backup be checked with a test restore."
+      },
+      {
+        "id": "backup_verify:demo-static.test",
+        "check": "backup_verify",
+        "area": "backups",
+        "title": "Backup checked",
+        "status": "warn",
+        "severity": "low",
+        "detail": "no backup was checked in the last month",
+        "domain": "demo-static.test",
+        "fix": {
+          "command": "backup:data-schedule",
+          "args": {
+            "domain": "demo-static.test",
+            "enabled": "yes",
+            "verify": "yes"
+          }
+        },
+        "how": "Let every scheduled backup be checked with a test restore."
+      },
+      {
+        "id": "backup_storage",
+        "check": "backup_storage",
+        "area": "backups",
+        "title": "Copies outside the server",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "backups stay on this server only: a lost server loses them too",
+        "domain": null,
+        "fix": null,
+        "how": "Add an S3 storage: every backup is then copied there."
+      }
+    ],
+    "vulnerabilities": {}
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

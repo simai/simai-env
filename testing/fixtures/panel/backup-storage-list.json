@@ -1,0 +1,12 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-backup-storage-list",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-backup-storages/1",
+    "storages": []
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

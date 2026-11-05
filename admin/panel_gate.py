@@ -60,6 +60,7 @@ SHA256 = re.compile(r"^[a-f0-9]{64}$")
 BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
+SECURITY_FIX = re.compile(r"^(auto_updates|fail2ban|ssh_password)$")
 STORAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 REGION = re.compile(r"^[a-z0-9-]{1,32}$")
@@ -245,6 +246,11 @@ ALLOW = {
     "site:nginx-custom": ({"domain": DOMAIN, "content": CONTENT}, {"domain", "content"}, "action"),
     "site:nginx-custom-show": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:apache": ({"domain": DOMAIN, "enable": YES_NO}, {"domain", "enable"}, "action"),
+    # Security center (1.45.0).
+    "security:status": ({}, set(), "read"),
+    "security:scan": ({}, set(), "action"),
+    "security:fix": ({"check": SECURITY_FIX}, {"check"}, "action"),
+    "self:firewall-ensure": ({}, set(), "action"),
     # Off-site storages for data backups (S3). Keys go in as files and are never kept.
     "backup:storage-list": ({}, set(), "read"),
     "backup:storage-add": ({"name": STORAGE_NAME, "bucket": BUCKET, "endpoint": ORIGIN, "region": REGION,
@@ -271,7 +277,8 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "software:list", "software:refresh", "software:update", "software:install", "software:remove",
               "site:nginx-custom", "site:nginx-custom-show", "site:apache",
               "backup:storage-list", "backup:storage-add", "backup:storage-test", "backup:storage-remove",
-              "backup:storage-copies", "backup:storage-fetch"}
+              "backup:storage-copies", "backup:storage-fetch",
+              "security:status", "security:scan", "security:fix", "self:firewall-ensure"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

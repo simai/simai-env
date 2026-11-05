@@ -255,7 +255,7 @@ docs/commands/self.md):
   {kind, target_hint, last_sent_at, last_error}`. Kinds: `disk_full`,
   `cert_expiring`, `cert_renew_failed`, `site_down`, `panel_down`,
   `backup_missing`, `backup_failed`, `backup_check_failed`,
-  `backup_offsite_failed`. An owner gets
+  `backup_offsite_failed`, `security_risk`. An owner gets
   only alerts of their sites and no channel.
 - `self:alerts-ack {id}` (action): the alert stays until its condition
   clears, marked as acknowledged by the panel user (`acked_by`). An owner
@@ -393,6 +393,19 @@ Backup storages (1.44.0), administrator only:
 - Every `backup:data` (and scheduled backup) is uploaded to the default
   storage; `site:describe` shows `last_offsite`.
 
+Security center (1.45.0), administrator only:
+
+- `security:status` (read, `simai-security/1`, see docs/commands/security.md):
+  score, problems with the most serious first, and for each a `fix` — a
+  gateway command with its arguments that resolves it in one click — or a
+  `how` text.
+- `security:scan` (action): asks the vulnerability databases now.
+- `security:fix {check: auto_updates|fail2ban|ssh_password}` (action with a
+  plan); `ssh_password` is refused while no SSH key is set.
+- `self:firewall-ensure` (action with a plan): turns on the firewall with
+  SSH, HTTP and HTTPS open.
+- New alert kind `security_risk` (target: the check id).
+
 Server software (1.38.0), administrator only:
 
 - `software:list` (`simai-software/1`): `components [{name, package,
@@ -519,7 +532,9 @@ action, job). Everything else is refused.
 - 1.42.0: `site:apache`;
 - 1.43.0: `software:remove`;
 - 1.44.0: `backup:storage-list`, `backup:storage-add`, `backup:storage-test`,
-  `backup:storage-remove`, `backup:storage-copies`, `backup:storage-fetch`.
+  `backup:storage-remove`, `backup:storage-copies`, `backup:storage-fetch`;
+- 1.45.0: `security:status`, `security:scan`, `security:fix`,
+  `self:firewall-ensure`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

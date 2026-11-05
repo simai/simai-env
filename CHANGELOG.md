@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## 1.45.0 - 2026-11-06
+
+- Security center. `security status` checks the server and its sites by
+  itself and gives a score with the problems, most serious first: waiting
+  security updates, automatic updates, a pending restart, SSH passwords and
+  root login, the firewall, Fail2ban, databases and caches open to the
+  network, the panel open to everybody, PHP without security support,
+  sites without HTTPS, expiring certificates, sites without a daily backup
+  or a checked one, no copies outside the server, known vulnerabilities in
+  the sites' Composer and npm packages (OSV) and an old WordPress. Each
+  problem carries the one-click fix (a panel command) or what to do.
+- `security scan` asks the vulnerability databases now; otherwise once a day
+  from the status refresh. Only package names and versions leave the
+  server; `SIMAI_SECURITY_ONLINE=no` turns it off.
+- `security fix --check auto_updates|fail2ban|ssh_password`; SSH keys-only is
+  refused while no key is set.
+- Serious problems open `security_risk` alerts. Panel gateway:
+  `security:status`, `security:scan`, `security:fix`, `self:firewall-ensure`
+  (administrators).
+
 ## 1.44.0 - 2026-11-06
 
 - Off-site backups to S3. `backup storage-add` registers an S3 or

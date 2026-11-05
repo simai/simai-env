@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.security-fix",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "security:fix",
+    "args": {
+      "check": "fail2ban"
+    },
+    "target": "host",
+    "description": "Fix a security problem: auto_updates, fail2ban or ssh_password",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

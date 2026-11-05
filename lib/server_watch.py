@@ -41,6 +41,7 @@ import host_metrics  # noqa: E402
 VAR = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env"))
 ALERTS = VAR / "alerts.json"
 HISTORY = VAR / "metrics-history.jsonl"
+SECURITY_REPORT = Path(os.environ.get("SIMAI_SECURITY_STATE", "/var/lib/simai-env/security")) / "report.json"
 BACKUP_RUNS = Path(os.environ.get("SIMAI_BACKUP_RUNS", "/var/lib/simai-env/backup-runs"))
 ETC = Path(os.environ.get("SIMAI_WATCH_ETC", "/etc/simai-env"))
 CHANNEL = ETC / "alerts-channel.json"
@@ -155,6 +156,13 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
                 f"the last backup of {domain} was not uploaded to storage {s['last_offsite'].get('storage')}", domain)
         if (s.get("last_verify") or {}).get("ok") is False:
             add("backup_check_failed", domain, "warning", f"the last check of a backup of {domain} failed", domain)
+    # Serious problems found by the security center (security status).
+    for c in load_json(SECURITY_REPORT, {}).get("checks") or []:
+        if c.get("status") == "risk" and c.get("severity") in ("high", "critical") \
+                and c.get("check") not in ("certificate", "backup_offsite"):
+            add("security_risk", str(c.get("id")), "critical" if c["severity"] == "critical" else "warning",
+                f"security: {c.get('title')}" + (f" ({c['domain']})" if c.get("domain") else "")
+                + f": {c.get('detail')}", c.get("domain"))
     return found
 
 

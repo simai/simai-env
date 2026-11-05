@@ -33,6 +33,8 @@ self_status_refresh_handler() {
   # Unattended upgrades change packages outside simai-env: refill the apt
   # answer cache so the panel's software and PHP lists stay fast.
   apt_cache_warm
+  # The security report (local checks; vulnerability databases once a day).
+  security_refresh_background
   # Firewall and panel access changes nobody confirmed are undone even when
   # their timer is gone (after a reboot).
   if [[ -n "$(python3 -I "${SIMAI_ENV_ROOT}/lib/timed_change.py" expired 2>/dev/null)" || -s /etc/simai-env/firewall/blocks.json ]]; then
