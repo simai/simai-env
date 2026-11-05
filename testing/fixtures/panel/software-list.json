@@ -238,7 +238,7 @@
           "redis-server"
         ],
         "php_extensions": [
-          "php-redis"
+          "php8.3-redis"
         ],
         "keeps": [
           "/var/lib/redis",
@@ -275,7 +275,7 @@
           "memcached"
         ],
         "php_extensions": [
-          "php-memcached"
+          "php8.3-memcached"
         ],
         "keeps": [
           "/etc/memcached.conf"
@@ -290,7 +290,7 @@
         "group": "languages",
         "package": "php-fpm",
         "installed": true,
-        "version": null,
+        "version": "8.3",
         "candidate": null,
         "update": false,
         "service": null,
@@ -442,7 +442,7 @@
           "imagemagick"
         ],
         "php_extensions": [
-          "php-imagick"
+          "php8.3-imagick"
         ],
         "keeps": [],
         "sites": []
@@ -616,7 +616,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 3349
+      "index_age_seconds": 3818
     }
   },
   "command_status": "success",

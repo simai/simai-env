@@ -21,6 +21,7 @@ l=$(cli software list --output json 2>/dev/null)
 [[ "$(js '[c["key"] for c in d["data"]["components"]]' <<<"$l")" == "['nginx', 'apache', 'certbot', 'fail2ban', 'mysql', 'postgresql', 'redis', 'memcached', 'php', 'node', 'composer', 'git', 'imagemagick', 'jpegoptim', 'optipng', 'ffmpeg', 'supervisor']" ]] && ok "the catalogue lists the programs" || bad "components: ${l:0:300}"
 [[ "$(js 'all(set(("title","purpose","group","state","can_install","can_update","can_remove","install_blocked","remove_blocked","keeps","sites")) <= set(c) for c in d["data"]["components"])' <<<"$l")" == True ]] && ok "every program has its state and actions" || bad "fields"
 [[ "$(comp nginx remove_blocked)" == *required_by_env* && "$(comp php remove_blocked)" == *managed_elsewhere* && "$(comp mysql can_install)" == False ]] && ok "simai-env's own programs cannot be removed" || bad "protected: $(comp nginx remove_blocked)"
+[[ "$(comp php version)" == *"$native"* && "$(comp redis php_extensions)" == *"php${native}-redis"* ]] && ok "PHP versions and their extensions are named" || bad "php: $(comp php version) $(comp redis php_extensions)"
 cli software remove --name nginx --confirm yes >/tmp/x 2>&1 && bad "nginx removed" || { dpkg -l nginx | grep -q '^ii' && ok "removing nginx is refused" || bad "nginx gone"; }
 
 # Memcached: install with the PHP extension, then remove keeping its configuration.

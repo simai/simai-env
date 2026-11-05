@@ -42,7 +42,7 @@
         "memcached"
       ],
       "php_extensions": [
-        "php-memcached"
+        "php8.3-memcached"
       ],
       "keeps": [
         "/etc/memcached.conf"

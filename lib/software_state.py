@@ -144,7 +144,7 @@ def mysql_service():
 
 
 def php_versions():
-    return sorted({p.name[3:] for p in Path("/etc/php").glob("[0-9]*") if (p / "fpm").is_dir()}) \
+    return sorted({p.name for p in Path("/etc/php").glob("[0-9]*") if (p / "fpm").is_dir()}) \
         if Path("/etc/php").is_dir() else []
 
 

@@ -42,7 +42,7 @@
         "redis-server"
       ],
       "php_extensions": [
-        "php-redis"
+        "php8.3-redis"
       ],
       "keeps": [
         "/var/lib/redis",

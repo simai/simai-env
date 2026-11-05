@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.43.1 - 2026-11-05
+
+- `software list`: the `php` row shows the installed PHP versions, and
+  `php_extensions` names the extension of every PHP-FPM version
+  (`php8.3-redis`), which `software install` and `software remove` act on.
+
 ## 1.43.0 - 2026-11-05
 
 - Server programs as a catalogue. `software list` lists 17 programs (web
