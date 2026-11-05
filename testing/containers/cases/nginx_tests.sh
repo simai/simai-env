@@ -40,6 +40,7 @@ export SCRIPT_DIR=/src SIMAI_ENV_ROOT=/src SIMAI_USER=root
 set +u; source admin/lib/site_utils.sh; set +e; set -u
 warn() { echo "warn: $*"; }
 mkdir -p /etc/nginx/sites-available
+ensure_nginx_static_maps  # the static profile reads $simai_static_cache_control
 ensure_nginx_catchall
 grep -q simai-catchall-v2 /etc/nginx/sites-available/000-catchall.conf && ok "catch-all v2 written" || bad "catch-all fell back: $(cat /etc/nginx/sites-available/000-catchall.conf)"
 
