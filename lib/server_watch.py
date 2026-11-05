@@ -150,6 +150,9 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
         run = load_json(BACKUP_RUNS / f"{domain}.json", {})
         if run.get("ok") is False:
             add("backup_failed", domain, "warning", f"the last backup of {domain} failed", domain)
+        if (s.get("last_offsite") or {}).get("ok") is False:
+            add("backup_offsite_failed", domain, "warning",
+                f"the last backup of {domain} was not uploaded to storage {s['last_offsite'].get('storage')}", domain)
         if (s.get("last_verify") or {}).get("ok") is False:
             add("backup_check_failed", domain, "warning", f"the last check of a backup of {domain} failed", domain)
     return found

@@ -35,6 +35,7 @@
       "backup": "20260101-000000",
       "restore_test": true
     },
+    "last_offsite": null,
     "adopted": null,
     "answers": {
       "http": 200,
@@ -55,9 +56,9 @@
       },
       "items": [
         {
-          "path": "/var/backups/simai/demo-php.test/20261105-200721",
-          "created_at": "2026-11-05T20:07:21",
-          "size_bytes": 4369,
+          "path": "/var/backups/simai/demo-php.test/20261105-230022",
+          "created_at": "2026-11-05T23:00:22",
+          "size_bytes": 4372,
           "parts": [
             "config",
             "db",
@@ -72,7 +73,8 @@
         "ok": true,
         "backup": "20260101-000000",
         "restore_test": true
-      }
+      },
+      "last_offsite": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-php-test.error.log",

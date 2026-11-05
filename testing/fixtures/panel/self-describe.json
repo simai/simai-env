@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.43.1",
+      "version": "1.44.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -62,6 +62,7 @@
         "backup_schedule": true,
         "last_backup": null,
         "last_verify": null,
+        "last_offsite": null,
         "adopted": null,
         "answers": {
           "http": 200,
@@ -105,6 +106,7 @@
           "backup": "20260101-000000",
           "restore_test": true
         },
+        "last_offsite": null,
         "adopted": null,
         "answers": {
           "http": 200,
@@ -137,6 +139,7 @@
         "backup_schedule": false,
         "last_backup": null,
         "last_verify": null,
+        "last_offsite": null,
         "adopted": null,
         "answers": {
           "http": 301,
@@ -163,9 +166,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261105200710",
-          "previous": "20261105200709-initial",
-          "deployed_at": "2026-11-05T20:07:10Z",
+          "current": "20261105230011",
+          "previous": "20261105230010-initial",
+          "deployed_at": "2026-11-05T23:00:11Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -174,6 +177,7 @@
         "backup_schedule": true,
         "last_backup": null,
         "last_verify": null,
+        "last_offsite": null,
         "adopted": null,
         "answers": {
           "http": 200,
@@ -203,6 +207,12 @@
         "backup:data-restore",
         "backup:data-schedule",
         "backup:data-verify",
+        "backup:storage-add",
+        "backup:storage-copies",
+        "backup:storage-fetch",
+        "backup:storage-list",
+        "backup:storage-remove",
+        "backup:storage-test",
         "change:confirm",
         "change:status",
         "cron:add",

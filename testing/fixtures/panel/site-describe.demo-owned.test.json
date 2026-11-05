@@ -24,6 +24,7 @@
     "backup_schedule": true,
     "last_backup": null,
     "last_verify": null,
+    "last_offsite": null,
     "adopted": null,
     "answers": {
       "http": 200,
@@ -43,7 +44,8 @@
         "verify": false
       },
       "items": [],
-      "last_verify": null
+      "last_verify": null,
+      "last_offsite": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-owned-test.error.log",

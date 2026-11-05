@@ -21,11 +21,12 @@
       "| Size     | 20K                                                |",
       "| Kept     | last 7                                             |",
       "| Off-site | not configured                                     |",
+      "| Storage  | not configured                                     |",
       "+----------+----------------------------------------------------+",
       "",
       "Next steps",
       "  Verify:            simai-admin.sh backup data-verify --path /var/backups/simai/demo-owned.test/20260101-000000 --restore-test yes --confirm yes"
     ],
-    "next": 18
+    "next": 19
   }
 }

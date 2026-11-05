@@ -254,7 +254,8 @@ docs/commands/self.md):
   last_seen, acked_at, acked_by, resolved_at}]`, `checked_at` and `channel
   {kind, target_hint, last_sent_at, last_error}`. Kinds: `disk_full`,
   `cert_expiring`, `cert_renew_failed`, `site_down`, `panel_down`,
-  `backup_missing`, `backup_failed`, `backup_check_failed`. An owner gets
+  `backup_missing`, `backup_failed`, `backup_check_failed`,
+  `backup_offsite_failed`. An owner gets
   only alerts of their sites and no channel.
 - `self:alerts-ack {id}` (action): the alert stays until its condition
   clears, marked as acknowledged by the panel user (`acked_by`). An owner
@@ -377,6 +378,20 @@ Apache mode (1.42.0), administrator only:
 - `site:apache {domain, enable: yes|no}`: an action; the job fails, with
   nothing changed, when Apache rejects the configuration or the site stops
   answering. `site:describe` shows `web_server`.
+
+Backup storages (1.44.0), administrator only:
+
+- `backup:storage-list` (read, `simai-backup-storages/1`, no keys) and
+  `backup:storage-copies {name, domain?}` (read, `simai-backup-copies/1`).
+- `backup:storage-add {name, bucket, endpoint?, region?, prefix?, keep: 1-90,
+  default?, access-key, secret-key}`: the keys go to the command as files,
+  show as `(stored)` in the plan and the job, and their files are removed
+  when the job ends. The job fails, with nothing saved, when the storage
+  refuses the keys or the bucket.
+- `backup:storage-test {name}`, `backup:storage-remove {name}` and
+  `backup:storage-fetch {name, domain, backup}` (then `backup:data-restore`).
+- Every `backup:data` (and scheduled backup) is uploaded to the default
+  storage; `site:describe` shows `last_offsite`.
 
 Server software (1.38.0), administrator only:
 
@@ -502,7 +517,9 @@ action, job). Everything else is refused.
 - 1.40.0: `file:upload`, `file:archive`, `file:extract`;
 - 1.41.0: `site:nginx-custom`, `site:nginx-custom-show`;
 - 1.42.0: `site:apache`;
-- 1.43.0: `software:remove`.
+- 1.43.0: `software:remove`;
+- 1.44.0: `backup:storage-list`, `backup:storage-add`, `backup:storage-test`,
+  `backup:storage-remove`, `backup:storage-copies`, `backup:storage-fetch`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

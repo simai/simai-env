@@ -18,9 +18,9 @@
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261105200710",
-      "previous": "20261105200709-initial",
-      "deployed_at": "2026-11-05T20:07:10Z",
+      "current": "20261105230011",
+      "previous": "20261105230010-initial",
+      "deployed_at": "2026-11-05T23:00:11Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],
@@ -29,6 +29,7 @@
     "backup_schedule": true,
     "last_backup": null,
     "last_verify": null,
+    "last_offsite": null,
     "adopted": null,
     "answers": {
       "http": 200,
@@ -48,7 +49,8 @@
         "verify": false
       },
       "items": [],
-      "last_verify": null
+      "last_verify": null,
+      "last_offsite": null
     },
     "logs": {
       "nginx_error": "/var/log/nginx/demo-static-test.error.log",

@@ -177,7 +177,11 @@ backup_data_run() {
   local with_db="${PARSED_ARGS[db]:-yes}" with_files="${PARSED_ARGS[files]:-yes}"
   local offsite="${PARSED_ARGS[offsite]:-${SIMAI_BACKUP_OFFSITE:-}}"
   local encrypt_to="${PARSED_ARGS[encrypt-to]:-${SIMAI_BACKUP_AGE_RECIPIENT:-}}"
+  local storage="${PARSED_ARGS[storage]:-}"
   require_args "domain" || return 1
+  if [[ -n "$storage" && "$storage" != none ]] && ! backup_storage_require "$storage"; then
+    return 1
+  fi
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
   # Without --keep a manual backup keeps as many as the site's schedule does.
@@ -272,6 +276,8 @@ backup_data_run() {
       return 1
     fi
   fi
+  BACKUP_OFFSITE_RESULT="not configured"
+  BACKUP_DATA_STORAGE="$storage" backup_storage_upload "$domain" "$dir"
   ui_result_table \
     "Domain|${domain}" \
     "Backup|${dir}" \
@@ -279,7 +285,8 @@ backup_data_run() {
     "Files|${with_files}" \
     "Size|$(du -sh "$dir" | awk '{print $1}')" \
     "Kept|last ${keep}" \
-    "Off-site|${offsite_state}"
+    "Off-site|${offsite_state}" \
+    "Storage|${BACKUP_OFFSITE_RESULT}"
   ui_next_steps
   ui_kv "Verify" "simai-admin.sh backup data-verify --path ${dir} --restore-test yes --confirm yes"
 }
@@ -465,7 +472,7 @@ backup_data_restore_handler() {
   fi
 }
 
-register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to=" "tier:advanced"
+register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to= storage=" "tier:advanced"
 register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "" "path= domain= backup= restore-test=" "tier:advanced effects:read"
 register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest= verify=" "tier:advanced"
 register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= confirm=" "tier:advanced"

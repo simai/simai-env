@@ -193,7 +193,8 @@ def backups(domain: str, project: str) -> dict:
                 "checksums": (d / "SHA256SUMS").is_file(),
                 "encrypted": any(f.name.endswith(".age") for f in files),
             })
-    return {"schedule": schedule, "items": items, "last_verify": last_verify(domain)}
+    return {"schedule": schedule, "items": items, "last_verify": last_verify(domain),
+            "last_offsite": last_offsite(domain)}
 
 
 def last_verify(domain: str) -> dict | None:
@@ -207,6 +208,19 @@ def last_verify(domain: str) -> dict | None:
         return None
     return {"at": data.get("at"), "ok": data.get("ok") is True, "backup": data.get("backup"),
             "restore_test": data.get("restore_test") is True}
+
+
+def last_offsite(domain: str) -> dict | None:
+    """Result of the last upload of a backup to the backup storage (S3)."""
+    state = Path(os.environ.get("SIMAI_BACKUP_OFFSITE_STATE", "/var/lib/simai-env/backup-offsite")) / f"{domain}.json"
+    try:
+        data = json.loads(state.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return {"at": data.get("at"), "ok": data.get("ok") is True, "storage": data.get("storage"),
+            "backup": data.get("backup"), "error": data.get("error")}
 
 
 def last_backup(domain: str, project: str) -> str | None:
@@ -271,6 +285,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "backup_schedule": (Path("/etc/cron.d") / f"simai-backup-{project}").is_file(),
         "last_backup": last_backup(domain, project),
         "last_verify": last_verify(domain),
+        "last_offsite": last_offsite(domain),
         "adopted": kv_file(STATE / "sites" / domain / "app.env").get("ADOPTED_AT"),
     }
     known = (status if status is not None else site_status()).get(domain) or {}

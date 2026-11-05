@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.44.0 - 2026-11-06
+
+- Off-site backups to S3. `backup storage-add` registers an S3 or
+  S3-compatible storage (AWS, Yandex Object Storage, Selectel, VK Cloud,
+  Cloudflare R2, Backblaze B2, MinIO); the keys are read from files, checked
+  with a write, read and delete before they are saved, kept root-only and
+  never shown. Every data backup, manual or scheduled, is then uploaded to
+  the default storage, which keeps the newest backups of each site
+  (`--keep`, default 30). A failed upload keeps the local backup and opens a
+  `backup_offsite_failed` alert; `site describe` shows `last_offsite`.
+- `backup storage-list`, `storage-test`, `storage-copies`, `storage-remove`,
+  and `storage-fetch`, which downloads a copy with its checksums checked so
+  `backup data-restore` can restore it, also on a new server. `backup data
+  --storage NAME|none` picks the storage for one backup.
+- Panel gateway: `backup:storage-*` for administrators; the keys show as
+  `(stored)` and are never kept in job records.
+
 ## 1.43.2 - 2026-11-06
 
 - Faster panel reads. The slow apt queries behind `software list` and `php

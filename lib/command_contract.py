@@ -26,7 +26,7 @@ def result(args):
         "verification": "not_run" if status == "planned" else "handler_exit_only",
     }
     # Only these audited handlers return structured, secret-free native data.
-    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "site:nginx-custom-show"} or key == "site:doctor" and status in {"success", "failed"}) and output:
+    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "site:nginx-custom-show", "backup:storage-list", "backup:storage-copies"} or key == "site:doctor" and status in {"success", "failed"}) and output:
         try:
             value["data"] = json.loads(Path(output).read_text())
             if key == "site:doctor":

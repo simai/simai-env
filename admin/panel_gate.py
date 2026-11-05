@@ -60,6 +60,11 @@ SHA256 = re.compile(r"^[a-f0-9]{64}$")
 BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
+STORAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+REGION = re.compile(r"^[a-z0-9-]{1,32}$")
+PREFIX = re.compile(r"^(?!.*\.\.)[A-Za-z0-9._-][A-Za-z0-9._/-]{0,127}$")
+S3_KEY = re.compile(r"^[A-Za-z0-9/+=._-]{8,256}$")
 MATCH = re.compile(r"^[ -~]{1,200}$")
 ACCESS_LOGIN = re.compile(r"^(?!site-)[a-z][a-z0-9-]{2,31}$")
 ALERT_ID = re.compile(r"^[a-f0-9]{12}$")
@@ -240,6 +245,17 @@ ALLOW = {
     "site:nginx-custom": ({"domain": DOMAIN, "content": CONTENT}, {"domain", "content"}, "action"),
     "site:nginx-custom-show": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:apache": ({"domain": DOMAIN, "enable": YES_NO}, {"domain", "enable"}, "action"),
+    # Off-site storages for data backups (S3). Keys go in as files and are never kept.
+    "backup:storage-list": ({}, set(), "read"),
+    "backup:storage-add": ({"name": STORAGE_NAME, "bucket": BUCKET, "endpoint": ORIGIN, "region": REGION,
+                            "prefix": PREFIX, "keep": KEEP_DAYS, "default": YES_NO,
+                            "access-key": S3_KEY, "secret-key": S3_KEY},
+                           {"name", "bucket", "access-key", "secret-key"}, "action"),
+    "backup:storage-test": ({"name": STORAGE_NAME}, {"name"}, "action"),
+    "backup:storage-remove": ({"name": STORAGE_NAME}, {"name"}, "action"),
+    "backup:storage-copies": ({"name": STORAGE_NAME, "domain": DOMAIN}, {"name"}, "read"),
+    "backup:storage-fetch": ({"name": STORAGE_NAME, "domain": DOMAIN, "backup": BACKUP},
+                             {"name", "domain", "backup"}, "action"),
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
@@ -253,7 +269,9 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "change:confirm", "change:status", "ssl:dns-credentials",
               "php:list", "php:install", "php:remove", "php:extension", "php:update",
               "software:list", "software:refresh", "software:update", "software:install", "software:remove",
-              "site:nginx-custom", "site:nginx-custom-show", "site:apache"}
+              "site:nginx-custom", "site:nginx-custom-show", "site:apache",
+              "backup:storage-list", "backup:storage-add", "backup:storage-test", "backup:storage-remove",
+              "backup:storage-copies", "backup:storage-fetch"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
@@ -262,8 +280,9 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
 NO_CANCEL = {"self:update"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
-FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file"}  # passed as a file
-SECRET_ARGS = {"token"}  # never kept in a job record, and their file goes when the job ends
+FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file",
+             "access-key": "access-key-file", "secret-key": "secret-key-file"}  # passed as a file
+SECRET_ARGS = {"token", "access-key", "secret-key"}  # never kept in a job record, and their file goes when the job ends
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
