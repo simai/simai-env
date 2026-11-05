@@ -9,7 +9,7 @@
       "check": "fail2ban"
     },
     "target": "host",
-    "description": "Fix a security problem: auto_updates, fail2ban or ssh_password",
+    "description": "Fix a security problem: antivirus, auto_updates, fail2ban or ssh_password",
     "effects": "write",
     "lock": "host",
     "applied": false

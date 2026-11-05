@@ -5,14 +5,14 @@
   "kind": "result",
   "data": {
     "schema": "simai-security/1",
-    "checked_at": "2026-11-05T23:40:57Z",
-    "score": 41,
+    "checked_at": "2026-11-05T23:59:26Z",
+    "score": 47,
     "grade": "risk",
     "summary": {
       "risk": 1,
-      "warn": 10,
+      "warn": 11,
       "ok": 4,
-      "unknown": 0
+      "unknown": 1
     },
     "recommendations": [
       "security_updates",
@@ -24,12 +24,13 @@
       "https:demo-redirect.test",
       "https:demo-static.test",
       "backup_storage",
+      "antivirus",
       "backup_verify:demo-owned.test",
       "backup_verify:demo-static.test"
     ],
     "online": {
       "enabled": true,
-      "checked_at": "2026-11-05T23:40:03Z",
+      "checked_at": "2026-11-05T23:58:35Z",
       "error": null
     },
     "checks": [
@@ -261,6 +262,38 @@
         "domain": null,
         "fix": null,
         "how": "Add an S3 storage: every backup is then copied there."
+      },
+      {
+        "id": "antivirus",
+        "check": "antivirus",
+        "area": "sites",
+        "title": "Antivirus",
+        "status": "warn",
+        "severity": "medium",
+        "detail": "site files are checked by simai-env's own web shell signatures only",
+        "domain": null,
+        "fix": {
+          "command": "security:fix",
+          "args": {
+            "check": "antivirus"
+          }
+        },
+        "how": "Install ClamAV: it adds thousands of malware signatures to the nightly check."
+      },
+      {
+        "id": "file_scan",
+        "check": "file_scan",
+        "area": "sites",
+        "title": "Site files checked",
+        "status": "unknown",
+        "severity": "high",
+        "detail": "site files were not checked yet",
+        "domain": null,
+        "fix": {
+          "command": "security:files-scan",
+          "args": {}
+        },
+        "how": "Run the check; it then runs every night."
       }
     ],
     "vulnerabilities": {}

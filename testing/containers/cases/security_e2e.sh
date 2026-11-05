@@ -69,6 +69,39 @@ s=$(st)
 score1=$(js 'd["data"]["score"]' <<<"$s")
 (( score1 > score0 )) && ok "the score rises after the fixes ($score0 -> $score1)" || bad "score $score0 -> $score1"
 
+# Site files: web shells are found, quarantined and can be put back.
+pub="$root/public"
+printf '<?php eval(base64_decode("ZWNobyAxOw=="));\n' >"$pub/shell.php"
+printf '<?php echo "fine";\n' >"$pub/ok.php"
+chown simai:www-data "$pub/shell.php" "$pub/ok.php"; chmod 0640 "$pub/shell.php"
+ln -sf /etc/passwd "$pub/link.php"
+cli security files-scan --domain "$D" --confirm yes >/tmp/fs 2>&1 || bad "files-scan: $(tail -3 /tmp/fs)"
+f=$(cli security files --output json 2>/dev/null)
+[[ "$(js "[x['path'] for x in d['data']['sites']['$D']['found']]" <<<"$f")" == "['public/shell.php']" ]] && ok "the file scan finds the web shell only" || bad "files: ${f:0:400}"
+s=$(st)
+[[ "$(c "malware:$D")" == "[('risk', None)]" && "$(js "[x['severity'] for x in d['data']['checks'] if x['id'] == 'malware:$D']" <<<"$s")" == "['critical']" ]] && ok "a web shell is a critical risk" || bad "malware: $(c "malware:$D")"
+cli security quarantine --domain "$D" --path ../../etc/passwd --confirm yes >/dev/null 2>&1 && bad "a path outside the site was quarantined" || ok "a path outside the site is refused"
+cli security quarantine --domain "$D" --path public/link.php --confirm yes >/dev/null 2>&1 && bad "a symlink was quarantined" || { [[ -f /etc/passwd ]] && ok "a symlink is refused"; }
+cli security quarantine --domain "$D" --path public/shell.php >/tmp/q 2>&1; grep -q 'Plan:' /tmp/q && [[ -f "$pub/shell.php" ]] && ok "quarantine without confirm is a plan" || bad "quarantine plan"
+cli security quarantine --domain "$D" --path public/shell.php --confirm yes >/tmp/q 2>&1 && [[ ! -e "$pub/shell.php" ]] && ok "the shell goes to the quarantine" || { bad "quarantine"; tail -3 /tmp/q; }
+q=$(cli security quarantine-list --output json 2>/dev/null); qid=$(js 'd["data"]["files"][0]["id"]' <<<"$q")
+[[ "$(stat -c %a "/var/lib/simai-env/quarantine/$D/$qid/file")" == 600 && "$q" != *'"root"'* ]] && ok "the quarantined file is root-only" || bad "quarantine list: ${q:0:300}"
+s=$(st); [[ -z "$(js "[x for x in d['data']['checks'] if x['id'] == 'malware:$D']" <<<"$s" | tr -d '[]')" ]] && ok "a quarantined file no longer counts" || bad "still counted"
+cli security quarantine-restore --id "$qid" --confirm yes >/dev/null 2>&1 && [[ "$(stat -c '%U %a' "$pub/shell.php")" == "simai 640" ]] && ok "restore puts it back with its owner and mode" || bad "restore: $(stat -c '%U %a' "$pub/shell.php" 2>&1)"
+cli security quarantine-restore --id "$qid" --confirm yes >/dev/null 2>&1 && bad "restored twice" || ok "a restored file cannot be restored again"
+rm -f "$pub/shell.php" "$pub/link.php"
+
+# ClamAV adds its signatures (a test signature here; real ones come from freshclam).
+cli security fix --check antivirus --confirm yes >/tmp/av 2>&1 && command -v clamscan >/dev/null && ok "the antivirus fix installs ClamAV" || { bad "antivirus"; tail -5 /tmp/av; }
+systemctl stop clamav-freshclam clamav-daemon >/dev/null 2>&1
+printf 'simai-clamav-test-content-0001\n' >"$pub/sample.txt"
+printf '%s:%s:Simai.Test.Signature\n' "$(md5sum "$pub/sample.txt" | cut -d' ' -f1)" "$(stat -c %s "$pub/sample.txt")" >/var/lib/clamav/simai-test.hdb
+cli security files-scan --domain "$D" --confirm yes >/tmp/fs 2>&1
+f=$(cli security files --output json 2>/dev/null)
+[[ "$(js "[(x['path'], x['engine']) for x in d['data']['sites']['$D']['found']]" <<<"$f")" == "[('public/sample.txt', 'clamav')]" ]] && ok "ClamAV signatures are used by the file scan" || bad "clamav: ${f:0:400} $(tail -3 /tmp/fs)"
+s=$(st); [[ "$(c antivirus)" == "[('ok', None)]" ]] && ok "the antivirus check is ok" || bad "antivirus check: $(c antivirus)"
+rm -f "$pub/sample.txt" /var/lib/clamav/simai-test.hdb
+
 # The status refresh keeps the report; serious problems open alerts.
 rm -rf /var/lib/simai-env/security
 cli self status-refresh --confirm yes >/dev/null 2>&1
@@ -90,6 +123,9 @@ g=$(gate "$(req null security:status '{}')")
 [[ "$(js 'd["data"]["schema"]' <<<"$g")" == simai-security/1 ]] && ok "security:status reads" || bad "gate status: ${g:0:300}"
 [[ "$(gate "$(req null security:fix '{"check":"fail2ban"}')" | js 'd["kind"]')" == plan ]] && ok "security:fix answers a plan" || bad "gate fix plan"
 [[ "$(gate "$(req null security:fix '{"check":"rm -rf"}')" | js 'd["reason"]')" == invalid_argument ]] && ok "an unknown fix is refused" || bad "gate bad fix"
+g=$(gate "$(req null security:files '{}')"); [[ "$(js 'd["data"]["schema"]' <<<"$g")" == simai-file-scan/1 ]] && ok "security:files reads" || bad "gate files: ${g:0:300}"
+g=$(gate "$(req null security:quarantine-list '{}')"); [[ "$(js 'd["data"]["schema"]' <<<"$g")" == simai-quarantine/1 ]] && ok "security:quarantine-list reads" || bad "gate qlist: ${g:0:300}"
+[[ "$(gate "$(req null security:quarantine "{\"domain\":\"$D\",\"path\":\"public/ok.php\"}")" | js 'd["kind"]')" == plan ]] && ok "security:quarantine answers a plan" || bad "gate quarantine plan"
 [[ "$(gate "$(req null self:firewall-ensure '{}')" | js 'd["kind"]')" == plan ]] && ok "self:firewall-ensure answers a plan" || bad "gate firewall plan"
 
 cli panel gate-disable --confirm yes >/dev/null 2>&1

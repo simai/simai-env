@@ -463,7 +463,30 @@ def check_online(online: dict) -> list[dict]:
     return res
 
 
-# ---------------------------------------------------------------- report
+def check_files() -> list[dict]:
+    res = []
+    clam = Path("/usr/bin/clamscan").exists()
+    res.append(check("antivirus", "sites", "Antivirus", "ok" if clam else "warn", "medium",
+                     "ClamAV checks site files every night" if clam
+                     else "site files are checked by simai-env's own web shell signatures only",
+                     fix=None if clam else fix("security:fix", check="antivirus"),
+                     how=None if clam else "Install ClamAV: it adds thousands of malware signatures to the nightly check."))
+    files = load(STATE_DIR / "files.json", {})
+    if not files.get("checked_at"):
+        res.append(check("file_scan", "sites", "Site files checked", "unknown", "high",
+                         "site files were not checked yet", fix=fix("security:files-scan"),
+                         how="Run the check; it then runs every night."))
+        return res
+    for domain, s in sorted((files.get("sites") or {}).items()):
+        found = s.get("found") or []
+        if found:
+            res.append(check("malware", "sites", "Suspicious files", "risk", "critical",
+                             f"{len(found)} files look like web shells or malware: "
+                             + ", ".join(f["path"] for f in found[:5]) + ("…" if len(found) > 5 else ""), domain,
+                             how="Look at each file (security files) and move it to the quarantine "
+                                 "(security quarantine); then change the site passwords and update its code."))
+    return res
+
 
 def report(access_file: str, online_mode: str = "") -> dict:
     sites = site_rows()
@@ -480,6 +503,7 @@ def report(access_file: str, online_mode: str = "") -> dict:
         save(ONLINE, online)
     checks = check_updates() + check_ssh() + check_firewall() + check_panel(access_file) + check_sites(sites)
     checks += check_online(online) if enabled else []
+    checks += check_files()
     # One kind of problem counts once at its worst, plus a point for every
     # further site with it (up to 5), so many sites do not sink the score.
     kinds: dict[str, list[int]] = {}

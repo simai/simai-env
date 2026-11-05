@@ -1,0 +1,12 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-security-quarantine-list",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-quarantine/1",
+    "files": []
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

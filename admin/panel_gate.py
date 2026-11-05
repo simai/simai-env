@@ -60,7 +60,8 @@ SHA256 = re.compile(r"^[a-f0-9]{64}$")
 BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
-SECURITY_FIX = re.compile(r"^(auto_updates|fail2ban|ssh_password)$")
+SECURITY_FIX = re.compile(r"^(antivirus|auto_updates|fail2ban|ssh_password)$")
+QUARANTINE_ID = re.compile(r"^[a-f0-9]{12}$")
 STORAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 REGION = re.compile(r"^[a-z0-9-]{1,32}$")
@@ -250,6 +251,11 @@ ALLOW = {
     "security:status": ({}, set(), "read"),
     "security:scan": ({}, set(), "action"),
     "security:fix": ({"check": SECURITY_FIX}, {"check"}, "action"),
+    "security:files-scan": ({"domain": DOMAIN}, set(), "action"),
+    "security:files": ({}, set(), "read"),
+    "security:quarantine": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
+    "security:quarantine-list": ({}, set(), "read"),
+    "security:quarantine-restore": ({"id": QUARANTINE_ID}, {"id"}, "action"),
     "self:firewall-ensure": ({}, set(), "action"),
     # Off-site storages for data backups (S3). Keys go in as files and are never kept.
     "backup:storage-list": ({}, set(), "read"),
@@ -278,7 +284,9 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "site:nginx-custom", "site:nginx-custom-show", "site:apache",
               "backup:storage-list", "backup:storage-add", "backup:storage-test", "backup:storage-remove",
               "backup:storage-copies", "backup:storage-fetch",
-              "security:status", "security:scan", "security:fix", "self:firewall-ensure"}
+              "security:status", "security:scan", "security:fix", "self:firewall-ensure",
+              "security:files-scan", "security:files", "security:quarantine", "security:quarantine-list",
+              "security:quarantine-restore"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.46.0 - 2026-11-06
+
+- Malware check of site files. `security files-scan` looks for web shells and
+  backdoors with simai-env's own signatures (code run from encoded strings,
+  commands from request input, known shell kits, PHP in upload folders) and
+  with ClamAV when it is installed; all sites are checked every night at the
+  lowest priority. Suspicious files are a critical problem in `security
+  status` and open an alert; `security files` lists them.
+- Quarantine: `security quarantine` moves a file out of the site (root only),
+  `security quarantine-list` and `security quarantine-restore` put it back
+  with its owner and mode.
+- `security fix --check antivirus` installs ClamAV with daily signature
+  updates (its daemon only with 4 GB of memory or more).
+- Panel gateway: `security:files-scan`, `security:files`,
+  `security:quarantine`, `security:quarantine-list`,
+  `security:quarantine-restore` (administrators).
+
 ## 1.45.1 - 2026-11-06
 
 - `security status`: one kind of problem counts once at its worst in the

@@ -405,6 +405,11 @@ Security center (1.45.0), administrator only:
 - `self:firewall-ensure` (action with a plan): turns on the firewall with
   SSH, HTTP and HTTPS open.
 - New alert kind `security_risk` (target: the check id).
+- 1.46.0: `security:files-scan {domain?}` (action), `security:files` (read,
+  `simai-file-scan/1`), `security:quarantine {domain, path}` (action with a
+  plan), `security:quarantine-list` (read, `simai-quarantine/1`),
+  `security:quarantine-restore {id}` (action with a plan);
+  `security:fix {check: antivirus}`.
 
 Server software (1.38.0), administrator only:
 
@@ -534,7 +539,9 @@ action, job). Everything else is refused.
 - 1.44.0: `backup:storage-list`, `backup:storage-add`, `backup:storage-test`,
   `backup:storage-remove`, `backup:storage-copies`, `backup:storage-fetch`;
 - 1.45.0: `security:status`, `security:scan`, `security:fix`,
-  `self:firewall-ensure`.
+  `self:firewall-ensure`;
+- 1.46.0: `security:files-scan`, `security:files`, `security:quarantine`,
+  `security:quarantine-list`, `security:quarantine-restore`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
