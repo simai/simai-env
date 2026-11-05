@@ -15,6 +15,7 @@ software_list_handler() {
 # Refresh the apt index so list shows updates published since the last refresh.
 software_refresh_handler() {
   parse_kv_args "$@"
+  rm -rf -- "${SIMAI_UPDATE_REMOTE_CACHE:-/var/lib/simai-env/cache/update-remote}"  # ask the update channel again too
   os_cmd_pkg_update
   run_long "Updating apt indexes" "${OS_CMD[@]}" || return 1
   ui_result_table "Updates|$(software_state upgradable | wc -l | tr -d ' ')" \

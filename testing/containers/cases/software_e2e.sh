@@ -33,6 +33,11 @@ cli software remove --name memcached --confirm yes >/tmp/m 2>&1 && ! dpkg -l mem
   && ok "Memcached is removed and its configuration kept" || { bad "memcached remove"; tail -5 /tmp/m; }
 cli software remove --name memcached --confirm yes >/dev/null 2>&1 && bad "removed twice" || ok "removing what is not installed is refused"
 cli software install --name jpegoptim --confirm yes >/dev/null 2>&1 && command -v jpegoptim >/dev/null && ok "a tool installs" || bad "jpegoptim"
+# Slow apt answers are kept until the package state changes, even outside simai-env.
+[[ "$(stat -c %a /var/lib/simai-env/cache/apt 2>/dev/null)" == 700 && -n "$(ls /var/lib/simai-env/cache/apt)" ]] && ok "apt answers are kept, root only" || bad "apt cache: $(ls -ld /var/lib/simai-env/cache/apt 2>&1)"
+[[ "$(comp optipng installed)" == False ]] && apt-get install -y -qq optipng >/dev/null 2>&1 && [[ "$(comp optipng installed)" == True ]] \
+  && ok "a package installed outside simai-env shows at once" || bad "stale cache: $(comp optipng installed)"
+apt-get remove -y -qq optipng >/dev/null 2>&1
 [[ "$(js 'type(d["data"]["system"]["updates"]).__name__' <<<"$l")" == int ]] && ok "system updates are counted" || bad "system: ${l:0:300}"
 
 # Redis: a plan first, then the install with the PHP extension.

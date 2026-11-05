@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.43.2 - 2026-11-06
+
+- Faster panel reads. The slow apt queries behind `software list` and `php
+  list` (`apt-get -s upgrade`, `apt-cache policy`, `apt-cache pkgnames`)
+  are kept in `/var/lib/simai-env/cache/apt` until the package state
+  changes (dpkg status, package lists, apt sources), so they are never
+  stale; the cache is refilled after package changes made by simai-env and
+  every five minutes by `self status-refresh`. On the stand both lists
+  answer in about 0.2 s instead of 2.3-2.6 s.
+- `self update-plan --target env` keeps the update channel's answer for 10
+  minutes (about 0.2 s instead of 2.2 s); `software refresh` and `self
+  update` ask again.
+
 ## 1.43.1 - 2026-11-05
 
 - `software list`: the `php` row shows the installed PHP versions, and

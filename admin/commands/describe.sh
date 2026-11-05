@@ -30,6 +30,9 @@ self_status_refresh_handler() {
   # Alerts and the load history come from the same run, so they keep working
   # while the panel is closed or down.
   python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" run
+  # Unattended upgrades change packages outside simai-env: refill the apt
+  # answer cache so the panel's software and PHP lists stay fast.
+  apt_cache_warm
   # Firewall and panel access changes nobody confirmed are undone even when
   # their timer is gone (after a reboot).
   if [[ -n "$(python3 -I "${SIMAI_ENV_ROOT}/lib/timed_change.py" expired 2>/dev/null)" || -s /etc/simai-env/firewall/blocks.json ]]; then

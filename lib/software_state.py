@@ -11,10 +11,14 @@ Usage: software_state.py OUTPUT          (OUTPUT json|human; simai-software/1)
 """
 import json
 import re
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import apt_cache  # noqa: E402
 
 NGINX = Path("/etc/nginx/sites-available")
 
@@ -88,7 +92,7 @@ def dpkg_versions(names):
 
 
 def candidates(names):
-    out = run("apt-cache", "policy", *names) if names else ""
+    out = apt_cache.run("apt-cache", "policy", *names) if names else ""
     res, pkg = {}, None
     for line in out.splitlines():
         if not line.startswith(" "):
@@ -100,7 +104,7 @@ def candidates(names):
 
 def upgradable():
     """Packages `apt-get upgrade` would change, from a simulation."""
-    out = run("apt-get", "-s", "-o", "Debug::NoLocking=1", "upgrade")
+    out = apt_cache.run("apt-get", "-s", "-o", "Debug::NoLocking=1", "upgrade")
     rows = []
     for line in out.splitlines():
         m = re.match(r"^Inst (\S+) \[([^\]]+)\] \((\S+) (.*?)\)", line)
@@ -183,12 +187,8 @@ def composer_version():
     exe = Path("/usr/local/bin/composer")
     if not exe.is_file():
         return None
-    try:
-        out = subprocess.run([str(exe), "--version", "--no-interaction"], capture_output=True, text=True,
-                             timeout=30, cwd="/", env={"COMPOSER_ALLOW_SUPERUSER": "1", "PATH": "/usr/bin:/bin",
-                                                       "HOME": "/root"}).stdout
-    except (OSError, subprocess.TimeoutExpired):
-        return "installed"
+    out = apt_cache.run(str(exe), "--version", "--no-interaction", timeout=30, watch=(str(exe),), cwd="/",
+                        env={"COMPOSER_ALLOW_SUPERUSER": "1", "PATH": "/usr/bin:/bin", "HOME": "/root"})
     m = re.search(r"(\d+\.\d+\.\d+)", out)
     return m.group(1) if m else "installed"
 

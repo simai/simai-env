@@ -290,6 +290,7 @@ self_update_restore_tree() {
 # and puts the previous toolkit back if a site that answered stops.
 self_update_handler() {
   parse_kv_args "$@"
+  rm -rf -- "${SIMAI_UPDATE_REMOTE_CACHE:-/var/lib/simai-env/cache/update-remote}"
   local target="${PARSED_ARGS[target]:-env}" check_sites="${PARSED_ARGS[check-sites]:-no}"
   case "$target" in
     panel) panel_update_handler; return $? ;;
@@ -852,13 +853,27 @@ self_update_plan_handler() {
     env)
       local url
       current=$(self_local_version)
-      url=$(self_remote_version_url 2>/dev/null || true)
-      [[ -n "$url" ]] && available=$(curl -fsSL --max-time 10 "$url" 2>/dev/null | head -c 64 | tr -d '[:space:]')
+      # The remote answer (resolving the branch, VERSION and CHANGELOG) is
+      # kept for 10 minutes per channel: the panel asks on every open.
+      # software refresh and self update forget it.
+      local kept="${SIMAI_UPDATE_REMOTE_CACHE:-/var/lib/simai-env/cache/update-remote}" channel
+      channel="$(self_update_ref)|${REPO_URL:-https://github.com/simai/simai-env}"
+      if [[ -f "${kept}/channel" && "$(cat "${kept}/channel")" == "$channel" && -f "${kept}/VERSION" \
+            && $(( $(date +%s) - $(stat -c %Y "${kept}/VERSION") )) -lt 600 ]]; then
+        available=$(cat "${kept}/VERSION")
+        cp "${kept}/CHANGELOG.md" "$changelog" 2>/dev/null || true
+      else
+        url=$(self_remote_version_url 2>/dev/null || true)
+        [[ -n "$url" ]] && available=$(curl -fsSL --max-time 10 "$url" 2>/dev/null | head -c 64 | tr -d '[:space:]')
+        if [[ "$available" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          curl -fsSL --max-time 10 "${url%/VERSION}/CHANGELOG.md" 2>/dev/null | head -c 500000 >"$changelog" || true
+          if [[ "$(id -u)" == 0 ]] && install -d -m 0700 "$kept" 2>/dev/null; then
+            printf '%s' "$channel" >"${kept}/channel"; cp "$changelog" "${kept}/CHANGELOG.md"; printf '%s' "$available" >"${kept}/VERSION"
+          fi
+        fi
+      fi
       [[ "$available" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || available=$(self_auto_update_state_get remote_version 2>/dev/null || true)
       [[ "$available" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { available=""; blocked="remote_unavailable"; }
-      if [[ -n "$available" && -n "$url" ]]; then
-        curl -fsSL --max-time 10 "${url%/VERSION}/CHANGELOG.md" 2>/dev/null | head -c 500000 >"$changelog" || true
-      fi
       notes_url="${REPO_URL:-https://github.com/simai/simai-env}/blob/main/CHANGELOG.md"
       ;;
     panel)

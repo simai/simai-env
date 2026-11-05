@@ -466,10 +466,22 @@ run_command() {
     rm -f "$captured"
   fi
   audit_log "finish" "$caller" "$section" "$name" "$args_redacted" "$rc" "$corr_id" || return 1
+  # Package changes: fill the apt answer cache now, so the next software and
+  # PHP listing (the panel's next click) is fast.
+  case "$key" in
+    software:install|software:remove|software:update|software:refresh|php:install|php:remove|php:update|php:extension|site:apache|db:pgsql-install)
+      apt_cache_warm ;;
+  esac
   if [[ -n "${SIMAI_EXECUTION_RECEIPT:-}" ]]; then
     python3 "${SIMAI_ENV_ROOT}/lib/command_contract.py" record "$SIMAI_EXECUTION_RECEIPT" "$key" "$rc" "$corr_id"
   fi
   return $rc
+}
+
+apt_cache_warm() {
+  [[ "$(id -u)" == 0 ]] || return 0
+  python3 -I "${SIMAI_ENV_ROOT}/lib/software_state.py" json >/dev/null 2>&1 || true
+  python3 -I "${SIMAI_ENV_ROOT}/lib/php_versions.py" json "$(platform_native_php_version 2>/dev/null || true)" >/dev/null 2>&1 || true
 }
 
 # Runs each site-scoped command as that site's own user (see site_utils.sh).

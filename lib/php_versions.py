@@ -9,9 +9,13 @@ Usage: php_versions.py OUTPUT NATIVE   (OUTPUT json|human; NATIVE e.g. 8.3)
 """
 import json
 import re
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import apt_cache  # noqa: E402
 
 ETC_PHP = Path("/etc/php")
 NGINX = Path("/etc/nginx/sites-available")
@@ -53,7 +57,7 @@ def packages(version):
 
 def candidates(names):
     """Installed and candidate versions from the apt index, one call."""
-    out = run("apt-cache", "policy", *names) if names else ""
+    out = apt_cache.run("apt-cache", "policy", *names) if names else ""
     res, pkg = {}, None
     for line in out.splitlines():
         if not line.startswith(" "):
@@ -77,7 +81,7 @@ def cli_default():
 
 
 def installable(have):
-    out = run("apt-cache", "pkgnames")
+    out = apt_cache.run("apt-cache", "pkgnames")
     found = {m.group(1) for m in (re.match(r"^php([0-9]+\.[0-9]+)-fpm$", l) for l in out.splitlines()) if m}
     return sorted(found - set(have), key=lambda v: tuple(map(int, v.split("."))))
 

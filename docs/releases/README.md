@@ -1,5 +1,6 @@
 # Releases
 
+- [v1.43.2](v1.43.2.md) — faster software, PHP and update plan reads.
 - [v1.43.0](v1.43.0.md) — server programs as a catalogue with install,
   update and remove.
 - [v1.42.1](v1.42.1.md) — update plan codes for the panel; the panel
