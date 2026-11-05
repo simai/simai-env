@@ -1,5 +1,7 @@
 # Releases
 
+- [v1.41.0](v1.41.0.md) — a site's own nginx directives, undone unless
+  confirmed.
 - [v1.40.0](v1.40.0.md) — file uploads, archives and extraction in the file
   manager.
 - [v1.39.0](v1.39.0.md) — the file manager: browse, edit, rename, remove and

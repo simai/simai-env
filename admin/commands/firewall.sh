@@ -40,7 +40,7 @@ timed_change_undo() {
   systemctl stop "simai-change-${id}.timer" >/dev/null 2>&1 || true
   case "$kind" in
     firewall) ufw reload >>"$LOG_FILE" 2>&1 || { error "ufw reload failed after restoring ${id}"; return 1; } ;;
-    panel_access) nginx -t >>"$LOG_FILE" 2>&1 && os_svc_reload_or_restart nginx >>"$LOG_FILE" 2>&1 || { error "nginx did not reload after restoring ${id}"; return 1; } ;;
+    panel_access|nginx_custom) nginx -t >>"$LOG_FILE" 2>&1 && os_svc_reload_or_restart nginx >>"$LOG_FILE" 2>&1 || { error "nginx did not reload after restoring ${id}"; return 1; } ;;
   esac
   printf '%s\n' "$kind"
 }

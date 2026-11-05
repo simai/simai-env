@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.41.0 - 2026-11-05
+
+- A site's own nginx directives. New `site nginx-custom --domain D
+  --content-file F [--window S]`: included at server level from
+  `/etc/nginx/simai-custom/<project>.conf`; applied only when `nginx -t`
+  accepts them and the site still answers, and undone after the window
+  unless `change confirm` keeps them. `site nginx-custom-show` shows them.
+  New sites include the file; older ones get the include on first use.
+  Removing a site removes its directives.
+- Panel gateway: `site:nginx-custom`, `site:nginx-custom-show`,
+  administrator only.
+- The local stand: `stand.sh up` starts a stopped stand instead of
+  recreating it, so the panel and its state survive.
+- Tests: `nginx_custom_e2e`.
+- Recorded panel answers: set 17.
+
 ## 1.40.0 - 2026-11-05
 
 - File manager, part 2. New `file upload` (any file up to 1 GiB, checked

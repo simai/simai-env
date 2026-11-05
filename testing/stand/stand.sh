@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=16
+FIXTURE_SET=17
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -220,6 +220,9 @@ FW
     "plan.file-remove|\"demo\"|file:remove|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\"}"
     "plan.file-extract|\"demo\"|file:extract|{\"domain\":\"demo-owned.test\",\"path\":\"public/site.zip\",\"to\":\"public\"}"
     "plan.file-archive|\"demo\"|file:archive|{\"domain\":\"demo-owned.test\",\"path\":\"public\",\"to\":\"public.zip\"}"
+    "site-nginx-custom-show.demo-php.test|null|site:nginx-custom-show|{\"domain\":\"demo-php.test\"}"
+    "plan.site-nginx-custom|null|site:nginx-custom|{\"domain\":\"demo-php.test\",\"content\":\"client_max_body_size 64m;\\n\"}"
+    "refused.owner-admin-only.site-nginx-custom-show|\"demo\"|site:nginx-custom-show|{\"domain\":\"demo-owned.test\"}"
     "refused.owner-scope.file-list|\"demo\"|file:list|{\"domain\":\"demo-php.test\"}"
     "refused.invalid-argument.file-read|null|file:read|{\"domain\":\"demo-owned.test\",\"path\":\"../etc/passwd\"}"
     "plan.ssl-dns-credentials|null|ssl:dns-credentials|{\"provider\":\"cloudflare\",\"token\":\"cfStandStandStandStandStandStand1234\"}"
@@ -364,6 +367,14 @@ PY
 case "${1:-}" in
   up)
     command -v docker >/dev/null || { echo "docker is required" >&2; exit 2; }
+    if ! running && docker container inspect "$NAME" >/dev/null 2>&1; then
+      # A stopped stand keeps its state (the panel, users, rules): start it, never recreate.
+      docker start "$NAME" >/dev/null
+      for _ in $(seq 60); do
+        in_stand systemctl is-system-running 2>/dev/null | grep -qE 'running|degraded' && break
+        sleep 2
+      done
+    fi
     if ! running; then
       docker build -q --build-arg "UBUNTU=${UBUNTU}" --build-arg "PHP=${PHP}" \
         -t "simai-e2e:${UBUNTU}" "${ROOT_DIR}/testing/containers" >/dev/null

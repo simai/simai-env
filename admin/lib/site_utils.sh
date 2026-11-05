@@ -1790,6 +1790,9 @@ remove_nginx_site() {
     backup=$(mktemp "/tmp/simai-nginx-${domain}.XXXX.conf")
     cp -p "$site_available" "$backup" >>"$LOG_FILE" 2>&1 || backup=""
   fi
+  local project="" custom=""
+  [[ -f "$site_available" ]] && project=$(sed -n 's/^# simai-project: *//p' "$site_available" | head -n1)
+  [[ "$project" =~ ^[a-z0-9-]+$ ]] && custom="${SIMAI_CUSTOM_NGINX_DIR:-/etc/nginx/simai-custom}/${project}.conf"
   rm -f "$site_enabled" "$site_available"
   if command -v nginx >/dev/null 2>&1; then
     if ! nginx -t >>"$LOG_FILE" 2>&1; then
@@ -1803,6 +1806,7 @@ remove_nginx_site() {
     fi
   os_svc_reload nginx || true
   fi
+  [[ -z "$custom" ]] || rm -f -- "$custom"  # the site's own directives go with it
   [[ -z "$backup" ]] || rm -f -- "$backup"
 }
 

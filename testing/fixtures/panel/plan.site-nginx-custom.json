@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-nginx-custom",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:nginx-custom",
+    "args": {
+      "domain": "demo-php.test",
+      "content": "(26 bytes)"
+    },
+    "target": "demo-php.test",
+    "description": "Set a site's own nginx directives (server level); undone unless confirmed (change confirm)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

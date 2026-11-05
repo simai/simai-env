@@ -355,6 +355,17 @@ site directory; links are never followed (`docs/commands/file.md`):
 - `path` is relative to the site directory: no `..`, no control
   characters, up to 1024 characters.
 
+A site's own nginx directives (1.41.0), administrator only:
+
+- `site:nginx-custom-show {domain}` (`simai-nginx-custom/1`: `domain, file,
+  present, included, content, sha256, pending_change {change_id,
+  expires_at}`).
+- `site:nginx-custom {domain, content}` (empty content removes them): a timed
+  change like `panel:access`. The job fails, with nothing changed, when nginx
+  rejects the directives or the site stops answering; otherwise its `result`
+  carries `change_id` and `expires_at`, and the change is undone after two
+  minutes unless `change:confirm {change_id}` keeps it.
+
 Server software (1.38.0), administrator only:
 
 - `software:list` (`simai-software/1`): `components [{name, package,
@@ -468,7 +479,8 @@ action, job). Everything else is refused.
   `software:install`;
 - 1.39.0: `file:list`, `file:stat`, `file:read`, `file:download`,
   `file:write`, `file:mkdir`, `file:rename`, `file:remove`;
-- 1.40.0: `file:upload`, `file:archive`, `file:extract`.
+- 1.40.0: `file:upload`, `file:archive`, `file:extract`;
+- 1.41.0: `site:nginx-custom`, `site:nginx-custom-show`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
@@ -493,8 +505,9 @@ the DNS provider status with plans for a token and a DNS certificate, and
 the PHP versions with plans for installing, removing and updating, and the
 server software with plans for a system update and an install, and an
 owner's site files with plans for a write, a removal, an archive and an
-extraction (downloads and uploads are bytes and are not recorded).
-Set 16 since 1.40.0. The panel's fixture driver replays them, and
+extraction (downloads and uploads are bytes and are not recorded), and a
+site's own nginx directives with a plan to set them.
+Set 17 since 1.41.0. The panel's fixture driver replays them, and
 both sides test against the same files: simai-env checks that it still
 answers in this shape, `larena/env` checks that it can display it. Re-record
 after a change of the answer shape, never edit the files by hand.

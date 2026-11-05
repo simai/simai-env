@@ -484,6 +484,36 @@ Checks (non-destructive):
 
 Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
 
+## nginx-custom
+Set a site's own nginx directives, included at server level of the site's
+virtual host from `/etc/nginx/simai-custom/<project>.conf` (both the HTTP
+and the HTTPS server). Use it for what the profile does not cover: extra
+`location` blocks, headers, `client_max_body_size`, rewrites.
+
+Options:
+- `--domain <domain>` (required)
+- `--content-file <file>` (required): the directives, text up to 64 KB; an
+  empty file removes them
+- `--window <seconds>` (30-600, default 120)
+- `--confirm yes`
+
+Behavior:
+- the virtual host and the directives file are saved first; a site rendered
+  before 1.41.0 gets the include on first use
+- `nginx -t` must accept the directives, otherwise nothing changes and the
+  nginx error is shown
+- nginx reloads; if the site answered before and no longer does, the change
+  is undone at once
+- otherwise it is a timed change: it is undone after `--window` seconds
+  unless `simai-admin.sh change confirm --id <id> --confirm yes` keeps it, so
+  a mistake that locks you out repairs itself
+- removing the site removes its directives
+
+## nginx-custom-show
+Show a site's own directives. `--output json` answers `simai-nginx-custom/1`:
+`domain, file, present, included, content, sha256, pending_change
+{change_id, expires_at}`.
+
 ## Per-site PHP ini overrides
 - Overrides are stored at `/etc/simai-env/sites/<domain>/php.ini` and applied as a managed pool block `simai-site-ini-*` (profile-managed `simai-profile-ini-*` stays last and has higher priority).
 - Commands:
