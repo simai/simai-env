@@ -414,6 +414,12 @@ Security center (1.45.0), administrator only:
   `security:level {set: basic|enhanced|strict}` (actions with plans);
   `security:status` has `level {current, applied_at}` and the check
   `web_protect`.
+- 1.48.0: `security:geo {mode: off|deny|allow, countries: "RU,KZ", ports:
+  web|all, keep}` (action with a plan; `allow` and `ports: all` are timed
+  changes: the job `result` has `change_id` and `expires_at`, confirmed with
+  `change:confirm`), `security:geo-status` (read, `simai-geo/1`),
+  `security:geo-update` (action), `security:geo-lookup {ip}` (read).
+  `security:status` has `geo {mode, countries, ports}`.
 
 Server software (1.38.0), administrator only:
 
@@ -546,7 +552,9 @@ action, job). Everything else is refused.
   `self:firewall-ensure`;
 - 1.46.0: `security:files-scan`, `security:files`, `security:quarantine`,
   `security:quarantine-list`, `security:quarantine-restore`;
-- 1.47.0: `security:web-protect`, `security:level`.
+- 1.47.0: `security:web-protect`, `security:level`;
+- 1.48.0: `security:geo`, `security:geo-status`, `security:geo-update`,
+  `security:geo-lookup`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

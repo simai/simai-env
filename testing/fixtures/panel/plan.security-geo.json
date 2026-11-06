@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.security-geo",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "security:geo",
+    "args": {
+      "mode": "deny",
+      "countries": "CN,KP"
+    },
+    "target": "host",
+    "description": "Block or allow countries: off, deny or allow a list, on web ports or all",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

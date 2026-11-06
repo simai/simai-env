@@ -118,6 +118,33 @@ jails `nginx-limit-req` and `nginx-botsearch` ban addresses that keep hitting
 the limit or probing for admin pages (`/etc/fail2ban/jail.d/simai-web.conf`).
 `--enabled no` removes both.
 
+## geo, geo-status, geo-update, geo-lookup
+```bash
+sudo /root/simai-env/simai-admin.sh security geo --mode deny --countries CN,KP --confirm yes
+sudo /root/simai-env/simai-admin.sh security geo --mode allow --countries RU,KZ,BY --ports web --confirm yes
+sudo /root/simai-env/simai-admin.sh change confirm --id <change_id> --confirm yes
+sudo /root/simai-env/simai-admin.sh security geo-status
+sudo /root/simai-env/simai-admin.sh security geo-lookup --ip 203.0.113.7
+sudo /root/simai-env/simai-admin.sh security geo --mode off --confirm yes
+```
+Country blocking drops connections in the kernel (nftables, its own table
+`inet simai_geo`, before ufw). `deny` drops the listed countries; `allow`
+accepts only them. `--ports web` (default) covers the sites and the panel
+(TCP 80/443, UDP 443); `--ports all` covers every port, SSH included. Never
+dropped: loopback, private networks, this server's own addresses, the
+address of the SSH session that runs the command, and `--keep` addresses.
+`allow` and `--ports all` could lock you out, so they are timed changes:
+undone after `--window` seconds (default 120) unless `change confirm` keeps
+them. The rules are loaded again at boot (`simai-geo.service`).
+
+The country data is DB-IP Lite (`https://db-ip.com`, CC BY 4.0; shown as
+`attribution` in `geo-status`), downloaded on first use into
+`/var/lib/simai-env/geo` and refreshed monthly while blocking is on
+(`geo-update` does it now). `geo-status` (`simai-geo/1`): `mode, countries,
+ports, active, dropped_packets, database {date, downloaded_at, rows,
+present}, ranges {v4, v6}, attribution`. `geo-lookup` (`simai-geo-lookup/1`):
+`ip, country`.
+
 ## level
 ```bash
 sudo /root/simai-env/simai-admin.sh security level --set enhanced

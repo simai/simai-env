@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=24
+FIXTURE_SET=25
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -221,6 +221,8 @@ FW
     "security-files|null|security:files|{}"
     "security-quarantine-list|null|security:quarantine-list|{}"
     "plan.security-level|null|security:level|{\"set\":\"enhanced\"}"
+    "security-geo-status|null|security:geo-status|{}"
+    "plan.security-geo|null|security:geo|{\"mode\":\"deny\",\"countries\":\"CN,KP\"}"
     "file-list.demo-owned.test|\"demo\"|file:list|{\"domain\":\"demo-owned.test\"}"
     "file-stat.demo-owned.test|\"demo\"|file:stat|{\"domain\":\"demo-owned.test\"}"
     "plan.file-write|\"demo\"|file:write|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\",\"content\":\"hello\\n\",\"expect-sha256\":\"new\"}"

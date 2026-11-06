@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.48.0 - 2026-11-06
+
+- Country blocking. `security geo --mode deny|allow --countries CN,KP`
+  drops connections from the listed countries, or from everyone else, in
+  the kernel (nftables, before ufw), on web ports or every port. This
+  server, private networks and the administrator's own address are never
+  dropped; `allow` and every-port rules are undone unless confirmed, so a
+  mistake cannot lock anyone out. Rules survive reboots.
+- The country data is DB-IP Lite (CC BY 4.0), downloaded on first use and
+  refreshed monthly; `security geo-status`, `geo-update`, `geo-lookup --ip`.
+- Panel gateway: `security:geo`, `security:geo-status`,
+  `security:geo-update`, `security:geo-lookup` (administrators).
+
 ## 1.47.0 - 2026-11-06
 
 - Protection from floods and attack scanners. `security web-protect` limits

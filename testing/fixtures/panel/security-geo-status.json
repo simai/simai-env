@@ -1,0 +1,27 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-security-geo-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-geo/1",
+    "mode": "off",
+    "countries": [],
+    "ports": "web",
+    "active": false,
+    "dropped_packets": null,
+    "database": {
+      "date": null,
+      "downloaded_at": null,
+      "rows": null,
+      "present": false
+    },
+    "ranges": {
+      "v4": 0,
+      "v6": 0
+    },
+    "attribution": "IP to country data by DB-IP (https://db-ip.com), CC BY 4.0"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

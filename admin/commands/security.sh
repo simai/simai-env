@@ -48,6 +48,13 @@ security_refresh_background() {
     exec 7>"${SIMAI_SECURITY_STATE}/.lock"
     flock -n 7 || exit 0
     security_audit refresh auto >/dev/null 2>&1 || true
+    # The country database once a month while country blocking is on.
+    local geo_mode geo_at
+    geo_mode=$(security_geo_mode)
+    geo_at=$(stat -c %Y "$(security_geo_db)" 2>/dev/null || echo 0)
+    if [[ -n "$geo_mode" && "$geo_mode" != off ]] && (( $(date +%s) - geo_at > 35 * 86400 )); then
+      SIMAI_ADMIN_MENU=0 "${SIMAI_ENV_ROOT}/simai-admin.sh" security geo-update --confirm yes >/dev/null 2>&1 || true
+    fi
     # Site files once a day, at night (02:00-05:59), at the lowest priority.
     local last hour
     hour=$(date +%H)
@@ -379,6 +386,171 @@ security_fix_handler() {
   ui_result_table "Fixed|${name}" "Done|${plan}"
 }
 
+# Country blocking: nftables rules from the DB-IP Lite database
+# (lib/geo_block.py). A change that could lock the administrator out
+# (allow mode, or every port) is a timed change: undone unless confirmed.
+SIMAI_GEO_DIR="${SIMAI_GEO_DIR:-/etc/simai-env/geo}"
+SIMAI_GEO_DATA="${SIMAI_GEO_DATA:-/var/lib/simai-env/geo}"
+SIMAI_GEO_UNIT="/etc/systemd/system/simai-geo.service"
+
+security_geo_db() { echo "${SIMAI_GEO_DATA}/dbip-country-lite.csv.gz"; }
+
+security_geo_download() {
+  local month url tmp info
+  install -d -m 0755 "$SIMAI_GEO_DATA"
+  tmp="${SIMAI_GEO_DATA}/.download.csv.gz"
+  for month in "$(date -u +%Y-%m)" "$(date -u -d "$(date -u +%Y-%m-15) -1 month" +%Y-%m)"; do
+    url="${SIMAI_GEO_DB_URL:-https://download.db-ip.com/free/dbip-country-lite-${month}.csv.gz}"
+    curl -fsSL --max-time 300 --retry 2 -o "$tmp" "$url" 2>>"$LOG_FILE" || continue
+    if info=$(python3 -I "${SIMAI_ENV_ROOT}/lib/geo_block.py" check-db "$tmp" 2>>"$LOG_FILE") \
+        && python3 -I -c 'import json,sys; d=json.loads(sys.argv[1]); sys.exit(0 if d["rows"] >= int(sys.argv[2]) else 1)' "$info" "${SIMAI_GEO_MIN_ROWS:-100000}"; then
+      mv -f "$tmp" "$(security_geo_db)"
+      printf 'MONTH=%s\nAT=%s\nROWS=%s\n' "$month" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        "$(python3 -I -c 'import json,sys; print(json.loads(sys.argv[1])["rows"])' "$info")" >"${SIMAI_GEO_DATA}/dbip-country-lite.csv.meta"
+      return 0
+    fi
+    [[ -z "${SIMAI_GEO_DB_URL:-}" ]] || break
+  done
+  rm -f -- "$tmp"
+  error "Cannot download the country database (db-ip.com)"
+  return 1
+}
+
+security_geo_mode() { sed -n 's/^MODE=//p' "${SIMAI_GEO_DIR}/geo.env" 2>/dev/null | tail -n1; }
+
+# Loads the rules (or removes them when off) and keeps them across reboots.
+security_geo_load() {
+  local mode
+  mode=$(security_geo_mode)
+  if [[ -z "$mode" || "$mode" == off || ! -s "${SIMAI_GEO_DIR}/rules.nft" ]]; then
+    nft delete table inet simai_geo >/dev/null 2>&1 || true
+    systemctl disable simai-geo.service >/dev/null 2>&1 || true
+    return 0
+  fi
+  nft -f "${SIMAI_GEO_DIR}/rules.nft" || return 1
+  if [[ ! -f "$SIMAI_GEO_UNIT" ]]; then
+    cat >"$SIMAI_GEO_UNIT" <<UNIT
+[Unit]
+Description=simai-env country blocking rules
+After=network-pre.target
+Before=network.target
+ConditionPathExists=${SIMAI_GEO_DIR}/rules.nft
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f ${SIMAI_GEO_DIR}/rules.nft
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+  systemctl enable simai-geo.service >/dev/null 2>&1 || true
+}
+
+# Writes geo.env and rules.nft for a mode; prints the build summary.
+security_geo_write() {  # mode countries ports keep
+  install -d -m 0700 "$SIMAI_GEO_DIR"
+  printf 'MODE=%s\nCOUNTRIES=%s\nPORTS=%s\n' "$1" "$2" "$3" >"${SIMAI_GEO_DIR}/geo.env.new"
+  local built
+  built=$(python3 -I "${SIMAI_ENV_ROOT}/lib/geo_block.py" build "${SIMAI_GEO_DIR}/geo.env.new" "$(security_geo_db)" \
+    "${SIMAI_GEO_DIR}/rules.nft.new" "$4") || return 1
+  nft -c -f "${SIMAI_GEO_DIR}/rules.nft.new" >>"$LOG_FILE" 2>&1 || { error "nftables rejected the country rules"; return 1; }
+  python3 -I -c 'import json,sys; d=json.loads(sys.argv[1]); print("RANGES_V4=%s\nRANGES_V6=%s" % (d["ranges_v4"], d["ranges_v6"]))' "$built" \
+    >>"${SIMAI_GEO_DIR}/geo.env.new" 2>/dev/null || true
+  mv -f "${SIMAI_GEO_DIR}/geo.env.new" "${SIMAI_GEO_DIR}/geo.env"
+  mv -f "${SIMAI_GEO_DIR}/rules.nft.new" "${SIMAI_GEO_DIR}/rules.nft"
+  printf '%s\n' "$built"
+}
+
+security_geo_handler() {
+  parse_kv_args "$@"
+  require_args "mode" || return 1
+  local mode="${PARSED_ARGS[mode]}" countries="${PARSED_ARGS[countries]:-}" ports="${PARSED_ARGS[ports]:-web}"
+  local window="${PARSED_ARGS[window]:-120}" confirm="${PARSED_ARGS[confirm]:-no}" keep="${PARSED_ARGS[keep]:-}"
+  [[ "$mode" =~ ^(off|deny|allow)$ ]] || { error "--mode must be off, deny or allow"; return 1; }
+  [[ "$ports" =~ ^(web|all)$ ]] || { error "--ports must be web or all"; return 1; }
+  countries="${countries^^}"; countries="${countries// /}"
+  if [[ "$mode" != off ]]; then
+    [[ "$countries" =~ ^[A-Z]{2}(,[A-Z]{2}){0,99}$ ]] || { error "--countries must be country codes like RU,KZ (ISO 3166)"; return 1; }
+  fi
+  [[ -z "$keep" || "$keep" =~ ^[0-9A-Fa-f:./]{2,49}(,[0-9A-Fa-f:./]{2,49}){0,19}$ ]] || { error "--keep must be addresses or networks, comma separated"; return 1; }
+  window=$(firewall_window "$window") || return 1
+  # The administrator's own SSH address is never dropped.
+  local client="${SSH_CLIENT:-}"; client="${client%% *}"
+  [[ -n "$client" ]] && keep="${keep:+${keep},}${client}"
+  local risky=no
+  [[ "$mode" == allow || ( "$mode" != off && "$ports" == all ) ]] && risky=yes
+  if [[ "${confirm,,}" != yes ]]; then
+    case "$mode" in
+      off) echo "Plan: turn country blocking off" ;;
+      deny) echo "Plan: drop connections from ${countries} to $([[ $ports == web ]] && echo "the sites and the panel (ports 80, 443)" || echo "every port, SSH included")" ;;
+      allow) echo "Plan: accept $([[ $ports == web ]] && echo "web connections (ports 80, 443)" || echo "connections to every port, SSH included,") only from ${countries}; drop the rest of the world" ;;
+    esac
+    [[ "$mode" == off ]] || echo "      never dropped: this server, private networks${client:+, your address ${client}}${PARSED_ARGS[keep]:+, ${PARSED_ARGS[keep]}}"
+    [[ "$risky" == yes ]] && echo "      undone in ${window} seconds unless confirmed (change confirm), so a mistake cannot lock you out"
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  if ! command -v nft >/dev/null 2>&1; then
+    run_long "Installing nftables" env DEBIAN_FRONTEND=noninteractive apt-get install -y nftables || return 1
+  fi
+  if [[ "$mode" != off && ! -s "$(security_geo_db)" ]]; then
+    info "Downloading the country database (DB-IP Lite)"
+    security_geo_download || return 1
+  fi
+  local begun="" id="" expires="" built
+  if [[ "$risky" == yes ]]; then
+    begun=$(timed_change_begin geo "" "$window" "country blocking ${mode} ${countries} on ${ports} ports" \
+      "${SIMAI_GEO_DIR}/geo.env" "${SIMAI_GEO_DIR}/rules.nft") || return 1
+    read -r id expires <<<"$begun"
+  fi
+  if ! built=$(security_geo_write "$mode" "$countries" "$ports" "$keep") || ! security_geo_load; then
+    [[ -n "$id" ]] && timed_change_undo "$id" >/dev/null 2>&1
+    rm -f -- "${SIMAI_GEO_DIR}/geo.env.new" "${SIMAI_GEO_DIR}/rules.nft.new"
+    error "Country blocking was not changed"
+    return 1
+  fi
+  security_audit refresh >/dev/null 2>&1 || true
+  if [[ -n "$id" ]]; then
+    timed_change_arm "$id" "$expires" "$window" geo
+  else
+    ui_result_table "Country blocking|${mode}" "Countries|${countries:-none}" "Ports|${ports}" \
+      "Ranges|$(python3 -I -c 'import json,sys; d=json.loads(sys.argv[1]); print(d["ranges_v4"] + d["ranges_v6"])' "$built" 2>/dev/null)"
+  fi
+}
+
+security_geo_status_handler() {
+  parse_kv_args "$@"
+  python3 -I "${SIMAI_ENV_ROOT}/lib/geo_block.py" status "${SIMAI_GEO_DIR}/geo.env" "$(security_geo_db)" "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
+security_geo_update_handler() {
+  parse_kv_args "$@"
+  security_geo_download || return 1
+  local mode countries ports
+  mode=$(security_geo_mode)
+  if [[ -n "$mode" && "$mode" != off ]]; then
+    countries=$(sed -n 's/^COUNTRIES=//p' "${SIMAI_GEO_DIR}/geo.env" | tail -n1)
+    ports=$(sed -n 's/^PORTS=//p' "${SIMAI_GEO_DIR}/geo.env" | tail -n1)
+    security_geo_write "$mode" "$countries" "${ports:-web}" "" >/dev/null && security_geo_load || { error "The new database could not be loaded; the old rules stay"; return 1; }
+  fi
+  ui_result_table "Country database|$(sed -n 's/^MONTH=//p' "${SIMAI_GEO_DATA}/dbip-country-lite.csv.meta")"
+}
+
+security_geo_lookup_handler() {
+  parse_kv_args "$@"
+  require_args "ip" || return 1
+  [[ "${PARSED_ARGS[ip]}" =~ ^[0-9A-Fa-f:.]{2,45}$ ]] || { error "--ip must be an IP address"; return 1; }
+  [[ -s "$(security_geo_db)" ]] || security_geo_download || return 1
+  python3 -I "${SIMAI_ENV_ROOT}/lib/geo_block.py" lookup "$(security_geo_db)" "${PARSED_ARGS[ip]}" "${SIMAI_COMMAND_OUTPUT:-human}"
+}
+
+register_cmd "security" "geo" "Block or allow countries: off, deny or allow a list, on web ports or all" "security_geo_handler" "mode" "countries= ports= keep= window= confirm=" "tier:advanced plan:handler"
+register_cmd "security" "geo-status" "Show country blocking: mode, countries, database and dropped packets" "security_geo_status_handler" "" "" "tier:advanced effects:read"
+register_cmd "security" "geo-update" "Download the newest country database and reload the rules (monthly by itself)" "security_geo_update_handler" "" "" "tier:advanced"
+register_cmd "security" "geo-lookup" "Show the country of an IP address" "security_geo_lookup_handler" "ip" "" "tier:advanced effects:read"
 register_cmd "security" "status" "Security check of the server and sites: score, problems and how to fix them" "security_status_handler" "" "" "tier:advanced effects:read"
 register_cmd "security" "scan" "Ask the vulnerability databases about site components now (daily by itself)" "security_scan_handler" "" "" "tier:advanced lock:none"
 register_cmd "security" "files-scan" "Check site files for web shells and malware now (nightly by itself)" "security_files_scan_handler" "" "domain=" "tier:advanced lock:none"

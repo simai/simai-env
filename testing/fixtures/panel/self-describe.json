@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.47.0",
+      "version": "1.48.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -166,9 +166,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261106001605",
-          "previous": "20261106001604-initial",
-          "deployed_at": "2026-11-06T00:16:05Z",
+          "current": "20261106003429",
+          "previous": "20261106003428-initial",
+          "deployed_at": "2026-11-06T00:34:29Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -261,6 +261,10 @@
         "security:files",
         "security:files-scan",
         "security:fix",
+        "security:geo",
+        "security:geo-lookup",
+        "security:geo-status",
+        "security:geo-update",
         "security:level",
         "security:quarantine",
         "security:quarantine-list",

@@ -61,6 +61,11 @@ BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 SECURITY_FIX = re.compile(r"^(antivirus|auto_updates|fail2ban|ssh_password)$")
+GEO_MODE = re.compile(r"^(off|deny|allow)$")
+GEO_PORTS = re.compile(r"^(web|all)$")
+COUNTRIES = re.compile(r"^[A-Za-z]{2}(,[A-Za-z]{2}){0,99}$")
+ADDRESSES_LIST = re.compile(r"^[0-9A-Fa-f:./]{2,49}(,[0-9A-Fa-f:./]{2,49}){0,19}$")
+IP_ADDRESS = re.compile(r"^[0-9A-Fa-f:.]{2,45}$")
 SECURITY_LEVEL = re.compile(r"^(basic|enhanced|strict)$")
 WEB_RATE = re.compile(r"^(?:[2-9]|[1-9][0-9]{1,2}|1000)$")
 WEB_BURST = re.compile(r"^(?:[1-9][0-9]{1,3}|10000)$")
@@ -257,6 +262,11 @@ ALLOW = {
     "security:files-scan": ({"domain": DOMAIN}, set(), "action"),
     "security:web-protect": ({"enabled": YES_NO, "rate": WEB_RATE, "burst": WEB_BURST}, {"enabled"}, "action"),
     "security:level": ({"set": SECURITY_LEVEL}, {"set"}, "action"),
+    "security:geo": ({"mode": GEO_MODE, "countries": COUNTRIES, "ports": GEO_PORTS, "keep": ADDRESSES_LIST},
+                     {"mode"}, "action"),
+    "security:geo-status": ({}, set(), "read"),
+    "security:geo-update": ({}, set(), "action"),
+    "security:geo-lookup": ({"ip": IP_ADDRESS}, {"ip"}, "read"),
     "security:files": ({}, set(), "read"),
     "security:quarantine": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
     "security:quarantine-list": ({}, set(), "read"),
@@ -291,7 +301,8 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "backup:storage-copies", "backup:storage-fetch",
               "security:status", "security:scan", "security:fix", "self:firewall-ensure",
               "security:files-scan", "security:files", "security:quarantine", "security:quarantine-list",
-              "security:quarantine-restore", "security:web-protect", "security:level"}
+              "security:quarantine-restore", "security:web-protect", "security:level",
+              "security:geo", "security:geo-status", "security:geo-update", "security:geo-lookup"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

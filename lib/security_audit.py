@@ -209,6 +209,16 @@ def security_env() -> dict:
         return {}
 
 
+def geo_summary() -> dict:
+    try:
+        e = dict(l.split("=", 1) for l in Path(os.environ.get("SIMAI_GEO_DIR", "/etc/simai-env/geo"), "geo.env")
+                 .read_text().splitlines() if "=" in l)
+    except OSError:
+        e = {}
+    return {"mode": e.get("MODE", "off"), "countries": [c for c in e.get("COUNTRIES", "").split(",") if c],
+            "ports": e.get("PORTS", "web")}
+
+
 def check_web() -> list[dict]:
     on = Path(os.environ.get("SIMAI_WEB_PROTECT_CONF", "/etc/nginx/conf.d/simai-protect.conf")).is_file()
     return [check("web_protect", "network", "Protection from floods and attack scanners", "ok" if on else "warn", "low",
@@ -542,6 +552,7 @@ def report(access_file: str, online_mode: str = "") -> dict:
                         "unknown": sum(c["status"] == "unknown" for c in checks)},
             "recommendations": [c["id"] for c in problems],
             "level": {"current": security_env().get("LEVEL"), "applied_at": security_env().get("LEVEL_AT")},
+            "geo": geo_summary(),
             "online": {"enabled": enabled, "checked_at": online.get("checked_at"), "error": online.get("error")},
             "checks": checks,
             "vulnerabilities": {d: s.get("vulnerabilities") or [] for d, s in (online.get("sites") or {}).items()
