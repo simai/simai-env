@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.security-level",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "security:level",
+    "args": {
+      "set": "enhanced"
+    },
+    "target": "host",
+    "description": "Apply a protection level: basic, enhanced or strict",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

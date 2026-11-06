@@ -5,12 +5,12 @@
   "kind": "result",
   "data": {
     "schema": "simai-security/1",
-    "checked_at": "2026-11-05T23:59:26Z",
-    "score": 47,
+    "checked_at": "2026-11-06T00:17:01Z",
+    "score": 45,
     "grade": "risk",
     "summary": {
       "risk": 1,
-      "warn": 11,
+      "warn": 12,
       "ok": 4,
       "unknown": 1
     },
@@ -25,12 +25,17 @@
       "https:demo-static.test",
       "backup_storage",
       "antivirus",
+      "web_protect",
       "backup_verify:demo-owned.test",
       "backup_verify:demo-static.test"
     ],
+    "level": {
+      "current": null,
+      "applied_at": null
+    },
     "online": {
       "enabled": true,
-      "checked_at": "2026-11-05T23:58:35Z",
+      "checked_at": "2026-11-06T00:16:09Z",
       "error": null
     },
     "checks": [
@@ -144,6 +149,23 @@
         "domain": null,
         "fix": null,
         "how": null
+      },
+      {
+        "id": "web_protect",
+        "check": "web_protect",
+        "area": "network",
+        "title": "Protection from floods and attack scanners",
+        "status": "warn",
+        "severity": "low",
+        "detail": "one address may send any number of requests",
+        "domain": null,
+        "fix": {
+          "command": "security:web-protect",
+          "args": {
+            "enabled": "yes"
+          }
+        },
+        "how": "Limit requests per address on all sites (bursts still pass)."
       },
       {
         "id": "https:demo-owned.test",

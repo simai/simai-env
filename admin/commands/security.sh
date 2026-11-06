@@ -8,6 +8,9 @@ set -euo pipefail
 
 SIMAI_SECURITY_STATE="${SIMAI_SECURITY_STATE:-/var/lib/simai-env/security}"
 SIMAI_FAIL2BAN_JAIL="${SIMAI_FAIL2BAN_JAIL:-/etc/fail2ban/jail.d/simai.conf}"
+SIMAI_FAIL2BAN_WEB_JAIL="${SIMAI_FAIL2BAN_WEB_JAIL:-/etc/fail2ban/jail.d/simai-web.conf}"
+SIMAI_WEB_PROTECT_CONF="${SIMAI_WEB_PROTECT_CONF:-/etc/nginx/conf.d/simai-protect.conf}"
+SIMAI_SECURITY_ENV="${SIMAI_SECURITY_ENV:-/etc/simai-env/security.env}"
 
 security_panel_access_file() {
   local domain
@@ -135,6 +138,168 @@ security_fix_antivirus() {
   apt_cache_warm
 }
 
+# Web protection for every site and the panel, at the nginx http level:
+# requests per address are limited (short bursts pass), known attack
+# scanners are slowed to a few requests a minute, and this server's own
+# addresses are never limited. Fail2ban then bans addresses that keep
+# hitting the limit or probing for admin pages.
+security_web_protect_write() {  # rate burst
+  local rate="$1" burst="$2"
+  cat <<CONF
+# simai-env: web protection (security center); managed by security web-protect
+geo \$simai_limit_exempt {
+    default 0;
+    127.0.0.0/8 1;
+    ::1 1;
+}
+map \$http_user_agent \$simai_bad_bot {
+    default 0;
+    "~*(sqlmap|nikto|nmap|masscan|zgrab|nuclei|wpscan|joomscan|acunetix|netsparker|dirbuster|gobuster|feroxbuster|ffuf|whatweb|httrack|libwww-perl|morfeus|zmeu|jorgee|havij|w3af|openvas)" 1;
+}
+map "\$simai_limit_exempt:\$simai_bad_bot" \$simai_flood_key {
+    default \$binary_remote_addr;
+    "~^1:" "";
+}
+map "\$simai_limit_exempt:\$simai_bad_bot" \$simai_bot_key {
+    default "";
+    "0:1" \$binary_remote_addr;
+}
+limit_req_zone \$simai_flood_key zone=simai_flood:20m rate=${rate}r/s;
+limit_req_zone \$simai_bot_key zone=simai_bots:5m rate=6r/m;
+limit_req zone=simai_flood burst=${burst} nodelay;
+limit_req zone=simai_bots burst=3 nodelay;
+limit_req_status 429;
+limit_req_log_level warn;
+CONF
+}
+
+security_fail2ban_web_write() {  # bantime maxretry
+  local jail
+  echo "# simai-env: ban addresses that keep hitting the request limit or probe for admin pages (security web-protect)"
+  for jail in nginx-limit-req nginx-botsearch; do
+    printf '\n[%s]\nenabled = true\nbackend = auto\nport = http,https\nlogpath = /var/log/nginx/*error.log\nfindtime = 10m\nmaxretry = %s\nbantime = %s\n' \
+      "$jail" "$2" "$1"
+  done
+}
+
+security_web_protect_apply() {  # enabled [rate burst bantime maxretry]
+  local enabled="$1" rate="${2:-30}" burst="${3:-300}" bantime="${4:-1h}" maxretry="${5:-10}" saved=""
+  if [[ -f "$SIMAI_WEB_PROTECT_CONF" ]]; then
+    saved=$(mktemp); cp -p "$SIMAI_WEB_PROTECT_CONF" "$saved"
+  fi
+  if [[ "$enabled" == yes ]]; then
+    security_web_protect_write "$rate" "$burst" >"$SIMAI_WEB_PROTECT_CONF"
+  else
+    rm -f -- "$SIMAI_WEB_PROTECT_CONF"
+  fi
+  if ! nginx -t >>"$LOG_FILE" 2>&1; then
+    if [[ -n "$saved" ]]; then mv -f "$saved" "$SIMAI_WEB_PROTECT_CONF"; else rm -f -- "$SIMAI_WEB_PROTECT_CONF"; fi
+    error "nginx rejected the web protection; nothing changed"
+    return 1
+  fi
+  rm -f -- "$saved"
+  os_svc_reload nginx >>"$LOG_FILE" 2>&1 || true
+  if [[ "$enabled" == yes ]] && command -v fail2ban-client >/dev/null 2>&1; then
+    security_fail2ban_web_write "$bantime" "$maxretry" >"$SIMAI_FAIL2BAN_WEB_JAIL"
+  else
+    rm -f -- "$SIMAI_FAIL2BAN_WEB_JAIL"
+  fi
+  if command -v fail2ban-client >/dev/null 2>&1; then
+    os_svc_restart fail2ban >>"$LOG_FILE" 2>&1 || true
+  fi
+}
+
+security_env_set() {  # key value
+  install -d -m 0755 "$(dirname "$SIMAI_SECURITY_ENV")"
+  touch "$SIMAI_SECURITY_ENV"
+  chmod 0644 "$SIMAI_SECURITY_ENV"
+  sed -i "/^${1}=/d" "$SIMAI_SECURITY_ENV"
+  printf '%s=%s\n' "$1" "$2" >>"$SIMAI_SECURITY_ENV"
+}
+
+security_web_protect_handler() {
+  parse_kv_args "$@"
+  require_args "enabled" || return 1
+  local enabled="${PARSED_ARGS[enabled]}" rate="${PARSED_ARGS[rate]:-30}" burst="${PARSED_ARGS[burst]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
+  [[ "$enabled" =~ ^(yes|no)$ ]] || { error "--enabled must be yes or no"; return 1; }
+  if [[ ! "$rate" =~ ^[0-9]+$ ]] || (( rate < 2 || rate > 1000 )); then error "--rate must be 2-1000 requests a second"; return 1; fi
+  burst="${burst:-$(( rate * 10 ))}"
+  if [[ ! "$burst" =~ ^[0-9]+$ ]] || (( burst < 10 || burst > 10000 )); then error "--burst must be 10-10000"; return 1; fi
+  if [[ "${confirm,,}" != yes ]]; then
+    if [[ "$enabled" == yes ]]; then
+      echo "Plan: limit every address to ${rate} requests a second (bursts of ${burst} pass) on all sites and the panel; slow known attack scanners to 6 a minute"
+      echo "      this server's own addresses are never limited; with Fail2ban, addresses that keep hitting the limit or probe for admin pages are banned for an hour"
+    else
+      echo "Plan: remove the web request limits and the Fail2ban web jails"
+    fi
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  security_web_protect_apply "$enabled" "$rate" "$burst" || return 1
+  security_env_set WEB_PROTECT "$enabled"
+  security_audit refresh >/dev/null 2>&1 || true
+  ui_result_table "Web protection|${enabled}" "Limit|$([[ $enabled == yes ]] && echo "${rate}/s per address, burst ${burst}" || echo none)"
+}
+
+# Protection levels: a bundle of fixes for people who do not want to pick.
+security_level_handler() {
+  parse_kv_args "$@"
+  require_args "set" || return 1
+  local level="${PARSED_ARGS[set]}" confirm="${PARSED_ARGS[confirm]:-no}" rate=0 burst=0 bantime=1h maxretry=10
+  [[ "$level" =~ ^(basic|enhanced|strict)$ ]] || { error "--set must be basic, enhanced or strict"; return 1; }
+  case "$level" in
+    enhanced) rate=30; burst=300 ;;
+    strict) rate=10; burst=100; bantime=1d; maxretry=5 ;;
+  esac
+  local keys=yes
+  security_ssh_keys_present || keys=no
+  if [[ "${confirm,,}" != yes ]]; then
+    echo "Plan: protection level ${level}:"
+    echo "  - firewall on: only SSH, HTTP and HTTPS are open"
+    echo "  - security updates installed every day by themselves"
+    echo "  - Fail2ban bans addresses that guess SSH passwords"
+    if [[ "$level" == basic ]]; then
+      echo "  - web request limits off"
+    else
+      echo "  - web requests limited to ${rate} a second per address (bursts of ${burst}); attack scanners slowed; Fail2ban bans offenders for ${bantime}"
+      echo "  - ClamAV antivirus for the nightly file check"
+      if [[ "$keys" == yes ]]; then
+        echo "  - SSH with keys only (root by key only)"
+      else
+        echo "  - SSH passwords stay on: no SSH key is set yet (add one, then apply the level again)"
+      fi
+    fi
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  local -a applied=() skipped=()
+  if ! ufw status 2>/dev/null | grep -q 'Status: active'; then
+    SIMAI_ADMIN_MENU=0 self_firewall_ensure_handler --confirm yes >>"$LOG_FILE" 2>&1 || { error "The firewall could not be turned on"; return 1; }
+  fi
+  applied+=(firewall)
+  security_fix_auto_updates || return 1; applied+=(auto_updates)
+  security_fix_fail2ban || return 1; applied+=(fail2ban)
+  if [[ "$level" == basic ]]; then
+    security_web_protect_apply no || return 1
+    security_env_set WEB_PROTECT no
+  else
+    security_web_protect_apply yes "$rate" "$burst" "$bantime" "$maxretry" || return 1
+    security_env_set WEB_PROTECT yes; applied+=(web_protect)
+    if ! command -v clamscan >/dev/null 2>&1; then security_fix_antivirus || return 1; fi
+    applied+=(antivirus)
+    if [[ "$keys" == yes ]]; then
+      self_ssh_hardening_ensure_handler --confirm yes >>"$LOG_FILE" 2>&1 || { error "sshd rejected the change"; return 1; }
+      applied+=(ssh_password)
+    else
+      skipped+=(ssh_password)
+    fi
+  fi
+  security_env_set LEVEL "$level"
+  security_env_set LEVEL_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  security_audit refresh >/dev/null 2>&1 || true
+  ui_result_table "Level|${level}" "Applied|${applied[*]}" "Skipped|${skipped[*]:-none}"
+}
+
 security_ssh_keys_present() {
   local f
   for f in /root/.ssh/authorized_keys /home/*/.ssh/authorized_keys; do
@@ -221,4 +386,6 @@ register_cmd "security" "files" "Show suspicious site files found by the last fi
 register_cmd "security" "quarantine" "Move a suspicious file of a site into the quarantine" "security_quarantine_handler" "domain path" "confirm=" "tier:advanced plan:handler"
 register_cmd "security" "quarantine-list" "List quarantined files" "security_quarantine_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "security" "quarantine-restore" "Put a quarantined file back" "security_quarantine_restore_handler" "id" "confirm=" "tier:advanced plan:handler"
+register_cmd "security" "web-protect" "Limit requests per address and slow attack scanners on all sites and the panel" "security_web_protect_handler" "enabled" "rate= burst= confirm=" "tier:advanced plan:handler"
+register_cmd "security" "level" "Apply a protection level: basic, enhanced or strict" "security_level_handler" "set" "confirm=" "tier:advanced plan:handler"
 register_cmd "security" "fix" "Fix a security problem: antivirus, auto_updates, fail2ban or ssh_password" "security_fix_handler" "check" "confirm=" "tier:advanced plan:handler"

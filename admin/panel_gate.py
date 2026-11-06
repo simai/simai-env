@@ -61,6 +61,9 @@ BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 SECURITY_FIX = re.compile(r"^(antivirus|auto_updates|fail2ban|ssh_password)$")
+SECURITY_LEVEL = re.compile(r"^(basic|enhanced|strict)$")
+WEB_RATE = re.compile(r"^(?:[2-9]|[1-9][0-9]{1,2}|1000)$")
+WEB_BURST = re.compile(r"^(?:[1-9][0-9]{1,3}|10000)$")
 QUARANTINE_ID = re.compile(r"^[a-f0-9]{12}$")
 STORAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
@@ -252,6 +255,8 @@ ALLOW = {
     "security:scan": ({}, set(), "action"),
     "security:fix": ({"check": SECURITY_FIX}, {"check"}, "action"),
     "security:files-scan": ({"domain": DOMAIN}, set(), "action"),
+    "security:web-protect": ({"enabled": YES_NO, "rate": WEB_RATE, "burst": WEB_BURST}, {"enabled"}, "action"),
+    "security:level": ({"set": SECURITY_LEVEL}, {"set"}, "action"),
     "security:files": ({}, set(), "read"),
     "security:quarantine": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
     "security:quarantine-list": ({}, set(), "read"),
@@ -286,7 +291,7 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "backup:storage-copies", "backup:storage-fetch",
               "security:status", "security:scan", "security:fix", "self:firewall-ensure",
               "security:files-scan", "security:files", "security:quarantine", "security:quarantine-list",
-              "security:quarantine-restore"}
+              "security:quarantine-restore", "security:web-protect", "security:level"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},

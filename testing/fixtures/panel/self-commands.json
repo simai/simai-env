@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 256,
+    "count": 258,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -3123,6 +3123,32 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh security level",
+        "description": "Apply a protection level: basic, enhanced or strict",
+        "required": [
+          "--set"
+        ],
+        "optional": {
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh security quarantine",
         "description": "Move a suspicious file of a site into the quarantine",
         "required": [
@@ -3232,6 +3258,34 @@
         "authorization": "root",
         "confirmation": "not-required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh security web-protect",
+        "description": "Limit requests per address and slow attack scanners on all sites and the panel",
+        "required": [
+          "--enabled"
+        ],
+        "optional": {
+          "--rate": null,
+          "--burst": null,
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

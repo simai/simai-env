@@ -47,6 +47,7 @@ Checks:
 | `site_components:<domain>` | sites | known vulnerabilities in `composer.lock` and `package-lock.json` packages (OSV) | how |
 | `wordpress_core:<domain>` | sites | WordPress older than the current release | how |
 | `vulnerability_scan` | sites | the databases could not be asked yet | `security:scan` |
+| `web_protect` | network | request limits per address on | `security:web-protect {enabled: yes}` |
 | `antivirus` | sites | ClamAV installed | `security:fix {check: antivirus}` |
 | `file_scan` | sites | site files not checked yet | `security:files-scan` |
 | `malware:<domain>` | sites | suspicious files found (critical) | how (`security:quarantine`) |
@@ -102,6 +103,37 @@ another file took its place.
 
 ClamAV's daemon socket (`/run/clamav/clamd.ctl`, servers with 4 GB of memory
 or more) can be used by site modules such as SIMAI Guard for Bitrix.
+
+## web-protect
+```bash
+sudo /root/simai-env/simai-admin.sh security web-protect --enabled yes --rate 30 --confirm yes
+```
+Limits every address to `--rate` requests a second on all sites and the
+panel (`--burst`, default ten times the rate, passes page loads with many
+files), and slows known attack scanners (sqlmap, nikto, nuclei, wpscan and
+others) to 6 requests a minute; refused requests get 429. Addresses of this
+server are never limited. Written as `/etc/nginx/conf.d/simai-protect.conf`
+(checked with `nginx -t`, the old file kept on failure). With Fail2ban, the
+jails `nginx-limit-req` and `nginx-botsearch` ban addresses that keep hitting
+the limit or probing for admin pages (`/etc/fail2ban/jail.d/simai-web.conf`).
+`--enabled no` removes both.
+
+## level
+```bash
+sudo /root/simai-env/simai-admin.sh security level --set enhanced
+sudo /root/simai-env/simai-admin.sh security level --set enhanced --confirm yes
+```
+A bundle for people who do not want to choose each setting; the plan lists
+the steps first.
+
+| Level | What it turns on |
+| --- | --- |
+| `basic` | firewall (SSH, HTTP, HTTPS), daily security updates, Fail2ban for SSH; no web limits |
+| `enhanced` | basic + web limits 30/s per address (burst 300), Fail2ban web jails (ban 1 hour after 10 hits), ClamAV, SSH keys only when a key is set |
+| `strict` | enhanced with web limits 10/s (burst 100) and bans of a day after 5 hits |
+
+The level is kept in `/etc/simai-env/security.env` and shows as `level
+{current, applied_at}` in `security status`.
 
 ## fix
 ```bash

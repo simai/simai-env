@@ -410,6 +410,10 @@ Security center (1.45.0), administrator only:
   plan), `security:quarantine-list` (read, `simai-quarantine/1`),
   `security:quarantine-restore {id}` (action with a plan);
   `security:fix {check: antivirus}`.
+- 1.47.0: `security:web-protect {enabled, rate: 2-1000, burst: 10-10000}` and
+  `security:level {set: basic|enhanced|strict}` (actions with plans);
+  `security:status` has `level {current, applied_at}` and the check
+  `web_protect`.
 
 Server software (1.38.0), administrator only:
 
@@ -541,7 +545,8 @@ action, job). Everything else is refused.
 - 1.45.0: `security:status`, `security:scan`, `security:fix`,
   `self:firewall-ensure`;
 - 1.46.0: `security:files-scan`, `security:files`, `security:quarantine`,
-  `security:quarantine-list`, `security:quarantine-restore`.
+  `security:quarantine-list`, `security:quarantine-restore`;
+- 1.47.0: `security:web-protect`, `security:level`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

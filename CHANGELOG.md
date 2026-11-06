@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.47.0 - 2026-11-06
+
+- Protection from floods and attack scanners. `security web-protect` limits
+  requests per address on all sites and the panel (bursts pass; this
+  server's own addresses never limited) and slows known scanners to 6
+  requests a minute; Fail2ban then bans addresses that keep hitting the
+  limit or probe for admin pages.
+- Protection levels: `security level --set basic|enhanced|strict` turns on a
+  bundle (firewall, daily security updates, Fail2ban; web limits, ClamAV and
+  SSH keys only from `enhanced`; tighter limits and longer bans in
+  `strict`), showing the steps first. `security status` shows the level.
+- Panel gateway: `security:web-protect`, `security:level` (administrators).
+
 ## 1.46.0 - 2026-11-06
 
 - Malware check of site files. `security files-scan` looks for web shells and

@@ -112,6 +112,29 @@ a=$(cli self alerts --output json 2>/dev/null)
 [[ "$(js '[x["target"] for x in d["data"]["alerts"] if x["kind"] == "security_risk" and x["state"] == "open"]' <<<"$a")" == *firewall* ]] \
   && ok "a serious problem opens an alert" || bad "alerts: ${a:0:400}"
 
+# Web protection: limits per address, scanners slowed, this server exempt.
+ip=$(hostname -I | awk '{print $1}')
+hit() { curl -s -o /dev/null -w '%{http_code}\n' --max-time 3 -H "Host: $D" "$@"; }
+cli security web-protect --enabled yes --rate 2 --burst 10 >/tmp/w 2>&1; grep -q 'Plan:' /tmp/w && [[ ! -e /etc/nginx/conf.d/simai-protect.conf ]] && ok "web-protect without confirm is a plan" || bad "web plan"
+cli security web-protect --enabled yes --rate 2 --burst 10 --confirm yes >/tmp/w 2>&1 && nginx -t >/dev/null 2>&1 && ok "web protection applies" || { bad "web apply"; tail -5 /tmp/w; }
+n=$(for _ in $(seq 1 40); do hit "http://$ip/ok.php"; done | grep -c 429)
+(( n > 0 )) && ok "a flood from one address gets 429 ($n of 40)" || bad "no 429 for a flood"
+n=$(for _ in $(seq 1 40); do hit "http://127.0.0.1/ok.php"; done | grep -c 429)
+(( n == 0 )) && ok "this server's own address is never limited" || bad "local limited: $n"
+sleep 6
+n=$(for _ in $(seq 1 8); do hit -A 'sqlmap/1.7' "http://$ip/ok.php"; done | grep -c 429)
+(( n >= 4 )) && ok "an attack scanner is slowed ($n of 8 refused)" || bad "scanner refused only $n"
+fail2ban-client status nginx-limit-req >/dev/null 2>&1 && ok "Fail2ban watches the request limit" || bad "no nginx-limit-req jail"
+s=$(st); [[ "$(c web_protect)" == "[('ok', None)]" ]] && ok "the web protection check is ok" || bad "web check: $(c web_protect)"
+
+# Protection levels.
+cli security level --set enhanced >/tmp/l 2>&1; grep -q 'ClamAV' /tmp/l && grep -q 'keys only' /tmp/l && ok "a level shows its steps first" || { bad "level plan"; cat /tmp/l; }
+cli security level --set enhanced --confirm yes >/tmp/l 2>&1 && grep -q 'rate=30r/s' /etc/nginx/conf.d/simai-protect.conf && ufw status | grep -q 'Status: active' \
+  && ok "the enhanced level applies its bundle" || { bad "level apply"; tail -5 /tmp/l; }
+[[ "$(st | js 'd["data"]["level"]["current"]')" == enhanced ]] && ok "security status shows the level" || bad "level in status"
+hit "http://$ip/ok.php" | grep -q 200 && ok "sites still answer through the firewall" || bad "site down after level"
+cli security level --set basic --confirm yes >/dev/null 2>&1 && [[ ! -e /etc/nginx/conf.d/simai-protect.conf ]] && ok "the basic level removes the web limits" || bad "basic"
+
 # Panel gateway: administrator only.
 cli panel gate-enable --confirm yes >/dev/null 2>&1
 ssh-keygen -q -t ed25519 -N '' -f /root/own <<<y >/dev/null 2>&1
@@ -127,6 +150,8 @@ g=$(gate "$(req null security:files '{}')"); [[ "$(js 'd["data"]["schema"]' <<<"
 g=$(gate "$(req null security:quarantine-list '{}')"); [[ "$(js 'd["data"]["schema"]' <<<"$g")" == simai-quarantine/1 ]] && ok "security:quarantine-list reads" || bad "gate qlist: ${g:0:300}"
 [[ "$(gate "$(req null security:quarantine "{\"domain\":\"$D\",\"path\":\"public/ok.php\"}")" | js 'd["kind"]')" == plan ]] && ok "security:quarantine answers a plan" || bad "gate quarantine plan"
 [[ "$(gate "$(req null self:firewall-ensure '{}')" | js 'd["kind"]')" == plan ]] && ok "self:firewall-ensure answers a plan" || bad "gate firewall plan"
+[[ "$(gate "$(req null security:level '{"set":"strict"}')" | js 'd["kind"]')" == plan ]] && ok "security:level answers a plan" || bad "gate level plan"
+[[ "$(gate "$(req null security:web-protect '{"enabled":"yes","rate":"1"}')" | js 'd["reason"]')" == invalid_argument ]] && ok "a rate below 2 is refused" || bad "gate rate"
 
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 cli owner remove --name acme --confirm yes >/dev/null 2>&1

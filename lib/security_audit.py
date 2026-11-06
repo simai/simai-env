@@ -201,6 +201,23 @@ def check_firewall() -> list[dict]:
     return res
 
 
+def security_env() -> dict:
+    try:
+        return dict(l.split("=", 1) for l in Path(os.environ.get("SIMAI_SECURITY_ENV", "/etc/simai-env/security.env"))
+                    .read_text().splitlines() if "=" in l)
+    except OSError:
+        return {}
+
+
+def check_web() -> list[dict]:
+    on = Path(os.environ.get("SIMAI_WEB_PROTECT_CONF", "/etc/nginx/conf.d/simai-protect.conf")).is_file()
+    return [check("web_protect", "network", "Protection from floods and attack scanners", "ok" if on else "warn", "low",
+                  "requests per address are limited and scanners are slowed" if on
+                  else "one address may send any number of requests",
+                  fix=None if on else fix("security:web-protect", enabled="yes"),
+                  how=None if on else "Limit requests per address on all sites (bursts still pass).")]
+
+
 def check_panel(access_file: str) -> list[dict]:
     domain = None
     if PANEL_STATE.is_file():
@@ -501,7 +518,8 @@ def report(access_file: str, online_mode: str = "") -> dict:
     if enabled and (online_mode == "online" or (online_mode == "auto" and stale)):
         online = online_scan(sites)
         save(ONLINE, online)
-    checks = check_updates() + check_ssh() + check_firewall() + check_panel(access_file) + check_sites(sites)
+    checks = check_updates() + check_ssh() + check_firewall() + check_web() + check_panel(access_file) \
+        + check_sites(sites)
     checks += check_online(online) if enabled else []
     checks += check_files()
     # One kind of problem counts once at its worst, plus a point for every
@@ -523,6 +541,7 @@ def report(access_file: str, online_mode: str = "") -> dict:
                         "ok": sum(c["status"] == "ok" for c in checks),
                         "unknown": sum(c["status"] == "unknown" for c in checks)},
             "recommendations": [c["id"] for c in problems],
+            "level": {"current": security_env().get("LEVEL"), "applied_at": security_env().get("LEVEL_AT")},
             "online": {"enabled": enabled, "checked_at": online.get("checked_at"), "error": online.get("error")},
             "checks": checks,
             "vulnerabilities": {d: s.get("vulnerabilities") or [] for d, s in (online.get("sites") or {}).items()
