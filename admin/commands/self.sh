@@ -107,8 +107,8 @@ self_auto_update_check_now() {
   local_version="$(self_local_version)"
   update_ref="$(self_update_ref)"
   remote_version_url="$(self_remote_version_url)"
-  remote_version=$(curl -fsSL "$remote_version_url" 2>/dev/null || true)
-  [[ -z "$remote_version" ]] && remote_version="(unavailable)"
+  remote_version=$(curl -fsSL --max-time 10 "$remote_version_url" 2>/dev/null | head -c 64 | tr -d '[:space:]' || true)
+  [[ "$remote_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || remote_version="(unavailable)"
   status=$(self_auto_update_status_from_versions "$local_version" "$remote_version")
   now=$(date +%s)
   self_auto_update_state_write \

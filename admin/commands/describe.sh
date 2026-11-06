@@ -35,6 +35,9 @@ self_status_refresh_handler() {
   apt_cache_warm
   # The security report (local checks; vulnerability databases once a day).
   security_refresh_background
+  # The update check (mode check by default, every 6 hours): the panel offers
+  # a new simai-env release without anyone running a command.
+  if declare -F self_auto_update_check_if_due >/dev/null; then self_auto_update_check_if_due || true; fi
   # Firewall and panel access changes nobody confirmed are undone even when
   # their timer is gone (after a reboot).
   if [[ -n "$(python3 -I "${SIMAI_ENV_ROOT}/lib/timed_change.py" expired 2>/dev/null)" || -s /etc/simai-env/firewall/blocks.json ]]; then

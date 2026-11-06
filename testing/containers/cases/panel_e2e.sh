@@ -289,6 +289,9 @@ gacl=$(getfacl -Rcp /home/simai/www 2>/dev/null | grep -E '^(default:)?user:[0-9
 
 # Site answers, disk and the last backup in one self:describe (stage 2 list).
 cli self status-refresh --confirm yes >/dev/null 2>&1 && ok "self status-refresh" || bad "status-refresh"
+rm -f /var/lib/simai-env/update/state.env
+cli self status-refresh --confirm yes >/dev/null 2>&1
+grep -qE '^checked_at_epoch=[0-9]+$' /var/lib/simai-env/update/state.env 2>/dev/null && ok "status-refresh checks for updates (mode check by default)" || bad "no update check from status-refresh"
 a=$(gate "$(req null self:describe '{}')")
 [[ "$(field 'all(isinstance(s["answers"]["http"], int) and s["answers"]["checked_at"] for s in d["data"]["sites"])' <<<"$a")" == True ]] && ok "every site has an HTTP answer" || bad "answers: $(field '[s.get("answers") for s in d["data"]["sites"]]' <<<"$a")"
 [[ "$(field 'all(isinstance(s["disk"]["bytes"], int) for s in d["data"]["sites"])' <<<"$a")" == True ]] && ok "every site has its disk use" || bad "disk: $(field '[s.get("disk") for s in d["data"]["sites"]]' <<<"$a")"

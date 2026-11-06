@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.49.2 - 2026-11-06
+
+- Update checks run by themselves: the five-minute `self status-refresh`
+  checks the update channel every 6 hours (mode `check`, the default; `self
+  auto-update-disable` turns it off), so `self auto-update-status` and the
+  panel's update offer have a fresh remote version without anyone running a
+  command. The check gives up after 10 seconds and keeps only a version.
+
 ## 1.49.1 - 2026-11-06
 
 - SIMAI Guard link: while the ClamAV daemon runs, Bitrix sites get
