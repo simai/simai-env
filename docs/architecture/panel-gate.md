@@ -191,7 +191,9 @@ Stage 9 reads:
 
 An action without `confirm` answers `kind: plan`: command, arguments, target,
 description, effects and lock. Nothing runs, and only commands whose
-registry entry requires confirmation are ever called this way.
+registry entry requires confirmation are ever called this way; for the
+others (since 1.49.0) the plan is a preview from the registry, marked
+`preview: true`.
 
 With `confirm: true` the gateway starts the command with `--confirm yes` as
 a transient systemd unit `simai-panel-job-<job_id>` and answers
@@ -420,6 +422,11 @@ Security center (1.45.0), administrator only:
   `change:confirm`), `security:geo-status` (read, `simai-geo/1`),
   `security:geo-update` (action), `security:geo-lookup {ip}` (read).
   `security:status` has `geo {mode, countries, ports}`.
+- 1.49.0: `mcp:status` (read, `simai-mcp-status/1`), `mcp:enable`,
+  `mcp:disable`, `mcp:key-add {pubkey, owner | admin: yes}`,
+  `mcp:key-remove {fingerprint | owner}` (actions with plans): AI assistants
+  over MCP, see `docs/commands/mcp.md`. MCP requests reach the gateway with
+  the actor `mcp:<owner|admin>:<key>`.
 
 Server software (1.38.0), administrator only:
 

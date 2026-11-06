@@ -69,6 +69,7 @@ IP_ADDRESS = re.compile(r"^[0-9A-Fa-f:.]{2,45}$")
 SECURITY_LEVEL = re.compile(r"^(basic|enhanced|strict)$")
 WEB_RATE = re.compile(r"^(?:[2-9]|[1-9][0-9]{1,2}|1000)$")
 WEB_BURST = re.compile(r"^(?:[1-9][0-9]{1,3}|10000)$")
+FINGERPRINT = re.compile(r"^SHA256:[A-Za-z0-9+/]{8,64}$")
 QUARANTINE_ID = re.compile(r"^[a-f0-9]{12}$")
 STORAGE_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 BUCKET = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
@@ -265,6 +266,11 @@ ALLOW = {
     "security:geo": ({"mode": GEO_MODE, "countries": COUNTRIES, "ports": GEO_PORTS, "keep": ADDRESSES_LIST},
                      {"mode"}, "action"),
     "security:geo-status": ({}, set(), "read"),
+    "mcp:status": ({}, set(), "read"),
+    "mcp:enable": ({}, set(), "action"),
+    "mcp:disable": ({}, set(), "action"),
+    "mcp:key-add": ({"pubkey": PUBKEY, "owner": OWNER, "admin": YES_NO}, {"pubkey"}, "action"),
+    "mcp:key-remove": ({"fingerprint": FINGERPRINT, "owner": OWNER}, set(), "action"),
     "security:geo-update": ({}, set(), "action"),
     "security:geo-lookup": ({"ip": IP_ADDRESS}, {"ip"}, "read"),
     "security:files": ({}, set(), "read"),
@@ -302,7 +308,8 @@ ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "o
               "security:status", "security:scan", "security:fix", "self:firewall-ensure",
               "security:files-scan", "security:files", "security:quarantine", "security:quarantine-list",
               "security:quarantine-restore", "security:web-protect", "security:level",
-              "security:geo", "security:geo-status", "security:geo-update", "security:geo-lookup"}
+              "security:geo", "security:geo-status", "security:geo-update", "security:geo-lookup",
+              "mcp:status", "mcp:enable", "mcp:disable", "mcp:key-add", "mcp:key-remove"}
 # Arguments the gateway always adds: the panel verifies with a restore test
 # and applies PHP settings to the running pool.
 FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"apply": "yes"},
@@ -447,9 +454,15 @@ def shown_args(args):
 
 
 def plan(command, args, attachment=None):
-    # Without --confirm only a command that requires confirmation is safe to call.
+    # Without --confirm only a command that requires confirmation is safe to
+    # call; for the others the plan is a preview from the registry.
     if command not in CONDITIONAL and registry_entry(command).get("confirmation") != "required":
-        return None
+        entry = registry_entry(command)
+        if not entry:
+            return None
+        return {"command": command, "args": shown_args(args), "target": args.get("domain") or "host",
+                "description": entry.get("description"), "effects": entry.get("effects"),
+                "lock": entry.get("lock"), "applied": False, "preview": True}
     files = {"attachment": {ATTACHMENT[command]: "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
     result = run(command, args, files)
     if result is None or result.get("status") != "planned":

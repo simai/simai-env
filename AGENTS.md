@@ -60,6 +60,7 @@ JSON goes to stdout, logs to stderr. None of these outputs contain secrets.
 | PostgreSQL | `db pgsql-install --confirm yes`; `site add ... --db-engine pgsql` |
 | Health | `site doctor --domain D`, `self status` |
 | Security | `security status` (score, problems, one-click fixes), `security fix --check C --confirm yes` |
+| AI assistants (MCP) | `mcp enable --confirm yes`, `mcp key-add --pubkey-file K --owner O --confirm yes`, `mcp status`; `docs/commands/mcp.md` |
 | Larena Panel | `panel install --domain D --confirm yes`, `panel update --confirm yes`, `panel status`, `panel remove`; gateway: `docs/architecture/panel-gate.md` |
 | Backup / restore | `backup data --domain D --confirm yes`; `backup data-verify --path P --restore-test yes --confirm yes`; `backup data-restore` |
 

@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 262,
+    "count": 267,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -2124,6 +2124,129 @@
           "--lines": "${LOGS_DEFAULT_LINES}",
           "--match": null
         },
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh mcp disable",
+        "description": "Turn MCP off: remove its keys, sudo rule and sshd block",
+        "required": [],
+        "optional": {
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh mcp enable",
+        "description": "Let AI assistants manage this server over SSH (MCP), through the panel gateway",
+        "required": [],
+        "optional": {
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh mcp key-add",
+        "description": "Allow an SSH key to use MCP as an owner (their sites) or as the administrator",
+        "required": [
+          "--pubkey-file"
+        ],
+        "optional": {
+          "--owner": null,
+          "--admin": null,
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh mcp key-remove",
+        "description": "Remove MCP keys by fingerprint or owner",
+        "required": [],
+        "optional": {
+          "--fingerprint": null,
+          "--owner": null,
+          "--confirm": null
+        },
+        "flags": [
+          "tier:advanced",
+          "plan:handler"
+        ],
+        "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh mcp status",
+        "description": "Show MCP access, its keys and how to connect AI clients",
+        "required": [],
+        "optional": {},
         "flags": [
           "effects:read"
         ],

@@ -3,7 +3,7 @@
   "set_version": 25,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.48.0",
+  "simai_env": "1.49.0",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -18,7 +18,7 @@
       "status": "ok"
     },
     "change-status.json": {
-      "sha256": "839600c8a2f55ca7584e00b0314e7546c056735f01716311c6ec8334a73f26e9",
+      "sha256": "f4caf09ad527c4e518bf35f39fc085e4ea2c2e2ed30b3ac96988390b043794d8",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -38,15 +38,15 @@
       "status": "ok"
     },
     "file-list.demo-owned.test.json": {
-      "sha256": "ba4dad91a1f43733974de65408d7950695b9b52a42defabd3bda5c961c5f4851",
+      "sha256": "dc328489db418403171477b06d9514628cbba3e6cb0481e13a32c9d8fa362d9d",
       "status": "ok"
     },
     "file-stat.demo-owned.test.json": {
-      "sha256": "4e467a100eba2f87cc9287afa03f1e011793a977034381cdfebe19e9dc997120",
+      "sha256": "3e187c69e5d3dcf97d3440b42107d2e60353bbacc47f6f1c45f98ee5899ed46e",
       "status": "ok"
     },
     "firewall-status.json": {
-      "sha256": "896e70d3c0cb1f209822f83e7e05290b26d14012453fa7c23758f5ba0286afe9",
+      "sha256": "081bb5334cb4f53eac0194976c05f8909b146653a6e7f644c039882a1e586d17",
       "status": "ok"
     },
     "job-log.json": {
@@ -114,7 +114,7 @@
       "status": "ok"
     },
     "plan.change-confirm.json": {
-      "sha256": "fa45ac4bb3aeda3d8555b778ac97f4f56ccb96e44430c6c2d44ef7183e924d60",
+      "sha256": "00bfdb7f542d7d2acd746b60d58e3d47c707aaa3bc8f499f336520699da26e57",
       "status": "ok"
     },
     "plan.cron-job-add.json": {
@@ -214,7 +214,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "0364e073419d7680dc0f73d89ce734ad409425d600684b7b1fe52fff3070ac17",
+      "sha256": "c5384cafdf9553a7725eb41f3197067bbff1956e9d68cb054be2ad35089b9ac9",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -282,7 +282,7 @@
       "status": "ok"
     },
     "plan.software-update.json": {
-      "sha256": "bc2af78a5d24eb8cdaafead4edecfa4fddf2cca2b728cb65bb2dbfa91bc5f084",
+      "sha256": "a20ea8078bf890d55966d71c8e37088b1e5e0566128b38a7f6838ba76a40244d",
       "status": "ok"
     },
     "plan.ssl-dns-credentials.json": {
@@ -426,7 +426,7 @@
       "status": "ok"
     },
     "security-status.json": {
-      "sha256": "7bcd4b0583c414a929b7bb021afaa574253a3d9994943e1060d2b3a829a5c374",
+      "sha256": "b8251e7b0e3c215469d42e30dbf556d99c5691dd757746e47fbeb93a96bc3b26",
       "status": "ok"
     },
     "self-alerts.json": {
@@ -438,15 +438,15 @@
       "status": "ok"
     },
     "self-commands.json": {
-      "sha256": "89a01a49e26654e520ba67628f3c6eb994686043ee81ed79a37bc5feb2c87b03",
+      "sha256": "007c8f2eb3cc3c03a6e8fd02dc383853052677513c89d8ec7ef5f75052c8e77e",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "5407d205986888e4119429ba79854a4d2cd5eb667f0824f4c4ac401f926bd1c1",
+      "sha256": "5f6d57aaeab41e2b81c8ac5458a224becdbed48342cf1daaf7b6d5368f4e0863",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "9715538d493733880e0d3ef495b732e28d7a71fca32f817091666dc0b6a35342",
+      "sha256": "5bff7ea96b77209761b1f0c7eecf4c52540feb52f9f96723782b9f12a392233f",
       "status": "ok"
     },
     "self-metrics-history.json": {
@@ -466,7 +466,7 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "3166b6ead9af233e476fd09c09f135a2c860e7310fee17cd67f1295334c9ab8d",
+      "sha256": "757eb5c682ae897cf110020f83de9fff915f866bf1857627e981a2cdcd10aa38",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
@@ -486,7 +486,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "35daa8d0c9f92ff7e1c7a8b2601cd73434e6c116531c4d3dd5b40efaecb4407f",
+      "sha256": "b92b4a9584934cc073ddf5949b9e66882454b61cb575fcdb0d4fc43f3eff4238",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -494,7 +494,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "53178c44120798d09d4f3f97b84d5f9cf23e02e747793178fbc6daeb77a8b449",
+      "sha256": "43aed5bf8dc20ddff6ae0d01889f0e30e12e9e606afd56cd2f2c179cf1948939",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {
@@ -522,7 +522,7 @@
       "status": "ok"
     },
     "software-list.json": {
-      "sha256": "2dae43253d9734ba0b75fdf6915c65550e4e70c237067f82bc4ea9e3e3decfce",
+      "sha256": "58e64ae27f387e091da592feaae10986dbc96c06a0f1d6f5cfda09eee2da0772",
       "status": "ok"
     },
     "ssl-dns-status.json": {

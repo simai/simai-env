@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.49.0 - 2026-11-06
+
+- MCP: AI assistants (Claude, Codex, Cursor...) manage the server over SSH,
+  through the panel gateway with its roles, checks and audit log.
+  `mcp enable`, `mcp key-add --pubkey-file K --owner O | --admin yes`,
+  `mcp key-remove`, `mcp status` (ready lines for clients), `mcp disable`.
+- Tools: `simai_overview` (who you are, what you may call), `simai_read`,
+  `simai_plan` (a plan and a one-time token), `simai_confirm` (runs exactly
+  that plan), `simai_job`. The role comes from the key's forced command;
+  code running as an owner cannot reach it; MCP keys are not managed over
+  MCP.
+- Panel gateway: `mcp:status`, `mcp:enable`, `mcp:disable`, `mcp:key-add`,
+  `mcp:key-remove` (administrators). An action that needs no confirmation
+  now answers a preview plan instead of `plan_failed`.
+
 ## 1.48.0 - 2026-11-06
 
 - Country blocking. `security geo --mode deny|allow --countries CN,KP`
