@@ -153,6 +153,25 @@ g=$(gate "$(req null security:quarantine-list '{}')"); [[ "$(js 'd["data"]["sche
 [[ "$(gate "$(req null security:level '{"set":"strict"}')" | js 'd["kind"]')" == plan ]] && ok "security:level answers a plan" || bad "gate level plan"
 [[ "$(gate "$(req null security:web-protect '{"enabled":"yes","rate":"1"}')" | js 'd["reason"]')" == invalid_argument ]] && ok "a rate below 2 is refused" || bad "gate rate"
 
+# SIMAI Guard on Bitrix sites gets the clamd socket while the daemon runs.
+B=bx.test
+[[ -f /etc/clamav/clamd.conf ]] && cp /etc/clamav/clamd.conf /root/clamd.conf.orig
+mkdir -p /etc/clamav; printf 'LocalSocket /run/simai-test-clamd.ctl\n' >/etc/clamav/clamd.conf
+python3 -c 'import socket,os,time; s=socket.socket(socket.AF_UNIX); s.bind("/run/simai-test-clamd.ctl"); s.listen(1); time.sleep(3600)' &
+fake=$!; for _ in 1 2 3 4 5; do [[ -S /run/simai-test-clamd.ctl ]] && break; sleep 1; done
+cli site add --domain "$B" --profile bitrix --php "$(bash -c 'source lib/platform.sh; platform_detect_os; platform_native_php_version')" --create-db yes --confirm yes >/tmp/bx 2>&1 || { bad "bitrix site add"; tail -5 /tmp/bx; }
+bpool=$(ls /etc/php/*/fpm/pool.d/bx-test.conf 2>/dev/null | head -1)
+grep -qx 'env\[SIMAI_GUARD_CLAMAV_SOCKET\] = /run/simai-test-clamd.ctl' "$bpool" && grep -qx 'SIMAI_GUARD_CLAMAV_SOCKET=/run/simai-test-clamd.ctl' /etc/cron.d/bx-test \
+  && ok "a new Bitrix site gets the clamd socket for SIMAI Guard (pool and cron)" || { bad "guard link: $(grep -h SIMAI_GUARD "$bpool" /etc/cron.d/bx-test)"; }
+grep -q '^AlertExceedsMax yes' /etc/clamav/clamd.conf || cli security scan --confirm yes >/dev/null 2>&1
+grep -q '^AlertExceedsMax yes' /etc/clamav/clamd.conf && ok "clamd reports files over its limits" || bad "AlertExceedsMax"
+sed -i '/SIMAI_GUARD_CLAMAV_SOCKET/d' "$bpool"; cli security scan --confirm yes >/dev/null 2>&1
+grep -q 'SIMAI_GUARD_CLAMAV_SOCKET' "$bpool" && ok "the link is restored when a pool was rewritten" || bad "guard resync"
+kill "$fake" 2>/dev/null; rm -f /run/simai-test-clamd.ctl; cli security scan --confirm yes >/tmp/sc 2>&1
+! grep -q 'SIMAI_GUARD_CLAMAV_SOCKET' "$bpool" /etc/cron.d/bx-test && ok "without the daemon the setting goes away" || bad "guard unlink: $(grep -H SIMAI_GUARD "$bpool" /etc/cron.d/bx-test; ls -la /run/simai-test-clamd.ctl 2>&1; tail -5 /tmp/sc)"
+cli site remove --domain "$B" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1
+if [[ -f /root/clamd.conf.orig ]]; then mv /root/clamd.conf.orig /etc/clamav/clamd.conf; else rm -f /etc/clamav/clamd.conf; fi
+
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 cli owner remove --name acme --confirm yes >/dev/null 2>&1
 cli site remove --domain "$D" --remove-files yes --confirm yes >/dev/null 2>&1

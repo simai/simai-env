@@ -36,6 +36,7 @@ security_scan_handler() {
   exec 7>"${SIMAI_SECURITY_STATE}/.lock"
   flock -w 120 7 || { error "Another security scan is running"; return 1; }
   info "Checking the server and asking the vulnerability databases"
+  security_guard_sync
   security_audit refresh online || { error "The security scan failed"; return 1; }
   security_audit status human
 }
@@ -48,6 +49,7 @@ security_refresh_background() {
     exec 7>"${SIMAI_SECURITY_STATE}/.lock"
     flock -n 7 || exit 0
     security_audit refresh auto >/dev/null 2>&1 || true
+    security_guard_sync >/dev/null 2>&1 || true
     # The country database once a month while country blocking is on.
     local geo_mode geo_at
     geo_mode=$(security_geo_mode)
@@ -141,8 +143,66 @@ security_fix_antivirus() {
   os_svc_enable_now clamav-freshclam >>"$LOG_FILE" 2>&1 || true
   if [[ " ${pkgs[*]} " == *" clamav-daemon "* ]]; then
     os_svc_enable_now clamav-daemon >>"$LOG_FILE" 2>&1 || true
+    # The socket appears once the signatures are loaded; the hourly refresh
+    # links the Bitrix sites later if it is not there yet.
+    local _
+    for _ in $(seq 1 60); do [[ -n "$(security_clamd_socket)" ]] && break; sleep 2; done
+    security_guard_sync
   fi
   apt_cache_warm
+}
+
+# The SIMAI Guard module (simai.guard) of Bitrix sites checks files with
+# ClamAV through clamd when SIMAI_GUARD_CLAMAV_SOCKET names its socket. While
+# the daemon runs, every Bitrix site gets it in its PHP-FPM pool and its cron
+# file (the agents); when it stops, the setting goes away. Content is sent
+# over the socket (INSTREAM), so clamd needs no access to site files.
+security_clamd_socket() {
+  local sock
+  sock=$(awk '$1 == "LocalSocket" {print $2; exit}' /etc/clamav/clamd.conf 2>/dev/null || true)
+  if [[ -n "$sock" && -S "$sock" ]]; then printf '%s' "$sock"; fi
+  return 0
+}
+
+security_guard_sync() {
+  local sock domain pool cron changed_php=() line want
+  sock=$(security_clamd_socket)
+  if [[ -n "$sock" ]] && ! grep -qs '^AlertExceedsMax yes' /etc/clamav/clamd.conf; then
+    # Otherwise clamd answers OK for a file over its size limits.
+    printf 'AlertExceedsMax yes\n' >>/etc/clamav/clamd.conf
+    os_svc_restart clamav-daemon >>"$LOG_FILE" 2>&1 || true
+  fi
+  for domain in $(list_simai_sites); do
+    read_site_metadata "$domain" >/dev/null 2>&1 || continue
+    [[ "${SITE_META[profile]:-}" == bitrix ]] || continue
+    pool="/etc/php/${SITE_META[php]}/fpm/pool.d/${SITE_META[php_socket_project]:-${SITE_META[project]}}.conf"
+    if [[ -f "$pool" ]]; then
+      want="${sock:+env[SIMAI_GUARD_CLAMAV_SOCKET] = ${sock}}"
+      line=$(grep -m1 '^env\[SIMAI_GUARD_CLAMAV_SOCKET\]' "$pool" || true)
+      if [[ "$line" != "$want" ]]; then
+        sed -i '/^env\[SIMAI_GUARD_CLAMAV_SOCKET\]/d' "$pool"
+        if [[ -n "$want" ]]; then
+          [[ -z "$(tail -c1 "$pool")" ]] || printf '\n' >>"$pool"  # the pool may end without a newline
+          printf '%s\n' "$want" >>"$pool"
+        fi
+        [[ " ${changed_php[*]} " == *" ${SITE_META[php]} "* ]] || changed_php+=("${SITE_META[php]}")
+      fi
+    fi
+    cron="/etc/cron.d/${SITE_META[project]}"
+    if grep -qs '^# simai-managed: yes' "$cron"; then
+      want="${sock:+SIMAI_GUARD_CLAMAV_SOCKET=${sock}}"
+      line=$(grep -m1 '^SIMAI_GUARD_CLAMAV_SOCKET=' "$cron" || true)
+      if [[ "$line" != "$want" ]]; then
+        sed -i '/^SIMAI_GUARD_CLAMAV_SOCKET=/d' "$cron"
+        if [[ -n "$want" ]]; then sed -i "0,/^\$/s||${want}\n|" "$cron"; fi
+      fi
+    fi
+  done
+  local ver
+  for ver in "${changed_php[@]}"; do
+    os_svc_reload_or_restart "php${ver}-fpm" >>"$LOG_FILE" 2>&1 || true
+  done
+  return 0
 }
 
 # Web protection for every site and the panel, at the nginx http level:

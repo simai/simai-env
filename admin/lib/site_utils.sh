@@ -486,6 +486,10 @@ EOF
       echo "*/5 * * * * ${run_user} cd ${project_path} && ${php_bin} public/wp-cron.php >> /dev/null 2>&1"
       ;;
     bitrix)
+      # SIMAI Guard reaches ClamAV through clamd (security_guard_sync).
+      local clamd_sock=""
+      if declare -F security_clamd_socket >/dev/null; then clamd_sock=$(security_clamd_socket); fi
+      if [[ -n "$clamd_sock" ]]; then echo "SIMAI_GUARD_CLAMAV_SOCKET=${clamd_sock}"; fi
       echo "* * * * * ${run_user} cd ${project_path} && ${php_bin} -d short_open_tag=1 public/bitrix/modules/main/tools/cron_events.php >> /dev/null 2>&1"
       ;;
   esac
@@ -1329,6 +1333,12 @@ EOF
     # site overrides (written before this block) still win.
     bitrix_profile_ini_block >>"$pool_file"
     site_ensure_bitrix_cli_ini "$php_version"
+    local clamd_sock=""
+    if declare -F security_clamd_socket >/dev/null; then clamd_sock=$(security_clamd_socket); fi
+    if [[ -n "$clamd_sock" ]]; then
+      [[ -z "$(tail -c1 "$pool_file")" ]] || printf '\n' >>"$pool_file"
+      printf 'env[SIMAI_GUARD_CLAMAV_SOCKET] = %s\n' "$clamd_sock" >>"$pool_file"
+    fi
   fi
   os_svc_reload_or_restart "php${php_version}-fpm" || true
 }

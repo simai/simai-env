@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.49.1 - 2026-11-06
+
+- SIMAI Guard link: while the ClamAV daemon runs, Bitrix sites get
+  `SIMAI_GUARD_CLAMAV_SOCKET` in their PHP-FPM pool and cron file, so the
+  `simai.guard` module checks files with the server's antivirus without
+  setup; `clamd.conf` gets `AlertExceedsMax yes`. Kept by the hourly
+  refresh and `security scan`, removed when the daemon stops.
+
 ## 1.49.0 - 2026-11-06
 
 - MCP: AI assistants (Claude, Codex, Cursor...) manage the server over SSH,

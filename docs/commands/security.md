@@ -102,7 +102,15 @@ restored_at}]`. Restore puts a file back with its owner and mode, unless
 another file took its place.
 
 ClamAV's daemon socket (`/run/clamav/clamd.ctl`, servers with 4 GB of memory
-or more) can be used by site modules such as SIMAI Guard for Bitrix.
+or more) is given to SIMAI Guard (`simai.guard`) on Bitrix sites: while the
+daemon runs, each Bitrix site's PHP-FPM pool has
+`env[SIMAI_GUARD_CLAMAV_SOCKET]` and its cron file (the agents) has
+`SIMAI_GUARD_CLAMAV_SOCKET=`, and `clamd.conf` gets `AlertExceedsMax yes`
+(otherwise clamd answers OK for files over its limits). Guard sends file
+content over the socket, so clamd needs no access to site files. The link is
+set when the daemon is installed and for new Bitrix sites, restored by the
+hourly refresh and `security scan` when a pool was rewritten, and removed
+when the daemon stops.
 
 ## web-protect
 ```bash
