@@ -266,9 +266,14 @@ docs/commands/self.md):
   `self:alerts-test`, administrator only. `token` (the Telegram bot token)
   is passed as a file, shown as `(stored)` in plans and job records, and its
   file is removed when the job ends.
-- `self:metrics-history {period: day|week|month}`, administrator only:
-  `simai-metrics-history/1`, 5-minute points for a day, hourly for a week or
-  a month, 30 days back.
+- `self:metrics-history {period: hour|6h|day|week|month}`, administrator
+  only: `simai-metrics-history/1`, 1-minute points for an hour, 5-minute for
+  6 hours or a day, hourly for a week or a month, 30 days back. Since 1.50.0
+  every point also has `cpu_percent`, `net_rx_bytes_per_s`,
+  `net_tx_bytes_per_s`, `disk_read_bytes_per_s`, `disk_write_bytes_per_s`
+  (averages over the step, or `null`), and the answer has `host
+  {net_interface, net_link_bits_per_s, disk_device, disk_kind}`
+  (`docs/commands/self.md`).
 
 Safe update (1.32.0), administrator only:
 

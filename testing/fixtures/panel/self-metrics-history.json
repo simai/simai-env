@@ -7,6 +7,12 @@
     "schema": "simai-metrics-history/1",
     "period": "day",
     "step_seconds": 300,
+    "host": {
+      "net_interface": "eth0",
+      "net_link_bits_per_s": 200000000,
+      "disk_device": "nvme0n1",
+      "disk_kind": "nvme"
+    },
     "points": [
       {
         "at": "2026-01-01T00:00:00Z",
@@ -21,7 +27,32 @@
             "used_bytes": 10737418240,
             "total_bytes": 42949672960
           }
-        ]
+        ],
+        "cpu_percent": null,
+        "net_rx_bytes_per_s": null,
+        "net_tx_bytes_per_s": null,
+        "disk_read_bytes_per_s": null,
+        "disk_write_bytes_per_s": null
+      },
+      {
+        "at": "2026-01-01T00:05:00Z",
+        "load1": 0.1,
+        "cpu_cores": 2,
+        "memory_used_bytes": 1073741824,
+        "memory_total_bytes": 4294967296,
+        "swap_used_bytes": 0,
+        "disk": [
+          {
+            "mount": "/",
+            "used_bytes": 10737418240,
+            "total_bytes": 42949672960
+          }
+        ],
+        "cpu_percent": 12.5,
+        "net_rx_bytes_per_s": 125000,
+        "net_tx_bytes_per_s": 2500000,
+        "disk_read_bytes_per_s": 4096,
+        "disk_write_bytes_per_s": 1048576
       }
     ]
   },

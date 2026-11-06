@@ -18,7 +18,7 @@ cli site add --domain acme.test --profile generic --php 8.3 --create-db no --own
 
 cli panel gate-status 2>&1 | grep -q 'Enabled *| no' && ok "gate disabled by default" || bad "gate status before enable"
 cli panel gate-enable --confirm yes >/tmp/p-en 2>&1 && ok "panel gate-enable" || { bad "gate-enable"; tail -5 /tmp/p-en; }
-cli panel gate-status 2>&1 | grep -q 'Enabled *| yes' && ok "gate status enabled" || bad "gate status after enable"
+cli panel gate-status 2>&1 | grep 'Enabled *| yes' >/dev/null && ok "gate status enabled" || bad "gate status after enable"
 
 # Requests as the panel account, through its only sudo rule.
 gate() { printf '%s' "$1" | sudo -n -u simai-panel sudo -n /usr/local/sbin/simai-panel-gate; }
@@ -363,6 +363,14 @@ refused not_allowed "$(req '"acme"' self:alerts-channel '{"kind":"off"}')" "an o
 a=$(gate "$(req null self:metrics-history '{"period":"day"}')")
 [[ "$(field 'd["data"]["step_seconds"] == 300 and len(d["data"]["points"]) >= 3 and d["data"]["points"][-1]["memory_total_bytes"] > 0' <<<"$a")" == True ]] && ok "a day of 5-minute load points" || bad "history day: ${a:0:300}"
 [[ "$(gate "$(req null self:metrics-history '{"period":"week"}')" | field 'd["data"]["step_seconds"] == 3600 and len(d["data"]["points"]) >= 1')" == True ]] && ok "a week of hourly points" || bad "history week"
+grep -q 'server_watch.py tick' /etc/cron.d/simai-site-status && ok "a 1-minute sample cron line" || bad "no tick cron"
+python3 -I lib/server_watch.py tick && sleep 2 && python3 -I lib/server_watch.py tick
+a=$(gate "$(req null self:metrics-history '{"period":"hour"}')")
+[[ "$(field 'd["data"]["step_seconds"] == 60 and len(d["data"]["points"]) >= 2 and isinstance(d["data"]["points"][-1]["cpu_percent"], float) and set(map(type, map(d["data"]["points"][-1].get, ["net_rx_bytes_per_s", "net_tx_bytes_per_s", "disk_read_bytes_per_s", "disk_write_bytes_per_s"]))) == {int} and set(d["data"]["host"]) == {"net_interface", "net_link_bits_per_s", "disk_device", "disk_kind"}' <<<"$a")" == True ]] && ok "an hour of 1-minute points with CPU, traffic and disk averages" || bad "history hour: $(field '[{k: v for k, v in p.items() if k != "disk"} for p in d["data"]["points"][-2:]]' <<<"$a")"
+cli self status-refresh --confirm yes >/dev/null 2>&1
+a=$(gate "$(req null self:metrics-history '{"period":"6h"}')")
+[[ "$(field 'd["data"]["step_seconds"] == 300 and isinstance(d["data"]["points"][-1]["cpu_percent"], float)' <<<"$a")" == True ]] && ok "6 hours of 5-minute points with averages" || bad "history 6h: ${a:0:400}"
+refused invalid_argument "$(req null self:metrics-history '{"period":"year"}')" "an unknown period"
 refused not_allowed "$(req '"acme"' self:metrics-history '{"period":"day"}')" "an owner reads the host history"
 
 # Host services and site profiles (1.33.0).

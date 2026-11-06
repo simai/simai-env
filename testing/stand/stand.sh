@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=25
+FIXTURE_SET=26
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -180,6 +180,8 @@ FW
     "plan.self-alerts-test|null|self:alerts-test|{}"
     "refused.owner-admin-only.alerts-channel|\"demo\"|self:alerts-channel|{\"kind\":\"off\"}"
     "self-metrics-history|null|self:metrics-history|{\"period\":\"day\"}"
+    "self-metrics-history.hour|null|self:metrics-history|{\"period\":\"hour\"}"
+    "self-metrics-history.week|null|self:metrics-history|{\"period\":\"week\"}"
     "refused.owner-admin-only.metrics-history|\"demo\"|self:metrics-history|{\"period\":\"week\"}"
     "self-update-plan.env|null|self:update-plan|{\"target\":\"env\"}"
     "self-update-plan.panel|null|self:update-plan|{\"target\":\"panel\"}"
@@ -338,9 +340,19 @@ for f in sorted(root.glob("*.json")):
         data["alerts"] = [dict(a, first_seen="2026-01-01T00:00:00Z", last_seen="2026-01-01T00:00:00Z")
                           for a in data["alerts"] if a.get("kind") == "backup_failed"]
     if data.get("schema") == "simai-metrics-history/1":
-        data["points"] = [{"at": "2026-01-01T00:00:00Z", "load1": 0.1, "cpu_cores": 2, "memory_used_bytes": 1073741824,
+        # Two points a step apart; the first has no averages, as after a reboot.
+        step = data.get("step_seconds", 300)
+        data["host"] = {"net_interface": "eth0", "net_link_bits_per_s": 200000000, "disk_device": "nvme0n1",
+                        "disk_kind": "nvme"}
+        data["points"] = [{"at": at, "load1": 0.1, "cpu_cores": 2, "memory_used_bytes": 1073741824,
                            "memory_total_bytes": 4294967296, "swap_used_bytes": 0,
-                           "disk": [{"mount": "/", "used_bytes": 10737418240, "total_bytes": 42949672960}]}]
+                           "disk": [{"mount": "/", "used_bytes": 10737418240, "total_bytes": 42949672960}],
+                           **rates} for at, rates in (
+            ("2026-01-01T00:00:00Z", dict.fromkeys(("cpu_percent", "net_rx_bytes_per_s", "net_tx_bytes_per_s",
+                                                    "disk_read_bytes_per_s", "disk_write_bytes_per_s"))),
+            (f"2026-01-01T{step // 3600:02d}:{step % 3600 // 60:02d}:00Z",
+             {"cpu_percent": 12.5, "net_rx_bytes_per_s": 125000, "net_tx_bytes_per_s": 2500000,
+              "disk_read_bytes_per_s": 4096, "disk_write_bytes_per_s": 1048576}))]
     if data.get("schema") == "simai-services/1":
         for svc in data["services"]:
             svc["since"] = "Thu 2026-01-01 00:00:00 UTC"

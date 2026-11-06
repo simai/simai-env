@@ -497,9 +497,21 @@ stays in `/etc/simai-env/alerts-telegram.token` (root, 0600) and is never
 printed. `--kind off` removes the channel and the token.
 
 The same run keeps one load sample in `/var/lib/simai-env/metrics-history.jsonl`
-(31 days). `metrics-history --period day` answers 5-minute points, `week` and
-`month` hourly averages: `simai-metrics-history/1` with `points [{at, load1,
-cpu_cores, memory_used_bytes, memory_total_bytes, swap_used_bytes, disk}]`.
+(31 days); a light cron line (`server_watch.py tick`) keeps one a minute in
+`metrics-fine.jsonl` (3 hours). `metrics-history --period hour` answers
+1-minute points, `6h` and `day` 5-minute points, `week` and `month` hourly
+averages: `simai-metrics-history/1` with `points [{at, load1, cpu_cores,
+memory_used_bytes, memory_total_bytes, swap_used_bytes, disk, cpu_percent,
+net_rx_bytes_per_s, net_tx_bytes_per_s, disk_read_bytes_per_s,
+disk_write_bytes_per_s}]`. The last five are averages since the previous
+sample: the CPU busy share, traffic of the physical network interfaces
+(all but loopback and container ones when none is physical) and reads and
+writes of the whole physical disks. They are `null` for the first sample,
+after a reboot or a gap, and in samples from before 1.50.0. `host` has
+facts for chart titles: `net_interface` (the default route),
+`net_link_bits_per_s` (`null` when the link does not say, as on many VMs),
+`disk_device` and `disk_kind` of the disk holding `/` (`nvme`, `ssd`, `hdd`,
+`virtual` for virtio disks, or `null`).
 
 ## profiles
 List the enabled site profiles with the `site add` arguments each one

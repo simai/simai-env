@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.50.0 - 2026-11-06
+
+- Load history for provider-style charts: every point of
+  `self metrics-history` also has `cpu_percent`, `net_rx_bytes_per_s`,
+  `net_tx_bytes_per_s`, `disk_read_bytes_per_s` and `disk_write_bytes_per_s`
+  (averages over the step: physical interfaces, whole physical disks), and
+  the answer has `host` with the link speed and the kind of the system disk
+  (`nvme`, `ssd`, `hdd`, `virtual`). New periods: `hour` (1-minute points,
+  from a light per-minute cron sample) and `6h` (5-minute points). Additive:
+  older points answer `null` for the new fields. Panel fixtures: set 26 with
+  `self-metrics-history.hour` and `.week`.
+
 ## 1.49.2 - 2026-11-06
 
 - Update checks run by themselves: the five-minute `self status-refresh`

@@ -9,14 +9,20 @@ lib/site_status.py. It keeps
   acknowledged, and is resolved when the condition clears. New and resolved
   alerts are sent to the alert channel, if one is set.
 - /var/lib/simai-env/metrics-history.jsonl: one load sample per run, kept 31
-  days, answered as 5-minute points for a day and hourly points for a week or
-  a month.
+  days, answered as 5-minute points for 6 hours or a day and hourly points
+  for a week or a month.
+- /var/lib/simai-env/metrics-fine.jsonl: one sample a minute (`tick`, its own
+  cron line), kept 3 hours, answered as 1-minute points for the last hour.
+
+A sample has the load, memory and disk use, and the averages since the
+previous sample of the same kind: CPU busy share, network traffic (physical
+interfaces) and disk reads and writes (whole physical disks).
 
 The channel (/etc/simai-env/alerts-channel.json, root only) is a webhook URL
 or a Telegram chat; the Telegram bot token is kept in its own root-only file
 and is never printed.
 
-Usage: server_watch.py run | alerts [json] | ack ID BY | history PERIOD [json]
+Usage: server_watch.py run | tick | alerts [json] | ack ID BY | history PERIOD [json]
        | channel KIND TARGET [TOKEN_FILE] | test
 """
 from __future__ import annotations
@@ -41,6 +47,13 @@ import host_metrics  # noqa: E402
 VAR = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env"))
 ALERTS = VAR / "alerts.json"
 HISTORY = VAR / "metrics-history.jsonl"
+FINE = VAR / "metrics-fine.jsonl"
+FINE_KEEP_MINUTES = 180
+PERIODS = ("hour", "6h", "day", "week", "month")
+RATE_KEYS = ("cpu_percent", "net_rx_bytes_per_s", "net_tx_bytes_per_s", "disk_read_bytes_per_s",
+             "disk_write_bytes_per_s")
+SYS = Path(os.environ.get("SIMAI_WATCH_SYS", "/sys"))
+PROC = Path(os.environ.get("SIMAI_WATCH_PROC", "/proc"))
 SECURITY_REPORT = Path(os.environ.get("SIMAI_SECURITY_STATE", "/var/lib/simai-env/security")) / "report.json"
 BACKUP_RUNS = Path(os.environ.get("SIMAI_BACKUP_RUNS", "/var/lib/simai-env/backup-runs"))
 ETC = Path(os.environ.get("SIMAI_WATCH_ETC", "/etc/simai-env"))
@@ -166,12 +179,145 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
     return found
 
 
-def sample(metrics: dict) -> dict:
+def physical_interfaces() -> list[str]:
+    try:
+        names = sorted(p.name for p in (SYS / "class" / "net").iterdir())
+    except OSError:
+        return []
+    real = [n for n in names if (SYS / "class" / "net" / n / "device").exists()]
+    # Containers and some VMs show no device links: every interface but the
+    # loopback and the virtual ones of containers and bridges.
+    return real or [n for n in names if n != "lo" and not n.startswith(("veth", "docker", "br-", "virbr", "cni"))]
+
+
+def counters() -> dict:
+    """Cumulative CPU, network and disk counters of the host, read from /proc."""
+    out: dict = {"t": time.time()}
+    try:
+        cpu = [int(x) for x in (PROC / "stat").read_text().splitlines()[0].split()[1:]]
+        idle = cpu[3] + (cpu[4] if len(cpu) > 4 else 0)
+        out["cpu_total"], out["cpu_busy"] = sum(cpu[:8]), sum(cpu[:8]) - idle
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        wanted, rx, tx = set(physical_interfaces()), 0, 0
+        for line in (PROC / "net" / "dev").read_text().splitlines()[2:]:
+            name, _, rest = line.partition(":")
+            if name.strip() in wanted:
+                f = rest.split()
+                rx, tx = rx + int(f[0]), tx + int(f[8])
+        out["net_rx"], out["net_tx"] = rx, tx
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        rd = wr = 0
+        for line in (PROC / "diskstats").read_text().splitlines():
+            f = line.split()
+            if len(f) >= 10 and (SYS / "block" / f[2].replace("/", "!") / "device").exists():
+                rd, wr = rd + int(f[5]) * 512, wr + int(f[9]) * 512  # sectors are always 512 bytes here
+        out["disk_read"], out["disk_write"] = rd, wr
+    except (OSError, ValueError):
+        pass
+    return out
+
+
+def rates(path: Path, max_gap: int) -> dict:
+    """Averages since the counters kept in path; None after a reboot or a long gap."""
+    cur, prev = counters(), load_json(path, {})
+    write_private(path, json.dumps(cur) + "\n")
+    dt = cur["t"] - prev.get("t", 0)
+    answer = dict.fromkeys(RATE_KEYS)
+    if not 0 < dt <= max_gap:
+        return answer
+
+    def delta(key):
+        if key in cur and key in prev and cur[key] >= prev[key]:
+            return cur[key] - prev[key]
+        return None
+
+    busy, total = delta("cpu_busy"), delta("cpu_total")
+    if busy is not None and total:
+        answer["cpu_percent"] = round(busy * 100 / total, 1)
+    for key, name in (("net_rx", "net_rx_bytes_per_s"), ("net_tx", "net_tx_bytes_per_s"),
+                      ("disk_read", "disk_read_bytes_per_s"), ("disk_write", "disk_write_bytes_per_s")):
+        d = delta(key)
+        answer[name] = None if d is None else round(d / dt)
+    return answer
+
+
+def default_interface() -> str | None:
+    try:
+        for line in (PROC / "net" / "route").read_text().splitlines()[1:]:
+            f = line.split()
+            if len(f) > 2 and f[1] == "00000000":
+                return f[0]
+    except OSError:
+        pass
+    return None
+
+
+def root_disk() -> Path | None:
+    """The /sys/block entry of the disk holding /, through partitions and device-mapper."""
+    try:
+        dev = os.stat("/").st_dev
+        path = (SYS / "dev" / "block" / f"{os.major(dev)}:{os.minor(dev)}").resolve(strict=True)
+    except OSError:
+        return None
+    for _ in range(5):
+        if (path / "partition").exists():
+            path = path.parent
+        slaves = sorted((path / "slaves").glob("*")) if (path / "slaves").is_dir() else []
+        if not slaves:
+            return path
+        path = slaves[0].resolve()
+    return path
+
+
+def host_info() -> dict:
+    """Facts for chart titles: the link speed and the kind of the system disk."""
+    speed = None
+    iface = default_interface()
+    if iface:
+        try:
+            mbit = int((SYS / "class" / "net" / iface / "speed").read_text().strip())
+            speed = mbit * 1_000_000 if mbit > 0 else None
+        except (OSError, ValueError):
+            pass
+    kind, name = None, None
+    disk = root_disk()
+    if disk is not None:
+        name = disk.name
+        if name.startswith("nvme"):
+            kind = "nvme"
+        elif name.startswith(("vd", "xvd")):
+            kind = "virtual"  # virtio disks do not tell what is under them
+        else:
+            try:
+                kind = "hdd" if (disk / "queue" / "rotational").read_text().strip() == "1" else "ssd"
+            except OSError:
+                kind = None
+    return {"net_interface": iface, "net_link_bits_per_s": speed, "disk_device": name, "disk_kind": kind}
+
+
+def sample(metrics: dict, measured: dict | None = None) -> dict:
     return {"at": metrics["checked_at"], "load1": metrics["cpu"]["load1"], "cpu_cores": metrics["cpu"]["cores"],
             "memory_used_bytes": metrics["memory"]["used_bytes"], "memory_total_bytes": metrics["memory"]["total_bytes"],
             "swap_used_bytes": metrics["swap"]["used_bytes"],
             "disk": [{"mount": d["mount"], "used_bytes": d["used_bytes"], "total_bytes": d["total_bytes"]}
-                     for d in metrics["disk"]]}
+                     for d in metrics["disk"]],
+            **(measured or dict.fromkeys(RATE_KEYS))}
+
+
+def tick() -> int:
+    """One sample a minute for the last-hour chart."""
+    point = sample({"checked_at": stamp(), **collect()}, rates(VAR / "metrics-counters-fine.json", 180))
+    VAR.mkdir(parents=True, exist_ok=True)
+    with open(FINE, "a") as out:
+        out.write(json.dumps(point) + "\n")
+    lines = FINE.read_text().splitlines()
+    if len(lines) > FINE_KEEP_MINUTES + 60:
+        write_private(FINE, "".join(l + "\n" for l in lines[-FINE_KEEP_MINUTES:]))
+    return 0
 
 
 def record_sample(point: dict) -> None:
@@ -184,12 +330,20 @@ def record_sample(point: dict) -> None:
         write_private(HISTORY, "".join(l + "\n" for l in lines if json.loads(l).get("at", "") >= cutoff))
 
 
+def mean(values: list, digits: int | None = None):
+    known = [v for v in values if isinstance(v, (int, float))]
+    if not known:
+        return None
+    return round(sum(known) / len(known), digits) if digits else round(sum(known) / len(known))
+
+
 def history(period: str) -> dict:
-    days = {"day": 1, "week": 7, "month": 30}[period]
-    cutoff = stamp(now() - timedelta(days=days))
+    span = {"hour": timedelta(hours=1), "6h": timedelta(hours=6), "day": timedelta(days=1),
+            "week": timedelta(days=7), "month": timedelta(days=30)}[period]
+    cutoff = stamp(now() - span)
     points = []
     try:
-        for line in HISTORY.read_text().splitlines():
+        for line in (FINE if period == "hour" else HISTORY).read_text().splitlines():
             try:
                 p = json.loads(line)
             except ValueError:
@@ -198,7 +352,10 @@ def history(period: str) -> dict:
                 points.append(p)
     except OSError:
         pass
-    if period != "day":  # hourly: average load and memory, the last disk value of the hour
+    for p in points:  # samples written before 1.50.0 have no averages
+        for key in RATE_KEYS:
+            p.setdefault(key, None)
+    if period in ("week", "month"):  # hourly: averages, the last disk value of the hour
         hours: dict[str, list] = {}
         for p in points:
             hours.setdefault(p["at"][:13], []).append(p)
@@ -207,9 +364,12 @@ def history(period: str) -> dict:
                    "memory_used_bytes": sum(p["memory_used_bytes"] for p in ps) // len(ps),
                    "memory_total_bytes": ps[-1]["memory_total_bytes"],
                    "swap_used_bytes": sum(p["swap_used_bytes"] for p in ps) // len(ps),
-                   "disk": ps[-1]["disk"]} for h, ps in sorted(hours.items())]
+                   "disk": ps[-1]["disk"],
+                   **{k: mean([p[k] for p in ps], 1 if k == "cpu_percent" else None) for k in RATE_KEYS}}
+                  for h, ps in sorted(hours.items())]
     return {"schema": "simai-metrics-history/1", "period": period,
-            "step_seconds": 300 if period == "day" else 3600, "points": points}
+            "step_seconds": {"hour": 60, "6h": 300, "day": 300}.get(period, 3600), "host": host_info(),
+            "points": points}
 
 
 def channel() -> dict:
@@ -268,7 +428,7 @@ def save_state(state: dict) -> None:
 
 def run() -> int:
     metrics = {"checked_at": stamp(), **collect()}
-    record_sample(sample(metrics))
+    record_sample(sample(metrics, rates(VAR / "metrics-counters.json", 900)))
     sites = [host_describe.describe_site(d, False, host_describe.site_status()) for d in host_describe.site_domains()]
     state, t = load_state(), stamp()
     current = {c["id"]: c for c in conditions(metrics, sites)}
@@ -380,6 +540,8 @@ def main() -> int:
     args = sys.argv[1:]
     if args[:1] == ["run"]:
         return run()
+    if args[:1] == ["tick"]:
+        return tick()
     if args[:1] == ["alerts"]:
         data = alerts_answer()
         if args[1:] == ["json"]:
@@ -392,13 +554,14 @@ def main() -> int:
         return 0
     if args[:1] == ["ack"] and len(args) == 3:
         return ack(args[1], args[2])
-    if args[:1] == ["history"] and len(args) >= 2 and args[1] in ("day", "week", "month"):
+    if args[:1] == ["history"] and len(args) >= 2 and args[1] in PERIODS:
         data = history(args[1])
         if args[2:] == ["json"]:
             print(json.dumps(data))
         else:
             for p in data["points"]:
-                print(f"{p['at']}  load {p['load1']:<6} memory {p['memory_used_bytes'] / (1 << 30):.1f} GiB")
+                cpu = "-" if p.get("cpu_percent") is None else f"{p['cpu_percent']}%"
+                print(f"{p['at']}  load {p['load1']:<6} cpu {cpu:<6} memory {p['memory_used_bytes'] / (1 << 30):.1f} GiB")
         return 0
     if args[:1] == ["channel"] and len(args) in (3, 4):
         return set_channel(args[1], args[2], args[3] if len(args) == 4 else None)

@@ -86,16 +86,18 @@ self_alerts_test_handler() {
 self_metrics_history_handler() {
   parse_kv_args "$@"
   local period="${PARSED_ARGS[period]:-day}"
-  [[ "$period" =~ ^(day|week|month)$ ]] || { error "--period must be day, week or month"; return 1; }
+  [[ "$period" =~ ^(hour|6h|day|week|month)$ ]] || { error "--period must be hour, 6h, day, week or month"; return 1; }
   python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" history "$period" "${SIMAI_COMMAND_OUTPUT:-human}"
 }
 
 self_status_cron_ensure() {
-  local want tmp
+  local want tick tmp
   want="*/5 * * * * root SIMAI_ADMIN_MENU=0 ${SIMAI_ENV_ROOT}/simai-admin.sh self status-refresh --confirm yes >/dev/null 2>&1"
-  grep -qsxF "$want" "$SIMAI_STATUS_CRON" && return 1
+  # One light sample a minute (no sites, no network) for the last-hour chart.
+  tick="* * * * * root python3 -I ${SIMAI_ENV_ROOT}/lib/server_watch.py tick >/dev/null 2>&1"
+  grep -qsxF "$want" "$SIMAI_STATUS_CRON" && grep -qsxF "$tick" "$SIMAI_STATUS_CRON" && return 1
   tmp=$(mktemp) || return 0
-  printf '# simai-managed: yes (site answers, disk, alerts and load history)\n%s\n' "$want" >"$tmp"
+  printf '# simai-managed: yes (site answers, disk, alerts and load history)\n%s\n%s\n' "$want" "$tick" >"$tmp"
   install -m 0644 -o root -g root "$tmp" "$SIMAI_STATUS_CRON"
   rm -f "$tmp"
   return 0
@@ -153,6 +155,6 @@ register_cmd "self" "alerts" "List server alerts: disk, certificates, sites, bac
 register_cmd "self" "alerts-ack" "Acknowledge an open alert" "self_alerts_ack_handler" "id" "by=" "tier:advanced lock:none"
 register_cmd "self" "alerts-channel" "Send alerts to a webhook or a Telegram chat, or nowhere" "self_alerts_channel_handler" "kind" "target= token-file=" "tier:advanced lock:none"
 register_cmd "self" "alerts-test" "Send a test message to the alert channel" "self_alerts_test_handler" "" "" "tier:advanced lock:none"
-register_cmd "self" "metrics-history" "Show the load history: 5-minute points for a day, hourly for a week or month" "self_metrics_history_handler" "" "period=" "tier:advanced effects:read"
+register_cmd "self" "metrics-history" "Show the load history: 1-minute points for an hour, 5-minute for 6 hours or a day, hourly for a week or month" "self_metrics_history_handler" "" "period=" "tier:advanced effects:read"
 register_cmd "self" "profiles" "List enabled site profiles with the site add arguments, values and defaults of each" "self_profiles_handler" "" "" "tier:advanced effects:read"
 register_cmd "self" "ai-catalog" "Generate AI First 1.0.0 discovery for the read-only pilot (JSON)" "self_ai_catalog_handler" "" "" "tier:advanced effects:read"

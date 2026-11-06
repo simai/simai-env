@@ -4006,7 +4006,7 @@
       },
       {
         "command": "simai-admin.sh self metrics-history",
-        "description": "Show the load history: 5-minute points for a day, hourly for a week or month",
+        "description": "Show the load history: 1-minute points for an hour, 5-minute for 6 hours or a day, hourly for a week or month",
         "required": [],
         "optional": {
           "--period": null
