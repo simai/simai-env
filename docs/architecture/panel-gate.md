@@ -50,7 +50,9 @@ address and the one-time first sign-in link (see below).
   points to this server (`--check-dns no` skips it), serves the panel at
   `http://D`, asks Let's Encrypt for a certificate (HTTP-01 through the
   panel site's ACME location), and then serves `https://D` with HTTP
-  redirected. `APP_URL` becomes `https://D`. If no certificate comes, nothing
+  redirected. `APP_URL` becomes `https://D`. While the address by IP is on,
+  `https://D:<port>` answers too, with the domain's certificate (1.51.5).
+  If no certificate comes, nothing
   is left of the domain. The certificate renews with the others
   (`ssl renew-due`). `panel domain --remove yes` takes it away again.
 - **Moving the port.** `panel port --port N` (100-65535, not SSH, web, mail

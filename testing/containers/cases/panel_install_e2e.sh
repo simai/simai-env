@@ -255,6 +255,11 @@ python3 -I lib/panel_address.py set domain panel-new.test && python3 -I lib/pane
 cli self status-refresh --confirm yes >/dev/null 2>&1
 sleep 2  # nginx applies a reload after the signal returns
 [[ "$(curl -sk --max-time 10 --resolve panel-new.test:443:127.0.0.1 'https://panel-new.test/?format=json' | field 'd["gateway"]')" == ok ]] && ok "the domain answers over HTTPS" || { bad "domain https: $(curl -sk --max-time 10 --resolve panel-new.test:443:127.0.0.1 'https://panel-new.test/?format=json' | head -c 200)"; nginx -t 2>&1 | tail -3; ss -ltn | grep -E ':(443|8500) '; journalctl -u nginx --no-pager | tail -5; grep -E 'nginx|emerg|panel' /var/log/simai-admin.log | tail -8 | cut -c1-200; }
+pp=$(python3 -I lib/panel_address.py get port)
+openssl s_client -connect 127.0.0.1:"$pp" -servername panel-new.test </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null | grep 'panel-new.test' >/dev/null \
+  && [[ "$(curl -sk --max-time 10 --resolve panel-new.test:"$pp":127.0.0.1 "https://panel-new.test:$pp/?format=json" | field 'd["gateway"]')" == ok ]] \
+  && ok "the domain on the panel port has its own certificate" || bad "domain on port $pp: $(openssl s_client -connect 127.0.0.1:"$pp" -servername panel-new.test </dev/null 2>/dev/null | openssl x509 -noout -subject 2>&1)"
+openssl s_client -connect 127.0.0.1:"$pp" </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null | grep 'SIMAI Panel' >/dev/null && ok "the address by IP keeps the self-signed certificate" || bad "IP cert on port $pp"
 curl -s -o /dev/null -w '%{http_code}' -H 'Host: panel-new.test' http://127.0.0.1/ | grep -q 301 && ok "and HTTP goes to HTTPS" || bad "domain http redirect"
 [[ "$(cli panel address --output json 2>/dev/null | field 'd["data"]["url"]')" == https://panel-new.test ]] && ok "the domain is the panel's address" || bad "address url"
 cli panel domain --remove yes --confirm yes >/dev/null 2>&1 && ! grep -q panel-new.test /etc/nginx/conf.d/simai-panel-address.conf && ok "panel domain --remove yes" || bad "domain remove"

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.51.5 - 2026-11-07
+
+- A panel domain with a certificate also answers on the panel port with
+  that certificate: `https://<domain>:8500` has no browser warning, while the
+  address by IP keeps the self-signed one.
+
 ## 1.51.4 - 2026-11-06
 
 - `site deploy` and `panel update` no longer refuse a release for a PHP

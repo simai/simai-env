@@ -112,6 +112,14 @@ def render(conf_path: str, cert: str, key: str) -> str:
                f"    ssl_certificate {cert};", f"    ssl_certificate_key {key};",
                "    # Plain HTTP sent to this port: send the browser to HTTPS.",
                f"    error_page 497 =301 https://$host:{port}$request_uri;"] + body + ["}", ""]
+        if st["domain"] and st["domain_ssl"]:
+            # The attached domain on the same port answers with its own
+            # certificate, so https://<domain>:<port> has no browser warning.
+            live = f"/etc/letsencrypt/live/{st['domain']}"
+            out += ["server {"] + http2_lines(f"listen {port} ssl") \
+                + [f"    listen [::]:{port} ssl;", f"    server_name {st['domain']};",
+                   f"    ssl_certificate {live}/fullchain.pem;", f"    ssl_certificate_key {live}/privkey.pem;",
+                   f"    error_page 497 =301 https://$host:{port}$request_uri;"] + body + ["}", ""]
     if st["domain"]:
         d = st["domain"]
         live = f"/etc/letsencrypt/live/{d}"
