@@ -41,6 +41,12 @@ timed_change_undo() {
   case "$kind" in
     firewall) ufw reload >>"$LOG_FILE" 2>&1 || { error "ufw reload failed after restoring ${id}"; return 1; } ;;
     geo) security_geo_load >>"$LOG_FILE" 2>&1 || { error "country rules did not reload after restoring ${id}"; return 1; } ;;
+    panel_address)
+      if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+        ufw reload >>"$LOG_FILE" 2>&1 || { error "ufw reload failed after restoring ${id}"; return 1; }
+      fi
+      nginx -t >>"$LOG_FILE" 2>&1 && os_svc_reload_or_restart nginx >>"$LOG_FILE" 2>&1 || { error "nginx did not reload after restoring ${id}"; return 1; }
+      panel_address_app_url || true ;;
     panel_access|nginx_custom) nginx -t >>"$LOG_FILE" 2>&1 && os_svc_reload_or_restart nginx >>"$LOG_FILE" 2>&1 || { error "nginx did not reload after restoring ${id}"; return 1; } ;;
   esac
   printf '%s\n' "$kind"

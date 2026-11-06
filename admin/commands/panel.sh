@@ -173,10 +173,23 @@ panel_setup_token_write() {
 }
 
 panel_print_setup_link() {
-  local domain="$1" token="$2" scheme=http
+  local domain="$1" token="$2" scheme=http ip_url domain_url fp
   [[ -n "$(panel_state_get SSL)" ]] && scheme=https
+  ip_url=$(panel_address_url ip_url 2>/dev/null || true)
+  domain_url=$(panel_address_url domain_url 2>/dev/null || true)
+  [[ -n "$domain_url" || "$domain" == "$SIMAI_PANEL_INTERNAL_DOMAIN" ]] || domain_url="${scheme}://${domain}"
   # The link is a one-time secret for the operator: stdout only, never the log.
-  printf '\nFirst sign-in (one time): %s://%s/?setup=%s\n' "$scheme" "$domain" "$token"
+  printf '\nLarena Panel is ready.\n'
+  [[ -n "$domain_url" ]] && printf '  Address:   %s\n' "$domain_url"
+  if [[ -n "$ip_url" ]]; then
+    printf '  By IP:     %s\n' "$ip_url"
+    fp=$(openssl x509 -in "${SIMAI_PANEL_TLS_DIR}/cert.pem" -noout -fingerprint -sha256 2>/dev/null | sed 's/^.*=//')
+    [[ -n "$fp" ]] && printf '  The browser warns about the self-signed certificate of this address; its SHA-256 is\n    %s\n' "$fp"
+  fi
+  printf '\nFirst sign-in (one time, you choose the password there):\n'
+  [[ -n "$domain_url" ]] && printf '  %s/?setup=%s\n' "$domain_url" "$token"
+  [[ -n "$ip_url" ]] && printf '  %s/?setup=%s\n' "$ip_url" "$token"
+  printf '\nA new link if this one is lost: sudo %s/simai-admin.sh panel setup-link --confirm yes\n' "$SIMAI_ENV_ROOT"
 }
 
 panel_release_get() { sed -n "s/^${1}=//p" "$SIMAI_PANEL_RELEASE" | tail -n1; }
@@ -281,9 +294,17 @@ panel_install_run() {
   local domain="${PARSED_ARGS[domain]:-}" git="${PARSED_ARGS[git]:-}" ref="${PARSED_ARGS[ref]:-}"
   local archive="${PARSED_ARGS[archive]:-}" sha="${PARSED_ARGS[sha256]:-}" php="${PARSED_ARGS[php]:-}"
   local email="${PARSED_ARGS[ssl-email]:-}" engine="${PARSED_ARGS[db-engine]:-}"
-  local version="${PARSED_ARGS[version]:-}" placeholder="${PARSED_ARGS[placeholder]:-no}"
-  require_args "domain" || return 1
+  local version="${PARSED_ARGS[version]:-}" placeholder="${PARSED_ARGS[placeholder]:-no}" port="${PARSED_ARGS[port]:-}"
+  # Without a domain the panel answers on the server's address and its own
+  # port (panel address); a domain is attached later (panel domain).
+  if [[ -z "$domain" ]]; then
+    domain="$SIMAI_PANEL_INTERNAL_DOMAIN"
+    [[ -z "$email" ]] || { warn "--ssl-email needs --domain; attach a domain later with panel domain"; email=""; }
+  fi
   validate_domain "$domain" "allow" || return 1
+  if [[ -n "$port" ]]; then
+    panel_address_py port-ok "$port" || return 1
+  fi
   [[ -z "$git" || -n "$ref" ]] || { error "--git needs --ref"; return 1; }
   [[ -z "$archive" || -n "$sha" ]] || { error "--archive needs --sha256"; return 1; }
   [[ -z "$git" || -z "$archive" ]] || { error "Use --git or --archive, not both"; return 1; }
@@ -365,6 +386,9 @@ panel_install_run() {
   panel_state_set PANEL_DOMAIN "$domain" && panel_state_set PANEL_USER "$user" && panel_state_set SOURCE "$source" || return 1
   panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" && panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
   panel_gate_sync || return 1
+  [[ -z "$port" ]] || panel_address_py set port "$port" || return 1
+  panel_address_sync >/dev/null || warn "The panel does not answer on its port yet; see ${LOG_FILE}"
+  [[ "$source" == build && "$domain" == "$SIMAI_PANEL_INTERNAL_DOMAIN" ]] && panel_address_app_url
   # The panel lists sites with whether they answer: keep that fresh.
   self_status_cron_ensure || true
   panel_admin self status-refresh --confirm yes >>"$LOG_FILE" 2>&1 || true
@@ -439,6 +463,7 @@ panel_update_run() {
     return 1
   fi
   panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
+  panel_address_sync >/dev/null || true
   current=$(sed -n 's/^CURRENT=//p' "$deploy_file" | tail -n1)
   ui_result_table "Panel|${domain}" "Version|${PANEL_RELEASE_VERSION:-custom}" "Release|${current}" "Previous|${previous}"
 }
@@ -468,8 +493,12 @@ panel_remove_handler() {
   panel_state_set PANEL_USER "" && panel_gate_sync || return 1
   progress_step "Removing the panel site ${domain} (other sites are not touched)"
   panel_remove_site "$domain" || return 1
-  local key
+  local key port
+  port=$(panel_address_py get port)
   for key in PANEL_DOMAIN SOURCE INSTALLED_AT SSL VERSION; do panel_state_set "$key" "" || return 1; done
+  panel_address_sync >/dev/null || true
+  panel_address_port_rule close "$port"
+  rm -f -- "$SIMAI_PANEL_ADDRESS_STATE"
   ui_result_table "Panel|removed (${domain})" "Other sites|unchanged" "Gateway log kept|${SIMAI_PANEL_GATE_LOG}"
 }
 
@@ -477,16 +506,17 @@ panel_status_handler() {
   local domain
   domain=$(panel_state_get PANEL_DOMAIN)
   if [[ -z "$domain" ]]; then
-    ui_result_table "Panel|not installed" "Install|simai-admin.sh panel install --domain <name> --confirm yes"
+    ui_result_table "Panel|not installed" "Install|simai-admin.sh panel install --confirm yes   (or --domain <name>)"
     return 0
   fi
   ui_result_table "Panel|${domain}" "Source|$(panel_state_get SOURCE)" "Version|$(panel_state_get VERSION)" "Pinned|$(panel_release_get VERSION)" "Runs as|$(panel_state_get PANEL_USER)" \
     "Installed|$(panel_state_get INSTALLED_AT)" "Release|$(sed -n 's/^CURRENT=//p' "$(site_sites_config_dir)/${domain}/deploy.env" 2>/dev/null | tail -n1)" \
     "Gateway|$([[ -x "$SIMAI_PANEL_GATE" ]] && echo enabled || echo missing)" \
+    "Address|$(panel_address_url 2>/dev/null || true)" \
     "Scheduler|$([[ -f "/etc/cron.d/$(project_slug_from_domain "$domain")" ]] && echo "every minute" || echo "off (set \"scheduler\": true in the build's .simai/app.json)")"
 }
 
-register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "domain" "version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"
+register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "" "domain= port= version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"
 register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "version= git= ref= archive= sha256=" "tier:advanced lock:none"
 register_cmd "panel" "remove" "Remove the panel site and its gateway access (other sites are not touched)" "panel_remove_handler" "" "" "tier:advanced lock:none"
 register_cmd "panel" "status" "Show the installed panel" "panel_status_handler" "" "" "effects:read"

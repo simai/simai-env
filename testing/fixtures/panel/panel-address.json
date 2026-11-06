@@ -1,0 +1,30 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-panel-address",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-panel-address/1",
+    "installed": false,
+    "site_domain": null,
+    "ip": "203.0.113.10",
+    "addresses": [
+      "203.0.113.10"
+    ],
+    "port": 8500,
+    "ip_access": true,
+    "ip_url": "https://203.0.113.10:8500",
+    "ip_certificate": {
+      "kind": "self-signed",
+      "sha256": "AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB",
+      "expires": "Jan  1 00:00:00 2036 GMT"
+    },
+    "domain": null,
+    "domain_ssl": false,
+    "domain_url": null,
+    "domain_managed": false,
+    "url": "https://203.0.113.10:8500"
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

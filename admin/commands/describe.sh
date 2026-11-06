@@ -35,6 +35,8 @@ self_status_refresh_handler() {
   apt_cache_warm
   # The security report (local checks; vulnerability databases once a day).
   security_refresh_background
+  # The panel's address copies the panel site's block: follow its changes.
+  if [[ -n "$(panel_state_get PANEL_DOMAIN 2>/dev/null || true)" ]]; then panel_address_sync >/dev/null 2>&1 || true; fi
   # The update check (mode check by default, every 6 hours): the panel offers
   # a new simai-env release without anyone running a command.
   if declare -F self_auto_update_check_if_due >/dev/null; then self_auto_update_check_if_due || true; fi

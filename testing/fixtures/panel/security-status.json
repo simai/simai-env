@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-security/1",
-    "checked_at": "2026-11-06T10:14:07Z",
+    "checked_at": "2026-11-06T12:47:52Z",
     "score": 45,
     "grade": "risk",
     "summary": {
@@ -40,7 +40,7 @@
     },
     "online": {
       "enabled": true,
-      "checked_at": "2026-11-06T10:13:06Z",
+      "checked_at": "2026-11-06T12:46:46Z",
       "error": null
     },
     "checks": [

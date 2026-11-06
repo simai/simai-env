@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.panel-port",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "panel:port",
+    "args": {
+      "port": "8600"
+    },
+    "target": "host",
+    "description": "Move the panel to another port (undone in --window seconds unless confirmed)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

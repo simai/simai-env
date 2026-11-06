@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 267,
+    "count": 271,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -2584,6 +2584,53 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh panel address",
+        "description": "Show where the panel answers: the server's address and port, and its domain",
+        "required": [],
+        "optional": {},
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh panel domain",
+        "description": "Attach a domain to the panel with a Let's Encrypt certificate, or --remove yes",
+        "required": [],
+        "optional": {
+          "--domain": null,
+          "--email": null,
+          "--remove": null,
+          "--check-dns": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh panel gate-disable",
         "description": "Remove the panel gateway, its sudo rule and SSH keys",
         "required": [],
@@ -2651,10 +2698,10 @@
       {
         "command": "simai-admin.sh panel install",
         "description": "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes",
-        "required": [
-          "--domain"
-        ],
+        "required": [],
         "optional": {
+          "--domain": null,
+          "--port": null,
           "--version": null,
           "--git": null,
           "--ref": null,
@@ -2673,6 +2720,56 @@
         "authorization": "root",
         "confirmation": "required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh panel ip-access",
+        "description": "Turn the panel's address by IP and port on or off (undone unless confirmed)",
+        "required": [
+          "--enabled"
+        ],
+        "optional": {
+          "--window": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh panel port",
+        "description": "Move the panel to another port (undone in --window seconds unless confirmed)",
+        "required": [
+          "--port"
+        ],
+        "optional": {
+          "--window": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "host",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

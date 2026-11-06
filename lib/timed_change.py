@@ -23,7 +23,7 @@ from pathlib import Path
 
 BASE = Path(os.environ.get("SIMAI_CHANGES_DIR", "/var/lib/simai-env/changes"))
 CHANGE_ID = re.compile(r"^[a-f0-9]{12}$")
-KINDS = {"firewall", "panel_access", "nginx_custom", "geo"}
+KINDS = {"firewall", "panel_access", "nginx_custom", "geo", "panel_address"}
 KEEP_DAYS = 30
 
 

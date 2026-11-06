@@ -21,11 +21,59 @@ alerts and the load history (1.31.0), the file manager with downloads
 ## Installation
 
 ```bash
+# a new server, one command; the panel answers on https://<server address>:8500
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash -s -- --with-panel
+# or at a domain that already points to the server
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash -s -- --with-panel --panel-domain panel.example.com --panel-email ops@example.com
+# on a server with simai-env
+sudo /root/simai-env/simai-admin.sh panel install --confirm yes            # [--port 8500]
 sudo /root/simai-env/simai-admin.sh panel install --domain panel.example.com --ssl-email ops@example.com --confirm yes
 sudo /root/simai-env/simai-admin.sh panel update --confirm yes
-# with the server:
-bash install.sh --with-panel --panel-domain panel.example.com --panel-email ops@example.com
 ```
+
+The end of the output is what the person needs to start: the panel's
+address and the one-time first sign-in link (see below).
+
+### Where the panel answers (1.51.0)
+
+- **By the server's address and port.** Every panel answers on
+  `https://<server address>:<port>`, 8500 by default (`--port` on install,
+  `--panel-port` for `install.sh`), with a self-signed certificate for the
+  server's addresses (`/etc/simai-env/panel-tls`, 10 years). The browser
+  warns once; the install prints the certificate's SHA-256 so the person can
+  compare it. Plain HTTP sent to the port is redirected to HTTPS. The port is
+  opened in ufw when ufw is on; a cloud provider's own firewall has to allow
+  it too.
+- **Without a domain** the panel site is called `panel.internal` (it never
+  resolves) and its `APP_URL` is the address by IP.
+- **A domain later.** `panel domain --domain D [--email E]` checks that `D`
+  points to this server (`--check-dns no` skips it), serves the panel at
+  `http://D`, asks Let's Encrypt for a certificate (HTTP-01 through the
+  panel site's ACME location), and then serves `https://D` with HTTP
+  redirected. `APP_URL` becomes `https://D`. If no certificate comes, nothing
+  is left of the domain. The certificate renews with the others
+  (`ssl renew-due`). `panel domain --remove yes` takes it away again.
+- **Moving the port.** `panel port --port N` (100-65535, not SSH, web, mail
+  or database ports, not in use) is a timed change: unless `change confirm
+  --id <id>` comes within `--window` seconds (300 by default), the previous
+  port comes back by itself, so a port the provider's network blocks does not
+  lock anyone out. The old port is closed in ufw.
+- **Only the domain.** `panel ip-access --enabled no` (timed as well) turns
+  the address by IP off once the panel has a domain with a certificate.
+- `panel address` (`--output json`: `simai-panel-address/1`) answers
+  `{installed, site_domain, ip, addresses, port, ip_access, ip_url,
+  ip_certificate {kind, sha256, expires}, domain, domain_ssl, domain_url,
+  domain_managed, url}`; `url` is the address to use: the domain once it has
+  a certificate, otherwise the address by IP.
+- How: both addresses are copies of the panel site's own server block (root,
+  PHP pool, access list, headers, locations) with other `listen` lines, in
+  `/etc/nginx/conf.d/simai-panel-address.conf`, outside the site list.
+  `self status-refresh` writes it again when the site's block changes;
+  nginx must accept it or the previous file stays.
+- Gateway, administrator only: `panel:address` (read), `panel:port {port}`,
+  `panel:ip-access {enabled}` (timed: the job result has `change_id`, then
+  `change:confirm` from the new address), `panel:domain {domain, email} |
+  {remove: yes}`.
 
 - The panel is an ordinary isolated site with its own account
   (`site-<project>`), never `simai` or root. Its domain must be new: an
@@ -51,8 +99,9 @@ bash install.sh --with-panel --panel-domain panel.example.com --panel-email ops@
   `simai-panel` when `panel gate-enable` is on); `panel gate-disable` keeps
   the installed panel's access.
 - **First sign-in.** The install writes `SIMAI_PANEL_SETUP_TOKEN=<64 hex>`
-  into the site's shared `.env` and prints
-  `https://<domain>/?setup=<token>` once, on stdout only (never in a log).
+  into the site's shared `.env` and prints `<address>/?setup=<token>` once
+  for each address of the panel (the domain and the address by IP), on
+  stdout only (never in a log).
   The panel build accepts that link for the first administrator and then
   removes the line from `.env`. `panel setup-link` replaces the token (the
   old link stops working).

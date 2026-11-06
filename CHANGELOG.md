@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 1.51.0 - 2026-11-06
+
+- The panel without a domain: `install.sh --with-panel` and `panel install`
+  no longer need one. Every panel answers on `https://<server address>:8500`
+  (`--port` / `--panel-port`) with a self-signed certificate whose SHA-256
+  the install prints; the port is opened in ufw. The end of the install
+  output has the panel's addresses and the one-time sign-in link for each,
+  and `install.sh` does not open the menu over it.
+- `panel domain --domain D [--email E]`: checks that D points here, gets a
+  Let's Encrypt certificate and serves the panel at `https://D`; nothing is
+  left when the certificate does not come. `--remove yes` takes it away.
+- `panel port --port N` and `panel ip-access --enabled yes|no` are timed
+  changes, undone unless confirmed, so a blocked port never locks anyone
+  out. `panel address` (`simai-panel-address/1`) says where the panel
+  answers. Gateway: `panel:address`, `panel:port`, `panel:ip-access`,
+  `panel:domain`, administrator only.
+
 ## 1.50.0 - 2026-11-06
 
 - Load history for provider-style charts: every point of

@@ -27,7 +27,7 @@ cli panel status 2>&1 | grep -q 'not installed' && ok "status before install" ||
 cli panel install --domain $P >/tmp/pl 2>&1
 [[ ! -f /etc/nginx/sites-available/$P.conf ]] && ok "install without confirm changes nothing" || bad "plan created the site"
 cli panel install --domain $P --placeholder yes --confirm yes >/tmp/pi 2>&1 && ok "panel install (placeholder)" || { bad "panel install"; tail -15 /tmp/pi; }
-token=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/pi)
+token=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/pi | head -n1)
 [[ -n "$token" ]] && ok "install prints a one-time sign-in link" || bad "no setup link: $(tail -3 /tmp/pi)"
 grep -rqs "$token" /var/log/simai-admin.log /var/log/simai-audit.log /var/log/simai-panel-gate.log && bad "setup token in a log" || ok "setup token stays out of the logs"
 
@@ -48,7 +48,7 @@ cli panel install --domain other.test --placeholder yes --confirm yes >/dev/null
 cli panel install --domain keep.test --git https://example.com/x --ref v1 --confirm yes >/dev/null 2>&1; [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "an existing site is never taken over" || bad "keep.test changed"
 
 cli panel setup-link --confirm yes >/tmp/ps 2>&1
-new=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/ps)
+new=$(sed -n 's#.*?setup=\([a-f0-9]\{64\}\)$#\1#p' /tmp/ps | head -n1)
 [[ -n "$new" && "$new" != "$token" ]] && ok "setup-link makes a new link" || bad "setup-link"
 [[ "$(page "?format=json&setup=${token}" | field 'd["setup"]')" == invalid ]] && ok "the old link stops working" || bad "old link still valid"
 [[ "$(page "?format=json&setup=${new}" | field 'd["setup"]')" == valid ]] && ok "the new link works" || bad "new link"
@@ -181,7 +181,9 @@ ls /tmp/tmp.*.tar.gz >/dev/null 2>&1 && bad "downloads left in /tmp" || ok "down
 kill "$httpd" 2>/dev/null; unset SIMAI_PANEL_RELEASE
 
 # The installer's options map to the same variables.
-grep -q 'needs --panel-domain' <<<"$(bash ./install.sh --with-panel </dev/null 2>&1)" && ok "--with-panel needs a domain" || bad "--with-panel without a domain"
+# (Not run: install.sh would replace this tree with the published release.)
+grep -q -- '--panel-port) SIMAI_INSTALL_PANEL_PORT=' install.sh && grep -q 'panel_args=(panel install --confirm yes)' install.sh \
+  && ok "--with-panel works without a domain, --panel-port sets the port" || bad "installer panel options"
 
 # The real published builds: the previous one, then an update to the one
 # this release pins, and back.
@@ -212,6 +214,51 @@ cli panel install --domain $P --placeholder yes --confirm yes >/dev/null 2>&1
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 [[ "$(page '?format=json' | field 'd["gateway"]')" == ok ]] && ok "gate-disable keeps the installed panel's access" || bad "panel lost the gateway"
 cli panel remove --confirm yes >/dev/null 2>&1
+
+# Without a domain (1.51.0): the panel answers on the server's address and
+# port 8500 with a self-signed certificate; a domain is attached later.
+port() { curl -sk --max-time 10 "https://127.0.0.1:${2:-8500}/$1"; }
+cli panel install --placeholder yes --confirm yes >/tmp/pn 2>&1 && ok "panel install without a domain" || { bad "install without a domain"; tail -15 /tmp/pn; }
+grep -q 'By IP: *https://.*:8500' /tmp/pn && ok "install prints the address by IP and port" || bad "no IP address: $(tail -12 /tmp/pn)"
+grep -qE '^ +https://.*:8500/\?setup=[a-f0-9]{64}$' /tmp/pn && ok "the sign-in link uses that address" || bad "sign-in link: $(tail -6 /tmp/pn)"
+grep -q 'SHA-256' /tmp/pn && ok "install prints the certificate fingerprint" || bad "no fingerprint"
+[[ "$(port '?format=json' | field 'd["gateway"]')" == ok ]] && ok "the panel answers on port 8500" || bad "port 8500: $(port '?format=json' | head -c 300)"
+curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8500/ | grep -q 301 && ok "plain HTTP on the port goes to HTTPS" || bad "http on 8500"
+a=$(cli panel address --output json 2>/dev/null)
+[[ "$(field 'd["data"]["port"] == 8500 and d["data"]["ip_access"] and d["data"]["domain"] is None and d["data"]["ip_url"].endswith(":8500") and d["data"]["ip_certificate"]["kind"] == "self-signed"' <<<"$a")" == True ]] && ok "panel address" || bad "address: ${a:0:400}"
+[[ -f /etc/nginx/conf.d/simai-panel-address.conf ]] && ! grep -q 'simai-managed' /etc/nginx/conf.d/simai-panel-address.conf && ok "the address is not a site of its own" || bad "address file"
+cli site list 2>/dev/null | grep -q 'simai-panel-address' && bad "address listed as a site" || ok "site list unchanged"
+cli panel port --port 22 --confirm yes >/dev/null 2>&1 && bad "SSH port accepted" || ok "a port of another service is refused"
+cli panel port --port 8600 --confirm yes >/tmp/pp 2>&1 && ok "panel port 8600" || { bad "panel port"; tail -8 /tmp/pp; }
+[[ "$(port '?format=json' 8600 | field 'd["gateway"]')" == ok && -z "$(port '' 8500)" ]] && ok "the panel moved to 8600" || bad "after the move"
+id=$(sed -n 's/.*change confirm --id \([a-f0-9]\{12\}\).*/\1/p' /tmp/pp | head -n1)
+cli change restore --id "$id" --confirm yes >/dev/null 2>&1
+[[ "$(port '?format=json' | field 'd["gateway"]')" == ok && "$(cli panel address --output json 2>/dev/null | field 'd["data"]["port"]')" == 8500 ]] && ok "an unconfirmed move is undone" || bad "undo of the move"
+cli panel port --port 8601 --confirm yes >/tmp/pp 2>&1
+id=$(sed -n 's/.*change confirm --id \([a-f0-9]\{12\}\).*/\1/p' /tmp/pp | head -n1)
+cli change confirm --id "$id" --confirm yes >/dev/null 2>&1
+cli panel port --port 8500 --confirm yes >/tmp/pp 2>&1
+id=$(sed -n 's/.*change confirm --id \([a-f0-9]\{12\}\).*/\1/p' /tmp/pp | head -n1)
+cli change confirm --id "$id" --confirm yes >/dev/null 2>&1 && [[ "$(port '?format=json' | field 'd["gateway"]')" == ok ]] && ok "a confirmed move stays" || bad "confirm move: $(tail -5 /tmp/pp)"
+cli panel ip-access --enabled no --confirm yes >/dev/null 2>&1 && bad "IP access off without a domain" || ok "IP access stays on while there is no domain"
+cli panel domain --domain nowhere.invalid --confirm yes >/tmp/pd 2>&1 && bad "a domain that points elsewhere" || ok "a domain that does not point here is refused"
+cli panel domain --domain keep.test --check-dns no --confirm yes >/dev/null 2>&1 && bad "a site's domain taken" || ok "a site's domain is refused"
+cli panel domain --domain panel-new.test --check-dns no --confirm yes >/tmp/pd 2>&1 && bad "certificate without the internet" || ok "no certificate: the domain is not attached"
+[[ "$(cli panel address --output json 2>/dev/null | field 'd["data"]["domain"]')" == None ]] && ! grep -q panel-new.test /etc/nginx/conf.d/simai-panel-address.conf && ok "and nothing is left of it" || bad "domain left after a failed certificate"
+# A domain with a certificate (made here instead of by Let's Encrypt).
+mkdir -p /etc/letsencrypt/live/panel-new.test
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=panel-new.test -keyout /etc/letsencrypt/live/panel-new.test/privkey.pem -out /etc/letsencrypt/live/panel-new.test/fullchain.pem >/dev/null 2>&1
+python3 -I lib/panel_address.py set domain panel-new.test && python3 -I lib/panel_address.py set domain_ssl yes
+cli self status-refresh --confirm yes >/dev/null 2>&1
+sleep 2  # nginx applies a reload after the signal returns
+[[ "$(curl -sk --max-time 10 --resolve panel-new.test:443:127.0.0.1 'https://panel-new.test/?format=json' | field 'd["gateway"]')" == ok ]] && ok "the domain answers over HTTPS" || { bad "domain https: $(curl -sk --max-time 10 --resolve panel-new.test:443:127.0.0.1 'https://panel-new.test/?format=json' | head -c 200)"; nginx -t 2>&1 | tail -3; ss -ltn | grep -E ':(443|8500) '; journalctl -u nginx --no-pager | tail -5; grep -E 'nginx|emerg|panel' /var/log/simai-admin.log | tail -8 | cut -c1-200; }
+curl -s -o /dev/null -w '%{http_code}' -H 'Host: panel-new.test' http://127.0.0.1/ | grep -q 301 && ok "and HTTP goes to HTTPS" || bad "domain http redirect"
+[[ "$(cli panel address --output json 2>/dev/null | field 'd["data"]["url"]')" == https://panel-new.test ]] && ok "the domain is the panel's address" || bad "address url"
+cli panel domain --remove yes --confirm yes >/dev/null 2>&1 && ! grep -q panel-new.test /etc/nginx/conf.d/simai-panel-address.conf && ok "panel domain --remove yes" || bad "domain remove"
+rm -rf /etc/letsencrypt/live/panel-new.test
+cli panel remove --confirm yes >/dev/null 2>&1
+sleep 2
+[[ ! -f /etc/nginx/conf.d/simai-panel-address.conf && -z "$(port '')" ]] && ok "panel remove closes the port" || { bad "port left after remove: $(port '' | head -c 200)"; ss -ltn | grep -E ':(8500) '; journalctl -u nginx --no-pager | tail -5; }
 
 # Leave the container as other cases expect it.
 if [[ "$had_profiles" == yes ]]; then cp /root/profiles.enabled.saved /etc/simai-env/profiles.enabled; else rm -f /etc/simai-env/profiles.enabled; fi

@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.panel-ip-access",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "panel:ip-access",
+    "args": {
+      "enabled": "no"
+    },
+    "target": "host",
+    "description": "Turn the panel's address by IP and port on or off (undone unless confirmed)",
+    "effects": "write",
+    "lock": "host",
+    "applied": false
+  }
+}

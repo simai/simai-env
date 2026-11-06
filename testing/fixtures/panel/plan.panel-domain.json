@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.panel-domain",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "panel:domain",
+    "args": {
+      "domain": "panel.example.com",
+      "email": "ops@example.com"
+    },
+    "target": "panel.example.com",
+    "description": "Attach a domain to the panel with a Let's Encrypt certificate, or --remove yes",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

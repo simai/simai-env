@@ -371,6 +371,10 @@ cli self status-refresh --confirm yes >/dev/null 2>&1
 a=$(gate "$(req null self:metrics-history '{"period":"6h"}')")
 [[ "$(field 'd["data"]["step_seconds"] == 300 and isinstance(d["data"]["points"][-1]["cpu_percent"], float)' <<<"$a")" == True ]] && ok "6 hours of 5-minute points with averages" || bad "history 6h: ${a:0:400}"
 refused invalid_argument "$(req null self:metrics-history '{"period":"year"}')" "an unknown period"
+a=$(gate "$(req null panel:address '{}')")
+[[ "$(field 'd["status"] == "ok" and d["data"]["schema"] == "simai-panel-address/1" and d["data"]["port"] == 8500' <<<"$a")" == True ]] && ok "panel:address" || bad "panel:address: ${a:0:300}"
+refused invalid_argument "$(req null panel:port '{"port":"80x"}')" "a bad panel port"
+refused not_allowed "$(req '"acme"' panel:port '{"port":"8600"}')" "an owner moves the panel"
 refused not_allowed "$(req '"acme"' self:metrics-history '{"period":"day"}')" "an owner reads the host history"
 
 # Host services and site profiles (1.33.0).

@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=26
+FIXTURE_SET=27
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -201,6 +201,11 @@ FW
     "plan.firewall-block|null|firewall:block|{\"address\":\"198.51.100.20\",\"ttl\":\"3600\"}"
     "plan.firewall-unblock|null|firewall:unblock|{\"address\":\"203.0.113.7\"}"
     "plan.panel-access|null|panel:access|{\"allow\":[\"192.0.2.10\",\"198.51.100.0/24\"]}"
+    "panel-address|null|panel:address|{}"
+    "plan.panel-port|null|panel:port|{\"port\":\"8600\"}"
+    "plan.panel-ip-access|null|panel:ip-access|{\"enabled\":\"no\"}"
+    "plan.panel-domain|null|panel:domain|{\"domain\":\"panel.example.com\",\"email\":\"ops@example.com\"}"
+    "refused.owner-admin-only.panel-address|\"demo\"|panel:address|{}"
     "plan.change-confirm|null|change:confirm|{\"change_id\":\"${change_id}\"}"
     "change-status|null|change:status|{\"change_id\":\"${change_id}\"}"
     "refused.owner-admin-only.firewall-status|\"demo\"|firewall:status|{}"
@@ -353,6 +358,11 @@ for f in sorted(root.glob("*.json")):
             (f"2026-01-01T{step // 3600:02d}:{step % 3600 // 60:02d}:00Z",
              {"cpu_percent": 12.5, "net_rx_bytes_per_s": 125000, "net_tx_bytes_per_s": 2500000,
               "disk_read_bytes_per_s": 4096, "disk_write_bytes_per_s": 1048576}))]
+    if data.get("schema") == "simai-panel-address/1":
+        # The stand's address and certificate differ on every machine.
+        data.update(ip="203.0.113.10", addresses=["203.0.113.10"], ip_url="https://203.0.113.10:8500",
+                    ip_certificate={"kind": "self-signed", "sha256": "AB:" * 31 + "AB", "expires": "Jan  1 00:00:00 2036 GMT"},
+                    url=data["domain_url"] if data.get("domain_ssl") else "https://203.0.113.10:8500")
     if data.get("schema") == "simai-services/1":
         for svc in data["services"]:
             svc["since"] = "Thu 2026-01-01 00:00:00 UTC"
