@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.51.4 - 2026-11-06
+
+- `site deploy` and `panel update` no longer refuse a release for a PHP
+  extension that is installed: the check read `php -m` through `grep -q`,
+  which under pipefail failed now and then when php got SIGPIPE. The same
+  pattern is fixed in the database, redis and OPcache checks.
+
 ## 1.51.3 - 2026-11-06
 
 - Larena Panel 0.3.1: after sign-in the server overview opens first, with

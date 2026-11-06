@@ -1123,7 +1123,7 @@ bitrix_perf_status_handler() {
     opcache_memory=$(doctor_php_pool_ini_get "$pool_file" "opcache.memory_consumption" || true)
   fi
   php_bin=$(resolve_php_bin "$BX_PHP_VERSION")
-  if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^redis$'; then
+  if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -i '^redis$' >/dev/null; then
     redis_ext="yes"
   fi
   if os_svc_has_unit "redis-server"; then

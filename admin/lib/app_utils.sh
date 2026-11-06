@@ -61,10 +61,13 @@ app_missing_packages() {
 
 # apt packages for the PHP extensions the application requires.
 app_php_ext_packages() {
-  local ver="$1" ext pkg
+  local ver="$1" ext pkg modules
   shift
+  # Read the module list once: `php -m | grep -q` under pipefail fails when
+  # grep exits early and php gets SIGPIPE, so a present extension looked missing.
+  modules=$("php${ver}" -m 2>/dev/null || true)
   for ext in "$@"; do
-    "php${ver}" -m 2>/dev/null | grep -qix "$ext" && continue
+    grep -qix -- "$ext" <<<"$modules" && continue
     pkg=$(doctor_ext_to_apt_pkg "$ver" "$ext")
     [[ -n "$pkg" ]] && printf '%s\n' "$pkg"
   done | sort -u

@@ -101,7 +101,7 @@ db_engine_ensure_php_driver() {
   [[ -n "$php_version" && "$php_version" != none ]] || return 0
   command -v "php${php_version}" >/dev/null 2>&1 || return 0
   if [[ "$engine" == pgsql ]]; then ext=pdo_pgsql pkg="php${php_version}-pgsql"; else ext=pdo_mysql pkg="php${php_version}-mysql"; fi
-  "php${php_version}" -m 2>/dev/null | grep -qx "$ext" && return 0
+  "php${php_version}" -m 2>/dev/null | grep -x "$ext" >/dev/null && return 0
   info "Installing ${pkg} for the site's database driver"
   DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" >>"$LOG_FILE" 2>&1 || {
     error "Could not install ${pkg}"

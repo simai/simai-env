@@ -167,12 +167,12 @@ site_perf_status_handler() {
       optimization_recommendation=$(site_user_recommendation "$domain" "$fpm_oversub")
       mem_available=$(perf_memory_available_summary)
       pool_share=$(perf_ratio_band "${max_children:-0}" "${total_children:-0}")
-      if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^Zend OPcache$'; then
+      if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -i '^Zend OPcache$' >/dev/null; then
         opcache_ext="yes"
       else
         opcache_ext="no"
       fi
-      if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^redis$'; then
+      if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -i '^redis$' >/dev/null; then
         redis_ext="yes"
       else
         redis_ext="no"

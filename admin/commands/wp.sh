@@ -402,7 +402,7 @@ wp_perf_status_handler() {
   if [[ -n "$WP_PHP_VERSION" && "$WP_PHP_VERSION" != "none" ]]; then
     local php_bin=""
     php_bin=$(resolve_php_bin "$WP_PHP_VERSION")
-    if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -qi '^redis$'; then
+    if [[ -n "$php_bin" ]] && "$php_bin" -m 2>/dev/null | grep -i '^redis$' >/dev/null; then
       redis_ext="yes"
     fi
   fi

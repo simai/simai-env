@@ -633,7 +633,7 @@ if [[ "${PROFILE_REQUIRES_DB}" != "no" && "$(site_db_engine "$domain")" == pgsql
   else
     doctor_add_result "FAIL" "db" "PostgreSQL service" "Not installed or inactive" "simai-admin.sh db pgsql-install --confirm yes"
   fi
-  if [[ -n "${php_version:-}" && "${php_version}" != "none" ]] && ! "php${php_version}" -m 2>/dev/null | grep -qx pdo_pgsql; then
+  if [[ -n "${php_version:-}" && "${php_version}" != "none" ]] && ! "php${php_version}" -m 2>/dev/null | grep -x pdo_pgsql >/dev/null; then
     doctor_add_result "FAIL" "db" "PHP pdo_pgsql" "Missing for PHP ${php_version}" "apt-get install php${php_version}-pgsql"
   fi
 elif [[ "${PROFILE_REQUIRES_DB}" != "no" ]]; then

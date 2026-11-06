@@ -306,7 +306,7 @@ laravel_perf_status_handler() {
     fi
   fi
   local redis_ext="no"
-  if [[ -n "$LARAVEL_PERF_PHP_BIN" ]] && "$LARAVEL_PERF_PHP_BIN" -m 2>/dev/null | grep -qi '^redis$'; then
+  if [[ -n "$LARAVEL_PERF_PHP_BIN" ]] && "$LARAVEL_PERF_PHP_BIN" -m 2>/dev/null | grep -i '^redis$' >/dev/null; then
     redis_ext="yes"
   fi
 
