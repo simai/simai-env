@@ -7,6 +7,12 @@ Minimal two-step setup for PHP projects and Node.js services on Ubuntu 22.04/24.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash
 ```
+With Larena Panel, the server's web panel, in the same command; the end of
+the output has the panel's address (`https://<server address>:8500`) and a
+one-time first sign-in link:
+```bash
+curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash -s -- --with-panel
+```
 2) If the menu did not open automatically, start it manually:
 ```bash
 sudo /root/simai-env/simai-admin.sh menu

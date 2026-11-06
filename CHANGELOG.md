@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.51.1 - 2026-11-06
+
+- `install.sh --with-panel` without `--panel-domain`, and `--panel-port`:
+  the installer part of 1.51.0, left out of that release. README: the one
+  command for a server with the panel.
+
 ## 1.51.0 - 2026-11-06
 
 - The panel without a domain: `install.sh --with-panel` and `panel install`

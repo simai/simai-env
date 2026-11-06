@@ -41,21 +41,21 @@ fi
 
 install_mode_validate
 
-# bash install.sh --with-panel --panel-domain panel.example.com [--panel-email ops@example.com]
-# is the same as the SIMAI_INSTALL_PANEL_* variables below.
+# bash install.sh --with-panel [--panel-port 8500] [--panel-domain panel.example.com --panel-email ops@example.com]
+# is the same as the SIMAI_INSTALL_PANEL_* variables below. Without a domain
+# the panel answers on https://<server address>:8500; a domain can be
+# attached later in the panel.
 WITH_PANEL=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-panel) WITH_PANEL=1; shift ;;
     --panel-domain) SIMAI_INSTALL_PANEL_DOMAIN="${2:-}"; shift 2 || shift ;;
     --panel-email) SIMAI_INSTALL_PANEL_EMAIL="${2:-}"; shift 2 || shift ;;
+    --panel-port) SIMAI_INSTALL_PANEL_PORT="${2:-}"; shift 2 || shift ;;
     *) shift ;;
   esac
 done
-if [[ "$WITH_PANEL" == 1 && -z "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]]; then
-  echo "--with-panel needs --panel-domain <name>" >&2
-  exit 1
-fi
+[[ "$WITH_PANEL" == 1 || -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" || -n "${SIMAI_INSTALL_PANEL_PORT:-}" ]] && SIMAI_INSTALL_PANEL=yes
 
 if [[ $EUID -ne 0 && "$INSTALL_DIR" == /root/* ]]; then
   echo "Please run as root or set INSTALL_DIR to a writable path" >&2
@@ -312,15 +312,22 @@ if install_profile_init_enabled; then
   fi
 fi
 
-# SIMAI_INSTALL_PANEL_DOMAIN=panel.example.com installs Larena Panel as its
-# own site right away (SIMAI_INSTALL_PANEL_EMAIL also requests a certificate).
-if [[ -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]]; then
-  panel_args=(panel install --domain "$SIMAI_INSTALL_PANEL_DOMAIN" --confirm yes)
+# SIMAI_INSTALL_PANEL=yes installs Larena Panel as its own site right away:
+# on the server's address and SIMAI_INSTALL_PANEL_PORT (8500), or at
+# SIMAI_INSTALL_PANEL_DOMAIN (SIMAI_INSTALL_PANEL_EMAIL also requests a
+# certificate). The end of its output has the first sign-in link.
+if [[ "${SIMAI_INSTALL_PANEL:-no}" == yes || -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]]; then
+  panel_args=(panel install --confirm yes)
+  [[ -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]] && panel_args+=(--domain "$SIMAI_INSTALL_PANEL_DOMAIN")
   [[ -n "${SIMAI_INSTALL_PANEL_EMAIL:-}" ]] && panel_args+=(--ssl-email "$SIMAI_INSTALL_PANEL_EMAIL")
-  echo "Installing Larena Panel at ${SIMAI_INSTALL_PANEL_DOMAIN}..."
-  if ! "${INSTALL_DIR}/simai-admin.sh" "${panel_args[@]}"; then
+  [[ -n "${SIMAI_INSTALL_PANEL_PORT:-}" ]] && panel_args+=(--port "$SIMAI_INSTALL_PANEL_PORT")
+  echo "Installing Larena Panel${SIMAI_INSTALL_PANEL_DOMAIN:+ at ${SIMAI_INSTALL_PANEL_DOMAIN}}..."
+  if "${INSTALL_DIR}/simai-admin.sh" "${panel_args[@]}"; then
+    # The sign-in link is the last thing the person needs: no menu over it.
+    SIMAI_INSTALL_NO_MENU=1
+  else
     echo "WARNING: Panel installation failed. Run later:"
-    echo "  sudo ${INSTALL_DIR}/simai-admin.sh panel install --domain ${SIMAI_INSTALL_PANEL_DOMAIN} --confirm yes"
+    echo "  sudo ${INSTALL_DIR}/simai-admin.sh ${panel_args[*]}"
   fi
 fi
 
