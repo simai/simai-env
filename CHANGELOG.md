@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 1.51.2 - 2026-11-06
+
+Found by installing on a fresh cloud server (Ubuntu 24.04, 2 CPU, 2 GB):
+
+- A database server the bootstrap installs listens on 127.0.0.1 only
+  (`/etc/mysql/conf.d/99-simai-network.cnf`); Percona listened on every
+  address. An existing database server is not touched.
+- `install.sh --with-panel` turns on the firewall (SSH, HTTP, HTTPS and the
+  panel port; `--no-firewall` leaves it alone), and `self firewall-ensure`
+  keeps the panel port open, so the security center's fix no longer locks
+  the panel out.
+- `install.sh` installs curl when it is missing (minimal images; `wget -qO-
+  … | sudo bash` works).
+- Security center: the panel without a domain is not reported as a site
+  without HTTPS; it gets a low "attach a domain" note instead.
+
 ## 1.51.1 - 2026-11-06
 
 - `install.sh --with-panel` without `--panel-domain`, and `--panel-port`:

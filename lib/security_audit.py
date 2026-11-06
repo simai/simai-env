@@ -280,7 +280,13 @@ def check_sites(sites: list[dict]) -> list[dict]:
                                  how="Plan the move to a newer PHP version."))
         if s.get("profile") == "alias":
             continue
-        if (s.get("ssl") or "none") == "none":
+        if d == "panel.internal":
+            # The panel without a domain answers only over HTTPS on its own
+            # port (panel address); its certificate is self-signed.
+            res.append(check("panel_domain", "access", "Panel address", "warn", "low",
+                             "the panel answers by IP with a self-signed certificate: the browser warns", d,
+                             how="Attach a domain to the panel (panel domain): it gets a Let's Encrypt certificate."))
+        elif (s.get("ssl") or "none") == "none":
             res.append(check("https", "sites", "HTTPS", "warn", "medium", "the site opens without encryption", d,
                              fix=fix("ssl:letsencrypt", domain=d),
                              how="Issue a free Let's Encrypt certificate (the domain must point to this server)."))

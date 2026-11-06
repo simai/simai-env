@@ -612,6 +612,8 @@ EOF
 
 install_mysql() {
   [[ "$MYSQL_FLAVOR" == none ]] && { info "Database server skipped (--mysql none)"; return 0; }
+  local fresh=no
+  command -v mysqld >/dev/null 2>&1 || fresh=yes
   apt_update_once
   if [[ $MYSQL_FLAVOR == "percona" ]]; then
     if [[ ! -f /etc/apt/sources.list.d/percona-release.list ]]; then
@@ -632,6 +634,13 @@ install_mysql() {
   else
     os_cmd_pkg_install mysql-server
     run_long "Installing MySQL Server" "${OS_CMD[@]}" || fail "Failed to install MySQL Server"
+  fi
+  # A database server this install brought listens on this host only (Percona
+  # listens on every address by default); db network opens it on purpose.
+  if [[ "$fresh" == yes && -d /etc/mysql/conf.d && ! -e /etc/mysql/conf.d/99-simai-network.cnf ]]; then
+    printf '[mysqld]\nbind-address = 127.0.0.1\nmysqlx-bind-address = 127.0.0.1\n' >/etc/mysql/conf.d/99-simai-network.cnf
+    chmod 0644 /etc/mysql/conf.d/99-simai-network.cnf
+    os_svc_restart mysql >>"$LOG_FILE" 2>&1 || warn "MySQL did not restart with the local-only setting"
   fi
   os_svc_enable_now mysql || true
 }

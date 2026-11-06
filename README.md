@@ -13,6 +13,13 @@ one-time first sign-in link:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash -s -- --with-panel
 ```
+A minimal Ubuntu image may have no curl; wget does the same:
+```bash
+wget -qO- https://raw.githubusercontent.com/simai/simai-env/main/install.sh | sudo bash -s -- --with-panel
+```
+It also turns on the firewall (SSH, HTTP, HTTPS and the panel port stay
+open; `--no-firewall` leaves it alone). A cloud provider's own firewall must
+allow the panel port too.
 2) If the menu did not open automatically, start it manually:
 ```bash
 sudo /root/simai-env/simai-admin.sh menu

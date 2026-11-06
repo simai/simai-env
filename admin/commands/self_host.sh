@@ -132,6 +132,12 @@ self_firewall_ensure_handler() {
   local open="" p
   for p in "${ssh_ports[@]}"; do open+="${p}/tcp "; done
   open+="80/tcp 443/tcp"
+  # The panel's address by IP (panel address) must stay reachable.
+  local panel_port=""
+  if [[ -n "$(panel_state_get PANEL_DOMAIN 2>/dev/null || true)" && "$(panel_address_py get ip_access 2>/dev/null)" == yes ]]; then
+    panel_port=$(panel_address_py get port 2>/dev/null || true)
+    [[ "$panel_port" =~ ^[0-9]+$ ]] && open+=" ${panel_port}/tcp" || panel_port=""
+  fi
   local -a blocked=()
   mapfile -t blocked < <(self_firewall_blocked_listeners "$open $(printf '%s ' "${extra[@]%%@*}")")
 
@@ -139,6 +145,7 @@ self_firewall_ensure_handler() {
     echo "Firewall plan (ufw):"
     echo "  - deny incoming, allow outgoing"
     echo "  - allow SSH (${ssh_ports[*]}), HTTP 80 and HTTPS 443 from anywhere"
+    [[ -z "$panel_port" ]] || echo "  - allow the panel port ${panel_port} from anywhere (panel address)"
     for p in "${extra[@]}"; do echo "  - allow ${p%%@*} from ${p#*@}"; done
     if [[ ${#blocked[@]} -gt 0 ]]; then
       echo "  - these listening services become unreachable from outside:"
@@ -157,6 +164,7 @@ self_firewall_ensure_handler() {
   for p in "${ssh_ports[@]}"; do ufw allow "${p}/tcp" >>"$LOG_FILE" 2>&1 || return 1; done
   ufw allow 80/tcp >>"$LOG_FILE" 2>&1 || return 1
   ufw allow 443/tcp >>"$LOG_FILE" 2>&1 || return 1
+  [[ -z "$panel_port" ]] || ufw allow "${panel_port}/tcp" comment simai-panel >>"$LOG_FILE" 2>&1 || return 1
   for p in "${extra[@]}"; do
     if [[ "$p" == *@* ]]; then
       ufw allow from "${p#*@}" to any port "${p%%/*}" proto "$(cut -d/ -f2 <<<"${p%%@*}")" >>"$LOG_FILE" 2>&1 || return 1

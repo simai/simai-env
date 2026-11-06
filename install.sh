@@ -41,6 +41,13 @@ fi
 
 install_mode_validate
 
+# Minimal Ubuntu images come without curl (wget | bash still starts this).
+if ! command -v curl >/dev/null 2>&1 && [[ $EUID -eq 0 ]] && command -v apt-get >/dev/null 2>&1; then
+  echo "Installing curl..."
+  DEBIAN_FRONTEND=noninteractive apt-get -qq update >/dev/null 2>&1 || true
+  DEBIAN_FRONTEND=noninteractive apt-get -qq install -y curl ca-certificates >/dev/null 2>&1 || { echo "curl is needed: apt-get install -y curl" >&2; exit 1; }
+fi
+
 # bash install.sh --with-panel [--panel-port 8500] [--panel-domain panel.example.com --panel-email ops@example.com]
 # is the same as the SIMAI_INSTALL_PANEL_* variables below. Without a domain
 # the panel answers on https://<server address>:8500; a domain can be
@@ -52,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --panel-domain) SIMAI_INSTALL_PANEL_DOMAIN="${2:-}"; shift 2 || shift ;;
     --panel-email) SIMAI_INSTALL_PANEL_EMAIL="${2:-}"; shift 2 || shift ;;
     --panel-port) SIMAI_INSTALL_PANEL_PORT="${2:-}"; shift 2 || shift ;;
+    --no-firewall) SIMAI_INSTALL_FIREWALL=no; shift ;;
     *) shift ;;
   esac
 done
@@ -321,6 +329,13 @@ if [[ "${SIMAI_INSTALL_PANEL:-no}" == yes || -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}
   [[ -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}" ]] && panel_args+=(--domain "$SIMAI_INSTALL_PANEL_DOMAIN")
   [[ -n "${SIMAI_INSTALL_PANEL_EMAIL:-}" ]] && panel_args+=(--ssl-email "$SIMAI_INSTALL_PANEL_EMAIL")
   [[ -n "${SIMAI_INSTALL_PANEL_PORT:-}" ]] && panel_args+=(--port "$SIMAI_INSTALL_PANEL_PORT")
+  # A server set up with the panel is a new server: close every port but
+  # SSH, the web and the panel's (--no-firewall keeps the firewall as it is).
+  if [[ "${SIMAI_INSTALL_FIREWALL:-yes}" != no ]] && ! { command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; }; then
+    echo "Turning on the firewall: SSH, HTTP, HTTPS and the panel port stay open..."
+    SIMAI_ADMIN_MENU=0 "${INSTALL_DIR}/simai-admin.sh" self firewall-ensure --confirm yes >/dev/null \
+      || echo "WARNING: the firewall was not turned on; later: sudo ${INSTALL_DIR}/simai-admin.sh self firewall-ensure --confirm yes"
+  fi
   echo "Installing Larena Panel${SIMAI_INSTALL_PANEL_DOMAIN:+ at ${SIMAI_INSTALL_PANEL_DOMAIN}}..."
   if "${INSTALL_DIR}/simai-admin.sh" "${panel_args[@]}"; then
     # The sign-in link is the last thing the person needs: no menu over it.

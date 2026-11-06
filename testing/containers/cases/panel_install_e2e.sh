@@ -222,6 +222,9 @@ cli panel install --placeholder yes --confirm yes >/tmp/pn 2>&1 && ok "panel ins
 grep -q 'By IP: *https://.*:8500' /tmp/pn && ok "install prints the address by IP and port" || bad "no IP address: $(tail -12 /tmp/pn)"
 grep -qE '^ +https://.*:8500/\?setup=[a-f0-9]{64}$' /tmp/pn && ok "the sign-in link uses that address" || bad "sign-in link: $(tail -6 /tmp/pn)"
 grep -q 'SHA-256' /tmp/pn && ok "install prints the certificate fingerprint" || bad "no fingerprint"
+cli self firewall-ensure 2>&1 | grep -q 'allow the panel port 8500' && ok "firewall-ensure keeps the panel port" || bad "firewall plan without the panel port"
+a=$(cli security status --output json 2>/dev/null)
+[[ "$(field '[c["check"] for c in d["data"]["checks"] if c.get("domain") == "panel.internal" and c["check"] in ("https", "panel_domain")]' <<<"$a")" == "['panel_domain']" ]] && ok "the panel without a domain is not an HTTPS problem" || bad "security checks of panel.internal: $(field '[c["id"] for c in d["data"]["checks"] if c.get("domain") == "panel.internal"]' <<<"$a" 2>&1 | head -c 300)"
 [[ "$(port '?format=json' | field 'd["gateway"]')" == ok ]] && ok "the panel answers on port 8500" || bad "port 8500: $(port '?format=json' | head -c 300)"
 curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8500/ | grep -q 301 && ok "plain HTTP on the port goes to HTTPS" || bad "http on 8500"
 a=$(cli panel address --output json 2>/dev/null)
