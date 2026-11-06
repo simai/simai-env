@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.51.3 - 2026-11-06
+
+- Larena Panel 0.3.1: after sign-in the server overview opens first, with
+  recommended actions (do now / not done / done, one click each through
+  plan and confirm); the panel address screen (domain, port, address by IP).
+
 ## 1.51.2 - 2026-11-06
 
 Found by installing on a fresh cloud server (Ubuntu 24.04, 2 CPU, 2 GB):

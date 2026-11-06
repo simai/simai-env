@@ -108,7 +108,7 @@ project=$(sed -n 's/^# simai-project: *//p' /etc/nginx/sites-available/$P.conf)
 user2=$(cat "/etc/simai-env/site-users/$project")
 [[ "$(stat -c '%U %a' $env)" == "$user2 640" ]] && ok ".env belongs to the panel account only" || bad ".env: $(stat -c '%U %a' $env)"
 [[ -L /home/simai/www/$P/current ]] && ok "the build has releases to roll back to" || bad "no release layout"
-cli panel status 2>&1 | grep -q 'build' && ok "status shows the build" || bad "status build"
+cli panel status 2>&1 | grep 'build' >/dev/null && ok "status shows the build" || bad "status build"
 grep -q "^${user2} ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate \"\"" /etc/sudoers.d/simai-panel && ok "gateway rule follows the build's account" || bad "sudoers: $(cat /etc/sudoers.d/simai-panel)"
 grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' $env && ok "the build gets a setup token in .env" || bad "token for build"
 [[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p2","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user2" sudo -n /usr/local/sbin/simai-panel-gate | field 'd["status"]')" == ok ]] && ok "the build calls the gateway" || bad "build gateway call"
