@@ -488,7 +488,7 @@ self_sudo_admin_is_ready() {
   local login="${1:-$(self_sudo_admin_login_default)}"
   [[ -n "$login" ]] || return 1
   id "$login" >/dev/null 2>&1 || return 1
-  id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -qx sudo || return 1
+  id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -x sudo >/dev/null || return 1
   [[ -f "$(self_sudo_admin_sudoers_file "$login")" ]] || return 1
   [[ -f "/home/${login}/.ssh/authorized_keys" ]] || return 1
 }
@@ -513,7 +513,7 @@ self_sudo_admin_doctor_handler() {
   else
     self_sudo_admin_add_result "FAIL" "User" "$login missing"
   fi
-  if id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -qx sudo; then
+  if id -nG "$login" 2>/dev/null | tr ' ' '\n' | grep -x sudo >/dev/null; then
     self_sudo_admin_add_result "PASS" "sudo group" "$login is in sudo"
   else
     self_sudo_admin_add_result "FAIL" "sudo group" "$login is not in sudo"

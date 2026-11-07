@@ -132,7 +132,7 @@ ssl_dns_credentials_handler() {
   token=$(head -n1 "$token_file" | tr -d '[:space:]')
   [[ "$token" =~ ^[A-Za-z0-9_-]{30,64}$ ]] || { error "The file does not hold a Cloudflare API token (30-64 letters, digits, - or _)"; return 1; }
   pkg=$(ssl_dns_provider_package "$provider")
-  if ! certbot plugins 2>/dev/null | grep -qi "dns-${provider}"; then
+  if ! certbot plugins 2>/dev/null | grep -i "dns-${provider}" >/dev/null; then
     os_cmd_pkg_install "$pkg"
     run_long "Installing ${pkg}" "${OS_CMD[@]}" || { error "Could not install ${pkg}"; return 1; }
   fi
@@ -148,7 +148,7 @@ ssl_dns_status_handler() {
   local file configured=no updated="" plugin=no
   file=$(ssl_dns_stored_credentials cloudflare)
   [[ -s "$file" ]] && { configured=yes; updated=$(date -u -r "$file" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || true); }
-  command -v certbot >/dev/null 2>&1 && certbot plugins 2>/dev/null | grep -qi dns-cloudflare && plugin=yes
+  command -v certbot >/dev/null 2>&1 && certbot plugins 2>/dev/null | grep -i dns-cloudflare >/dev/null && plugin=yes
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
     printf '{"schema":"simai-ssl-dns/1","providers":[{"provider":"cloudflare","configured":%s,"updated_at":%s,"plugin_installed":%s}]}\n' \
       "$([[ $configured == yes ]] && echo true || echo false)" "$([[ -n $updated ]] && printf '"%s"' "$updated" || echo null)" \
@@ -226,7 +226,7 @@ ssl_wildcard_preflight_show() {
     credentials_status="N/A (you will add TXT records yourself)"
   else
     provider_pkg=$(ssl_dns_provider_package "$dns_provider")
-    if ! certbot plugins 2>/dev/null | grep -qi "${plugin_flag#--}"; then
+    if ! certbot plugins 2>/dev/null | grep -i "${plugin_flag#--}" >/dev/null; then
       plugin_status="FAIL (install ${provider_pkg})"
       hard_fail=1
     fi
@@ -644,7 +644,7 @@ ssl_issue_handler() {
       plugin_flag=$(ssl_dns_provider_flag "$dns_provider")
       credentials_flag=$(ssl_dns_provider_credentials_flag "$dns_provider")
       pkg=$(ssl_dns_provider_package "$dns_provider")
-      if ! certbot plugins 2>/dev/null | grep -qi "dns-${dns_provider}"; then
+      if ! certbot plugins 2>/dev/null | grep -i "dns-${dns_provider}" >/dev/null; then
         error "Certbot DNS plugin for ${dns_provider} is not available. Install package: ${pkg}"
         return 1
       fi

@@ -50,14 +50,14 @@ panel_address_render() {
   SIMAI_NGINX_HTTP2_DIRECTIVE="$http2" panel_address_py render "$conf" "${SIMAI_PANEL_TLS_DIR}/cert.pem" "${SIMAI_PANEL_TLS_DIR}/key.pem"
 }
 
-panel_address_ufw_active() { command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; }
+panel_address_ufw_active() { command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep '^Status: active' >/dev/null; }
 
 # Opens the panel port in ufw (when ufw is on); `close` removes the rule.
 panel_address_port_rule() {
   local verb="$1" port="$2"
   panel_address_ufw_active || return 0
   if [[ "$verb" == open ]]; then
-    ufw status 2>/dev/null | grep -qE "^${port}/tcp +ALLOW +Anywhere( |$)" && return 0
+    ufw status 2>/dev/null | grep -E "^${port}/tcp +ALLOW +Anywhere( |$)" >/dev/null && return 0
     ufw allow "${port}/tcp" comment simai-panel >>"$LOG_FILE" 2>&1
   else
     ufw delete allow "${port}/tcp" >>"$LOG_FILE" 2>&1 || true

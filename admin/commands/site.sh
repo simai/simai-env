@@ -720,7 +720,7 @@ site_add_handler_impl() {
       if [[ ${#profiles_available[@]} -eq 0 ]]; then
         ordered+=("$p")
       else
-        if printf '%s\n' "${profiles_available[@]}" | grep -qx "$p"; then
+        if printf '%s\n' "${profiles_available[@]}" | grep -x "$p" >/dev/null; then
           ordered+=("$p")
         fi
       fi
@@ -736,7 +736,7 @@ site_add_handler_impl() {
       ordered=("${fallback_profiles[@]}")
     fi
     local default_profile="generic"
-    if ! printf '%s\n' "${ordered[@]}" | grep -qx "generic"; then
+    if ! printf '%s\n' "${ordered[@]}" | grep -x "generic" >/dev/null; then
       default_profile="${ordered[0]}"
     fi
     profile=$(select_from_list "Select profile" "$default_profile" "${ordered[@]}")
@@ -837,7 +837,7 @@ site_add_handler_impl() {
     if [[ ${#sites[@]} -eq 0 ]]; then
       mapfile -t sites < <(list_sites)
     fi
-    if ! printf '%s\n' "${sites[@]}" | grep -qx "$target_domain"; then
+    if ! printf '%s\n' "${sites[@]}" | grep -x "$target_domain" >/dev/null; then
       error "Target site ${target_domain} not found on this host"
       return 1
     fi

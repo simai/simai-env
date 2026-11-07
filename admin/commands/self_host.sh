@@ -43,7 +43,7 @@ self_swap_ensure_handler() {
     return 0
   fi
 
-  if swapon --show=NAME --noheadings 2>/dev/null | grep -qx "$SELF_SWAP_FILE"; then
+  if swapon --show=NAME --noheadings 2>/dev/null | grep -x "$SELF_SWAP_FILE" >/dev/null; then
     info "Swap file ${SELF_SWAP_FILE} is already active (${current_mb} MB)"
   elif (( current_mb > 0 )); then
     info "Swap is already provided by another device (${current_mb} MB); no file added"
@@ -173,7 +173,7 @@ self_firewall_ensure_handler() {
     fi
   done
   for p in "${ssh_ports[@]}"; do
-    ufw show added 2>/dev/null | grep -qE "^ufw allow ${p}/tcp\$" || { error "SSH rule for port ${p} is missing; firewall not enabled"; return 1; }
+    ufw show added 2>/dev/null | grep -E "^ufw allow ${p}/tcp\$" >/dev/null || { error "SSH rule for port ${p} is missing; firewall not enabled"; return 1; }
   done
   ufw default deny incoming >>"$LOG_FILE" 2>&1 || return 1
   ufw default allow outgoing >>"$LOG_FILE" 2>&1 || return 1

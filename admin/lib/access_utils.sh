@@ -315,12 +315,30 @@ access_mount_is_active() {
   grep -qs " ${target} " /proc/mounts
 }
 
+# Ends every process of a system user and waits (up to 5 s) until they are
+# gone: SIGKILL is delivered asynchronously, and an SFTP session still
+# exiting keeps the jail's mount busy and the account in use.
+access_end_sessions() {
+  local user="$1" i
+  id -u "$user" >/dev/null 2>&1 || return 0
+  pkill -KILL -u "$user" 2>/dev/null || true
+  for (( i = 0; i < 50; i++ )); do
+    pgrep -u "$user" >/dev/null 2>&1 || return 0
+    sleep 0.1
+  done
+  return 0
+}
+
 access_unmount_project_root() {
   local login="$1"
-  local site_dir
+  local site_dir i
   site_dir=$(access_project_site_dir "$login")
   access_mount_is_active "$site_dir" || return 0
-  umount "$site_dir" 2>/dev/null || true
+  for (( i = 0; i < 5; i++ )); do
+    umount "$site_dir" 2>/dev/null || true
+    access_mount_is_active "$site_dir" || break
+    sleep 1
+  done
   if access_mount_is_active "$site_dir"; then
     error "Cannot unmount ${site_dir}; the project directory is still attached"
     return 1

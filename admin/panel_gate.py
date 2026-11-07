@@ -584,18 +584,30 @@ def read_job(job_id):
 def job_state(job_id):
     d = job_dir(job_id)
     meta = read_job(job_id) or {}
-    code = None
-    try:
-        code = int((d / "exit_code").read_text().strip())
-    except (OSError, ValueError):
-        pass
+    def exit_code():
+        try:
+            return int((d / "exit_code").read_text().strip())
+        except (OSError, ValueError):
+            return None
+
+    code = exit_code()
+    state = None
     if (d / "cancelled").is_file():
         state = "cancelled"
     elif code is None:
-        active = subprocess.run(["systemctl", "is-active", unit_name(job_id)], capture_output=True, text=True,
-                                env=ENV, timeout=10).stdout.strip()
-        state = "running" if active in ("active", "activating") else "failed"
-    else:
+        try:
+            active = subprocess.run(["systemctl", "is-active", unit_name(job_id)], capture_output=True, text=True,
+                                    env=ENV, timeout=10).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            active = ""
+        if active in ("inactive", "failed"):
+            # The job may have written its exit code and ended between the
+            # first look and this one: look again before calling it failed.
+            code = exit_code()
+            state = "failed" if code is None else None
+        else:
+            state = "running"  # active, activating, deactivating, or no clear answer yet
+    if state is None:
         state = "succeeded" if code in (0, 88) else ("busy" if code == 75 else "failed")
     result = None
     try:

@@ -16,7 +16,7 @@ cli owner create --name acme --pubkey-file /root/own.pub --confirm yes >/dev/nul
 cli site add --domain open.test --profile generic --php 8.3 --create-db no --confirm yes >/dev/null 2>&1
 cli site add --domain acme.test --profile generic --php 8.3 --create-db no --owner acme --confirm yes >/dev/null 2>&1
 
-cli panel gate-status 2>&1 | grep -q 'Enabled *| no' && ok "gate disabled by default" || bad "gate status before enable"
+cli panel gate-status 2>&1 | grep 'Enabled *| no' >/dev/null && ok "gate disabled by default" || bad "gate status before enable"
 cli panel gate-enable --confirm yes >/tmp/p-en 2>&1 && ok "panel gate-enable" || { bad "gate-enable"; tail -5 /tmp/p-en; }
 cli panel gate-status 2>&1 | grep 'Enabled *| yes' >/dev/null && ok "gate status enabled" || bad "gate status after enable"
 
@@ -130,12 +130,15 @@ systemctl is-active "simai-panel-job-${cjob}" >/dev/null 2>&1 && bad "job unit s
 rm -f /home/simai/www/open.test/big.bin
 
 # Stage 3-4: creating sites, deploying archives, redirects, owners, removing.
-job_ok() { local a j; a=$(gate "$2"); j=$(field 'd.get("job_id","")' <<<"$a"); [[ -n "$j" && "$(wait_job "$1" "$j")" == succeeded ]]; }
+# On failure the job's answer, state and last log lines go to the case log, so a
+# failure says why.
+job_why() { echo "    job ${2:-?}: ${3:-}" >&2; [[ -n "${2:-}" ]] && gate "$(req "$1" job:log "{\"job_id\":\"$2\"}")" | field '"\n".join("      " + l for l in d["data"]["lines"][-12:])' >&2 || true; }
+job_ok() { local a j s; a=$(gate "$2"); j=$(field 'd.get("job_id","")' <<<"$a"); [[ -n "$j" ]] && s=$(wait_job "$1" "$j"); [[ "$s" == succeeded ]] || { job_why "$1" "$j" "state=${s:-none} answer=${a:0:200}"; return 1; }; }
 a=$(gate "$(req null site:add '{"domain":"new.test","profile":"static"}')")
 [[ "$(field 'd["kind"]' <<<"$a")" == plan ]] && ok "site add answers a plan" || bad "site add plan: $a"
 [[ -f /etc/nginx/sites-available/new.test.conf ]] && bad "plan created the site" || ok "site add plan changes nothing"
 job_ok null "$(creq null site:add '{"domain":"new.test","profile":"static"}')" && ok "site add job" || bad "site add job"
-gate "$(req null self:describe '{}')" | field '[s["domain"] for s in d["data"]["sites"]]' | grep -q new.test && ok "new site is listed" || bad "new site missing"
+gate "$(req null self:describe '{}')" | field '[s["domain"] for s in d["data"]["sites"]]' | grep new.test >/dev/null && ok "new site is listed" || bad "new site missing"
 
 mkdir -p /root/rel && echo panel-release >/root/rel/index.html && tar -C /root/rel -czf /root/rel.tgz .
 sum=$(sha256sum /root/rel.tgz | cut -d' ' -f1); size=$(stat -c %s /root/rel.tgz)
@@ -209,7 +212,7 @@ job_ok '"acme"' "$(creq '"acme"' backup:data '{"domain":"db.test","files":"no"}'
 bk=$(gate "$(req '"acme"' site:describe '{"domain":"db.test"}')" | field 'd["data"]["backups"]["items"][0]["path"].rsplit("/", 1)[1]')
 [[ "$(gate "$(req '"acme"' backup:data-verify "{\"domain\":\"db.test\",\"backup\":\"${bk}\"}")" | field 'd["kind"]')" == plan ]] && ok "verify plan" || bad "verify plan"
 a=$(gate "$(creq '"acme"' backup:data-verify "{\"domain\":\"db.test\",\"backup\":\"${bk}\"}")"); j=$(field 'd["job_id"]' <<<"$a")
-[[ "$(wait_job '"acme"' "$j")" == succeeded ]] && gate "$(req '"acme"' job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"])' | grep -q 'PASS restore test' && ok "verify with a restore test" || bad "verify job"
+[[ "$(wait_job '"acme"' "$j")" == succeeded ]] && gate "$(req '"acme"' job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"])' | grep 'PASS restore test' >/dev/null && ok "verify with a restore test" || bad "verify job"
 sleep 1; mysql -uroot -e "INSERT INTO \`${dbn}\`.t VALUES (2);"
 a=$(gate "$(req '"acme"' backup:data-restore "{\"domain\":\"db.test\",\"backup\":\"${bk}\",\"files\":\"no\"}")")
 [[ "$(field 'd["kind"]' <<<"$a")" == plan ]] && ok "restore plan" || bad "restore plan: $a"
@@ -274,7 +277,7 @@ a=$(gate "$(req '"acme"' access:list '{}')")
 [[ "$(field '[(x["login"], x["domain"], x["auth"], x["enabled"], x["sftp_path"]) for x in d["data"]["accesses"]]' <<<"$a")" == "[('dbstaff', 'db.test', 'key', True, '/site')]" ]] && ok "owner lists the site's SFTP accounts" || bad "access list: ${a:0:300}"
 printf 'put /etc/hostname /site/up.txt\nls /site\n' | sftpk /root/staff dbstaff >/tmp/sftp1 2>&1 && grep -q up.txt /tmp/sftp1 && ok "SFTP with the key into the site" || bad "sftp: $(tail -3 /tmp/sftp1)"
 sudo -u acme cat /home/simai/www/db.test/up.txt >/dev/null && ok "the site reads an uploaded file" || bad "uploaded file not readable by the site"
-getfacl -p /home/simai/www/db.test 2>/dev/null | grep -q '^user:simai:' && bad "the shared account got access to an isolated site" || ok "no shared-account access to the isolated site"
+getfacl -p /home/simai/www/db.test 2>/dev/null | grep '^user:simai:' >/dev/null && bad "the shared account got access to an isolated site" || ok "no shared-account access to the isolated site"
 refused owner_scope "$(req '"acme"' access:create-project "{\"domain\":\"open.test\",\"login\":\"x-staff\",\"pubkey\":\"${staff}\"}")" "owner creates an account on another site"
 refused invalid_argument "$(req '"acme"' access:create-project '{"domain":"db.test","login":"pwstaff","password":"secret123"}')" "an account with a password"
 refused invalid_argument "$(req '"acme"' access:create-project '{"domain":"db.test","login":"nokey"}')" "an account without a key"
@@ -366,8 +369,8 @@ a=$(gate "$(creq null self:alerts-channel "{\"kind\":\"telegram\",\"target\":\"-
 [[ "$(wait_job null "$j")" == succeeded ]] && ok "admin sets a Telegram channel" || bad "telegram job"
 [[ "$(stat -c '%U %a' /etc/simai-env/alerts-telegram.token)" == "root 600" ]] && ok "the bot token is root-only" || bad "token file mode"
 grep -rqF -- "$tok" /var/lib/simai-env/panel-jobs /var/log/simai-panel-gate.log && bad "the bot token is in a job record or log" || ok "the bot token is in no job record or log"
-gate "$(req null job:status "{\"job_id\":\"$j\"}")" | grep -qF -- "${tok#*:}" && bad "job status returns the token" || ok "job status hides the token"
-gate "$(req null self:alerts '{}')" | grep -qF -- "${tok#*:}" && bad "alerts return the token" || ok "alerts do not return the token"
+gate "$(req null job:status "{\"job_id\":\"$j\"}")" | grep -F -- "${tok#*:}" >/dev/null && bad "job status returns the token" || ok "job status hides the token"
+gate "$(req null self:alerts '{}')" | grep -F -- "${tok#*:}" >/dev/null && bad "alerts return the token" || ok "alerts do not return the token"
 job_ok null "$(creq null self:alerts-channel '{"kind":"off"}')" && [[ ! -f /etc/simai-env/alerts-telegram.token ]] && ok "channel off removes the token" || bad "channel off"
 refused invalid_argument "$(req null self:alerts-channel '{"kind":"webhook","target":"file:///etc/passwd"}')" "a non-HTTP webhook"
 refused not_allowed "$(req '"acme"' self:alerts-channel '{"kind":"off"}')" "an owner sets the channel"
@@ -402,7 +405,7 @@ job_ok null "$(creq null service:restart "{\"name\":\"${php_unit}\"}")" && syste
 echo 'this is not nginx;' >/etc/nginx/conf.d/zz-broken.conf
 j=$(gate "$(creq null service:restart '{"name":"nginx"}')" | field 'd["job_id"]')
 [[ "$(wait_job null "$j")" == failed ]] && systemctl is-active --quiet nginx && ok "a broken nginx config refuses the restart, nginx keeps running" || bad "restart with a broken config"
-gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'configuration test failed' && ok "the job says why" || bad "broken config log"
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep 'configuration test failed' >/dev/null && ok "the job says why" || bad "broken config log"
 rm -f /etc/nginx/conf.d/zz-broken.conf
 refused not_allowed "$(req '"acme"' service:restart '{"name":"nginx"}')" "an owner restarts a service"
 refused not_allowed "$(req '"acme"' service:list '{}')" "an owner lists services"
@@ -424,7 +427,7 @@ uppid=$!; sleep 1
 job_ok null "$(creq null site:add '{"domain":"px.test","profile":"proxy","upstream-port":"18777","upstream-path":"/app/","websockets":"yes"}')" && ok "a proxy site" || bad "proxy site add"
 [[ "$(curl -s -H 'Host: px.test' http://127.0.0.1/)" == upstream-ok ]] && ok "the proxy site serves the local service" || bad "proxy answer: $(curl -s -H 'Host: px.test' http://127.0.0.1/ | head -c 200)"
 grep -q 'proxy_set_header Upgrade' /etc/nginx/sites-available/px.test.conf && ! grep -q '# *proxy_set_header Upgrade' /etc/nginx/sites-available/px.test.conf && ok "websockets yes upgrades connections" || bad "websocket lines"
-job_ok null "$(creq null site:add '{"domain":"px2.test","profile":"proxy","upstream-port":"18777"}')" && grep -q '# *proxy_set_header Upgrade' /etc/nginx/sites-available/px2.test.conf && ok "without websockets the upgrade is off" || bad "proxy without websockets"
+job_ok null "$(creq null site:add '{"domain":"px2.test","profile":"proxy","upstream-port":"18777"}')" && grep -q '# *proxy_set_header Upgrade' /etc/nginx/sites-available/px2.test.conf && ok "without websockets the upgrade is off" || { bad "proxy without websockets"; grep -n 'Upgrade\|Connection' /etc/nginx/sites-available/px2.test.conf >&2 || echo "    no px2.test.conf" >&2; }
 j=$(gate "$(creq null site:add '{"domain":"px3.test","profile":"proxy","upstream-port":"443"}')" | field 'd["job_id"]')
 [[ "$(wait_job null "$j")" == failed && ! -f /etc/nginx/sites-available/px3.test.conf ]] && ok "the proxy refuses nginx's own port" || bad "proxy to 443"
 refused invalid_argument "$(req null site:add '{"domain":"px4.test","profile":"proxy","upstream-port":"8080","upstream-host":"10.0.0.1"}')" "a proxy to another host"
@@ -503,7 +506,7 @@ refused invalid_argument "$(req null self:update '{"target":"all"}')" "an unknow
 
 j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
 [[ "$(long_job "$j")" == succeeded && "$(cat VERSION)" == 9.9.9 ]] && ok "update job replaces the toolkit" || { bad "update job: $(cat VERSION)"; gate "$(req null job:log "{\"job_id\":\"$j\"}")" | field '"\n".join(d["data"]["lines"][-15:])'; }
-gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'still answer' && ok "the job checked the sites after the update" || bad "no site check in the log"
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep 'still answer' >/dev/null && ok "the job checked the sites after the update" || bad "no site check in the log"
 echo "$before" > VERSION
 
 touch /root/slow-update
@@ -511,7 +514,7 @@ j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
 sleep 2
 refused not_cancellable "$(req null job:cancel "{\"job_id\":\"$j\"}")" "cancelling an update midway"
 rm -f /root/slow-update
-[[ "$(long_job "$j")" == succeeded ]] && ok "the update finished after the refused cancel" || bad "update after cancel"
+s=$(long_job "$j"); [[ "$s" == succeeded ]] && ok "the update finished after the refused cancel" || { bad "update after cancel"; job_why null "$j" "state=$s"; }
 echo "$before" > VERSION
 
 touch /root/break-sites
@@ -519,7 +522,7 @@ j=$(gate "$(creq null self:update '{"target":"env"}')" | field 'd["job_id"]')
 [[ "$(long_job "$j")" == failed ]] && ok "an update that breaks sites fails" || bad "broken update state"
 cd /root/simai-env  # the rollback put a new directory in place of the one this shell stood in
 [[ "$(cat VERSION)" == "$before" ]] && ok "the previous toolkit is back" || bad "not rolled back: $(cat VERSION)"
-gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep -q 'stopped answering after the update: .*open.test' && ok "the log names the sites that stopped" || bad "rollback log"
+gate "$(req null job:log "{\"job_id\":\"$j\"}")" | grep 'stopped answering after the update: .*open.test' >/dev/null && ok "the log names the sites that stopped" || bad "rollback log"
 rm -f /root/break-sites
 for u in $(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}'); do systemctl start "$u" >/dev/null 2>&1; done
 cp /root/update.sh.real update.sh
@@ -532,7 +535,7 @@ job_ok null "$(creq null owner:block '{"name":"acme"}')" && ok "owner block job"
 refused owner_blocked "$(req '"acme"' self:describe '{}')" "requests as a blocked owner"
 [[ "$(gate "$(req null self:describe '{}')" | field '[o["blocked"] for o in d["data"]["isolation"]["owners"] if o["name"] == "acme"]')" == "[True]" ]] && ok "the list shows the block" || bad "blocked flag"
 [[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: acme.test' http://127.0.0.1/)" =~ ^[23] ]] && ok "the blocked owner's site keeps serving" || bad "acme.test down"
-cli owner list 2>&1 | grep -q 'acme.*blocked' && ok "owner list shows the block" || bad "owner list"
+cli owner list 2>&1 | grep 'acme.*blocked' >/dev/null && ok "owner list shows the block" || bad "owner list"
 job_ok null "$(creq null owner:unblock '{"name":"acme"}')" && ok "owner unblock job" || bad "owner unblock"
 [[ -z "$(getent shadow acme | cut -d: -f8)" ]] && [[ "$(gate "$(req '"acme"' self:describe '{}')" | field 'd["status"]')" == ok ]] && ok "unblocked owner works again" || bad "after unblock"
 
@@ -588,7 +591,7 @@ a=$(req null site:describe '{"domain":"open.test"}' | sshp)
 [[ "$(field 'd["data"]["domain"]' <<<"$a")" == open.test ]] && ok "request over SSH" || bad "ssh request: $a"
 a=$(req null self:describe '{}' | sshp 'id; cat /etc/shadow')
 [[ "$(field 'd["status"]' <<<"$a")" == ok ]] && ok "SSH command is ignored, only the gateway runs" || bad "ssh forced command: $a"
-cli panel gate-status 2>&1 | grep -q 'SSH keys *| 1' && ok "one SSH key listed" || bad "key count"
+cli panel gate-status 2>&1 | grep 'SSH keys *| 1' >/dev/null && ok "one SSH key listed" || bad "key count"
 
 cli panel gate-disable --confirm yes >/dev/null 2>&1 && ok "gate-disable" || bad "gate-disable"
 gate "$(req null self:describe '{}')" >/dev/null 2>&1 && bad "gateway still reachable" || ok "gateway gone after disable"

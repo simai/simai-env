@@ -42,7 +42,7 @@ timed_change_undo() {
     firewall) ufw reload >>"$LOG_FILE" 2>&1 || { error "ufw reload failed after restoring ${id}"; return 1; } ;;
     geo) security_geo_load >>"$LOG_FILE" 2>&1 || { error "country rules did not reload after restoring ${id}"; return 1; } ;;
     panel_address)
-      if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+      if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep '^Status: active' >/dev/null; then
         ufw reload >>"$LOG_FILE" 2>&1 || { error "ufw reload failed after restoring ${id}"; return 1; }
       fi
       nginx -t >>"$LOG_FILE" 2>&1 && os_svc_reload_or_restart nginx >>"$LOG_FILE" 2>&1 || { error "nginx did not reload after restoring ${id}"; return 1; }
@@ -155,7 +155,7 @@ firewall_block_handler() {
   [[ "$addr" != any && "$addr" != *$'\n'* ]] || { error "--address takes one address or CIDR block"; return 1; }
   [[ "$ttl" =~ ^[0-9]{1,8}$ ]] && (( ttl == 0 || (ttl >= 60 && ttl <= 31536000) )) \
     || { error "--ttl must be 60-31536000 seconds, or 0 to keep the block until it is removed"; return 1; }
-  if ufw show added 2>/dev/null | grep -qE "^ufw (prepend )?deny from ${addr//./\\.}\$"; then
+  if ufw show added 2>/dev/null | grep -E "^ufw (prepend )?deny from ${addr//./\\.}\$" >/dev/null; then
     error "${addr} is already blocked"
     return 1
   fi
@@ -173,7 +173,7 @@ firewall_unblock_handler() {
   firewall_require_ufw || return 1
   window=$(firewall_window "${PARSED_ARGS[window]:-}") || return 1
   addr=$(python3 -I "$FIREWALL_STATE_PY" addresses "${PARSED_ARGS[address]}") || return 1
-  ufw show added 2>/dev/null | grep -qE "^ufw (prepend )?deny from ${addr//./\\.}\$" || { error "${addr} is not blocked"; return 1; }
+  ufw show added 2>/dev/null | grep -E "^ufw (prepend )?deny from ${addr//./\\.}\$" >/dev/null || { error "${addr} is not blocked"; return 1; }
   firewall_timed_apply "unblock ${addr}" "$window" firewall_unblock_apply "$addr"
 }
 

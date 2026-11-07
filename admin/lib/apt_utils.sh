@@ -2,7 +2,7 @@
 
 has_ondrej_php_repo() {
   if ls /etc/apt/sources.list.d/*ondrej*php*.list >/dev/null 2>&1; then return 0; fi
-  if apt-cache policy php8.2-fpm 2>/dev/null | grep -qi "ondrej"; then return 0; fi
+  if apt-cache policy php8.2-fpm 2>/dev/null | grep -i "ondrej" >/dev/null; then return 0; fi
   return 1
 }
 

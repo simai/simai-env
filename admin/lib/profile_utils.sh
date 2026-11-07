@@ -40,7 +40,7 @@ is_profile_enabled() {
   if ! profiles_allowlist_exists; then
     return 0
   fi
-  read_profiles_allowlist | grep -qx "$id"
+  read_profiles_allowlist | grep -x "$id" >/dev/null
 }
 
 ensure_profiles_allowlist_initialized_from_legacy() {

@@ -154,7 +154,7 @@ owner_remove_handler() {
     error "Use --confirm yes to remove owner ${name} and its home directory"
     return 1
   fi
-  pkill -KILL -u "$name" 2>/dev/null || true
+  access_end_sessions "$name"
   gpasswd -d www-data "$name" >/dev/null 2>&1 || true
   userdel -r "$name" >/dev/null 2>&1 || userdel "$name" >/dev/null 2>&1 || true
   groupdel "$name" >/dev/null 2>&1 || true

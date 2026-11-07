@@ -117,14 +117,14 @@ site_fix_handler() {
   local ext
   for ext in "${PROFILE_PHP_EXTENSIONS_REQUIRED[@]}"; do
     [[ -z "$ext" ]] && continue
-    if ! printf '%s\n' "${modules[@]}" | grep -qx "${ext,,}"; then
+    if ! printf '%s\n' "${modules[@]}" | grep -x "${ext,,}" >/dev/null; then
       missing_req+=("$ext")
     fi
   done
   if [[ "$include_recommended" == "yes" ]]; then
     for ext in "${PROFILE_PHP_EXTENSIONS_RECOMMENDED[@]}"; do
       [[ -z "$ext" ]] && continue
-      if ! printf '%s\n' "${modules[@]}" | grep -qx "${ext,,}"; then
+      if ! printf '%s\n' "${modules[@]}" | grep -x "${ext,,}" >/dev/null; then
         missing_rec+=("$ext")
       fi
     done
@@ -258,7 +258,7 @@ site_fix_handler() {
           mapfile -t modules < <(doctor_php_modules "$php_bin" || true)
           local still_missing=()
           for ext in "${missing_req[@]}"; do
-            if ! printf '%s\n' "${modules[@]}" | grep -qx "${ext,,}"; then
+            if ! printf '%s\n' "${modules[@]}" | grep -x "${ext,,}" >/dev/null; then
               still_missing+=("$ext")
             fi
           done

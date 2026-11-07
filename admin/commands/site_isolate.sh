@@ -26,7 +26,7 @@ site_isolate_rewrite_cron() {
 site_isolate_acl_switch() {
   local root="$1" from="$2" to="$3"
   command -v getfacl >/dev/null 2>&1 || return 0
-  getfacl -p "$root" 2>/dev/null | grep -q "^user:${from}:" || return 0
+  getfacl -p "$root" 2>/dev/null | grep "^user:${from}:" >/dev/null || return 0
   setfacl -R -x "u:${from}" "$root" 2>/dev/null || true
   find "$root" -type d -print0 | xargs -0 -r setfacl -x "d:u:${from}" 2>/dev/null || true
   setfacl -R -m "u:${to}:rwX" "$root" || return 1

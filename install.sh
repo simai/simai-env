@@ -299,7 +299,7 @@ if install_profile_init_enabled; then
   if [[ $EUID -eq 0 ]]; then
     if [[ ! -f /etc/simai-env/profiles.enabled ]]; then
       has_simai=0
-      if find /etc/nginx/sites-available -maxdepth 1 -type f -name "*.conf" -print -quit 2>/dev/null | grep -q .; then
+      if find /etc/nginx/sites-available -maxdepth 1 -type f -name "*.conf" -print -quit 2>/dev/null | grep . >/dev/null; then
         if grep -qE '^[[:space:]]*# simai-domain:' /etc/nginx/sites-available/*.conf 2>/dev/null; then
           has_simai=1
         fi
@@ -331,7 +331,7 @@ if [[ "${SIMAI_INSTALL_PANEL:-no}" == yes || -n "${SIMAI_INSTALL_PANEL_DOMAIN:-}
   [[ -n "${SIMAI_INSTALL_PANEL_PORT:-}" ]] && panel_args+=(--port "$SIMAI_INSTALL_PANEL_PORT")
   # A server set up with the panel is a new server: close every port but
   # SSH, the web and the panel's (--no-firewall keeps the firewall as it is).
-  if [[ "${SIMAI_INSTALL_FIREWALL:-yes}" != no ]] && ! { command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; }; then
+  if [[ "${SIMAI_INSTALL_FIREWALL:-yes}" != no ]] && ! { command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep '^Status: active' >/dev/null; }; then
     echo "Turning on the firewall: SSH, HTTP, HTTPS and the panel port stay open..."
     SIMAI_ADMIN_MENU=0 "${INSTALL_DIR}/simai-admin.sh" self firewall-ensure --confirm yes >/dev/null \
       || echo "WARNING: the firewall was not turned on; later: sudo ${INSTALL_DIR}/simai-admin.sh self firewall-ensure --confirm yes"

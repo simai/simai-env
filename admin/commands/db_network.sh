@@ -22,7 +22,7 @@ db_network_localize_handler() {
   binary=$(command -v mysqld) || { error 'mysqld not found'; return 1; }
   "$binary" --version | grep -Eq 'Ver 8\.' || { error 'This change supports MySQL/Percona 8 only'; return 1; }
   # Refuse an obvious active remote consumer even after acknowledgement.
-  if ss -ntH state established '( sport = :3306 or sport = :33060 )' | awk '{print $NF}' | grep -Ev '^(127\.|\[?::1\]?|\[?::ffff:127\.)' | grep -q .; then
+  if ss -ntH state established '( sport = :3306 or sport = :33060 )' | awk '{print $NF}' | grep -Ev '^(127\.|\[?::1\]?|\[?::ffff:127\.)' | grep . >/dev/null; then
     error 'External database connections are active; prepare an address allowlist instead'
     return 1
   fi
@@ -62,7 +62,7 @@ db_network_localize_handler() {
   os_svc_restart mysql
   mysql_root_detect_cli || { error 'MySQL local connection failed after restart'; return 1; }
   mysql_root_exec 'SELECT 1' >/dev/null
-  if ss -lntH '( sport = :3306 or sport = :33060 )' | awk '{print $4}' | grep -Ev '^127\.' | grep -q .; then
+  if ss -lntH '( sport = :3306 or sport = :33060 )' | awk '{print $4}' | grep -Ev '^127\.' | grep . >/dev/null; then
     error 'A database listener is still non-local'; return 1
   fi
   DB_NETWORK_SUCCESS=yes

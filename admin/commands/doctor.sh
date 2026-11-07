@@ -396,7 +396,7 @@ site_doctor_handler() {
   fi
   local ngout
   ngout=$(nginx -t 2>&1 || true)
-  if echo "$ngout" | grep -q "test is successful"; then
+  if echo "$ngout" | grep "test is successful" >/dev/null; then
     doctor_add_result "PASS" "nginx" "nginx -t" "OK" ""
   else
     doctor_add_result "FAIL" "nginx" "nginx -t" "Failed" "See /var/log/simai-admin.log and nginx -t output"
@@ -447,13 +447,13 @@ site_doctor_handler() {
       local ext
       for ext in "${PROFILE_PHP_EXTENSIONS_REQUIRED[@]}"; do
         [[ -z "$ext" ]] && continue
-        if ! printf '%s\n' "${mods[@]}" | grep -qx "${ext,,}"; then
+        if ! printf '%s\n' "${mods[@]}" | grep -x "${ext,,}" >/dev/null; then
           missing_req+=("$ext")
         fi
       done
       for ext in "${PROFILE_PHP_EXTENSIONS_RECOMMENDED[@]}"; do
         [[ -z "$ext" ]] && continue
-        if ! printf '%s\n' "${mods[@]}" | grep -qx "${ext,,}"; then
+        if ! printf '%s\n' "${mods[@]}" | grep -x "${ext,,}" >/dev/null; then
           missing_rec+=("$ext")
         fi
       done
@@ -770,7 +770,7 @@ fi
             else
               doctor_add_result "FAIL" "nginx" "target: Config exists" "/etc/nginx/sites-available/${target}.conf missing" "Create target site first"
             fi
-            if echo "$ngout" | grep -q "test is successful"; then
+            if echo "$ngout" | grep "test is successful" >/dev/null; then
               doctor_add_result "PASS" "nginx" "target: nginx -t" "OK" ""
             else
               doctor_add_result "FAIL" "nginx" "target: nginx -t" "Failed" "See /var/log/simai-admin.log and nginx -t output"

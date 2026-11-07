@@ -218,14 +218,14 @@ declare -p PROFILE_BOOTSTRAP_FILES 2>/dev/null || true
 
   check_array_declared() {
     local name="$1"
-    printf "%s\n" "$meta" | grep -q "declare -a ${name}=" 
+    printf "%s\n" "$meta" | grep "declare -a ${name}=" >/dev/null 
   }
 
   local array_names=(PROFILE_PHP_EXTENSIONS_REQUIRED PROFILE_PHP_EXTENSIONS_RECOMMENDED PROFILE_PHP_INI_REQUIRED PROFILE_PHP_INI_RECOMMENDED PROFILE_PHP_INI_FORBIDDEN)
   local an
   for an in "${array_names[@]}"; do
-    if printf "%s\n" "$meta" | grep -q "^declare .* ${an}="; then
-      if ! printf "%s\n" "$meta" | grep -q "declare -a ${an}="; then
+    if printf "%s\n" "$meta" | grep "^declare .* ${an}=" >/dev/null; then
+      if ! printf "%s\n" "$meta" | grep "declare -a ${an}=" >/dev/null; then
         profile_add_result "FAIL" "$id" "${an} must be an array"
         failures=1
       fi
@@ -423,7 +423,7 @@ profile_enable_handler() {
   ensure_profiles_allowlist_initialized_from_legacy
   local current=()
   mapfile -t current < <(read_profiles_allowlist || true)
-  if printf '%s\n' "${current[@]}" | grep -qx "$id"; then
+  if printf '%s\n' "${current[@]}" | grep -x "$id" >/dev/null; then
     info "Profile ${id} already enabled"
     return 0
   fi
@@ -454,7 +454,7 @@ profile_disable_handler() {
     error "Unknown profile: ${id}"
     return 1
   fi
-  if profiles_core_ids | grep -qx "$id"; then
+  if profiles_core_ids | grep -x "$id" >/dev/null; then
     if [[ "$force" != "yes" ]]; then
       error "Cannot disable core profile ${id} without --force yes"
       return 1

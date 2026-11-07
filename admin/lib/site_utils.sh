@@ -310,7 +310,7 @@ site_user_remove_account() {
   local user="$1"
   [[ "$user" =~ ^site-[a-z0-9-]{1,27}$ ]] || return 0
   site_is_owner "$user" && return 0
-  pkill -KILL -u "$user" 2>/dev/null || true
+  access_end_sessions "$user"
   gpasswd -d www-data "$user" >/dev/null 2>&1 || true
   userdel "$user" >/dev/null 2>&1 || true
   groupdel "$user" >/dev/null 2>&1 || true
@@ -376,7 +376,7 @@ site_ensure_opcache_isolation() {
 # granted (entries left by an older access remove).
 account_drop_stale_acl() {
   local user="$1"
-  getfacl -cp "$WWW_ROOT" 2>/dev/null | grep -q "^\(default:\)\?user:${user}:" || return 0
+  getfacl -cp "$WWW_ROOT" 2>/dev/null | grep "^\(default:\)\?user:${user}:" >/dev/null || return 0
   warn "Dropping access entries left on ${WWW_ROOT} for the reused uid of ${user}"
   access_revoke_acl "$user" "$WWW_ROOT"
 }
@@ -540,7 +540,7 @@ cron_legacy_detect_marked() {
     dump=$(crontab -l -u "$user" 2>/dev/null || true)
   fi
   [[ -z "$dump" ]] && return 0
-  if echo "$dump" | grep -qF "SIMAI ${domain}"; then
+  if echo "$dump" | grep -F "SIMAI ${domain}" >/dev/null; then
     LEGACY_SUSPECT=1
   fi
   local fmt
@@ -2239,15 +2239,15 @@ remove_cron_file() {
   fi
   local head
   head=$(head -n 20 "$cron_file" 2>/dev/null || true)
-  if ! echo "$head" | grep -q "^# simai-managed: yes"; then
+  if ! echo "$head" | grep "^# simai-managed: yes" >/dev/null; then
     warn "Refusing to delete non-simai cron file: ${cron_file}"
     return 1
   fi
-  if ! echo "$head" | grep -q "^# simai-slug: ${slug}"; then
+  if ! echo "$head" | grep "^# simai-slug: ${slug}" >/dev/null; then
     warn "Refusing to delete cron file with mismatched slug: ${cron_file}"
     return 1
   fi
-  if [[ -n "$domain_check" ]] && ! echo "$head" | grep -q "^# simai-domain: ${domain_check}"; then
+  if [[ -n "$domain_check" ]] && ! echo "$head" | grep "^# simai-domain: ${domain_check}" >/dev/null; then
     warn "Refusing to delete cron file: domain mismatch for ${cron_file}"
     return 1
   fi
@@ -2565,7 +2565,7 @@ ssl_cert_is_staging() {
   command -v openssl >/dev/null 2>&1 || return 1
   local issuer
   issuer=$(openssl x509 -issuer -noout -in "$cert" 2>/dev/null || true)
-  echo "$issuer" | grep -qiE '(fake|staging)'
+  echo "$issuer" | grep -iE '(fake|staging)' >/dev/null
 }
 
 site_nginx_is_enabled() {
@@ -2907,7 +2907,7 @@ laravel_web_state_probe() {
   local body="" code="000"
   body=$(laravel_web_probe_fetch "$domain" "/" || true)
   code=$(laravel_web_probe_status_code "$domain" "/")
-  if printf '%s' "$body" | grep -q "SIMAI placeholder"; then
+  if printf '%s' "$body" | grep "SIMAI placeholder" >/dev/null; then
     echo "placeholder"
     return 0
   fi
@@ -3247,7 +3247,7 @@ wordpress_web_state_probe() {
     echo "installed"
     return 0
   fi
-  if printf '%s' "$root_body" | grep -q "SIMAI placeholder"; then
+  if printf '%s' "$root_body" | grep "SIMAI placeholder" >/dev/null; then
     echo "placeholder"
     return 0
   fi
@@ -3440,7 +3440,7 @@ bitrix_web_state_probe() {
     echo "installed"
     return 0
   fi
-  if printf '%s' "$root_body" | grep -q "SIMAI placeholder"; then
+  if printf '%s' "$root_body" | grep "SIMAI placeholder" >/dev/null; then
     echo "placeholder"
     return 0
   fi

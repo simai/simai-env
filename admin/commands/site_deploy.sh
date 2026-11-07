@@ -62,7 +62,7 @@ deploy_archive_safe() {
       return 1
     fi
   done < <(tar -tzf "$archive")
-  if tar -tvzf "$archive" | awk 'NF {print substr($0,1,1)}' | grep -qv '^[-dl]$'; then
+  if tar -tvzf "$archive" | awk 'NF {print substr($0,1,1)}' | grep -v '^[-dl]$' >/dev/null; then
     error "Archive contains hard links or special files"
     return 1
   fi

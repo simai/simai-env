@@ -55,7 +55,7 @@ app_php_series() {
 app_missing_packages() {
   local pkg
   for pkg in "$@"; do
-    dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed" || printf '%s\n' "$pkg"
+    dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep "install ok installed" >/dev/null || printf '%s\n' "$pkg"
   done
 }
 
@@ -156,7 +156,7 @@ app_port_in_use() {
   for f in "$(site_sites_config_dir)"/*/service.env; do
     [[ -f "$f" ]] && grep -qx "APP_PORT=${port}" "$f" && return 0
   done
-  ss -ltnH 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}\$"
+  ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]${port}\$" >/dev/null
 }
 
 # First free port in 3100..3999 unless one is requested.

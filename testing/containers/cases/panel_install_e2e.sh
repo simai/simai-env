@@ -23,7 +23,7 @@ cli site deploy --domain keep.test --archive /root/k.tgz --sha256 "$(sha256sum /
 had_profiles=no; [[ -f /etc/simai-env/profiles.enabled ]] && { had_profiles=yes; cp /etc/simai-env/profiles.enabled /root/profiles.enabled.saved; }
 cli profile init --mode core --force yes --confirm yes >/dev/null 2>&1
 
-cli panel status 2>&1 | grep -q 'not installed' && ok "status before install" || bad "status before install"
+cli panel status 2>&1 | grep 'not installed' >/dev/null && ok "status before install" || bad "status before install"
 cli panel install --domain $P >/tmp/pl 2>&1
 [[ ! -f /etc/nginx/sites-available/$P.conf ]] && ok "install without confirm changes nothing" || bad "plan created the site"
 cli panel install --domain $P --placeholder yes --confirm yes >/tmp/pi 2>&1 && ok "panel install (placeholder)" || { bad "panel install"; tail -15 /tmp/pi; }
@@ -37,12 +37,12 @@ user=$(cat "/etc/simai-env/site-users/$project")
 [[ "$(page '?format=json' | field 'd["gateway"]')" == ok ]] && ok "placeholder reaches the gateway" || bad "placeholder gateway: $(page '?format=json')"
 [[ "$(page "?format=json&setup=${token}" | field 'd["setup"]')" == valid ]] && ok "setup link is valid" || bad "setup link"
 [[ "$(page '?format=json&setup=0000' | field 'd["setup"]')" == invalid ]] && ok "wrong setup link is refused" || bad "wrong link accepted"
-page '' | grep -q 'not reachable' && bad "html page reports no gateway" || ok "placeholder page renders"
-page '' | grep -qE 'keep\.test|simai_env|php_versions' && bad "placeholder leaks server data" || ok "placeholder shows no server data"
+page '' | grep 'not reachable' >/dev/null && bad "html page reports no gateway" || ok "placeholder page renders"
+page '' | grep -E 'keep\.test|simai_env|php_versions' >/dev/null && bad "placeholder leaks server data" || ok "placeholder shows no server data"
 sudo -n -u "$user" sudo -n /bin/true >/dev/null 2>&1 && bad "panel account has wider sudo" || ok "panel account may run only the gateway"
 [[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p1","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user" sudo -n /usr/local/sbin/simai-panel-gate | field '{"keep.test", "panel.test"} <= {s["domain"] for s in d["data"]["sites"]}')" == True ]] && ok "panel account calls the gateway" || bad "panel account gateway call"
 
-cli panel status 2>&1 | grep -q 'placeholder' && ok "status shows the placeholder" || bad "status after install"
+cli panel status 2>&1 | grep 'placeholder' >/dev/null && ok "status shows the placeholder" || bad "status after install"
 cli panel install --domain $P --placeholder yes --confirm yes >/dev/null 2>&1 && bad "second placeholder install accepted" || ok "reinstalling the placeholder is refused"
 cli panel install --domain other.test --placeholder yes --confirm yes >/dev/null 2>&1 && bad "second panel accepted" || ok "a second panel domain is refused"
 cli panel install --domain keep.test --git https://example.com/x --ref v1 --confirm yes >/dev/null 2>&1; [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "an existing site is never taken over" || bad "keep.test changed"
@@ -102,7 +102,7 @@ grep -q "^APP_URL=http://$P" $env && ok "APP_URL is the panel domain" || bad "AP
 grep -q '^DB_DATABASE=' $env && ok "the build knows its database" || bad "no DB_ settings in .env"
 if grep -q '^DB_CONNECTION=mysql' $env; then
   db_user=$(sed -n 's/^DB_USERNAME=//p' $env)
-  mysql -Ne "SHOW GRANTS FOR '${db_user}'@'localhost'" | grep -q 'REFERENCES' && ok "the database user may create foreign keys" || bad "no REFERENCES grant"
+  mysql -Ne "SHOW GRANTS FOR '${db_user}'@'localhost'" | grep 'REFERENCES' >/dev/null && ok "the database user may create foreign keys" || bad "no REFERENCES grant"
 fi
 project=$(sed -n 's/^# simai-project: *//p' /etc/nginx/sites-available/$P.conf)
 user2=$(cat "/etc/simai-env/site-users/$project")
@@ -136,12 +136,12 @@ cli panel remove --confirm yes >/tmp/pr 2>&1 && ok "panel remove" || { bad "pane
 [[ ! -f /etc/nginx/sites-available/$P.conf && ! -d /home/simai/www/$P ]] && ok "panel site removed" || bad "panel site left"
 [[ ! -f /etc/sudoers.d/simai-panel && ! -f /usr/local/sbin/simai-panel-gate ]] && ok "gateway removed with the panel" || bad "gateway left"
 [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "other sites keep working" || bad "keep.test broken"
-cli panel status 2>&1 | grep -q 'not installed' && ok "status after remove" || bad "status after remove"
+cli panel status 2>&1 | grep 'not installed' >/dev/null && ok "status after remove" || bad "status after remove"
 
 s5=$(mk_build v4 broken)
 cli panel install --domain $P --archive /root/build-v4.tgz --sha256 "$s5" --confirm yes >/tmp/pbb 2>&1 && bad "a build that does not answer was installed" || ok "a build that does not answer is refused"
 [[ ! -f /etc/nginx/sites-available/$P.conf && ! -d /home/simai/www/$P ]] && ok "a failed first install leaves nothing" || bad "leftovers: $(ls -d /home/simai/www/$P 2>/dev/null) $(ls /etc/nginx/sites-available/$P.conf 2>/dev/null)"
-cli panel status 2>&1 | grep -q 'not installed' && ok "status after the failed install" || bad "status after failed install"
+cli panel status 2>&1 | grep 'not installed' >/dev/null && ok "status after the failed install" || bad "status after failed install"
 cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/dev/null 2>&1 && bad "update without a panel accepted" || ok "update needs an installed panel"
 
 # The pinned build: a release file of its own, served by a local web server, so
@@ -159,19 +159,19 @@ grep -q 'does not match its checksum' /tmp/pr1 && [[ ! -f /etc/nginx/sites-avail
 pin 1.0.0 "$s6"
 cli panel install --domain $P --confirm yes >/tmp/pr2 2>&1 && ok "panel install downloads the pinned build" || { bad "pinned install"; tail -5 /tmp/pr2; }
 [[ "$(page '')" == panel-r1 ]] && ok "the pinned build is served" || bad "pinned build: $(page '' | head -c 120)"
-cli panel status 2>&1 | grep -q 'Version.*1\.0\.0' && ok "status shows the version" || bad "status version: $(cli panel status 2>&1 | tail -8)"
-cli panel update --confirm yes 2>&1 | grep -q 'nothing to do' && ok "update at the pinned version does nothing" || bad "update same version"
+cli panel status 2>&1 | grep 'Version.*1\.0\.0' >/dev/null && ok "status shows the version" || bad "status version: $(cli panel status 2>&1 | tail -8)"
+cli panel update --confirm yes 2>&1 | grep 'nothing to do' >/dev/null && ok "update at the pinned version does nothing" || bad "update same version"
 pin 2.0.0 "$s7"
 up=$(cli self update-plan --target panel --output json 2>/dev/null)
 [[ "$(python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]; print(d["current"], d["available"], d["update_available"], d["checks"])' <<<"$up")" == "1.0.0 2.0.0 True ['${P}']" ]] && ok "update plan: installed and pinned versions, the checked panel" || bad "panel update plan: ${up:0:300}"
 # self update --target panel is the panel's own path (the gateway's self:update).
 cli self update --target panel --confirm yes >/tmp/pr3 2>&1 && ok "update moves to the newly pinned version" || { bad "pinned update"; tail -5 /tmp/pr3; }
-[[ "$(page '')" == panel-r2 ]] && cli panel status 2>&1 | grep -q 'Version.*2\.0\.0' && ok "the new version is served and recorded" || bad "after pinned update: $(page '' | head -c 120)"
+[[ "$(page '')" == panel-r2 ]] && cli panel status 2>&1 | grep 'Version.*2\.0\.0' >/dev/null && ok "the new version is served and recorded" || bad "after pinned update: $(page '' | head -c 120)"
 pin 1.0.0 "$s6"
 cli panel update --confirm yes >/dev/null 2>&1 && bad "update stepped back to an older pin" || ok "update never steps back by itself"
 cli panel update --version 1.0.0 --confirm yes >/dev/null 2>&1 && bad "--version without a checksum accepted" || ok "--version needs --sha256"
 cli panel update --version 1.0.0 --sha256 "$s6" --confirm yes >/dev/null 2>&1 && [[ "$(page '')" == panel-r1 ]] && ok "--version with its checksum chooses a version" || bad "--version update: $(page '' | head -c 120)"
-cli panel update --archive /root/build-r2.tgz --sha256 "$s7" --confirm yes >/dev/null 2>&1 && ! cli panel status 2>&1 | grep -q 'Version.*[0-9]\.[0-9]\.[0-9] .*|$' && ok "an archive is not recorded as a version" || bad "archive version"
+cli panel update --archive /root/build-r2.tgz --sha256 "$s7" --confirm yes >/dev/null 2>&1 && ! cli panel status 2>&1 | grep 'Version.*[0-9]\.[0-9]\.[0-9] .*|$' >/dev/null && ok "an archive is not recorded as a version" || bad "archive version"
 # A build installed from its own archive declares its version in panel-build.json.
 r=$(cli site describe --domain $P --output json 2>/dev/null | field 'd["data"]["root"]'); printf '{"version":"2.0.1-dev"}' >"$r/current/panel-build.json"
 [[ "$(cli self update-plan --target panel --output json 2>/dev/null | field 'd["data"]["current"] + " " + str(d["data"]["update_available"]) + " " + d["data"]["restart_items"][0]["kind"] + " " + d["data"]["backup_item"]["kind"] + " " + d["data"]["rollback_kind"]')" == "2.0.1-dev False php_fpm_pool panel_data panel_release" ]] \
@@ -193,7 +193,7 @@ cli panel install --domain real.test --version 0.2.0 --sha256 7c3c10df6b0cbb2080
 [[ "$(up)" == 200 ]] && ok "the published build answers /up" || bad "/up of the published build"
 grep -q '/?setup=[a-f0-9]\{64\}$' /tmp/pr4 && ok "the published build prints its first sign-in link" || bad "no link"
 [[ "$(cli self update-plan --target panel --output json 2>/dev/null | field 'd["data"]["current"] + " " + d["data"]["available"] + " " + str(d["data"]["update_available"])')" == "0.2.0 ${pinned} True" ]] && ok "the plan offers ${pinned} over 0.2.0" || bad "real update plan"
-cli self update --target panel --confirm yes >/tmp/pr5 2>&1 && [[ "$(up)" == 200 ]] && cli panel status 2>&1 | grep -q "Version.*${pinned}" && ok "update to the pinned ${pinned} answers /up" || { bad "update to ${pinned}"; tail -8 /tmp/pr5; }
+cli self update --target panel --confirm yes >/tmp/pr5 2>&1 && [[ "$(up)" == 200 ]] && cli panel status 2>&1 | grep "Version.*${pinned}" >/dev/null && ok "update to the pinned ${pinned} answers /up" || { bad "update to ${pinned}"; tail -8 /tmp/pr5; }
 cli site deploy-rollback --domain real.test --confirm yes >/tmp/pr6 2>&1 && [[ "$(up)" == 200 ]] && ok "rollback to 0.2.0 still answers /up" || { bad "rollback of the published build"; tail -5 /tmp/pr6; }
 cli panel remove --confirm yes >/dev/null 2>&1
 
@@ -222,15 +222,15 @@ cli panel install --placeholder yes --confirm yes >/tmp/pn 2>&1 && ok "panel ins
 grep -q 'By IP: *https://.*:8500' /tmp/pn && ok "install prints the address by IP and port" || bad "no IP address: $(tail -12 /tmp/pn)"
 grep -qE '^ +https://.*:8500/\?setup=[a-f0-9]{64}$' /tmp/pn && ok "the sign-in link uses that address" || bad "sign-in link: $(tail -6 /tmp/pn)"
 grep -q 'SHA-256' /tmp/pn && ok "install prints the certificate fingerprint" || bad "no fingerprint"
-cli self firewall-ensure 2>&1 | grep -q 'allow the panel port 8500' && ok "firewall-ensure keeps the panel port" || bad "firewall plan without the panel port"
+cli self firewall-ensure 2>&1 | grep 'allow the panel port 8500' >/dev/null && ok "firewall-ensure keeps the panel port" || bad "firewall plan without the panel port"
 a=$(cli security status --output json 2>/dev/null)
 [[ "$(field '[c["check"] for c in d["data"]["checks"] if c.get("domain") == "panel.internal" and c["check"] in ("https", "panel_domain")]' <<<"$a")" == "['panel_domain']" ]] && ok "the panel without a domain is not an HTTPS problem" || bad "security checks of panel.internal: $(field '[c["id"] for c in d["data"]["checks"] if c.get("domain") == "panel.internal"]' <<<"$a" 2>&1 | head -c 300)"
 [[ "$(port '?format=json' | field 'd["gateway"]')" == ok ]] && ok "the panel answers on port 8500" || bad "port 8500: $(port '?format=json' | head -c 300)"
-curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8500/ | grep -q 301 && ok "plain HTTP on the port goes to HTTPS" || bad "http on 8500"
+curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:8500/ | grep 301 >/dev/null && ok "plain HTTP on the port goes to HTTPS" || bad "http on 8500"
 a=$(cli panel address --output json 2>/dev/null)
 [[ "$(field 'd["data"]["port"] == 8500 and d["data"]["ip_access"] and d["data"]["domain"] is None and d["data"]["ip_url"].endswith(":8500") and d["data"]["ip_certificate"]["kind"] == "self-signed"' <<<"$a")" == True ]] && ok "panel address" || bad "address: ${a:0:400}"
 [[ -f /etc/nginx/conf.d/simai-panel-address.conf ]] && ! grep -q 'simai-managed' /etc/nginx/conf.d/simai-panel-address.conf && ok "the address is not a site of its own" || bad "address file"
-cli site list 2>/dev/null | grep -q 'simai-panel-address' && bad "address listed as a site" || ok "site list unchanged"
+cli site list 2>/dev/null | grep 'simai-panel-address' >/dev/null && bad "address listed as a site" || ok "site list unchanged"
 cli panel port --port 22 --confirm yes >/dev/null 2>&1 && bad "SSH port accepted" || ok "a port of another service is refused"
 cli panel port --port 8600 --confirm yes >/tmp/pp 2>&1 && ok "panel port 8600" || { bad "panel port"; tail -8 /tmp/pp; }
 [[ "$(port '?format=json' 8600 | field 'd["gateway"]')" == ok && -z "$(port '' 8500)" ]] && ok "the panel moved to 8600" || bad "after the move"
@@ -265,7 +265,7 @@ openssl s_client -connect 127.0.0.1:"$pp" -servername panel-new.test </dev/null 
   && [[ "$(curl -sk --max-time 10 --resolve panel-new.test:"$pp":127.0.0.1 "https://panel-new.test:$pp/?format=json" | field 'd["gateway"]')" == ok ]] \
   && ok "the domain on the panel port has its own certificate" || bad "domain on port $pp: $(openssl s_client -connect 127.0.0.1:"$pp" -servername panel-new.test </dev/null 2>/dev/null | openssl x509 -noout -subject 2>&1)"
 openssl s_client -connect 127.0.0.1:"$pp" </dev/null 2>/dev/null | openssl x509 -noout -subject 2>/dev/null | grep 'SIMAI Panel' >/dev/null && ok "the address by IP keeps the self-signed certificate" || bad "IP cert on port $pp"
-curl -s -o /dev/null -w '%{http_code}' -H 'Host: panel-new.test' http://127.0.0.1/ | grep -q 301 && ok "and HTTP goes to HTTPS" || bad "domain http redirect"
+curl -s -o /dev/null -w '%{http_code}' -H 'Host: panel-new.test' http://127.0.0.1/ | grep 301 >/dev/null && ok "and HTTP goes to HTTPS" || bad "domain http redirect"
 [[ "$(cli panel address --output json 2>/dev/null | field 'd["data"]["url"]')" == https://panel-new.test ]] && ok "the domain is the panel's address" || bad "address url"
 cli panel domain --remove yes --confirm yes >/dev/null 2>&1 && ! grep -q panel-new.test /etc/nginx/conf.d/simai-panel-address.conf && ok "panel domain --remove yes" || bad "domain remove"
 rm -rf /etc/letsencrypt/live/panel-new.test

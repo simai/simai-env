@@ -34,7 +34,7 @@ php_remove_handler() {
   run_long "Removing PHP ${v} (${#pkgs[@]} packages)" env DEBIAN_FRONTEND=noninteractive apt-get purge -y "${pkgs[@]}" || return 1
   run_long "Removing packages nothing needs" env DEBIAN_FRONTEND=noninteractive apt-get autoremove -y || true
   # Pools and settings left from sites that used this version; no site does now.
-  if ! dpkg-query -W -f '${db:Status-Abbrev}\n' "php${v}-*" 2>/dev/null | grep -q '^ii'; then
+  if ! dpkg-query -W -f '${db:Status-Abbrev}\n' "php${v}-*" 2>/dev/null | grep '^ii' >/dev/null; then
     rm -rf -- "/etc/php/${v}"
   fi
   ui_result_table "PHP|${v}" "Packages removed|${#pkgs[@]}" "Sites|none used it"
@@ -50,7 +50,7 @@ php_extension_handler() {
   [[ "$name" =~ ^[a-z0-9_]{2,32}$ ]] || { error "--name must be an extension name such as intl or imagick"; return 1; }
   [[ "$enabled" =~ ^(yes|no)$ ]] || { error "--enabled must be yes or no"; return 1; }
   local ini="/etc/php/${v}/mods-available/${name}.ini" fpm="/usr/sbin/php-fpm${v}" was=no
-  [[ -f "$ini" ]] && "$fpm" -m 2>/dev/null | tr 'A-Z' 'a-z' | grep -qx -- "$name" && was=yes
+  [[ -f "$ini" ]] && "$fpm" -m 2>/dev/null | tr 'A-Z' 'a-z' | grep -x -- "$name" >/dev/null && was=yes
   if [[ "$enabled" == yes && ! -f "$ini" ]]; then
     apt-cache show "php${v}-${name}" >/dev/null 2>&1 || { error "No package php${v}-${name}; see simai-admin.sh php extensions --php ${v}"; return 1; }
     run_long "Installing php${v}-${name}" env DEBIAN_FRONTEND=noninteractive apt-get install -y "php${v}-${name}" || return 1

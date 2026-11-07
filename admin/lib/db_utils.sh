@@ -37,17 +37,17 @@ normalize_db_identifier() {
 
 db_exists() {
   local name="$1"
-  mysql_root_query_stdin "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${name}'" | grep -qx "$name"
+  mysql_root_query_stdin "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${name}'" | grep -x "$name" >/dev/null
 }
 
 db_user_exists() {
   local user="$1"
-  mysql_root_query_stdin "SELECT User FROM mysql.user WHERE User='${user}' AND Host='localhost'" | grep -qx "$user"
+  mysql_root_query_stdin "SELECT User FROM mysql.user WHERE User='${user}' AND Host='localhost'" | grep -x "$user" >/dev/null
 }
 
 db_user_has_grant_on() {
   local user="$1" db="$2"
-  mysql_root_query_stdin "SHOW GRANTS FOR '${user}'@'localhost'" | grep -q "\`${db}\`"
+  mysql_root_query_stdin "SHOW GRANTS FOR '${user}'@'localhost'" | grep "\`${db}\`" >/dev/null
 }
 
 db_default_privileges() {

@@ -340,7 +340,7 @@ security_level_handler() {
     return 0
   fi
   local -a applied=() skipped=()
-  if ! ufw status 2>/dev/null | grep -q 'Status: active'; then
+  if ! ufw status 2>/dev/null | grep 'Status: active' >/dev/null; then
     SIMAI_ADMIN_MENU=0 self_firewall_ensure_handler --confirm yes >>"$LOG_FILE" 2>&1 || { error "The firewall could not be turned on"; return 1; }
   fi
   applied+=(firewall)

@@ -447,7 +447,7 @@ access_disable_handler() {
   # -L only locks the password; an expired account is also refused for SSH
   # keys by PAM account checks. Existing sessions are closed as well.
   usermod -L -e 1 "$login" || { error "Failed to lock ${login}"; return 1; }
-  pkill -KILL -u "$login" 2>/dev/null || true
+  access_end_sessions "$login"
   local now
   now=$(date +"%Y-%m-%dT%H:%M:%S")
   access_write_metadata "$login" \
@@ -552,9 +552,7 @@ access_remove_handler() {
     [[ "$choice" == "yes" ]] || { command_cancelled; return $?; }
   fi
   if [[ "${ACCESS_META[TYPE]:-}" == "project" ]]; then
-    if id -u "$login" >/dev/null 2>&1; then
-      pkill -KILL -u "$login" 2>/dev/null || true
-    fi
+    access_end_sessions "$login"
     access_disable_mount_unit "$login" || true
     access_unmount_project_root "$login" || {
       error "Access ${login} was not removed; stop its sessions and retry"

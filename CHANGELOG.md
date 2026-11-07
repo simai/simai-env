@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## 1.52.1 - 2026-11-07
+
+- Larena Panel 0.4.0: pages render from answers the panel refreshes in the
+  background every minute, the overview asks its reads as one batch, and
+  available updates show in the alert bar and on the overview.
+- Panel jobs: a job that ended between the gateway's two looks (exit code,
+  then systemd) was reported `failed` although it succeeded; the gateway
+  looks at the exit code again before saying so, and a systemd answer it
+  cannot read means "running", not "failed".
+- Removing an SFTP account, a site account or an owner waits until the
+  user's processes have exited before unmounting and deleting the user (up
+  to 5 s), and the jail unmount retries; an SFTP session still closing made
+  the removal fail now and then.
+- `cmd | grep -q` under pipefail failed when grep stopped reading early and
+  the writer got SIGPIPE; every such check in the toolkit and the panel tests
+  now lets grep read to the end.
+- Panel tests print the job state and the last log lines when a job check
+  fails.
+
 ## 1.52.0 - 2026-11-07
 
 - Panel gateway: a `batch` request answers up to 12 reads in one call, four

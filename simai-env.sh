@@ -553,7 +553,7 @@ install_php_stack() {
     info "Using PHP ${PHP_VERSION} from the Ubuntu repository"
   elif ! platform_ondrej_php_available; then
     fail "PHP ${PHP_VERSION} needs ondrej/php, which has no packages for ${PLATFORM_OS_CODENAME} yet; use --php $(platform_native_php_version)"
-  elif ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep -q ondrej; then
+  elif ! grep -R "ondrej/php" /etc/apt/sources.list /etc/apt/sources.list.d 2>/dev/null | grep ondrej >/dev/null; then
     info "Adding ondrej/php PPA"
     os_cmd_pkg_add_ppa "ppa:ondrej/php"
     if ! run_long "Adding ondrej/php" "${OS_CMD[@]}"; then
