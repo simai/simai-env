@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.51.7 - 2026-11-07
+
+- Larena Panel 0.3.2: after sign-in the administrator lands on the server
+  overview (the sign-in went to the sites before); "Overview" is the first
+  menu row.
+
 ## 1.51.6 - 2026-11-07
 
 - `panel domain` prepares the certificate check folder before asking Let's
