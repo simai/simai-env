@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.52.0 - 2026-11-07
+
+- Panel gateway: a `batch` request answers up to 12 reads in one call, four
+  at a time, each checked, scoped and logged as if it came alone. Five reads
+  of the overview: 4.3 s one by one, 2.6 s as a batch on a 2-CPU server.
+
 ## 1.51.7 - 2026-11-07
 
 - Larena Panel 0.3.2: after sign-in the administrator lands on the server

@@ -195,6 +195,37 @@ Secrets are never part of an answer: no `.env` values, database passwords,
 private keys or deploy keys. Commands that print secrets for an operator
 (for example a generated password) are not in the allowlist.
 
+### Several reads at once (1.52.0)
+
+Each call costs the panel about 0.7-1 s on a small server, mostly simai-env
+starting up, so a page that asks five things one after another waits about
+five seconds. A batch asks them in one call and the gateway runs them side
+by side, four at a time:
+
+```json
+{ "schema": "simai-panel-request/1", "request_id": "page-1", "actor": { … },
+  "command": "batch",
+  "requests": [ { "command": "self:describe" },
+                { "command": "self:metrics-history", "args": { "period": "day" } } ] }
+```
+
+```json
+{ "schema": "simai-panel-answer/1", "request_id": "page-1", "status": "ok",
+  "kind": "batch", "answers": [ { "request_id": "page-1.0", "status": "ok", … },
+                                { "request_id": "page-1.1", … } ] }
+```
+
+- 1 to 12 reads, kind `read` only; an action, a job look, a download or a
+  nested batch is answered `refused`/`not_allowed` in its place, the others
+  still run.
+- Each read is checked, scoped to the owner and logged exactly as if it came
+  alone, under the id `<request_id>.<index>`; `answers` keep the order of
+  `requests`.
+- A malformed batch (no list, more than 12, extra keys such as `confirm`, an
+  id longer than 60) is refused as a whole with `bad_request`.
+- Measured on 2 CPUs / 2 GB: five overview reads 4.3 s one by one, 2.6 s as a
+  batch. The CPU is the limit, so a batch helps less on one core.
+
 ## Site data in the answers
 
 Each site in `self:describe` and `site:describe` also carries:
@@ -617,7 +648,9 @@ action, job). Everything else is refused.
   `security:quarantine-list`, `security:quarantine-restore`;
 - 1.47.0: `security:web-protect`, `security:level`;
 - 1.48.0: `security:geo`, `security:geo-status`, `security:geo-update`,
-  `security:geo-lookup`.
+  `security:geo-lookup`;
+- 1.51.0: `panel:address`, `panel:port`, `panel:ip-access`, `panel:domain`;
+- 1.52.0: `batch` (several reads in one call).
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

@@ -54,6 +54,18 @@ refused invalid_argument "$(req null site:describe '{"domain":"x.test","confirm"
 refused invalid_argument "$(req null site:describe '{}')" "missing domain"
 refused invalid_argument "$(req null site:describe '{"domain":["a.test"]}')" "non-string value"
 refused bad_actor "$(req '"../root"' self:describe '{}')" "bad owner name"
+# A batch: several reads of one page in one call, side by side (1.52.0).
+breq() { printf '{"schema":"simai-panel-request/1","request_id":"b1","actor":{"user":"admin@x","owner":%s},"command":"batch","requests":%s}' "$1" "$2"; }
+a=$(gate "$(breq null '[{"command":"self:describe"},{"command":"site:describe","args":{"domain":"acme.test"}},{"command":"self:metrics"}]')")
+[[ "$(field 'd["status"] + d["kind"] + str([x["status"] for x in d["answers"]]) + str([x["request_id"] for x in d["answers"]])' <<<"$a")" == "okbatch['ok', 'ok', 'ok']['b1.0', 'b1.1', 'b1.2']" ]] \
+  && [[ "$(field 'len(d["answers"][0]["data"]["sites"])' <<<"$a")" == 2 ]] && ok "a batch answers each read in order" || bad "batch: ${a:0:300}"
+a=$(gate "$(breq '"acme"' '[{"command":"site:describe","args":{"domain":"acme.test"}},{"command":"site:describe","args":{"domain":"open.test"}},{"command":"site:add","args":{"domain":"x.test"}},{"command":"batch"}]')")
+[[ "$(field 'str([x["status"] + ":" + str(x.get("reason")) for x in d["answers"]])' <<<"$a")" == "['ok:None', 'refused:owner_scope', 'refused:not_allowed', 'refused:not_allowed']" ]] \
+  && ok "a batch checks each read as if alone: owner scope, reads only, no nesting" || bad "batch checks: ${a:0:400}"
+many=$(python3 -c 'import json; print(json.dumps([{"command":"self:metrics"}]*13))')
+[[ "$(gate "$(breq null "$many")" | field 'd["status"] + ":" + d["reason"]')" == "refused:bad_request" ]] && ok "a batch holds 12 reads at most" || bad "batch size"
+[[ "$(gate "$(breq null '[]')" | field 'd["reason"]')" == bad_request ]] && ok "an empty batch is refused" || bad "empty batch"
+[[ "$(gate "$(breq null '[{"command":"self:describe","confirm":true}]')" | field 'd["reason"]')" == bad_request ]] && ok "a batch read cannot be confirmed" || bad "batch confirm"
 refused bad_request 'not json' "malformed request"
 refused bad_request '{"schema":"other","request_id":"r1"}' "wrong schema"
 refused not_allowed '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"user":"a"},"command":"self:describe","args":{},"confirm":true}' "confirm on a read command"

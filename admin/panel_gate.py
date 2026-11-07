@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +27,8 @@ CLI = str(ROOT / "simai-admin.sh")
 LOG = os.environ.get("SIMAI_PANEL_GATE_LOG", "/var/log/simai-panel-gate.log")
 JOBS = Path(os.environ.get("SIMAI_PANEL_JOBS", "/var/lib/simai-env/panel-jobs"))
 MAX_REQUEST = 64 * 1024
+MAX_BATCH = 12        # reads in one batch request
+BATCH_WORKERS = 4     # of them at once
 MAX_ATTACHMENT = int(os.environ.get("SIMAI_DEPLOY_MAX_ARCHIVE_MB", "1024")) * 1048576
 TIMEOUT = 300
 JOB_KEEP_DAYS = 30
@@ -736,20 +739,77 @@ def download(args, answer, entry, started):
     return 0
 
 
+def batch_requests(raw):
+    """The reads of a batch request as single request lines, or None when the
+    line is not a batch. Each read gets the batch's actor and its own id."""
+    try:
+        req = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(req, dict) or req.get("command") != "batch":
+        return None
+    reads = req.get("requests")
+    rid = req.get("request_id")
+    if not isinstance(reads, list) or not 1 <= len(reads) <= MAX_BATCH or not isinstance(rid, str) \
+            or not REQUEST_ID.match(rid) or len(rid) > 60 or set(req) - {"schema", "request_id", "actor", "command", "requests"}:
+        raise Refused("bad_request")
+    lines = []
+    for i, one in enumerate(reads):
+        if not isinstance(one, dict) or set(one) - {"command", "args"}:
+            raise Refused("bad_request")
+        lines.append(json.dumps({"schema": req.get("schema"), "request_id": f"{rid}.{i}", "actor": req.get("actor"),
+                                 "command": one.get("command"), "args": one.get("args", {})}).encode())
+    return req, lines
+
+
 def main():
     started = time.time()
     stream = sys.stdin.buffer
     raw = stream.readline(MAX_REQUEST + 1)  # the request line; an archive may follow
+    try:
+        batch = batch_requests(raw) if len(raw) <= MAX_REQUEST else None
+    except Refused as refusal:
+        batch = refusal
+    if batch is not None:
+        # Several reads of one page at once: each is checked and logged as
+        # if it came alone, and they run side by side.
+        answer = {"schema": "simai-panel-answer/1", "request_id": None}
+        if isinstance(batch, Refused) or stream.read(1):
+            answer.update(status="refused", reason="bad_request")
+        else:
+            req, lines = batch
+            answer["request_id"] = req["request_id"]
+            with ThreadPoolExecutor(max_workers=BATCH_WORKERS) as pool:
+                answers = list(pool.map(lambda line: handle(line, None, time.time(), reads_only=True), lines))
+            answer.update(status="ok", kind="batch", answers=answers)
+        json.dump(answer, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+        return 0
+    answer = handle(raw, stream, started)
+    if isinstance(answer, dict):  # a download has written its answer and the file itself
+        json.dump(answer, sys.stdout, ensure_ascii=False)
+        sys.stdout.write("\n")
+    return 0
+
+
+def handle(raw, stream, started, reads_only=False):
     answer = {"schema": "simai-panel-answer/1", "request_id": None}
     entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "caller": os.environ.get("SUDO_USER", "")}
     try:
+        if reads_only:
+            # A batch holds reads only, whatever their arguments.
+            one = json.loads(raw)
+            answer["request_id"] = one["request_id"]
+            if one.get("command") not in ALLOW or ALLOW[one["command"]][2] != "read":
+                entry.update(request_id=one["request_id"], command=str(one.get("command"))[:64])
+                raise Refused("not_allowed")
         req, command, args, owner = parse(raw)
         answer["request_id"] = req["request_id"]
         entry.update(request_id=req["request_id"], user=req["actor"]["user"], owner=owner,
                      impersonated_by=req["actor"].get("impersonated_by"), command=command,
                      domain=args.get("domain"))
-        if command not in ATTACHMENT or not req.get("confirm") or not req.get("attachment"):
+        if stream is not None and (command not in ATTACHMENT or not req.get("confirm") or not req.get("attachment")):
             if stream.read(1):
                 raise Refused("bad_request")  # nothing may follow a request without an archive
         if owner is not None and "domain" in args and command != "site:add" and not owned(owner, args["domain"]):
@@ -833,9 +893,7 @@ def main():
     entry.update(status=answer["status"], reason=answer.get("reason"),
                  operation_id=answer.get("operation_id"), ms=int((time.time() - started) * 1000))
     log(entry)
-    json.dump(answer, sys.stdout, ensure_ascii=False)
-    sys.stdout.write("\n")
-    return 0
+    return answer
 
 
 if __name__ == "__main__":
