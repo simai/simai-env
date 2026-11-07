@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.51.6 - 2026-11-07
+
+- `panel domain` prepares the certificate check folder before asking Let's
+  Encrypt: a panel with releases serves `current/public`, and the ACME
+  location's `<root>/public` did not exist, so no certificate was issued.
+
 ## 1.51.5 - 2026-11-07
 
 - A panel domain with a certificate also answers on the panel port with

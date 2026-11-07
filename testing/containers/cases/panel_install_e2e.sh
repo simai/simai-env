@@ -247,6 +247,11 @@ cli panel ip-access --enabled no --confirm yes >/dev/null 2>&1 && bad "IP access
 cli panel domain --domain nowhere.invalid --confirm yes >/tmp/pd 2>&1 && bad "a domain that points elsewhere" || ok "a domain that does not point here is refused"
 cli panel domain --domain keep.test --check-dns no --confirm yes >/dev/null 2>&1 && bad "a site's domain taken" || ok "a site's domain is refused"
 cli panel domain --domain panel-new.test --check-dns no --confirm yes >/tmp/pd 2>&1 && bad "certificate without the internet" || ok "no certificate: the domain is not attached"
+wr=$(sed -n 's#^[[:space:]]*alias \(.*\)/\.well-known/acme-challenge/;#\1#p' "/etc/nginx/sites-available/$(cli panel address --output json 2>/dev/null | field 'd["data"]["site_domain"]').conf" | head -n1)
+echo probe-ok > "$wr/.well-known/acme-challenge/probe" 2>/dev/null
+! grep -q 'does not exist or is not a directory' /tmp/pd && [[ "$(curl -sk --max-time 10 "https://127.0.0.1:$(python3 -I lib/panel_address.py get port)/.well-known/acme-challenge/probe")" == probe-ok ]] \
+  && ok "the certificate check folder is prepared and served" || bad "acme webroot ${wr}: $(grep -i 'exist' /tmp/pd | head -2)"
+rm -f "$wr/.well-known/acme-challenge/probe"
 [[ "$(cli panel address --output json 2>/dev/null | field 'd["data"]["domain"]')" == None ]] && ! grep -q panel-new.test /etc/nginx/conf.d/simai-panel-address.conf && ok "and nothing is left of it" || bad "domain left after a failed certificate"
 # A domain with a certificate (made here instead of by Let's Encrypt).
 mkdir -p /etc/letsencrypt/live/panel-new.test

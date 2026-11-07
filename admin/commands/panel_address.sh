@@ -228,6 +228,10 @@ panel_domain_handler() {
   progress_step "Serving the panel at http://${domain}"
   panel_address_py set domain "$domain" && panel_address_sync >/dev/null || { panel_address_py set domain "" || true; return 1; }
   progress_step "Requesting a Let's Encrypt certificate for ${domain}"
+  # A panel with releases serves current/public; the ACME location points to
+  # <root>/public, which only exists once something creates it.
+  mkdir -p "${webroot}/.well-known/acme-challenge" && chmod 755 "$webroot" "${webroot}/.well-known" "${webroot}/.well-known/acme-challenge" \
+    || { error "Cannot prepare ${webroot} for the certificate check"; panel_address_py set domain "" || true; panel_address_sync >/dev/null || true; return 1; }
   local -a cmd=(certbot certonly --cert-name "$domain" --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos --keep-until-expiring)
   if [[ -n "$email" ]]; then cmd+=(-m "$email"); else cmd+=(--register-unsafely-without-email); fi
   if ! "${cmd[@]}" >>"$LOG_FILE" 2>&1; then
