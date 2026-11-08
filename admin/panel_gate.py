@@ -51,6 +51,7 @@ ENGINE = re.compile(r"^(mysql|pgsql)$")
 ORIGIN = re.compile(r"^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 CODE = re.compile(r"^30[1278]$")
 KEEP_DROP = re.compile(r"^(keep|drop)$")
+NAME_MODE = re.compile(r"^(serve|redirect)$")
 URL_PATH = re.compile(r"^/[A-Za-z0-9._~/%-]{0,500}$")
 REDIRECT_TO = re.compile(r"^(/|https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/?)[A-Za-z0-9._~/%?&=+-]{0,500}$")
 GIT_URL = re.compile(r"^(https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/[A-Za-z0-9._~/-]{1,300}|"
@@ -166,6 +167,10 @@ ALLOW = {
     "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
                     {"domain"}, "action"),
     "site:set-php": ({"domain": DOMAIN, "php": PHP}, {"domain", "php"}, "action"),
+    # A site's extra names (1.53.0): www and other domains, the certificate follows.
+    "site:names": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "site:name-add": ({"domain": DOMAIN, "name": DOMAIN, "mode": NAME_MODE, "check-dns": YES_NO}, {"domain", "name"}, "action"),
+    "site:name-remove": ({"domain": DOMAIN, "name": DOMAIN}, {"domain", "name"}, "action"),
     "site:redirect-add": ({"domain": DOMAIN, "from": URL_PATH, "to": REDIRECT_TO, "code": CODE},
                           {"domain", "from", "to"}, "action"),
     "site:redirect-remove": ({"domain": DOMAIN, "from": URL_PATH}, {"domain", "from"}, "action"),
@@ -670,6 +675,33 @@ def owned(owner, domain):
     return domain in owned_domains(owner)
 
 
+def site_names_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("simai_site_names", ROOT / "lib" / "site_names.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def check_site_name(command, args):
+    """Refusals the panel can name before a job starts (the command checks again)."""
+    names = site_names_module()
+    domain, name = args["domain"].lower(), args["name"].lower()
+    listed = [n["name"] for n in names.load(domain)]
+    if command == "site:name-remove":
+        if name not in listed:
+            raise Refused("name_unknown")
+        return
+    if not names.DOMAIN.match(name):
+        raise Refused("invalid_argument")
+    if name == domain:
+        raise Refused("name_is_primary")
+    if names.taken(name, domain):
+        raise Refused("name_taken")
+    if name not in listed and len(listed) >= names.MAX_NAMES:
+        raise Refused("name_limit")
+
+
 def load_alerts():
     try:
         return json.loads(ALERTS.read_text()).get("alerts", {})
@@ -846,6 +878,8 @@ def handle(raw, stream, started, reads_only=False):
                 raise Refused("unknown_alert")
             if not alert.get("domain") or not owned(owner, alert["domain"]):
                 raise Refused("owner_scope")  # host alerts are the administrator's
+        if command in ("site:name-add", "site:name-remove"):
+            check_site_name(command, args)
         kind = ALLOW[command][2]
         if kind == "download":
             return download(args, answer, entry, started)

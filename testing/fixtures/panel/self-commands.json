@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 271,
+    "count": 274,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -5521,6 +5521,80 @@
         "command": "simai-admin.sh site list",
         "description": "List configured sites",
         "required": [],
+        "optional": {},
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site name-add",
+        "description": "Add an extra name (www, another domain) that shows the site or redirects to it; the certificate follows",
+        "required": [
+          "--domain",
+          "--name"
+        ],
+        "optional": {
+          "--mode": null,
+          "--check-dns": null
+        },
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site name-remove",
+        "description": "Remove an extra name of a site; the certificate is reissued without it",
+        "required": [
+          "--domain",
+          "--name"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site names",
+        "description": "Show a site's names: main domain, extra names (www, aliases), DNS and HTTPS",
+        "required": [
+          "--domain"
+        ],
         "optional": {},
         "flags": [
           "effects:read"

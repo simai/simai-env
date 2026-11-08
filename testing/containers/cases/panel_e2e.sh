@@ -54,6 +54,17 @@ refused invalid_argument "$(req null site:describe '{"domain":"x.test","confirm"
 refused invalid_argument "$(req null site:describe '{}')" "missing domain"
 refused invalid_argument "$(req null site:describe '{"domain":["a.test"]}')" "non-string value"
 refused bad_actor "$(req '"../root"' self:describe '{}')" "bad owner name"
+# A site's names through the gateway (1.53.0).
+[[ "$(gate "$(req '"acme"' site:names '{"domain":"acme.test"}')" | field 'd["status"] + d["data"]["schema"] + d["data"]["names"][0]["name"]')" == oksimai-site-names/1acme.test ]] && ok "an owner reads the names of a site" || bad "site:names"
+refused owner_scope "$(req '"acme"' site:names '{"domain":"open.test"}')" "an owner reads the names of another site"
+[[ "$(gate "$(req '"acme"' site:name-add '{"domain":"acme.test","name":"www.acme.test","mode":"redirect"}')" | field 'd["kind"] + d["data"]["args"]["name"]')" == planwww.acme.test ]] && ok "name-add answers a plan" || bad "name-add plan"
+refused invalid_argument "$(req null site:name-add '{"domain":"acme.test","name":"www.acme.test","mode":"proxy"}')" "an unknown name mode"
+refused name_taken "$(req '"acme"' site:name-add '{"domain":"acme.test","name":"open.test"}')" "a name another site answers on"
+refused name_is_primary "$(req null site:name-add '{"domain":"acme.test","name":"acme.test"}')" "the site's main domain as an extra name"
+refused name_unknown "$(req null site:name-remove '{"domain":"acme.test","name":"www.acme.test"}')" "removing a name the site does not have"
+python3 -c 'import json; json.dump({"names": [{"name": "n%d.acme.test" % i, "mode": "redirect"} for i in range(20)]}, open("/etc/simai-env/sites/acme.test/names.json", "w"))'
+refused name_limit "$(req null site:name-add '{"domain":"acme.test","name":"www.acme.test"}')" "a 21st extra name"
+rm -f /etc/simai-env/sites/acme.test/names.json
 # A batch: several reads of one page in one call, side by side (1.52.0).
 breq() { printf '{"schema":"simai-panel-request/1","request_id":"b1","actor":{"user":"admin@x","owner":%s},"command":"batch","requests":%s}' "$1" "$2"; }
 a=$(gate "$(breq null '[{"command":"self:describe"},{"command":"site:describe","args":{"domain":"acme.test"}},{"command":"self:metrics"}]')")

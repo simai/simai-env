@@ -137,6 +137,34 @@ Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
 `200.html` for single-page apps). Deploy keys, the gate and the workflow
 step: `docs/operations/ci-deploy.md`.
 
+### Extra names (www, other domains) (1.53.0)
+
+```bash
+sudo /root/simai-env/simai-admin.sh site names --domain D
+sudo /root/simai-env/simai-admin.sh site name-add --domain D --name www.D --confirm yes
+sudo /root/simai-env/simai-admin.sh site name-add --domain D --name shop.example.com --mode serve --confirm yes
+sudo /root/simai-env/simai-admin.sh site name-remove --domain D --name www.D --confirm yes
+```
+
+- `--mode redirect` (default): the name answers 301 to the main domain,
+  keeping the path; the usual choice for `www`. It lives in
+  `/etc/nginx/conf.d/simai-site-names-D.conf`, which also serves the site's
+  ACME location.
+- `--mode serve`: the name shows the site; it joins the site's own
+  `server_name` and stays there when nginx is written again (PHP switch,
+  certificate).
+- The name must point to this server (`--check-dns no` skips the check), must
+  not belong to another site or to the panel, and a site has at most 20.
+- A site with a Let's Encrypt certificate gets one certificate for all its
+  names (`certbot --expand`, renewed with them). If the certificate cannot be
+  extended, the new name is taken back and nothing is left of it. Removing a
+  name reissues the certificate without it; if that fails the old one stays.
+- The list is kept in `/etc/simai-env/sites/D/names.json`. `site names
+  --output json` answers `simai-site-names/1`: `{domain, names [{name, kind:
+  primary|extra|wildcard, mode: serve|redirect, dns {points_here, addresses},
+  https}], certificate {names, issuer, auto_renew, not_after} | null, max,
+  suggest}`.
+
 ### Serving only some paths
 
 ```bash

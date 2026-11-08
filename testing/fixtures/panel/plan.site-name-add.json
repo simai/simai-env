@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-name-add",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:name-add",
+    "args": {
+      "domain": "demo-names.test",
+      "name": "old.demo-names.test",
+      "mode": "redirect"
+    },
+    "target": "demo-names.test",
+    "description": "Add an extra name (www, another domain) that shows the site or redirects to it; the certificate follows",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

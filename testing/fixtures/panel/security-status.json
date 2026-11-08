@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-security/1",
-    "checked_at": "2026-11-06T12:47:52Z",
+    "checked_at": "2026-11-08T16:14:32Z",
     "score": 45,
     "grade": "risk",
     "summary": {
@@ -40,7 +40,7 @@
     },
     "online": {
       "enabled": true,
-      "checked_at": "2026-11-06T12:46:46Z",
+      "checked_at": "2026-11-08T16:13:35Z",
       "error": null
     },
     "checks": [
@@ -51,7 +51,7 @@
         "title": "Security updates",
         "status": "risk",
         "severity": "high",
-        "detail": "4 packages have security fixes waiting: apt, ca-certificates, libapt-pkg6.0t64, libpcre2-8-0",
+        "detail": "3 packages have security fixes waiting: apt, libapt-pkg6.0t64, libpcre2-8-0",
         "domain": null,
         "fix": {
           "command": "software:update",

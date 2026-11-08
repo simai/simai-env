@@ -1,0 +1,25 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-job-site-name-add-status",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "job_id": "000000000000000000000000",
+    "state": "succeeded",
+    "exit_code": 0,
+    "command": "site:name-add",
+    "args": {
+      "domain": "demo-names.test",
+      "name": "old.demo-names.test",
+      "mode": "redirect",
+      "check-dns": "no"
+    },
+    "created_at": "2026-01-01T00:00:00Z",
+    "request_id": "fixture-job-site-name-add",
+    "actor": {
+      "user": "admin@stand.test",
+      "owner": null
+    },
+    "result": null
+  }
+}

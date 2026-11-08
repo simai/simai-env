@@ -448,13 +448,15 @@ site_best_effort_primary_ip() {
 }
 
 site_server_name_value() {
-  local domain="$1" host_mode="${2:-standard}" wildcard_domain="${3:-}"
+  local domain="$1" host_mode="${2:-standard}" wildcard_domain="${3:-}" extra=""
   host_mode=$(site_host_mode_normalize "$host_mode" 2>/dev/null || echo "standard")
+  # Extra names that show the site (site name-add --mode serve).
+  [[ -f "/etc/simai-env/sites/${domain}/names.json" ]] && extra=$(python3 -I "${SIMAI_ENV_ROOT}/lib/site_names.py" serve "$domain" 2>/dev/null || true)
   if [[ "$host_mode" == "wildcard" ]]; then
     [[ -z "$wildcard_domain" ]] && wildcard_domain="$(site_default_wildcard_domain "$domain")"
-    echo "${domain} ${wildcard_domain}"
+    echo "${domain} ${wildcard_domain}${extra:+ ${extra}}"
   else
-    echo "$domain"
+    echo "${domain}${extra:+ ${extra}}"
   fi
 }
 

@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 27,
+  "set_version": 29,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.51.0",
+  "simai_env": "1.53.0",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -18,7 +18,7 @@
       "status": "ok"
     },
     "change-status.json": {
-      "sha256": "2b7b2757eac4c49a279b832fd3683fcbb4d6699e7202c7d70fc59d2e18eb8088",
+      "sha256": "ba74de3b84e3eead945ecc6c2b5addb9c9705110207409d132d0885c9d75887d",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -38,19 +38,35 @@
       "status": "ok"
     },
     "file-list.demo-owned.test.json": {
-      "sha256": "3de3bd43dbf049da6ea093912233c2acb16f3f2146c89d18edbdf5dd49e483e1",
+      "sha256": "a72da22ace12dc47ec63470aaf4f7fc15255a681e4b22da9e4494b44fe470eee",
       "status": "ok"
     },
     "file-stat.demo-owned.test.json": {
-      "sha256": "6a2f6721ccb9554e48702e31a84d6665813b88a5448b179e1afab513fe1e664d",
+      "sha256": "9035219e2ed886f7dcf35a39a4e6cf70d083ff7217ab6e841fe6f5f98826fb0e",
       "status": "ok"
     },
     "firewall-status.json": {
-      "sha256": "8e18da037fb549cba71270f25ecda80d571bbf113c0784d3064043cc82297503",
+      "sha256": "6cfdc988938e78ba3055873b4671f08c377814f0733042bba4fb47d69551cf42",
       "status": "ok"
     },
     "job-log.json": {
       "sha256": "56bb0b566ec62d7a03a739c22df70d5820bd9df346beb8a886332a02e50ff833",
+      "status": "ok"
+    },
+    "job-site-name-add-status.json": {
+      "sha256": "47d210b5ad9a4b05043d37a7033e8665dd78cb12627f805650a7a93e20fb4457",
+      "status": "ok"
+    },
+    "job-site-name-add.json": {
+      "sha256": "9a31205b61a27b6b69b06d499089bbd5d85f0a904596f2a802a3ce2e2ba2a1af",
+      "status": "ok"
+    },
+    "job-site-name-remove-status.json": {
+      "sha256": "972ab9018139f6d37467882e65fe837bf5651c33ffac397e82bfb63da430f866",
+      "status": "ok"
+    },
+    "job-site-name-remove.json": {
+      "sha256": "01069dc98387c7a179f6f258dd571c1b24d63a93c5bf640821261853fe2764a7",
       "status": "ok"
     },
     "job-start.json": {
@@ -118,7 +134,7 @@
       "status": "ok"
     },
     "plan.change-confirm.json": {
-      "sha256": "4e267e0f0279f6736048cbddfd44a40789c5b6f34784e350db33bf9328bcd05f",
+      "sha256": "c36769a111cd3e92c777afc89a7b20a3ec1e0c689e34f21549faf18b4d5d4d8a",
       "status": "ok"
     },
     "plan.cron-job-add.json": {
@@ -230,7 +246,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "98f52fcd7fad2421f62d0ad7c1289efb648321eb2b320ceac3d7b6e3442a0bce",
+      "sha256": "1c6e121ff496c2ef23d245d74fc090f25097de87105e95a110805139c8d868af",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -273,6 +289,14 @@
       "sha256": "a0f0072af2d932ef9aa66a204d390730d5dc10179a2bb8cfffd34eb8704fc691",
       "status": "ok"
     },
+    "plan.site-name-add.json": {
+      "sha256": "c5e3776c5cd4018c1b5ec127770101991c974518a9a6b785b2eccc5e105a6efc",
+      "status": "ok"
+    },
+    "plan.site-name-remove.json": {
+      "sha256": "92488ce915aead69c758a822e5b2d7c56dc8c0b379decf2bb0074b3b84eef291",
+      "status": "ok"
+    },
     "plan.site-nginx-custom.json": {
       "sha256": "8c7e524d6e94b7b32428c593c49fa4bd803e510618552f2fa097345c4d23c134",
       "status": "ok"
@@ -298,7 +322,7 @@
       "status": "ok"
     },
     "plan.software-update.json": {
-      "sha256": "836ff4a94bebeada44ccc332404be44e65a9fb669ea1e6d29d7e5b35fc879422",
+      "sha256": "d252edfd712ade9f88ab2102354d0b7faf7c9c062b09f5d365bb7d1a5bc7f034",
       "status": "ok"
     },
     "plan.ssl-dns-credentials.json": {
@@ -327,6 +351,18 @@
     },
     "refused.invalid-argument.service-name.json": {
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
+    },
+    "refused.name-is-primary.json": {
+      "sha256": "83813f71f9683015b8d88f2b9c1f1deb38aa810a087d8bf4a935dff1eaaea21a",
+      "status": "refused"
+    },
+    "refused.name-taken.json": {
+      "sha256": "21d724a7e48663172cb9578cbf7738141185b3f0091864c2c52ea3605b68dae1",
+      "status": "refused"
+    },
+    "refused.name-unknown.json": {
+      "sha256": "620dc3e8a32c049c9bbe724861d9b03426a2f69836718ff597d50ed91daf4ec9",
       "status": "refused"
     },
     "refused.not-allowed.json": {
@@ -413,6 +449,10 @@
       "sha256": "6c757a2388d73453c32299b66920ebde638ba4f900e9972e3445daf07015f0e2",
       "status": "refused"
     },
+    "refused.owner-scope.site-names.json": {
+      "sha256": "258635df8ad660d791204acd3a4da111a4105ebbc77d7d1c2df28a545b446f19",
+      "status": "refused"
+    },
     "refused.owner-scope.site-php-ini-list.json": {
       "sha256": "96de89c80b1fc7b883ae8156cc8073fe69faacf8ecf7bf184338c1b7b2e81d90",
       "status": "refused"
@@ -446,7 +486,7 @@
       "status": "ok"
     },
     "security-status.json": {
-      "sha256": "d0ff36a436226b36d4ab635475b251cfcbaec726175216e75be740518b802824",
+      "sha256": "dd2b2e06ddf8f209f162e69e2e43af624d448c6a56a10d994f1b6e8c9ae42db7",
       "status": "ok"
     },
     "self-alerts.json": {
@@ -458,15 +498,15 @@
       "status": "ok"
     },
     "self-commands.json": {
-      "sha256": "eeac2df34b1ac0a306481f3729e0727c2b434b5756e712e5c58ff2dc0f85df8c",
+      "sha256": "6f103f67ceefe9b109b8f199ea16e0039c42272ef9d717ac6193350a60bb980e",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "c5764784cf8f27415461964e8495d38d6bafce1aefc81cd5f85b460a00d165b6",
+      "sha256": "14140041b31c316e542159a6802c056c58138ba4aebd2507e217150cbeaf85d1",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "22a6284e50e515f005363e67cadcd89a3123ac42116f577c7f52aa7efe42b465",
+      "sha256": "d8d5037e9a4239147758d8c1d2f8e531a460775f61183917b614827cdfeaf174",
       "status": "ok"
     },
     "self-metrics-history.hour.json": {
@@ -494,11 +534,11 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "2dbfc95cabec9210d5f04b5b9652542331f7356b5f565153f6474f87a61302b1",
+      "sha256": "8abd0b13be02726c99dc40b00817e422a0b185f27eeac0a8623388c2ea4404c8",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
-      "sha256": "da2591ef1f73524fa7f6f0380620c47382c3dbbdebeb12ffe5bdc360c348b36f",
+      "sha256": "05f422c48f15fd34f23d71bf3d07d49f8543a0f254c1155df2761a8739e4922b",
       "status": "ok"
     },
     "service-list.json": {
@@ -514,7 +554,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "e4fb34012282963d06c6d22e0e759ed49bf05595300d51f16b22d051614df20c",
+      "sha256": "cf0ffeec438d1afe55fb66a4c6e91aff63ab218f7c0d9b8c68c9f6ac4e59aa88",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -522,7 +562,7 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "07e42d6765bd5339396bd198b403ac6137dbcdcddb16a1d52cdd9e82fbdb3823",
+      "sha256": "75181965ed32f2885b2f5eee22a87edec14989f2fd84297140824a34039be279",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {
@@ -541,6 +581,14 @@
       "sha256": "aed260e50358996ddd6503d4a53034a68588b4062c1208d9f82cf817e3854387",
       "status": "ok"
     },
+    "site-names.demo-names.test.json": {
+      "sha256": "8d204f4dc0dc986d94dcbfbe8a41b05fd4527ec57b215a4de5db60847de6ba61",
+      "status": "ok"
+    },
+    "site-names.demo-owned.test.json": {
+      "sha256": "59d16753fbc5a4aaa577f1accc5ba537b43a543c7d1c5fd34cf0085ad8aafde0",
+      "status": "ok"
+    },
     "site-nginx-custom-show.demo-php.test.json": {
       "sha256": "0524e086d15d816dc8fb6ab5333fe3231c5d0b99311e692988f64880438a854e",
       "status": "ok"
@@ -550,7 +598,7 @@
       "status": "ok"
     },
     "software-list.json": {
-      "sha256": "ef9542aa49aac848d3e74a706c9165e8386d17da5cc1a26874b1914de17954a9",
+      "sha256": "b2d7657fcc2b0b488fab57eb15262cea7467c5c2486f7224d4d6abafdc4f2ff3",
       "status": "ok"
     },
     "ssl-dns-status.json": {

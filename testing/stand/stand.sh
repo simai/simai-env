@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=27
+FIXTURE_SET=29
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -201,6 +201,9 @@ FW
     "plan.firewall-block|null|firewall:block|{\"address\":\"198.51.100.20\",\"ttl\":\"3600\"}"
     "plan.firewall-unblock|null|firewall:unblock|{\"address\":\"203.0.113.7\"}"
     "plan.panel-access|null|panel:access|{\"allow\":[\"192.0.2.10\",\"198.51.100.0/24\"]}"
+    "site-names.demo-owned.test|\"demo\"|site:names|{\"domain\":\"demo-owned.test\"}"
+    "plan.site-name-add|\"demo\"|site:name-add|{\"domain\":\"demo-owned.test\",\"name\":\"www.demo-owned.test\",\"mode\":\"redirect\"}"
+    "refused.owner-scope.site-names|\"demo\"|site:names|{\"domain\":\"demo-php.test\"}"
     "panel-address|null|panel:address|{}"
     "plan.panel-port|null|panel:port|{\"port\":\"8600\"}"
     "plan.panel-ip-access|null|panel:ip-access|{\"enabled\":\"no\"}"
@@ -291,6 +294,41 @@ FW
   # shellcheck disable=SC2059
   printf "$req" job-log job:log "{\"job_id\":\"${job}\"}" '' | gate >"${FIXTURES}/job-log.json"
   in_stand bash -c 'ls -1d /var/backups/simai/demo-owned.test/*/ | tail -n1 | xargs -r rm -rf'
+  # Site names on a site that has all three kinds: www sent to the main
+  # domain, a name that shows the site, and its wildcard. The site lives only
+  # for this recording, so the answers above do not change.
+  local N=demo-names.test
+  in_stand bash -c "cd /root/simai-env && ./simai-admin.sh site add --domain $N --profile static --host-mode wildcard --owner demo --create-db no --confirm yes \
+    && ./simai-admin.sh site name-add --domain $N --name www.$N --check-dns no --confirm yes \
+    && ./simai-admin.sh site name-add --domain $N --name demo-names-alt.test --mode serve --check-dns no --confirm yes" >/dev/null 2>&1 \
+    || echo "[stand] the site names demo site was not made" >&2
+  names_job() {  # name of the fixture, request; follows the job to its end
+    local out="${FIXTURES}/$1" id
+    # shellcheck disable=SC2059 # the format is the request template above
+    printf "$req" "$1" "$2" "$3" ',"confirm":true' | gate >"${out}.json"
+    id=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("job_id", ""))' "${out}.json")
+    for _ in $(seq 120); do
+      # shellcheck disable=SC2059
+      printf "$req" "$1-status" job:status "{\"job_id\":\"${id}\"}" '' | gate >"${out}-status.json"
+      grep -q '"state": "running"' "${out}-status.json" || break
+      sleep 1
+    done
+  }
+  local nrow
+  for nrow in \
+    "site-names.${N}|\"demo\"|site:names|{\"domain\":\"${N}\"}" \
+    "plan.site-name-add|\"demo\"|site:name-add|{\"domain\":\"${N}\",\"name\":\"old.${N}\",\"mode\":\"redirect\"}" \
+    "plan.site-name-remove|\"demo\"|site:name-remove|{\"domain\":\"${N}\",\"name\":\"www.${N}\"}" \
+    "refused.name-taken|\"demo\"|site:name-add|{\"domain\":\"${N}\",\"name\":\"demo-static.test\"}" \
+    "refused.name-is-primary|\"demo\"|site:name-add|{\"domain\":\"${N}\",\"name\":\"${N}\"}" \
+    "refused.name-unknown|\"demo\"|site:name-remove|{\"domain\":\"${N}\",\"name\":\"none.${N}\"}"; do
+    IFS='|' read -r name owner command args <<<"$nrow"
+    printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":%s},"command":"%s","args":%s}' \
+      "$name" "$owner" "$command" "$args" | gate >"${FIXTURES}/${name}.json"
+  done
+  names_job job-site-name-add site:name-add "{\"domain\":\"${N}\",\"name\":\"old.${N}\",\"mode\":\"redirect\",\"check-dns\":\"no\"}"
+  names_job job-site-name-remove site:name-remove "{\"domain\":\"${N}\",\"name\":\"old.${N}\"}"
+  in_stand /root/simai-env/simai-admin.sh site remove --domain "$N" --remove-files yes --confirm yes >/dev/null 2>&1 || true
   # Every answer must be valid JSON; a recording with stray output is useless.
   # manifest.json pins the set: larena/env checks its copy against it.
   python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'
@@ -363,6 +401,10 @@ for f in sorted(root.glob("*.json")):
         data.update(ip="203.0.113.10", addresses=["203.0.113.10"], ip_url="https://203.0.113.10:8500",
                     ip_certificate={"kind": "self-signed", "sha256": "AB:" * 31 + "AB", "expires": "Jan  1 00:00:00 2036 GMT"},
                     url=data["domain_url"] if data.get("domain_ssl") else "https://203.0.113.10:8500")
+    if data.get("schema") == "simai-site-names/1":
+        # What the stand's names resolve to differs between machines.
+        for row in data["names"]:
+            row["dns"] = {"points_here": False, "addresses": []}
     if data.get("schema") == "simai-services/1":
         for svc in data["services"]:
             svc["since"] = "Thu 2026-01-01 00:00:00 UTC"

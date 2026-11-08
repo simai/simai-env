@@ -1,0 +1,29 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-names.demo-owned.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-names/1",
+    "domain": "demo-owned.test",
+    "names": [
+      {
+        "name": "demo-owned.test",
+        "kind": "primary",
+        "mode": "serve",
+        "dns": {
+          "points_here": false,
+          "addresses": []
+        },
+        "https": false
+      }
+    ],
+    "certificate": null,
+    "max": 20,
+    "suggest": [
+      "www.demo-owned.test"
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.51.0",
+      "version": "1.53.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -113,6 +113,9 @@
         "site:deploy-rollback",
         "site:describe",
         "site:doctor",
+        "site:name-add",
+        "site:name-remove",
+        "site:names",
         "site:php-ini-list",
         "site:php-ini-set",
         "site:php-ini-unset",

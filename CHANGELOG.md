@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 1.53.0 - 2026-11-08
+
+- A site's extra names: `site names`, `site name-add --name N [--mode
+  serve|redirect]`, `site name-remove`. `www` and other domains either show
+  the site or answer 301 to its main domain; the name must point here and
+  belong to no other site; a site's Let's Encrypt certificate is extended to
+  every name, and a name it cannot cover is taken back. Panel gateway:
+  `site:names`, `site:name-add`, `site:name-remove` (owners for their own
+  sites); the gateway names its refusals before a job starts: `name_taken`,
+  `name_is_primary`, `name_limit`, `name_unknown`. Test `names_e2e`.
+- Larena Panel 0.4.2.
+
 ## 1.52.1 - 2026-11-07
 
 - Larena Panel 0.4.0: pages render from answers the panel refreshes in the

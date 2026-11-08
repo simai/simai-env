@@ -5,14 +5,14 @@
   "kind": "result",
   "data": {
     "schema": "simai-change/1",
-    "change_id": "999225722c6e",
+    "change_id": "ebfe95471542",
     "kind": "firewall",
     "domain": null,
     "state": "confirmed",
-    "created_at": "2026-11-06T12:46:54Z",
-    "expires_at": "2026-11-06T12:48:54Z",
+    "created_at": "2026-11-08T16:13:41Z",
+    "expires_at": "2026-11-08T16:15:41Z",
     "summary": "block 203.0.113.7",
-    "confirmed_at": "2026-11-06T12:46:54Z",
+    "confirmed_at": "2026-11-08T16:13:42Z",
     "restored_at": null
   },
   "command_status": "success",

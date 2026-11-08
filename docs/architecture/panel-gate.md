@@ -188,7 +188,7 @@ simai-env result status: `site doctor` answers `ok` with
 | `status` | Meaning |
 | --- | --- |
 | `ok` | `kind` is `result` (data), `plan` (what an action would do) or `job` (`job_id` of a started action) |
-| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `owner_blocked`, `attachment_mismatch`, `unknown_job`, `not_running` |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `owner_blocked`, `attachment_mismatch`, `unknown_job`, `not_running`; for site names `name_taken`, `name_is_primary`, `name_limit`, `name_unknown` |
 | `failed` | ran and failed; `reason`: the simai-env error code, `invalid_output`, `plan_failed` or `job_not_started` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
@@ -604,6 +604,15 @@ action, job). Everything else is refused.
   db-engine, redirect-to, redirect-code, redirect-path}`; `site:remove
   {domain, remove-files, drop-db, drop-db-user}`; `site:set-php`;
   `site:redirect-add {domain, from, to, code}`, `site:redirect-remove`;
+  `site:names {domain}` (read, `simai-site-names/1`), `site:name-add {domain,
+  name, mode: serve|redirect, check-dns}`, `site:name-remove {domain, name}`
+  (1.53.0; details in docs/commands/site.md, "Extra names"). Before a plan
+  or a job the gateway refuses `name_taken` (another site, one of its
+  names, or the panel answers on it), `name_is_primary` (the site's main
+  domain), `name_limit` (the site has 20 extra names; the main domain and
+  wildcards are not counted, changing the mode of a listed name is) and,
+  for removal, `name_unknown`. A name that does not point to the server or
+  a certificate Let's Encrypt refuses fails the job; its log says why;
   `site:db-create`, `site:db-drop`; `cron:add`, `cron:remove` (the Laravel
   scheduler entry); `ssl:remove {domain, delete-cert}`; `owner:create {name,
   pubkey}`, `owner:add-key`, `owner:remove`;
@@ -650,7 +659,8 @@ action, job). Everything else is refused.
 - 1.48.0: `security:geo`, `security:geo-status`, `security:geo-update`,
   `security:geo-lookup`;
 - 1.51.0: `panel:address`, `panel:port`, `panel:ip-access`, `panel:domain`;
-- 1.52.0: `batch` (several reads in one call).
+- 1.52.0: `batch` (several reads in one call);
+- 1.53.0: `site:names`, `site:name-add`, `site:name-remove`.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

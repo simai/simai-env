@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.name-is-primary",
+  "status": "refused",
+  "reason": "name_is_primary"
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-names.demo-names.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-names/1",
+    "domain": "demo-names.test",
+    "names": [
+      {
+        "name": "demo-names.test",
+        "kind": "primary",
+        "mode": "serve",
+        "dns": {
+          "points_here": false,
+          "addresses": []
+        },
+        "https": false
+      },
+      {
+        "name": "www.demo-names.test",
+        "kind": "extra",
+        "mode": "redirect",
+        "dns": {
+          "points_here": false,
+          "addresses": []
+        },
+        "https": false
+      },
+      {
+        "name": "demo-names-alt.test",
+        "kind": "extra",
+        "mode": "serve",
+        "dns": {
+          "points_here": false,
+          "addresses": []
+        },
+        "https": false
+      },
+      {
+        "name": "*.demo-names.test",
+        "kind": "wildcard",
+        "mode": "serve",
+        "dns": {
+          "points_here": false,
+          "addresses": []
+        },
+        "https": false
+      }
+    ],
+    "certificate": null,
+    "max": 20,
+    "suggest": []
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

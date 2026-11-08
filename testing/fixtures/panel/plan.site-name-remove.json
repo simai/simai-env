@@ -1,0 +1,18 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-name-remove",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:name-remove",
+    "args": {
+      "domain": "demo-names.test",
+      "name": "www.demo-names.test"
+    },
+    "target": "demo-names.test",
+    "description": "Remove an extra name of a site; the certificate is reissued without it",
+    "effects": "delete",
+    "lock": "site",
+    "applied": false
+  }
+}
