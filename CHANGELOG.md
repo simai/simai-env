@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 1.55.0 - 2026-11-10
+
+- Profile rules with a one-click fix. `site doctor` reports Bitrix rules
+  learned on a restored real site (restore files in the web root, `.default`
+  folders, MySQL session modes, database charset, PHP time zone vs server,
+  OPcache baseline) and, for PHP sites, graceful PHP-FPM reloads. Each
+  rule has a stable `key`; a failing one names its `fix`, and the JSON answer
+  says `since` when it first failed. New `site check-state` and `site
+  check-fix --id <key>` (plan, then `--confirm yes`), the same steps that
+  `bitrix finalize` and `self migrate` run. Test `site_checks_e2e`.
+
+- `bitrix status --output json`: the route and step of a Bitrix site
+  (prepare, upload, validate, run_restore, run_setup, finalize, done) with
+  the wizard URL and the rules finalize still has to fix.
+
+- Panel gateway: `site:check-state`, `site:check-fix` (refused
+  `unknown_check` / `check_ok`, the plan carries the title and what the
+  button does), `bitrix:status`, `bitrix:restore-ready`, `bitrix:finalize`.
+  `site:add` of a profile switched off on the server is refused
+  `profile_disabled`: 1.54.0 checked it only when the site was created, and
+  its recorded answer `plan.site-add-disabled-profile` showed a plain plan
+  (the stand had every profile on). Fixture set 31: the stand keeps `node`
+  off; new answers for Bitrix steps, rules and fixes.
+
 ## 1.54.1 - 2026-11-10
 
 - Larena Panel 0.4.3: while the server does not answer in time, panel pages

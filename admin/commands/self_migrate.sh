@@ -255,22 +255,15 @@ self_migrate_app_routes_charset() {
 # Bitrix sites rendered before 1.53.1 refused every ".default" folder as a
 # hidden file, so admin styles and scripts (tables, filters) did not load.
 self_migrate_bitrix_dot_default() {
-  local cfg domain backup
+  local cfg rc
   for cfg in /etc/nginx/sites-available/*.conf; do
     [[ -f "$cfg" ]] || continue
-    grep -q '^# simai-nginx-template: bitrix$' "$cfg" || continue
-    grep -qF 'location ~ /\.(?!well-known/) {' "$cfg" || continue
-    domain=$(basename "$cfg" .conf)
-    backup="${cfg}.bak.$(date +%Y%m%d%H%M%S)"
-    cp -p "$cfg" "$backup" || continue
-    sed -i 's#location ~ /\\.(?!well-known/) {#location ~ /\\.(?!well-known/|default/) {#' "$cfg"
-    if grep -qF 'location ~ /\.(?!well-known/|default/) {' "$cfg" && nginx -t >>"$LOG_FILE" 2>&1; then
-      SELF_MIGRATE_CHANGES+=("${domain}: Bitrix .default folders served (admin styles and scripts)")
-      SELF_MIGRATE_RELOAD_NGINX=1
-    else
-      cp -p "$backup" "$cfg"
-      warn "Could not allow .default folders in ${cfg}; previous configuration restored"
-    fi
+    rc=0; bitrix_nginx_dot_default_fix "$cfg" || rc=$?
+    case $rc in
+      0) SELF_MIGRATE_CHANGES+=("$(basename "$cfg" .conf): Bitrix .default folders served (admin styles and scripts)")
+         SELF_MIGRATE_RELOAD_NGINX=1 ;;
+      1) warn "Could not allow .default folders in ${cfg}; previous configuration restored" ;;
+    esac
   done
   return 0
 }

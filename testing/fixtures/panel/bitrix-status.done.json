@@ -1,0 +1,23 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-bitrix-status.done",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-bitrix-status/1",
+    "domain": "demo-bitrix.test",
+    "route": "none",
+    "step": "prepare",
+    "restore_url": null,
+    "installer_url": null,
+    "next": "bitrix:restore-ready",
+    "archive": null,
+    "pending": [],
+    "db_state": "unknown",
+    "web_state": "placeholder",
+    "settings": true,
+    "core": false
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

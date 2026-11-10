@@ -103,6 +103,8 @@ SERVICE = re.compile(r"^(nginx|mysql|mariadb|postgresql|redis-server|cron|php[5-
 PORT = re.compile(r"^[1-9][0-9]{0,4}$")
 UPSTREAM_PATH = re.compile(r"^/[A-Za-z0-9._~/-]{0,200}$")
 BITRIX_FILES = re.compile(r"^(none|setup|restore)$")
+CHECK_ID = re.compile(r"^[a-z0-9]{1,16}\.[a-z0-9-]{1,40}$")  # a profile rule (admin/lib/site_checks.sh)
+BITRIX_ARCHIVE = re.compile(r"^(?:auto|[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar))$")
 CRON_ID = re.compile(r"^[a-f0-9]{8}$")
 CRON_SCHEDULE = re.compile(r"^[0-9*/,-]{1,40}( [0-9*/,-]{1,40}){4}$")  # checked fully by the command
 CRON_COMMAND = re.compile(r"^[!-,.-~][ -~]{0,999}$")
@@ -167,6 +169,12 @@ ALLOW = {
     "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
                     {"domain"}, "action"),
     "site:set-php": ({"domain": DOMAIN, "php": PHP}, {"domain", "php"}, "action"),
+    # 1.55.0: profile rules from site:doctor fixed by one button; Bitrix steps.
+    "site:check-state": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "read"),
+    "site:check-fix": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "action"),
+    "bitrix:status": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "bitrix:restore-ready": ({"domain": DOMAIN, "archive": BITRIX_ARCHIVE}, {"domain"}, "action"),
+    "bitrix:finalize": ({"domain": DOMAIN}, {"domain"}, "action"),
     # A site's extra names (1.53.0): www and other domains, the certificate follows.
     "site:names": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:name-add": ({"domain": DOMAIN, "name": DOMAIN, "mode": NAME_MODE, "check-dns": YES_NO}, {"domain", "name"}, "action"),
@@ -702,6 +710,24 @@ def check_site_name(command, args):
         raise Refused("name_limit")
 
 
+def check_profile_enabled(args):
+    """site:add of a profile switched off on this server (profile enable)."""
+    profiles = ((run("self:profiles", {}) or {}).get("data") or {}).get("profiles") or []
+    if args["profile"] not in {p.get("id") for p in profiles}:
+        raise Refused("profile_disabled")
+
+
+def check_fix(args):
+    """site:check-fix: the rule's state now; refuses unknown_check or check_ok."""
+    result = run("site:check-state", args)
+    data = (result or {}).get("data")
+    if not isinstance(data, dict):
+        raise Refused("unknown_check")
+    if data.get("refusal") in ("unknown_check", "check_ok"):
+        raise Refused(data["refusal"])
+    return {k: data.get(k) for k in ("id", "title", "plan", "detail", "state")}
+
+
 def load_alerts():
     try:
         return json.loads(ALERTS.read_text()).get("alerts", {})
@@ -880,6 +906,9 @@ def handle(raw, stream, started, reads_only=False):
                 raise Refused("owner_scope")  # host alerts are the administrator's
         if command in ("site:name-add", "site:name-remove"):
             check_site_name(command, args)
+        if command == "site:add":
+            check_profile_enabled(args)
+        check = check_fix(args) if command == "site:check-fix" else None
         kind = ALLOW[command][2]
         if kind == "download":
             return download(args, answer, entry, started)
@@ -892,6 +921,8 @@ def handle(raw, stream, started, reads_only=False):
                 if data is None:
                     answer.update(status="failed", reason="plan_failed")
                 else:
+                    if check:
+                        data["check"] = check  # title and one line: what the button does
                     answer.update(status="ok", kind="plan", data=data)
                 raise Done
             job_id, started_ok = start_job(req, command, args, stream)

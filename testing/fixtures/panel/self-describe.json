@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.54.0",
+      "version": "1.55.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -166,9 +166,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261110011113",
-          "previous": "20261110011112-initial",
-          "deployed_at": "2026-11-10T01:11:14Z",
+          "current": "20261110124810",
+          "previous": "20261110124809-initial",
+          "deployed_at": "2026-11-10T12:48:10Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -213,6 +213,9 @@
         "backup:storage-list",
         "backup:storage-remove",
         "backup:storage-test",
+        "bitrix:finalize",
+        "bitrix:restore-ready",
+        "bitrix:status",
         "change:confirm",
         "change:status",
         "cron:add",
@@ -299,6 +302,8 @@
         "service:restart",
         "site:add",
         "site:apache",
+        "site:check-fix",
+        "site:check-state",
         "site:db-create",
         "site:db-drop",
         "site:db-rotate",

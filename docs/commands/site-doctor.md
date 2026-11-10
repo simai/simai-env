@@ -25,6 +25,26 @@ What it checks (non-destructive):
   exposure on `3306/33060`, and `.env` presence for required DB profiles.
 - Alias: when `--include-target=yes`, performs a prefixed partial check of the target site (non-recursive).
 
+Profile rules with a one-click fix (1.55.0):
+- Each rule has a stable key; a failing rule names its fix:
+  `simai-admin.sh site check-fix --domain <d> --id <key> --confirm yes`
+  (without `--confirm` a plan; refused when the rule holds or does not apply).
+  `site check-state --domain <d> --id <key>` shows one rule.
+- Bitrix: `bitrix.docroot-leftovers` (FAIL: backup volumes, restore.php or
+  SQL dumps downloadable from the web root; moved to `<site>/restore-archive`),
+  `bitrix.dot-default` (FAIL: nginx refuses `.default` folders),
+  `bitrix.db-session-modes` (after_connect_d7.php without `sql_mode=''` and
+  `innodb_strict_mode=0`), `bitrix.db-charset` (database default is not the
+  profile charset), `bitrix.timezone` (PHP runs in another zone than the
+  server and MySQL, and the site sets none), `bitrix.opcache` (host OPcache
+  baseline not met). PHP sites: `php.fpm-graceful-reload` (a reload kills
+  busy requests). Keyed rules without a fix: `bitrix.upload-limit`,
+  `bitrix.sef-fallback`, `bitrix.static-gzip`, `bitrix.static-cache`,
+  `bitrix.ownership`.
+- `--output json`: such items carry `key`, `fix`, `since` (first time the
+  rule failed, kept in `/var/lib/simai-env/site-checks/<domain>.json`; null
+  while it passes) and `detail`; the answer names the `profile`.
+
 Notes:
 - No changes are applied; use `site drift` for metadata/cron drift planning/fixes.
 - `--strict yes` makes the command exit non-zero on FAIL results.

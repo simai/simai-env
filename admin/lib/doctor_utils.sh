@@ -6,6 +6,8 @@ doctor_results_init() {
   DOCTOR_TITLE=()
   DOCTOR_DETAILS=()
   DOCTOR_HINTS=()
+  DOCTOR_KEY=()
+  DOCTOR_FIX=()
 }
 
 doctor_to_bytes() {
@@ -25,29 +27,62 @@ doctor_to_bytes() {
   esac
 }
 
+# Optional key: a stable id of the rule (profile rules, see site_checks.sh);
+# optional fix: the `site check-fix` id that repairs it.
 doctor_add_result() {
-  local status="$1" area="$2" title="$3" details="$4" hint="${5:-}"
+  local status="$1" area="$2" title="$3" details="$4" hint="${5:-}" key="${6:-}" fix="${7:-}"
   DOCTOR_STATUS+=("$status")
   DOCTOR_AREA+=("$area")
   DOCTOR_TITLE+=("$title")
   DOCTOR_DETAILS+=("$details")
   DOCTOR_HINTS+=("$hint")
+  DOCTOR_KEY+=("$key")
+  DOCTOR_FIX+=("$fix")
 }
+
+# First time each keyed rule was seen failing, per site (root-owned state).
+SITE_CHECKS_STATE_DIR="${SITE_CHECKS_STATE_DIR:-/var/lib/simai-env/site-checks}"
 
 doctor_print_report() {
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
-    local i
+    local i state=""
+    if [[ -n "${DOCTOR_DOMAIN:-}" ]] && { [[ -d "$SITE_CHECKS_STATE_DIR" ]] || install -d -m 0700 "$SITE_CHECKS_STATE_DIR" 2>/dev/null; }; then
+      state="${SITE_CHECKS_STATE_DIR}/${DOCTOR_DOMAIN}.json"
+    fi
     for i in "${!DOCTOR_STATUS[@]}"; do
-      printf '%s\t%s\t%s\n' "${DOCTOR_STATUS[$i]}" "${DOCTOR_AREA[$i]}" "${DOCTOR_TITLE[$i]}"
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "${DOCTOR_STATUS[$i]}" "${DOCTOR_AREA[$i]}" "${DOCTOR_KEY[$i]:-}" "${DOCTOR_FIX[$i]:-}" "${DOCTOR_DETAILS[$i]//$'\t'/ }" "${DOCTOR_TITLE[$i]}"
     done | python3 -c '
-import json,sys
-checks=[]; summary={s:0 for s in ("PASS","WARN","FAIL","SKIP")}
-for i,line in enumerate(sys.stdin):
-    level,area,title=line.rstrip("\n").split("\t",2)
+import json, os, sys, time
+state_path, profile = sys.argv[1], sys.argv[2] or None
+try:
+    seen = json.load(open(state_path)) if state_path else {}
+    if not isinstance(seen, dict): seen = {}
+except (OSError, ValueError):
+    seen = {}
+now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+checks = []; summary = {s: 0 for s in ("PASS", "WARN", "FAIL", "SKIP")}; failing = {}
+for i, line in enumerate(sys.stdin):
+    level, area, key, fix, detail, title = line.rstrip("\n").split("\t", 5)
     if level not in summary: raise SystemExit("invalid diagnostic status")
-    summary[level]+=1
-    checks.append({"id":i+1,"status":level,"area":area,"title":title})
-print(json.dumps({"schema":"simai-site-diagnostics/1","status":"FAIL" if summary["FAIL"] else "WARN" if summary["WARN"] else "PASS","summary":summary,"checks":checks},indent=2))'
+    summary[level] += 1
+    row = {"id": i + 1, "status": level, "area": area, "title": title}
+    if key:
+        since = None
+        if level in ("WARN", "FAIL"):
+            since = failing[key] = seen.get(key) or now
+        row.update(key=key, fix=fix or None, since=since, detail=detail[:300])
+    checks.append(row)
+if state_path:
+    try:
+        tmp = state_path + ".tmp"
+        with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600), "w") as out:
+            json.dump(failing, out)
+        os.replace(tmp, state_path)
+    except OSError:
+        pass
+print(json.dumps({"schema": "simai-site-diagnostics/1", "profile": profile,
+                  "status": "FAIL" if summary["FAIL"] else "WARN" if summary["WARN"] else "PASS",
+                  "summary": summary, "checks": checks}, indent=2))' "$state" "${DOCTOR_PROFILE:-}"
     return 0
   fi
   local pass=0 warn=0 fail=0 skip=0

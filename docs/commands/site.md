@@ -511,6 +511,16 @@ Checks (non-destructive):
 - Alias profiles: when `--include-target=yes`, performs a prefixed partial check of the target site (root/docroot/markers/healthcheck/nginx/php service/pool/socket) without recursion
 
 Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
+Profile rules carry a fix id; see docs/commands/site-doctor.md.
+
+## check-state / check-fix
+One profile rule of a site (1.55.0):
+`site check-state --domain <d> --id <key>` shows its state (`ok|needed|n/a`),
+what the fix does and why a fix would be refused (`unknown_check`,
+`check_ok`); `site check-fix --domain <d> --id <key> --confirm yes` runs the
+fix and checks the rule again (without `--confirm` a plan, which is refused
+the same way). The fixes are the toolkit's own steps (`bitrix finalize`,
+`self migrate`), one at a time.
 
 ## nginx-custom
 Set a site's own nginx directives, included at server level of the site's

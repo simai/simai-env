@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.bitrix-restore-ready",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "bitrix:restore-ready",
+    "args": {
+      "domain": "demo-bitrix.test"
+    },
+    "target": "demo-bitrix.test",
+    "description": "Prepare Bitrix restore.php flow",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

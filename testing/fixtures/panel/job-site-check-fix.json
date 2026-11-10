@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-job-site-check-fix",
+  "status": "refused",
+  "reason": "check_ok"
+}

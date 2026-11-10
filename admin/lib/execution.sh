@@ -75,6 +75,7 @@ command_plan_check() {
   shift
   case "$key" in
     site:add) site_add_plan_check "$@" || return 1 ;;
+    site:check-fix) site_check_fix_plan_check "$@" || return 1 ;;
   esac
   return 0
 }

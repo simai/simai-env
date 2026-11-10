@@ -5,6 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-site-diagnostics/1",
+    "profile": "static",
     "status": "PASS",
     "summary": {
       "PASS": 12,

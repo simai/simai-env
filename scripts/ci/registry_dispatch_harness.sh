@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+# shellcheck disable=SC2034 # read by the sourced libraries
 SCRIPT_DIR="$ROOT_DIR"
 export ADMIN_DIR="${ROOT_DIR}/admin"
 export LOG_FILE="${TMPDIR:-/tmp}/simai-env-registry-dispatch.log"
@@ -20,6 +21,7 @@ source "${ROOT_DIR}/admin/lib/php_utils.sh"
 source "${ROOT_DIR}/admin/lib/php_fpm_host.sh"
 source "${ROOT_DIR}/admin/lib/fix_utils.sh"
 source "${ROOT_DIR}/admin/lib/doctor_utils.sh"
+source "${ROOT_DIR}/admin/lib/site_checks.sh"
 source "${ROOT_DIR}/admin/lib/db_utils.sh"
 source "${ROOT_DIR}/admin/lib/access_utils.sh"
 load_command_modules "${ROOT_DIR}/admin/commands"

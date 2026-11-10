@@ -205,43 +205,6 @@
         ]
       },
       {
-        "id": "node",
-        "title": "Node.js service (long-running, behind nginx)",
-        "php": null,
-        "db": "no",
-        "cron": false,
-        "queue": false,
-        "alias": false,
-        "args": [
-          {
-            "name": "domain",
-            "required": true,
-            "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
-          },
-          {
-            "name": "app-port",
-            "required": false,
-            "pattern": "^[1-9][0-9]{3,4}$",
-            "description": "port of the application service; a free one is chosen when empty"
-          },
-          {
-            "name": "owner",
-            "required": false,
-            "pattern": "^[a-z][a-z0-9_-]{0,31}$"
-          },
-          {
-            "name": "backup",
-            "required": false,
-            "values": [
-              "yes",
-              "no"
-            ],
-            "default": "yes",
-            "description": "a daily data backup from the start"
-          }
-        ]
-      },
-      {
         "id": "proxy",
         "title": "Reverse proxy to a service on a local port",
         "php": null,

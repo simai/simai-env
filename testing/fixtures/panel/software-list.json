@@ -579,9 +579,33 @@
       }
     ],
     "system": {
-      "updates": 3,
-      "security": 3,
+      "updates": 7,
+      "security": 7,
       "packages": [
+        {
+          "name": "libperl5.38t64",
+          "from": "5.38.2-3.2ubuntu0.6",
+          "to": "5.38.2-3.2ubuntu0.7",
+          "security": true
+        },
+        {
+          "name": "perl",
+          "from": "5.38.2-3.2ubuntu0.6",
+          "to": "5.38.2-3.2ubuntu0.7",
+          "security": true
+        },
+        {
+          "name": "perl-base",
+          "from": "5.38.2-3.2ubuntu0.6",
+          "to": "5.38.2-3.2ubuntu0.7",
+          "security": true
+        },
+        {
+          "name": "perl-modules-5.38",
+          "from": "5.38.2-3.2ubuntu0.6",
+          "to": "5.38.2-3.2ubuntu0.7",
+          "security": true
+        },
         {
           "name": "libapt-pkg6.0t64",
           "from": "2.8.3",
@@ -604,7 +628,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 3796
+      "index_age_seconds": 6320
     }
   },
   "command_status": "success",

@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.check-ok",
+  "status": "refused",
+  "reason": "check_ok"
+}

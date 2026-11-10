@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=30
+FIXTURE_SET=31
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -64,6 +64,8 @@ systemctl enable --now ssh >/dev/null 2>&1 || true
 [[ -f /root/stand-owner ]] || ssh-keygen -q -t ed25519 -N '' -C stand-owner -f /root/stand-owner
 cli profile enable --id redirect --confirm yes
 cli profile enable --id bitrix --confirm yes
+# One profile stays off, for the "profile_disabled" refusal.
+cli profile disable --id node --confirm yes
 ./simai-admin.sh owner list 2>/dev/null | grep -q demo || cli owner create --name demo --pubkey-file /root/stand-owner.pub --confirm yes
 site() { [[ -f "/etc/nginx/sites-available/$1.conf" ]] || cli site add --domain "$@" --confirm yes; }
 site demo-static.test --profile static
@@ -258,7 +260,7 @@ FW
     "self-profiles.owner-demo|\"demo\"|self:profiles|{}"
     "plan.site-add-proxy|null|site:add|{\"domain\":\"demo-proxy.test\",\"profile\":\"proxy\",\"upstream-port\":\"3000\",\"websockets\":\"yes\"}"
     "plan.site-add-bitrix|null|site:add|{\"domain\":\"demo-bitrix.test\",\"profile\":\"bitrix\",\"bitrix-files\":\"setup\"}"
-    "plan.site-add-disabled-profile|null|site:add|{\"domain\":\"demo-wp.test\",\"profile\":\"wordpress\"}"
+    "refused.profile-disabled|null|site:add|{\"domain\":\"demo-node.test\",\"profile\":\"node\"}"
     "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
@@ -331,6 +333,51 @@ FW
   names_job job-site-name-add site:name-add "{\"domain\":\"${N}\",\"name\":\"old.${N}\",\"mode\":\"redirect\",\"check-dns\":\"no\"}"
   names_job job-site-name-remove site:name-remove "{\"domain\":\"${N}\",\"name\":\"old.${N}\"}"
   in_stand /root/simai-env/simai-admin.sh site remove --domain "$N" --remove-files yes --confirm yes >/dev/null 2>&1 || true
+  # A Bitrix site walked through its restore steps, then its profile rules
+  # and their fixes. It lives only for this recording.
+  local B=demo-bitrix.test bx="/home/simai/www/demo-bitrix.test/public"
+  bx_status() {  # fixture name: bitrix:status now
+    printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":null},"command":"bitrix:status","args":{"domain":"%s"}}' \
+      "$1" "$B" | gate >"${FIXTURES}/$1.json"
+  }
+  bx_req() {  # fixture name, command, args
+    printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":null},"command":"%s","args":%s}' \
+      "$1" "$2" "$3" | gate >"${FIXTURES}/$1.json"
+  }
+  in_stand bash -c "cd /root/simai-env && ./simai-admin.sh site add --domain $B --profile bitrix --php 8.3 --create-db yes --confirm yes \
+    && rm -f $bx/restore.php $bx/bitrixsetup.php" >/dev/null 2>&1 || echo "[stand] the Bitrix demo site was not made" >&2
+  bx_status bitrix-status.prepare
+  in_stand bash -c "echo '<?php // restore wizard' >$bx/restore.php && chown simai:www-data $bx/restore.php"
+  bx_status bitrix-status.upload
+  in_stand bash -c "mkdir -p /tmp/bxa/bitrix && echo x >/tmp/bxa/bitrix/x.txt && tar -C /tmp/bxa -czf $bx/demo_20260101_full_abc.tar.gz . && chown simai:www-data $bx/demo_20260101_full_abc.tar.gz"
+  bx_status bitrix-status.validate
+  bx_req plan.bitrix-restore-ready bitrix:restore-ready "{\"domain\":\"${B}\"}"
+  in_stand /root/simai-env/simai-admin.sh bitrix restore-ready --domain "$B" --confirm yes >/dev/null 2>&1
+  bx_status bitrix-status.run-restore
+  # What the restore wizard leaves: an installed database with a utf8mb3
+  # default, the archive's own after_connect_d7.php, files in the web root.
+  in_stand bash -s "$B" "$bx" <<'BX' >/dev/null 2>&1
+B=$1 bx=$2
+db=$(sed -n 's/^DB_NAME=//p' "/etc/simai-env/sites/$B/db.env")
+mysql -e "CREATE TABLE IF NOT EXISTS \`$db\`.b_user (ID INT PRIMARY KEY); INSERT IGNORE INTO \`$db\`.b_user VALUES (1); ALTER DATABASE \`$db\` COLLATE utf8mb3_general_ci;"
+printf '<?php\nreturn [];\n' >"$bx/bitrix/.settings.php"
+printf '%s\n' '<?php' "\$this->queryExecute(\"SET NAMES 'utf8mb4'\");" >"$bx/bitrix/php_interface/after_connect_d7.php"
+chown -R simai:www-data "$bx/bitrix"
+BX
+  bx_status bitrix-status.finalize
+  bx_req site-doctor.${B} site:doctor "{\"domain\":\"${B}\"}"
+  bx_req site-check-state.bitrix-db-charset site:check-state "{\"domain\":\"${B}\",\"id\":\"bitrix.db-charset\"}"
+  bx_req plan.site-check-fix site:check-fix "{\"domain\":\"${B}\",\"id\":\"bitrix.db-session-modes\"}"
+  bx_req refused.unknown-check site:check-fix "{\"domain\":\"${B}\",\"id\":\"bitrix.sef-fallback\"}"
+  bx_req plan.bitrix-finalize bitrix:finalize "{\"domain\":\"${B}\"}"
+  names_job job-site-check-fix site:check-fix "{\"domain\":\"${B}\",\"id\":\"bitrix.db-session-modes\"}"
+  bx_req refused.check-ok site:check-fix "{\"domain\":\"${B}\",\"id\":\"bitrix.db-session-modes\"}"
+  local fx
+  for fx in bitrix.docroot-leftovers bitrix.db-charset; do  # host rules already hold on the stand
+    in_stand /root/simai-env/simai-admin.sh site check-fix --domain "$B" --id "$fx" --confirm yes >/dev/null 2>&1 || true
+  done
+  bx_status bitrix-status.done
+  in_stand /root/simai-env/simai-admin.sh site remove --domain "$B" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
   # Every answer must be valid JSON; a recording with stray output is useless.
   # manifest.json pins the set: larena/env checks its copy against it.
   python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'
@@ -347,6 +394,9 @@ for f in sorted(root.glob("*.json")):
     data = d.get("data") if isinstance(d.get("data"), dict) else {}
     if "generated_at" in data:
         data["generated_at"] = "2026-01-01T00:00:00Z"
+    for check in data.get("checks", []) if isinstance(data.get("checks"), list) else []:
+        if isinstance(check, dict) and check.get("since"):
+            check["since"] = "2026-01-01T00:00:00Z"
     sites = list(data.get("sites", [])) if isinstance(data.get("sites"), list) else []
     if "domain" in data and "answers" in data:
         sites.append(data)

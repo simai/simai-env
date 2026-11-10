@@ -23,6 +23,20 @@ Shows:
 - nginx SEF fallback state for Bitrix URLs (`/bitrix/urlrewrite.php`)
 - nginx static asset compression/cache hints for first page load performance
 
+With `--output json` (`simai-bitrix-status/1`, also `bitrix:status` in the
+panel gateway) it answers where the site is on its way:
+- `route`: `restore` (restore.php in the web root, or a site restored
+  earlier), `setup` (bitrixsetup.php), `installed`, `none`;
+- `step`: `prepare` (no wizard yet: `bitrix restore-ready` or
+  `installer-ready`), `upload` (restore.php, no archive), `validate`
+  (archive uploaded, not checked by `restore-ready` yet, or changed since),
+  `run_restore` (open `restore_url`), `run_setup` (open `installer_url`),
+  `finalize` (installed; `pending` lists the profile rules `bitrix finalize`
+  fixes), `done`;
+- `next`: the command for the step, or `open_url`.
+`restore-ready` remembers the archive it validated (name and size) in
+`/etc/simai-env/sites/<domain>/bitrix-restore.env`.
+
 ## Cron Status
 
 ```bash

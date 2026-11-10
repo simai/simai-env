@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.bitrix-finalize",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "bitrix:finalize",
+    "args": {
+      "domain": "demo-bitrix.test"
+    },
+    "target": "demo-bitrix.test",
+    "description": "Finalize Bitrix post-install baseline",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

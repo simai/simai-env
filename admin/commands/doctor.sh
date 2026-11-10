@@ -110,10 +110,14 @@ site_doctor_handler() {
 
   progress_init 11
   doctor_results_init
+  # shellcheck disable=SC2034 # read by doctor_print_report (since per rule)
+  DOCTOR_DOMAIN="$domain"
 
   progress_step "Reading site metadata"
   read_site_metadata "$domain"
   local profile="${SITE_META[profile]:-generic}"
+  # shellcheck disable=SC2034 # read by doctor_print_report
+  DOCTOR_PROFILE="$profile"
   local project="${SITE_META[project]:-}"
   local root="${SITE_META[root]:-}"
   local php_version="${SITE_META[php]:-}"
@@ -256,9 +260,9 @@ site_doctor_handler() {
       local root_owned_count
       root_owned_count=$(find "$doc_root" -xdev \( -user root -o -group root \) -printf . 2>/dev/null | wc -c | tr -d ' ')
       if [[ "${root_owned_count:-0}" -gt 0 ]]; then
-        doctor_add_result "WARN" "fs" "Root-owned files" "${root_owned_count} item(s) under ${doc_root}" "Run: simai-admin.sh bitrix ownership --domain ${domain} --apply yes --confirm yes"
+        doctor_add_result "WARN" "fs" "Root-owned files" "${root_owned_count} item(s) under ${doc_root}" "Run: simai-admin.sh bitrix ownership --domain ${domain} --apply yes --confirm yes" "bitrix.ownership"
       else
-        doctor_add_result "PASS" "fs" "Root-owned files" "None under ${doc_root}" ""
+        doctor_add_result "PASS" "fs" "Root-owned files" "None under ${doc_root}" "" "bitrix.ownership"
       fi
     fi
   fi
@@ -323,6 +327,8 @@ site_doctor_handler() {
   else
     doctor_add_result "SKIP" "app" "Application profile checks" "No profile-specific app checks for ${profile}" ""
   fi
+  # Profile rules with a one-click fix (admin/lib/site_checks.sh).
+  doctor_add_profile_rules "$domain" "$profile"
 
   progress_step "Nginx checks"
   local avail="/etc/nginx/sites-available/${domain}.conf"
@@ -373,24 +379,24 @@ site_doctor_handler() {
     fi
     if [[ "$profile" == "bitrix" ]]; then
       if grep -qE 'client_max_body_size[[:space:]]+64m;' "$avail" 2>/dev/null; then
-        doctor_add_result "PASS" "nginx" "Bitrix upload body limit" "client_max_body_size 64m" ""
+        doctor_add_result "PASS" "nginx" "Bitrix upload body limit" "client_max_body_size 64m" "" "bitrix.upload-limit"
       else
-        doctor_add_result "FAIL" "nginx" "Bitrix upload body limit" "client_max_body_size 64m is missing" "Regenerate nginx config from nginx-bitrix.conf or add client_max_body_size 64m to the server block"
+        doctor_add_result "FAIL" "nginx" "Bitrix upload body limit" "client_max_body_size 64m is missing" "Regenerate nginx config from nginx-bitrix.conf or add client_max_body_size 64m to the server block" "bitrix.upload-limit"
       fi
       if grep -qE 'try_files[[:space:]]+\$uri[[:space:]]+\$uri/[[:space:]]+/bitrix/urlrewrite\.php' "$avail" 2>/dev/null; then
-        doctor_add_result "PASS" "nginx" "Bitrix SEF fallback" "/bitrix/urlrewrite.php" ""
+        doctor_add_result "PASS" "nginx" "Bitrix SEF fallback" "/bitrix/urlrewrite.php" "" "bitrix.sef-fallback"
       else
-        doctor_add_result "FAIL" "nginx" "Bitrix SEF fallback" "Nginx fallback is not /bitrix/urlrewrite.php" "Regenerate nginx config from nginx-bitrix.conf; SSL commands must preserve template=bitrix"
+        doctor_add_result "FAIL" "nginx" "Bitrix SEF fallback" "Nginx fallback is not /bitrix/urlrewrite.php" "Regenerate nginx config from nginx-bitrix.conf; SSL commands must preserve template=bitrix" "bitrix.sef-fallback"
       fi
       if grep -qE 'gzip_types.*text/css.*application/javascript' "$avail" 2>/dev/null; then
-        doctor_add_result "PASS" "nginx" "Bitrix static gzip types" "css/js enabled" ""
+        doctor_add_result "PASS" "nginx" "Bitrix static gzip types" "css/js enabled" "" "bitrix.static-gzip"
       else
-        doctor_add_result "WARN" "nginx" "Bitrix static gzip types" "CSS/JS may be served uncompressed" "Regenerate nginx config from nginx-bitrix.conf"
+        doctor_add_result "WARN" "nginx" "Bitrix static gzip types" "CSS/JS may be served uncompressed" "Regenerate nginx config from nginx-bitrix.conf" "bitrix.static-gzip"
       fi
       if grep -qE 'location[[:space:]]+~\*.*css.*js' "$avail" 2>/dev/null && grep -qE 'expires[[:space:]]+[0-9]+d' "$avail" 2>/dev/null; then
-        doctor_add_result "PASS" "nginx" "Bitrix static cache" "expires configured" ""
+        doctor_add_result "PASS" "nginx" "Bitrix static cache" "expires configured" "" "bitrix.static-cache"
       else
-        doctor_add_result "WARN" "nginx" "Bitrix static cache" "Static asset cache headers are missing" "Regenerate nginx config from nginx-bitrix.conf"
+        doctor_add_result "WARN" "nginx" "Bitrix static cache" "Static asset cache headers are missing" "Regenerate nginx config from nginx-bitrix.conf" "bitrix.static-cache"
       fi
     fi
   fi

@@ -5,10 +5,11 @@
   "kind": "result",
   "data": {
     "schema": "simai-site-diagnostics/1",
+    "profile": "generic",
     "status": "WARN",
     "summary": {
       "PASS": 19,
-      "WARN": 2,
+      "WARN": 3,
       "FAIL": 0,
       "SKIP": 3
     },
@@ -63,96 +64,106 @@
       },
       {
         "id": 9,
-        "status": "PASS",
-        "area": "nginx",
-        "title": "Config exists"
+        "status": "WARN",
+        "area": "rules",
+        "title": "PHP-FPM reload lets requests finish",
+        "key": "php.fpm-graceful-reload",
+        "fix": "php.fpm-graceful-reload",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "a reload kills busy requests (502)"
       },
       {
         "id": 10,
         "status": "PASS",
         "area": "nginx",
-        "title": "Enabled link"
+        "title": "Config exists"
       },
       {
         "id": 11,
         "status": "PASS",
         "area": "nginx",
-        "title": "Healthcheck location"
+        "title": "Enabled link"
       },
       {
         "id": 12,
         "status": "PASS",
         "area": "nginx",
-        "title": "nginx -t"
+        "title": "Healthcheck location"
       },
       {
         "id": 13,
         "status": "PASS",
-        "area": "php",
-        "title": "PHP version"
+        "area": "nginx",
+        "title": "nginx -t"
       },
       {
         "id": 14,
         "status": "PASS",
         "area": "php",
-        "title": "PHP binary"
+        "title": "PHP version"
       },
       {
         "id": 15,
         "status": "PASS",
         "area": "php",
-        "title": "php-fpm service"
+        "title": "PHP binary"
       },
       {
         "id": 16,
         "status": "PASS",
         "area": "php",
-        "title": "Pool config"
+        "title": "php-fpm service"
       },
       {
         "id": 17,
         "status": "PASS",
         "area": "php",
-        "title": "Socket"
+        "title": "Pool config"
       },
       {
         "id": 18,
         "status": "PASS",
         "area": "php",
-        "title": "Required extensions"
+        "title": "Socket"
       },
       {
         "id": 19,
+        "status": "PASS",
+        "area": "php",
+        "title": "Required extensions"
+      },
+      {
+        "id": 20,
         "status": "WARN",
         "area": "php",
         "title": "Recommended extensions"
       },
       {
-        "id": 20,
+        "id": 21,
         "status": "SKIP",
         "area": "cron",
         "title": "Cron"
       },
       {
-        "id": 21,
+        "id": 22,
         "status": "SKIP",
         "area": "ssl",
         "title": "SSL"
       },
       {
-        "id": 22,
+        "id": 23,
         "status": "PASS",
         "area": "db",
         "title": "MySQL service"
       },
       {
-        "id": 23,
+        "id": 24,
         "status": "PASS",
         "area": "db",
         "title": "MySQL network exposure"
       },
       {
-        "id": 24,
+        "id": 25,
         "status": "WARN",
         "area": "db",
         "title": "db.env"

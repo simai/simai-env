@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-security/1",
-    "checked_at": "2026-11-10T01:15:02Z",
+    "checked_at": "2026-11-10T12:49:37Z",
     "score": 45,
     "grade": "risk",
     "summary": {
@@ -40,7 +40,7 @@
     },
     "online": {
       "enabled": true,
-      "checked_at": "2026-11-10T01:11:34Z",
+      "checked_at": "2026-11-10T12:48:16Z",
       "error": null
     },
     "checks": [
@@ -51,7 +51,7 @@
         "title": "Security updates",
         "status": "risk",
         "severity": "high",
-        "detail": "3 packages have security fixes waiting: apt, libapt-pkg6.0t64, libpcre2-8-0",
+        "detail": "7 packages have security fixes waiting: apt, libapt-pkg6.0t64, libpcre2-8-0, libperl5.38t64, perl, perl-base, perl-modules-5.38",
         "domain": null,
         "fix": {
           "command": "software:update",

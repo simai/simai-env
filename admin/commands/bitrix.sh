@@ -484,6 +484,115 @@ bitrix_perf_site_mode_for_apply() {
   esac
 }
 
+# Where a Bitrix site is on its way: route setup|restore|installed|none and
+# step prepare|upload|validate|run_restore|run_setup|finalize|done, for the
+# panel's step tracker. Sets BX_FLOW_ROUTE, BX_FLOW_STEP, BX_FLOW_URL,
+# BX_FLOW_PENDING (finalize rules still failing) and BX_FLOW_ARCHIVE.
+bitrix_restore_marker_path() {
+  printf '%s/%s/bitrix-restore.env\n' "$(site_sites_config_dir)" "$1"
+}
+
+# Base archive volume in the docroot (what restore-ready validates).
+bitrix_restore_base_archive() {
+  local doc_root="$1" file
+  local -a candidates=()
+  shopt -s nullglob
+  for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar; do
+    [[ "$file" == *_encode.tar.gz ]] && continue
+    [[ -f "$file" && ! -L "$file" ]] && candidates+=("$file")
+  done
+  shopt -u nullglob
+  (( ${#candidates[@]} == 1 )) && printf '%s\n' "${candidates[0]}"
+  (( ${#candidates[@]} > 0 ))
+}
+
+bitrix_restore_marker_write() {
+  local domain="$1" archive="$2" parts="$3" marker size
+  marker=$(bitrix_restore_marker_path "$domain")
+  size=$(stat -c %s "$archive" 2>/dev/null || echo 0)
+  install -d -m 0750 "$(dirname "$marker")" 2>/dev/null || return 0
+  printf 'ARCHIVE=%s\nSIZE=%s\nPARTS=%s\nVALIDATED_AT=%s\n' "$(basename "$archive")" "$size" "$parts" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$marker"
+  chmod 0640 "$marker" 2>/dev/null || true
+}
+
+bitrix_restore_marker_matches() {
+  local domain="$1" archive="$2" marker name="" size="" line
+  marker=$(bitrix_restore_marker_path "$domain")
+  [[ -f "$marker" ]] || return 1
+  while IFS= read -r line; do
+    case "$line" in ARCHIVE=*) name="${line#ARCHIVE=}" ;; SIZE=*) size="${line#SIZE=}" ;; esac
+  done <"$marker"
+  [[ "$name" == "$(basename "$archive")" && "$size" == "$(stat -c %s "$archive" 2>/dev/null)" ]]
+}
+
+bitrix_flow_state() {
+  local domain="$1" web_state="${2:-}" id archive=""
+  BX_FLOW_ROUTE="none"; BX_FLOW_STEP="prepare"; BX_FLOW_URL=""; BX_FLOW_PENDING=(); BX_FLOW_ARCHIVE=""
+  [[ -n "$web_state" ]] || web_state=$(bitrix_web_state_probe "$domain")
+  local restore_script setup_script
+  restore_script=$(bitrix_restore_script_path "$BX_DOC_ROOT")
+  setup_script=$(bitrix_setup_script_path "$BX_DOC_ROOT")
+  if [[ "$web_state" == installed ]]; then
+    BX_FLOW_ROUTE="installed"
+    [[ -f "$(bitrix_restore_marker_path "$domain")" ]] && BX_FLOW_ROUTE="restore"
+    for id in bitrix.docroot-leftovers bitrix.db-session-modes bitrix.db-charset bitrix.timezone; do
+      site_check_state "$id" "$domain"
+      [[ "$SC_STATE" == needed ]] && BX_FLOW_PENDING+=("$id")
+    done
+    if (( ${#BX_FLOW_PENDING[@]} > 0 )); then BX_FLOW_STEP="finalize"; else BX_FLOW_STEP="done"; fi
+    return 0
+  fi
+  if [[ -s "$restore_script" ]]; then
+    BX_FLOW_ROUTE="restore"
+    if ! bitrix_restore_base_archive "$BX_DOC_ROOT" >/dev/null; then
+      BX_FLOW_STEP="upload"
+    else
+      archive=$(bitrix_restore_base_archive "$BX_DOC_ROOT" || true)
+      BX_FLOW_ARCHIVE="$(basename "${archive:-}")"
+      if [[ -n "$archive" ]] && bitrix_restore_marker_matches "$domain" "$archive"; then
+        BX_FLOW_STEP="run_restore"
+        BX_FLOW_URL="$(site_primary_url "$domain")/restore.php"
+      else
+        BX_FLOW_STEP="validate"
+      fi
+    fi
+    return 0
+  fi
+  if [[ -s "$setup_script" ]]; then
+    BX_FLOW_ROUTE="setup"
+    BX_FLOW_STEP="run_setup"
+    BX_FLOW_URL=$(bitrix_installer_open_url "$domain" "$BX_DOC_ROOT")
+  fi
+  return 0
+}
+
+bitrix_status_json() {
+  local db_state web_state
+  db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
+  web_state=$(bitrix_web_state_probe "$BX_DOMAIN")
+  bitrix_flow_state "$BX_DOMAIN" "$web_state"
+  local settings="no" core="$BX_HAS_CORE"
+  [[ -f "$BX_SETTINGS_FILE" ]] && settings="yes"
+  local next=""
+  case "$BX_FLOW_STEP" in
+    upload) next="file:upload" ;;
+    validate) next="bitrix:restore-ready" ;;
+    run_restore|run_setup) next="open_url" ;;
+    finalize) next="bitrix:finalize" ;;
+    prepare) next="bitrix:restore-ready" ;;
+  esac
+  python3 -c '
+import json, sys
+domain, route, step, url, archive, db, web, settings, core, nxt = sys.argv[1:11]
+print(json.dumps({"schema": "simai-bitrix-status/1", "domain": domain, "route": route, "step": step,
+                  "restore_url": url if step == "run_restore" else None,
+                  "installer_url": url if step == "run_setup" else None,
+                  "next": nxt or None, "archive": archive or None,
+                  "pending": [p for p in sys.argv[11:] if p],
+                  "db_state": db, "web_state": web, "settings": settings == "yes", "core": core == "yes"}, indent=2))' \
+    "$BX_DOMAIN" "$BX_FLOW_ROUTE" "$BX_FLOW_STEP" "$BX_FLOW_URL" "$BX_FLOW_ARCHIVE" "$db_state" "$web_state" "$settings" "$core" "$next" "${BX_FLOW_PENDING[@]}"
+}
+
 bitrix_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -494,6 +603,10 @@ bitrix_status_handler() {
   else
     rc=$?
     return $rc
+  fi
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    bitrix_status_json
+    return
   fi
 
   ui_header "SIMAI ENV · Bitrix status"
@@ -1082,6 +1195,10 @@ bitrix_restore_ready_handler() {
     status="partial"
   elif [[ $archive_rc -eq 2 ]]; then
     status="waiting for archive"
+  fi
+  # bitrix status shows run_restore only for the archive validated here.
+  if [[ "$status" == ready && -n "$BITRIX_RESTORE_ARCHIVE_PATH" && -f "$BITRIX_RESTORE_ARCHIVE_PATH" ]]; then
+    bitrix_restore_marker_write "$BX_DOMAIN" "$BITRIX_RESTORE_ARCHIVE_PATH" "$archive_parts"
   fi
 
   ui_result_table \

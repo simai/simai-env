@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.unknown-check",
+  "status": "refused",
+  "reason": "unknown_check"
+}

@@ -660,7 +660,23 @@ action, job). Everything else is refused.
   `security:geo-lookup`;
 - 1.51.0: `panel:address`, `panel:port`, `panel:ip-access`, `panel:domain`;
 - 1.52.0: `batch` (several reads in one call);
-- 1.53.0: `site:names`, `site:name-add`, `site:name-remove`.
+- 1.53.0: `site:names`, `site:name-add`, `site:name-remove`;
+- 1.55.0: `site:check-state {domain, id}` (read, `simai-site-check/1`),
+  `site:check-fix {domain, id}`, `bitrix:status {domain}` (read,
+  `simai-bitrix-status/1`), `bitrix:restore-ready {domain, archive}`,
+  `bitrix:finalize {domain}`. `site:doctor` items of profile rules carry
+  `key`, `fix` (a `site:check-fix` id or null), `since` (when the rule first
+  failed, null while it passes) and `detail`; the answer names the
+  `profile`. Before a `site:check-fix` plan or job the gateway refuses
+  `unknown_check` (no such rule for the site's profile, or a rule without a
+  fix) and `check_ok` (the rule holds); the plan carries `check` with
+  `title` and `plan` (one line: what the button does). `site:add` of a
+  profile switched off on the server is refused `profile_disabled`.
+  `bitrix:status` answers `route` (setup|restore|installed|none), `step`
+  (prepare|upload|validate|run_restore|run_setup|finalize|done), `next`
+  (the command for the step, or `open_url`), `restore_url` /
+  `installer_url` for the wizard steps and `pending` (rules `bitrix:finalize`
+  will fix).
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

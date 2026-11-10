@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 274,
+    "count": 276,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -5019,6 +5019,54 @@
         "optional": {
           "--domain": null
         },
+        "flags": [
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site check-fix",
+        "description": "Fix one profile rule reported by site doctor (fix id from the report)",
+        "required": [
+          "--domain",
+          "--id"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site check-state",
+        "description": "Show one profile rule of a site: state, what its fix does, why a fix would be refused",
+        "required": [
+          "--domain",
+          "--id"
+        ],
+        "optional": {},
         "flags": [
           "effects:read"
         ],

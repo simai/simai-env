@@ -1,0 +1,417 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-doctor.demo-bitrix.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-diagnostics/1",
+    "profile": "bitrix",
+    "status": "FAIL",
+    "summary": {
+      "PASS": 43,
+      "WARN": 3,
+      "FAIL": 10,
+      "SKIP": 2
+    },
+    "checks": [
+      {
+        "id": 1,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Project slug"
+      },
+      {
+        "id": 2,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Project root"
+      },
+      {
+        "id": 3,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Profile"
+      },
+      {
+        "id": 4,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Root directory"
+      },
+      {
+        "id": 5,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Docroot"
+      },
+      {
+        "id": 6,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Bootstrap files"
+      },
+      {
+        "id": 7,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Writable path"
+      },
+      {
+        "id": 8,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Writable path"
+      },
+      {
+        "id": 9,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Writable path"
+      },
+      {
+        "id": 10,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Writable path"
+      },
+      {
+        "id": 11,
+        "status": "PASS",
+        "area": "fs",
+        "title": ".env permissions"
+      },
+      {
+        "id": 12,
+        "status": "PASS",
+        "area": "fs",
+        "title": "World-writable files"
+      },
+      {
+        "id": 13,
+        "status": "WARN",
+        "area": "fs",
+        "title": "Root-owned files",
+        "key": "bitrix.ownership",
+        "fix": null,
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "1 item(s) under /home/simai/www/demo-bitrix.test/public"
+      },
+      {
+        "id": 14,
+        "status": "PASS",
+        "area": "app",
+        "title": "Bitrix settings"
+      },
+      {
+        "id": 15,
+        "status": "SKIP",
+        "area": "app",
+        "title": "Bitrix core files"
+      },
+      {
+        "id": 16,
+        "status": "FAIL",
+        "area": "rules",
+        "title": "Bitrix restore files outside the web root",
+        "key": "bitrix.docroot-leftovers",
+        "fix": "bitrix.docroot-leftovers",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "2 file(s) downloadable from the web root"
+      },
+      {
+        "id": 17,
+        "status": "PASS",
+        "area": "rules",
+        "title": "Bitrix .default folders are served",
+        "key": "bitrix.dot-default",
+        "fix": "bitrix.dot-default",
+        "since": null,
+        "detail": "served"
+      },
+      {
+        "id": 18,
+        "status": "PASS",
+        "area": "rules",
+        "title": "Bitrix MySQL session modes",
+        "key": "bitrix.db-session-modes",
+        "fix": "bitrix.db-session-modes",
+        "since": null,
+        "detail": "sql_mode and innodb_strict_mode set"
+      },
+      {
+        "id": 19,
+        "status": "PASS",
+        "area": "rules",
+        "title": "Bitrix database default charset",
+        "key": "bitrix.db-charset",
+        "fix": "bitrix.db-charset",
+        "since": null,
+        "detail": "utf8mb4/utf8mb4_unicode_ci"
+      },
+      {
+        "id": 20,
+        "status": "WARN",
+        "area": "rules",
+        "title": "Bitrix PHP time zone",
+        "key": "bitrix.timezone",
+        "fix": "bitrix.timezone",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "PHP UTC, server and MySQL Etc/UTC"
+      },
+      {
+        "id": 21,
+        "status": "PASS",
+        "area": "rules",
+        "title": "PHP OPcache baseline for Bitrix",
+        "key": "bitrix.opcache",
+        "fix": "bitrix.opcache",
+        "since": null,
+        "detail": "baseline met"
+      },
+      {
+        "id": 22,
+        "status": "WARN",
+        "area": "rules",
+        "title": "PHP-FPM reload lets requests finish",
+        "key": "php.fpm-graceful-reload",
+        "fix": "php.fpm-graceful-reload",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "a reload kills busy requests (502)"
+      },
+      {
+        "id": 23,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Config exists"
+      },
+      {
+        "id": 24,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Enabled link"
+      },
+      {
+        "id": 25,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Healthcheck location"
+      },
+      {
+        "id": 26,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Bitrix upload body limit",
+        "key": "bitrix.upload-limit",
+        "fix": null,
+        "since": null,
+        "detail": "client_max_body_size 64m"
+      },
+      {
+        "id": 27,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Bitrix SEF fallback",
+        "key": "bitrix.sef-fallback",
+        "fix": null,
+        "since": null,
+        "detail": "/bitrix/urlrewrite.php"
+      },
+      {
+        "id": 28,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Bitrix static gzip types",
+        "key": "bitrix.static-gzip",
+        "fix": null,
+        "since": null,
+        "detail": "css/js enabled"
+      },
+      {
+        "id": 29,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Bitrix static cache",
+        "key": "bitrix.static-cache",
+        "fix": null,
+        "since": null,
+        "detail": "expires configured"
+      },
+      {
+        "id": 30,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "nginx -t"
+      },
+      {
+        "id": 31,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP version"
+      },
+      {
+        "id": 32,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP binary"
+      },
+      {
+        "id": 33,
+        "status": "PASS",
+        "area": "php",
+        "title": "php-fpm service"
+      },
+      {
+        "id": 34,
+        "status": "PASS",
+        "area": "php",
+        "title": "Pool config"
+      },
+      {
+        "id": 35,
+        "status": "PASS",
+        "area": "php",
+        "title": "Socket"
+      },
+      {
+        "id": 36,
+        "status": "FAIL",
+        "area": "php",
+        "title": "Required extensions"
+      },
+      {
+        "id": 37,
+        "status": "PASS",
+        "area": "php",
+        "title": "Recommended extensions"
+      },
+      {
+        "id": 38,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 39,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 40,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 41,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 42,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 43,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 44,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 45,
+        "status": "FAIL",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 46,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI required"
+      },
+      {
+        "id": 47,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 48,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 49,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 50,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 51,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 52,
+        "status": "PASS",
+        "area": "php",
+        "title": "INI recommended"
+      },
+      {
+        "id": 53,
+        "status": "PASS",
+        "area": "cron",
+        "title": "Cron file"
+      },
+      {
+        "id": 54,
+        "status": "SKIP",
+        "area": "ssl",
+        "title": "SSL"
+      },
+      {
+        "id": 55,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL service"
+      },
+      {
+        "id": 56,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL network exposure"
+      },
+      {
+        "id": 57,
+        "status": "PASS",
+        "area": "db",
+        "title": "db.env"
+      },
+      {
+        "id": 58,
+        "status": "PASS",
+        "area": "db",
+        "title": ".env presence"
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

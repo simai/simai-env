@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.54.0",
+      "version": "1.55.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -73,6 +73,9 @@
         "backup:data-restore",
         "backup:data-schedule",
         "backup:data-verify",
+        "bitrix:finalize",
+        "bitrix:restore-ready",
+        "bitrix:status",
         "cron:add",
         "cron:job-add",
         "cron:job-disable",
@@ -106,6 +109,8 @@
         "self:describe",
         "self:profiles",
         "site:add",
+        "site:check-fix",
+        "site:check-state",
         "site:db-create",
         "site:db-drop",
         "site:db-rotate",
