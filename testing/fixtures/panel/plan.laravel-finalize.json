@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.laravel-finalize",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "laravel:finalize",
+    "args": {
+      "domain": "demo-laravel.test"
+    },
+    "target": "demo-laravel.test",
+    "description": "Complete Laravel post-bootstrap baseline",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

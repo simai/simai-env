@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.56.2 - 2026-11-10
+
+- The Laravel create-site route ends with `laravel:finalize` (app key,
+  migrations, config cache) after the deploy, so the panel can run it as a
+  step. Fixture set 33 adds site status answers for WordPress and Laravel
+  sites along their steps.
+
 ## 1.56.1 - 2026-11-10
 
 - 1.56.0 shipped without its profile files: `self profiles` had no

@@ -486,6 +486,12 @@
                 "args": {}
               },
               {
+                "id": "finalize",
+                "title": "Set the app key, run migrations, cache the config",
+                "command": "laravel:finalize",
+                "args": {}
+              },
+              {
                 "id": "done",
                 "title": "Check the site",
                 "command": "site:doctor",

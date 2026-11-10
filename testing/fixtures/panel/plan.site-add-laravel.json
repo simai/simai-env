@@ -15,7 +15,7 @@
     "lock": "host",
     "applied": false,
     "resources": {
-      "disk_free_bytes": 1394522189824,
+      "disk_free_bytes": 1393677488128,
       "needed_bytes": 0,
       "ram_mb": 14963,
       "ram_min_mb": 512,

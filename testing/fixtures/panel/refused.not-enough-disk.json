@@ -5,7 +5,7 @@
   "reason": "not_enough_disk",
   "data": {
     "resources": {
-      "disk_free_bytes": 1394521354240,
+      "disk_free_bytes": 1393676795904,
       "needed_bytes": 32985348833280,
       "ram_mb": 14963,
       "ram_min_mb": 1536,
@@ -29,6 +29,6 @@
       "total_bytes": 10995116277760,
       "encrypted": false
     },
-    "detail": "Not enough free disk: 1298.7 GB free on the site filesystem, 30720.0 GB needed (three times the archive)"
+    "detail": "Not enough free disk: 1298.0 GB free on the site filesystem, 30720.0 GB needed (three times the archive)"
   }
 }

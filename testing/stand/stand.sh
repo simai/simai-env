@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=32
+FIXTURE_SET=33
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -401,8 +401,9 @@ BX
   # password is pinned below), the steps of a restore on a second site, the
   # profile rules. They live only for this recording.
   local W=demo-wp.test WC=demo-wp-copy.test wc="/home/simai/www/demo-wp-copy.test"
-  wp_status() {  # fixture name, domain: wp:status now
+  wp_status() {  # fixture name, domain: wp:status now, and site:status as site-status.<domain>.<step>
     bx_req "$1" wp:status "{\"domain\":\"$2\"}"
+    bx_req "site-status.$2.${1#wp-status.}" site:status "{\"domain\":\"$2\"}"
   }
   in_stand bash -c "cd /root/simai-env && ./simai-admin.sh profile enable --id wordpress --confirm yes; \
     ./simai-admin.sh site add --domain $W --profile wordpress --php 8.3 --create-db yes --confirm yes \
@@ -438,6 +439,18 @@ BX
   for ws in "$W" "$WC"; do
     in_stand /root/simai-env/simai-admin.sh site remove --domain "$ws" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
   done
+  # A Laravel site: waiting for its first release, then a release without an
+  # app key (the panel offers laravel:finalize). It lives only for this recording.
+  local L=demo-laravel.test lr="/home/simai/www/demo-laravel.test"
+  in_stand /root/simai-env/simai-admin.sh site add --domain "$L" --profile laravel --php 8.3 --create-db yes --confirm yes >/dev/null 2>&1 \
+    || echo "[stand] the Laravel demo site was not made" >&2
+  bx_req "site-status.${L}.deploy" site:status "{\"domain\":\"${L}\"}"
+  in_stand bash -c "o=\$(stat -c %U:%G $lr) && mkdir -p $lr/bootstrap && printf '<?php // demo app\\n' >$lr/artisan \
+    && printf '<?php return null; // demo app\\n' >$lr/bootstrap/app.php && chown -R \$o $lr/artisan $lr/bootstrap \
+    && if [ -f $lr/.env ]; then sed -i 's/^APP_KEY=.*/APP_KEY=/' $lr/.env; fi" >/dev/null 2>&1
+  bx_req "site-status.${L}.configure" site:status "{\"domain\":\"${L}\"}"
+  bx_req plan.laravel-finalize laravel:finalize "{\"domain\":\"${L}\"}"
+  in_stand /root/simai-env/simai-admin.sh site remove --domain "$L" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
   # Every answer must be valid JSON; a recording with stray output is useless.
   # manifest.json pins the set: larena/env checks its copy against it.
   python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'

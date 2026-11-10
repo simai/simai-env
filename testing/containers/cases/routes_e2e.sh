@@ -32,7 +32,7 @@ steps() { j "[s['id']+'='+s['command'] for x in d['data']['profiles'] if x['id']
   && ok 'bitrix new steps' || bad "bitrix new: $(steps bitrix new)"
 [[ "$(steps bitrix restore)" == "['add=site:add', 'upload=file:upload', 'validate=bitrix:restore-ready', 'run_restore=open_url', 'finalize=bitrix:finalize', 'done=site:doctor']" ]] \
   && ok 'bitrix restore steps' || bad "bitrix restore: $(steps bitrix restore)"
-[[ "$(steps laravel repo)" == "['add=site:add', 'deploy=site:deploy', 'done=site:doctor']" ]] && ok 'laravel repo steps' || bad "laravel repo: $(steps laravel repo)"
+[[ "$(steps laravel repo)" == "['add=site:add', 'deploy=site:deploy', 'finalize=laravel:finalize', 'done=site:doctor']" ]] && ok 'laravel repo steps' || bad "laravel repo: $(steps laravel repo)"
 [[ "$(j "[s['args'] for x in d['data']['profiles'] if x['id']=='bitrix' for r in x['routes'] for s in r['steps'] if s['id']=='add']" <<<"$p")" \
    == "[{'bitrix-files': 'setup'}, {'bitrix-files': 'restore'}]" ]] && ok 'site:add steps carry bitrix-files' || bad 'bitrix-files args'
 [[ "$(j "[s['url_from'] for x in d['data']['profiles'] if x['id']=='bitrix' for r in x['routes'] for s in r['steps'] if s['command']=='open_url']" <<<"$p")" \

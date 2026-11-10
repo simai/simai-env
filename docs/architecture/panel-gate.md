@@ -693,6 +693,13 @@ action, job). Everything else is refused.
   (`new`, `restore`, `repo` with inputs and steps). Fixture set 32 adds
   `site-status.<site>` for the demo sites and
   `site-status.demo-bitrix.test.<step>` along the Bitrix restore.
+- 1.56.2: the Laravel `repo` route lists `laravel:finalize` as its step
+  after `site:deploy`. Memory needs are answered in the `resources` block of
+  `site:add` plans, not in `self:profiles`; `available` is per route. Fixture
+  set 33 adds `site-status.demo-wp.test.<step>`,
+  `site-status.demo-wp-copy.test.<step>`,
+  `site-status.demo-laravel.test.{deploy,configure}` and
+  `plan.laravel-finalize`.
 
 - 1.56.0: `bitrix:restore-ready {domain, archive, source, url}`: `source`
   is a path relative to the site directory (letters, digits, `._/-`, no

@@ -15,7 +15,7 @@
     "lock": "site",
     "applied": false,
     "resources": {
-      "disk_free_bytes": 1394521362432,
+      "disk_free_bytes": 1393676804096,
       "needed_bytes": 483,
       "ram_mb": 14963,
       "ram_min_mb": 1536,

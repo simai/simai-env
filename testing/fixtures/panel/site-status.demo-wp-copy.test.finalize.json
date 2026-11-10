@@ -1,0 +1,25 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-status.demo-wp-copy.test.finalize",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-status/1",
+    "domain": "demo-wp-copy.test",
+    "profile": "wordpress",
+    "route": "restore",
+    "step": "finalize",
+    "next": "wp:finalize",
+    "restore_url": null,
+    "installer_url": null,
+    "pending": [
+      "wordpress.config-perms"
+    ],
+    "detail": {
+      "db_state": "installed",
+      "web_state": "installed"
+    }
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}
