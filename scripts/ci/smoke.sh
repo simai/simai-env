@@ -129,10 +129,11 @@ grep -q 'fail2ban sshd jail' admin/commands/self.sh || fail "self status must re
 grep -q 'php${PHP_VERSION}-redis' simai-env.sh || fail "bootstrap PHP stack must include php-redis"
 grep -q 'php${ver}-redis' admin/lib/php_utils.sh || fail "php install helper must include php-redis"
 
-# 10) Nginx templates must deny dotfiles except ACME challenges
+# 10) Nginx templates must deny dotfiles except ACME challenges (and Bitrix .default)
 for tmpl in templates/nginx-*.conf; do
   [[ -f "$tmpl" ]] || continue
-  grep -Fq 'location ~ /\.(?!well-known/)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
+  # Bitrix also serves its ".default" template folders.
+  grep -Eq 'location ~ /\\\.\(\?!well-known/(\|default/)?\)' "$tmpl" || fail "${tmpl} missing dotfile deny rule"
 done
 
 # 11) self-update supply-chain guardrails must stay wired

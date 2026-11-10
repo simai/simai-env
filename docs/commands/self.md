@@ -559,3 +559,12 @@ sudo /root/simai-env/simai-admin.sh self commands
 
 `self migrate` links `/root/AGENTS.md` to the agent guide shipped with
 simai-env unless that file already exists.
+
+`self migrate` also sets `process_control_timeout = 10s` in the `[global]`
+section of `/etc/php/<version>/fpm/php-fpm.conf` for every installed PHP-FPM
+version that has no non-zero value (busy requests finish on reload instead of
+a 502), and writes the Bitrix OPcache host baseline
+(`/etc/php/<version>/fpm/conf.d/99-zz-simai-opcache.ini`, see
+`bitrix php-baseline-sync`) for every version that serves a Bitrix site. Both
+are validated with `php-fpm<version> -t`, restored on failure, and reload
+PHP-FPM only when something changed.

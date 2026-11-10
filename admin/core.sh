@@ -431,6 +431,10 @@ run_command() {
   if [[ "$preview" == yes && -n "${CMD_PLAN_HANDLER[$key]:-}" && "$output" != json ]]; then
     preview=no
   fi
+  if [[ "$preview" == yes ]] && ! command_plan_check "$key" "${command_args[@]}"; then
+    [[ "$output" != json ]] || command_result failed 1 "$key" "$target" "$corr_id" "$effect" ''
+    return 1
+  fi
   if [[ "$preview" == yes ]]; then
     if [[ "$output" == json ]]; then
       command_result planned 0 "$key" "$target" "$corr_id" "$effect" ''

@@ -260,6 +260,9 @@ php_install_handler() {
     return 1
   fi
 
+  # Reloads by the toolkit let busy requests finish instead of a 502.
+  php_fpm_process_control_timeout_ensure "$php_version" >/dev/null || warn "process_control_timeout not set for php${php_version}-fpm"
+
   progress_step "Verifying php${php_version}-fpm status"
   local svc_status
   if os_svc_is_active "php${php_version}-fpm"; then

@@ -80,6 +80,25 @@ site_add_cancelled() {
   command_cancelled "$(site_add_cancel_message "$domain" "$step")"
 }
 
+# Fails with the operator hint when a bundled profile is disabled. Used by the
+# handler and by the plan of site add (command_plan_check), so both refuse alike.
+site_add_require_enabled_profile() {
+  local profile="$1"
+  is_profile_enabled "$profile" && return 0
+  error "Profile '${profile}' is disabled. Enable it: simai-admin.sh profile enable --id ${profile} (or initialize all bundled profiles with: simai-admin.sh profile init --mode all --force yes)"
+  return 1
+}
+
+# Plan of site add: refuse what the handler would refuse before changing
+# anything. Unknown profiles are left to the handler's own message.
+site_add_plan_check() {
+  local profile
+  profile=$(command_arg profile "$@")
+  [[ -n "$profile" ]] || profile=generic
+  is_profile_known "$profile" || return 0
+  site_add_require_enabled_profile "$profile"
+}
+
 site_add_confirm_creation() {
   local domain="$1"
   local choice=""
@@ -758,9 +777,8 @@ site_add_handler_impl() {
       error "Unknown profile: ${profile}. Available: ${avail}"
       return 1
     fi
-    if [[ "$enable_all_profiles_after_confirm" != "yes" ]] && ! is_profile_enabled "$profile"; then
-      error "Profile '${profile}' is disabled. Enable it: simai-admin.sh profile enable --id ${profile} (or initialize all bundled profiles with: simai-admin.sh profile init --mode all --force yes)"
-      return 1
+    if [[ "$enable_all_profiles_after_confirm" != "yes" ]]; then
+      site_add_require_enabled_profile "$profile" || return 1
     fi
   fi
 

@@ -63,6 +63,19 @@ JSON
 }
 
 cli profile enable --id node --confirm yes >/dev/null 2>&1
+
+# The plan of site add already refuses a disabled profile and names the fix
+# (the panel gateway asks for plans before confirming); enabled, it plans.
+cli profile disable --id bitrix --confirm yes >/dev/null 2>&1
+cli site add --domain plan.test --profile bitrix >/tmp/p-dis 2>&1 && bad "plan with a disabled profile succeeded" \
+  || { grep -q 'profile enable --id bitrix' /tmp/p-dis && ! grep -q 'No handler was executed' /tmp/p-dis \
+    && ok "plan of site add refuses a disabled profile" || { bad "disabled plan"; cat /tmp/p-dis; }; }
+cli site add --domain plan.test --profile bitrix --output json >/tmp/p-dis.json 2>/dev/null && bad "json plan with a disabled profile succeeded" \
+  || { python3 -c 'import json,sys; d=json.load(open("/tmp/p-dis.json")); sys.exit(d["status"] != "failed")' \
+    && ok "json plan of site add fails for a disabled profile" || { bad "json disabled plan"; cat /tmp/p-dis.json; }; }
+cli profile enable --id bitrix --confirm yes >/dev/null 2>&1
+cli site add --domain plan.test --profile bitrix >/tmp/p-en 2>&1 && grep -q 'No handler was executed' /tmp/p-en \
+  && [[ ! -e /etc/nginx/sites-available/plan.test.conf ]] && ok "plan of site add succeeds once the profile is enabled" || { bad "enabled plan"; cat /tmp/p-en; }
 cli site add --domain $D --profile static --confirm yes >/tmp/p-add 2>&1 || { bad "site add static"; tail -10 /tmp/p-add; }
 cli site add --domain other.test --profile static --confirm yes >/tmp/p-other 2>&1 || { bad "second site"; tail -5 /tmp/p-other; }
 mk_static

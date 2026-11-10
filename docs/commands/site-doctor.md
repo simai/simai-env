@@ -12,6 +12,13 @@ What it checks (non-destructive):
   root.
 - nginx: config/symlink presence, healthcheck policy vs profile, `nginx -t`.
 - PHP: installed version, php-fpm service/pool/socket, required/recommended extensions, INI expectations.
+  INI values are read as PHP-FPM of the site's version applies them: the pool
+  (`php_admin_value`/`php_admin_flag`) first, then the FPM `php.ini` and
+  `conf.d` (not the CLI ones). OPcache memory keys
+  (`opcache.memory_consumption`, `opcache.interned_strings_buffer`,
+  `opcache.max_accelerated_files`) are always read from the FPM master, since
+  a pool value does not change them; for Bitrix they come from the host
+  baseline (`bitrix php-baseline-sync`).
 - Cron: `/etc/cron.d/<slug>` when profile enables cron.
 - SSL: cert files presence when metadata says ssl=on.
 - DB: mysql service presence when profile requires DB, MySQL public listener

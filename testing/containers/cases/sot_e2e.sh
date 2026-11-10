@@ -9,6 +9,14 @@ pool=/etc/php/8.3/fpm/pool.d/bx-test.conf
 grep -q '; simai-profile-ini-begin' $pool && ok "new pool has profile block" || bad "no profile block"
 [[ -f /etc/php/8.3/cli/conf.d/99-simai-bitrix.ini && "$(php8.3 -r 'echo ini_get("short_open_tag");')" == 1 ]] && ok "CLI short_open_tag on via conf.d" || bad "CLI short tag"
 u=$(cat /etc/simai-env/site-users/bx-test)
+mkdir -p $P/public/bitrix/themes/.default && echo 'a{}' >$P/public/bitrix/themes/.default/x.css && echo secret >$P/public/.env.local
+chown -R $u:$u $P/public/bitrix/themes $P/public/.env.local
+hc() { curl -s -o /dev/null -w '%{http_code}' -H "Host: $D" "http://127.0.0.1$1"; }
+[[ "$(hc /bitrix/themes/.default/x.css)" == 200 && "$(hc /.env.local)" == 403 ]] && ok "Bitrix .default folders load, hidden files stay closed" || bad ".default $(hc /bitrix/themes/.default/x.css) .env $(hc /.env.local)"
+cfg=/etc/nginx/sites-available/$D.conf
+sed -i 's#(?!well-known/|default/)#(?!well-known/)#' $cfg && systemctl reload nginx && sleep 1
+./simai-admin.sh self migrate --confirm yes >/tmp/m0 2>&1; sleep 1
+[[ "$(hc /bitrix/themes/.default/x.css)" == 200 && "$(hc /.env.local)" == 403 ]] && grep -q 'default folders' /tmp/m0 && ok "self migrate opens .default on an older Bitrix site" || bad "migrate .default: $(hc /bitrix/themes/.default/x.css) $(grep Migrated /tmp/m0)"
 printf '<? echo "mem=", ini_get("memory_limit"), " short=", ini_get("short_open_tag");\n' >$P/public/sot.php; chown $u:$u $P/public/sot.php
 h() { curl -s -H "Host: $D" http://127.0.0.1/sot.php; }
 [[ "$(h)" == "mem=512M short=1" ]] && ok "short tag works before php-ini set ($(h))" || bad "before: $(h)"

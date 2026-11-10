@@ -172,16 +172,39 @@ Notes:
 simai-admin.sh bitrix finalize --domain <domain> --confirm yes [--ssl yes --email <email>] [--redirect yes|no] [--hsts yes|no] [--staging yes|no]
 ```
 
-Safe post-install orchestration for Bitrix sites after the web installer has finished:
+Safe post-install and post-restore orchestration for Bitrix sites after the web installer or the `restore.php` wizard has finished:
 - verifies that Bitrix web installation is already complete (`web state = installed`)
-- runs `bitrix php-baseline-sync`
+- moves restore leftovers out of the docroot (see below)
+- makes `bitrix/php_interface/after_connect_d7.php` set `SET SESSION sql_mode=''` and `SET SESSION innodb_strict_mode=0`
+- sets the site database default charset/collation to the profile values (`utf8mb4` / `utf8mb4_unicode_ci`)
+- runs `bitrix php-baseline-sync` (including PHP `date.timezone`)
 - applies `bitrix agents-sync --apply yes`
 - optionally issues Let's Encrypt if `--ssl yes --email <email>` is provided
+
+Each step is shown in the result table. The command is idempotent: a second run
+reports every step as unchanged. It is also safe on a fresh install.
+
+Restore leftovers:
+- A restore leaves the archive volumes, `restore.php` and the database dump in the public docroot, where they can be downloaded.
+- Finalize moves (never deletes) them into `<site root>/restore-archive/` (mode `0700`, site user), next to but outside the docroot, and prints the destination.
+- Only these files are moved: top-level backup volumes named like Bitrix backups (`<name>_<type>_<id>.tar.gz`, `.tar.gz.N`, `.enc.gz`, `.enc.gz.N`), top-level `restore.php`, and `bitrix/backup/*.sql`. Distribution archives (`*_encode.tar.gz`), other files and symlinks stay.
+- A file whose name already exists in `restore-archive/` gets a timestamp prefix.
+- When the docroot is the site root itself, nothing is moved and the step fails with a message.
+
+MySQL session modes:
+- The archive replaces `.settings.php` (a connection without the toolkit's `init_commands`) and `after_connect_d7.php` (often only `SET NAMES`). Bitrix then runs under the server's strict `sql_mode` and `innodb_strict_mode=ON`.
+- Finalize appends only the missing statements to `after_connect_d7.php`, in the style the file uses (`$this->queryExecute(...)` or `$connection->queryExecute(...)`), keeps the existing lines (charset and collation are not rewritten), removes a trailing `?>`, checks the result with `php -l`, keeps owner and mode, and replaces the file atomically. A missing file is created from the toolkit template.
+- `.settings.php` and its credentials are never changed or printed.
+
+Database charset:
+- The archive's `*_after_connect.sql` can run `ALTER DATABASE ... COLLATE utf8mb3_general_ci`, so the database default differs from the `utf8mb4` connection (site checker warning).
+- Finalize changes only the database default with `ALTER DATABASE`; tables are never converted. The number of tables that still use `utf8mb3` is reported for information.
 
 Notes:
 - In CLI mode `--confirm yes` is required.
 - If the site is still in installer mode, the command stops with a clear error and prints the correct installer URL.
-- This is the recommended single step after finishing the Bitrix web installer.
+- This is the recommended single step after finishing the Bitrix web installer or the restore wizard.
+- If a step fails, the remaining steps still run, the table names the failure and the command exits non-zero.
 
 ## PHP Baseline Sync
 
@@ -196,11 +219,33 @@ Then enforces critical FPM keys per site:
 - `memory_limit=512M`
 - `opcache.validate_timestamps=1`
 - `opcache.revalidate_freq=0`
+- `date.timezone` set to the host time zone (`timedatectl`, then `/etc/timezone`, then `/etc/localtime`; `UTC` when none is valid), so PHP and MySQL agree on the time. Only added when the site has no `date.timezone` override yet; `site php-ini-set --name date.timezone` keeps the operator's value.
+
+Other per-site overrides set with `site php-ini-set` are kept; the baseline keys win.
+
+Host baseline: OPcache memory cannot be set per pool (one shared memory per
+PHP version), so before the pool step the command writes
+`/etc/php/<version>/fpm/conf.d/99-zz-simai-opcache.ini` for the PHP version of
+each target site:
+- `opcache.memory_consumption=256`
+- `opcache.interned_strings_buffer=16`
+- `opcache.max_accelerated_files=20000`
+- `realpath_cache_ttl=600`
+
+Each value is the larger of the baseline and what the other ini files of that
+version set, so a higher value chosen by an administrator (in their own
+`conf.d` file) stays; the file loads last, so the `self perf-apply` preset
+cannot lower it. It is validated with `php-fpm<version> -t` (restored on
+failure) and PHP-FPM reloads only when it changed. `site add` / `site set-php`
+of a Bitrix site and `self migrate` (for every version that serves a Bitrix
+site) write the same file; `site doctor` then reports these four checks as
+`PASS`.
 
 Notes:
 - Single-domain mode works with `--domain`.
 - Bulk mode (`--all yes`) requires `--confirm yes` in CLI mode.
-- Read-only checks are not changed; only PHP pool INI overrides are updated.
+- Read-only checks are not changed; only PHP pool INI overrides and the host
+  baseline file above are updated.
 - run this after Bitrix web installation, before final `site_checker` / `perfmon` acceptance checks.
 
 ## Perf Status
@@ -213,8 +258,8 @@ Shows:
 - managed site performance mode (`site perf-tune` state)
 - install stage (`installer` vs `post-install`)
 - Bitrix DB/runtime compatibility markers:
-  - `.settings.php` init commands
-  - `after_connect_d7.php`
+  - `.settings.php` init commands (`ready (via after_connect_d7.php)` when a restored `.settings.php` has none but `after_connect_d7.php` sets the session modes)
+  - `after_connect_d7.php` (`ready` when it sets an empty `sql_mode` and `innodb_strict_mode=0`)
   - agents-via-cron readiness
 - effective PHP-FPM runtime values used by Bitrix checker-sensitive paths
 - cache directory presence

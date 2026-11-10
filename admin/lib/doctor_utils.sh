@@ -132,13 +132,20 @@ doctor_php_pool_ini_get() {
 
 doctor_php_ini_effective_get() {
   local php_bin="$1" pool_file="${2:-}" key="$3"
-  local pool_value=""
-  if [[ -n "$pool_file" ]]; then
+  local pool_value="" fpm_ver=""
+  # A pool under /etc/php/<ver>/fpm/pool.d runs under PHP-FPM of <ver>, whose
+  # php.ini and conf.d differ from the CLI ones.
+  [[ "$pool_file" =~ ^/etc/php/([0-9]+\.[0-9]+)/fpm/pool\.d/ ]] && fpm_ver="${BASH_REMATCH[1]}"
+  if [[ -n "$pool_file" ]] && ! php_fpm_master_only_key "$key"; then
     pool_value=$(doctor_php_pool_ini_get "$pool_file" "$key" || true)
   fi
   if [[ -n "$pool_value" ]]; then
     printf '%s' "$pool_value"
     return 0
+  fi
+  if [[ -n "$fpm_ver" ]] && php_fpm_host_bin "$fpm_ver" >/dev/null 2>&1; then
+    php_fpm_master_ini_get "$fpm_ver" "$key"
+    return
   fi
   doctor_php_ini_get "$php_bin" "$key"
 }

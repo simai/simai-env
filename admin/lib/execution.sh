@@ -67,6 +67,18 @@ command_effect() {
   printf '%s\n' "$effect"
 }
 
+# Refusals a plan can already see, so the operator (and the panel gateway,
+# which asks for plans) learns them before confirming. Each check reuses the
+# handler's own function; a failing check prints the handler's error.
+command_plan_check() {
+  local key="$1"
+  shift
+  case "$key" in
+    site:add) site_add_plan_check "$@" || return 1 ;;
+  esac
+  return 0
+}
+
 command_arg_yes() {
   local value
   value=$(command_arg "$@")

@@ -17,7 +17,21 @@ D=shop.example.com
 root=/home/simai/www/$D
 mkdir -p "$root/public" "$root/storage/logs" "$root/node_modules/x"
 echo '<?php echo 1;' >"$root/public/index.php"; echo big >"$root/storage/logs/app.log"; echo dep >"$root/node_modules/x/i.js"
+# An already compressed backup kept outside the docroot after a restore.
+mkdir -p "$root/restore-archive"; echo old >"$root/restore-archive/old-site.tar.gz"
 chown -R simai "$root"
+# PATH wrappers record the CPU nice value and I/O class each heavy tool runs
+# with, then exec the real binary: no timing involved.
+wrap=/tmp/prio-bin; mkdir -p "$wrap"; : >/tmp/prio.log
+for t in tar gzip mysqldump sha256sum; do
+  real=$(command -v "$t") || continue
+  cat >"$wrap/$t" <<EOF
+#!/bin/bash
+echo "$t ni=\$(awk '{print \$19}' /proc/\$\$/stat) io=\$(ionice -p \$\$ 2>/dev/null) args=\$*" >>/tmp/prio.log
+exec $real "\$@"
+EOF
+  chmod +x "$wrap/$t"
+done
 mkdir -p /etc/nginx/sites-available
 source lib/site_metadata.sh; set +e
 { site_nginx_metadata_render "$D" shop-example-com generic "$root" shop-example-com 8.2 none "" "" shop-example-com nginx-generic public; echo 'server { listen 80; }'; } \
@@ -27,7 +41,7 @@ install -d -m 0700 /etc/simai-env/sites/$D
 printf 'DB_NAME=shop\nDB_USER=shop\nDB_PASS=x\n' >/etc/simai-env/sites/$D/db.env
 
 # 1. Backup
-out=$(cli backup data --domain $D --keep 2 2>&1); rc=$?
+out=$(PATH="$wrap:$PATH" cli backup data --domain $D --keep 2 2>&1); rc=$?
 [[ $rc -eq 0 ]] && ok "backup data succeeds" || { bad "backup data rc=$rc"; echo "$out" | tail -20; }
 dir=$(ls -1d /var/backups/simai/$D/2* | tail -1)
 for f in db.sql.gz files.tar.gz manifest.txt SHA256SUMS; do [[ -s "$dir/$f" ]] && ok "has $f" || bad "missing $f"; done
@@ -36,9 +50,20 @@ for f in db.sql.gz files.tar.gz manifest.txt SHA256SUMS; do [[ -s "$dir/$f" ]] &
 zcat "$dir/db.sql.gz" | grep -q "INSERT INTO \`orders\`" && ok "dump contains data" || bad "dump has no data"
 tar -tzf "$dir/files.tar.gz" | grep -q 'public/index.php' && ok "files include project" || bad "project files missing"
 tar -tzf "$dir/files.tar.gz" | grep -q 'node_modules\|storage/logs/app.log' && bad "caches/logs not excluded" || ok "node_modules and logs excluded"
+tar -tzf "$dir/files.tar.gz" | grep -q 'restore-archive' && bad "restore-archive was archived" || ok "restore-archive excluded"
+grep -q '^tar ni=10 .*-czf .*files.tar.gz' /tmp/prio.log && ok "file archive runs at nice 10" || { bad "file archive priority"; cat /tmp/prio.log; }
+grep -q '^mysqldump ni=10 ' /tmp/prio.log && grep -q '^gzip ni=10 .*-c$' /tmp/prio.log && ok "dump and its gzip run at nice 10" || { bad "dump priority"; cat /tmp/prio.log; }
+if ionice -c3 true >/dev/null 2>&1; then
+  grep '^tar ni=10 .*files.tar.gz' /tmp/prio.log | grep -q 'io=idle' && ok "file archive runs in the idle I/O class" || { bad "file archive I/O class"; cat /tmp/prio.log; }
+else
+  echo "INFO ionice not permitted here; I/O class not checked"
+fi
 
 # 2. Verify + restore test
-cli backup data-verify --path "$dir" --restore-test yes >/tmp/v 2>&1 && grep -q "restore test (1 tables" /tmp/v && ok "verify + restore test" || { bad "verify"; cat /tmp/v; }
+: >/tmp/prio.log
+PATH="$wrap:$PATH" cli backup data-verify --path "$dir" --restore-test yes >/tmp/v 2>&1 && grep -q "restore test (1 tables" /tmp/v && ok "verify + restore test" || { bad "verify"; cat /tmp/v; }
+grep -q '^tar ni=10 .*-tzf' /tmp/prio.log && grep -q '^sha256sum ni=10 ' /tmp/prio.log && grep -q '^gzip ni=10 .*-dc' /tmp/prio.log \
+  && ok "verify runs at nice 10" || { bad "verify priority"; cat /tmp/prio.log; }
 [[ -z "$(mysql -uroot -N -e "SHOW DATABASES LIKE 'simai_restore_check%'")" ]] && ok "scratch DB dropped" || bad "scratch DB left"
 printf 'x' >>"$dir/files.tar.gz"
 cli backup data-verify --path "$dir" >/dev/null 2>&1 && bad "tampered backup verified" || ok "tampering detected"

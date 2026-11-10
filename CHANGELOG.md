@@ -2,6 +2,59 @@
 
 ## Unreleased
 
+## 1.54.0 - 2026-11-10
+
+- Bitrix sites: nginx refused every `.default` folder as a hidden file, so
+  admin tables and filters drew without their styles and scripts. New sites
+  serve them; `self migrate` repairs existing Bitrix sites (hidden files such
+  as `.env` and `.git` stay closed).
+
+- `site add` without `--confirm yes` (and the panel gateway's plan) already
+  refuses a disabled profile with the same message as the run, naming
+  `profile enable --id <id>`, instead of a plan that fails on confirm.
+  Test `profile_e2e`.
+
+- PHP-FPM reloads by the toolkit (`bitrix perf-apply`, `site php-ini-set
+  --apply yes`, ...) killed busy workers, so a running request got 502.
+  `php install`, the installer and `self migrate` now set
+  `process_control_timeout = 10s` in `[global]` of `php-fpm.conf` (an
+  administrator's non-zero value stays). Test `php_e2e`.
+
+- Bitrix hosts: `site doctor` warned about OPcache memory, interned strings,
+  max accelerated files and `realpath_cache_ttl`, which a pool cannot change.
+  A Bitrix `site add` / `set-php`, `bitrix php-baseline-sync` (and so
+  `perf-apply`) and `self migrate` write
+  `/etc/php/<version>/fpm/conf.d/99-zz-simai-opcache.ini` (256 / 16 / 20000 /
+  600, never lower than other ini files set). `site doctor` and `site fix`
+  read INI values as PHP-FPM sees them (FPM `php.ini` and `conf.d`, not CLI),
+  and `site fix` no longer writes OPcache memory keys into the pool.
+  Test `php_e2e`.
+
+- `bitrix finalize` after a restore fixes what the Bitrix site checker
+  flagged: it appends `SET SESSION sql_mode=''` and
+  `SET SESSION innodb_strict_mode=0` to the restored `after_connect_d7.php`
+  (charset lines and `.settings.php` stay as they are), sets the site
+  database default back to `utf8mb4`/`utf8mb4_unicode_ci` (tables are not
+  converted; the number still on `utf8mb3` is reported), and moves the
+  archive volumes, `restore.php` and the `bitrix/backup/*.sql` dump out of
+  the public docroot into `<site root>/restore-archive/` (mode 700). Each
+  step shows in the result table; a second run changes nothing. Test
+  `bitrix_finalize_e2e`.
+- `bitrix php-baseline-sync` sets PHP `date.timezone` to the host time zone
+  when the site has no such override (PHP ran in UTC while MySQL used the
+  system zone), and keeps the site's other `site php-ini-set` overrides
+  instead of replacing them with the baseline.
+- `bitrix perf-status` reports the session modes as ready when they come
+  from `after_connect_d7.php`. The Bitrix DB preseed cleans up its temp
+  files if moving a file into place fails.
+- `backup data` and `backup data-verify` run their heavy work (dump and
+  gzip, file archive, `age`, checksums, archive and restore-test checks) at
+  low priority: `nice -n 10` (`SIMAI_BACKUP_NICE`) and `ionice -c3` when
+  available, for manual, scheduled and panel runs alike; exit codes are
+  unchanged. Site file backups no longer pack `<site root>/restore-archive/`.
+  A nightly backup of a 1 GB Bitrix site on a 2 CPU server had pushed the
+  load to 14 and the panel gateway to 4-9 s per call. Test `backup_tests`.
+
 ## 1.53.0 - 2026-11-08
 
 - A site's extra names: `site names`, `site name-add --name N [--mode

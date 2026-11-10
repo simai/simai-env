@@ -112,7 +112,11 @@ pgsql_site_rotate() {
 pgsql_dump_gz() {
   local db_name="$1" out="$2"
   pgsql_require || return 1
-  runuser -u postgres -- pg_dump --clean --if-exists --no-password "$db_name" 2>>"$LOG_FILE" | gzip -c >"$out"
+  # Low priority via backup_lowprio (admin/commands/backup_data.sh) when loaded.
+  local -a low=()
+  declare -F backup_lowprio >/dev/null && low=(backup_lowprio)
+  ${low[@]+"${low[@]}"} runuser -u postgres -- pg_dump --clean --if-exists --no-password "$db_name" 2>>"$LOG_FILE" \
+    | ${low[@]+"${low[@]}"} gzip -c >"$out"
 }
 
 pgsql_restore_gz() {

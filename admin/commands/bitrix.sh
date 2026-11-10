@@ -185,13 +185,279 @@ bitrix_perf_after_connect_state() {
     echo "missing"
     return 0
   fi
-  if grep -q "innodb_strict_mode" "$file" 2>/dev/null \
-    && grep -q "sql_mode=''" "$file" 2>/dev/null \
-    && grep -q "utf8mb4_unicode_ci" "$file" 2>/dev/null; then
+  if bitrix_after_connect_has_sql_mode "$file" && bitrix_after_connect_has_strict_off "$file"; then
     echo "ready"
     return 0
   fi
   echo "partial"
+}
+
+# Session modes Bitrix requires (site checker: empty sql_mode,
+# innodb_strict_mode OFF). A restored archive brings its own
+# after_connect_d7.php, usually with charset lines only.
+bitrix_after_connect_has_sql_mode() {
+  local file="$1"
+  grep -Eqi "sql_mode[[:space:]]*=[[:space:]]*(''|\"\"|\\\\'\\\\')" "$file" 2>/dev/null
+}
+
+bitrix_after_connect_has_strict_off() {
+  local file="$1"
+  grep -Eqi "innodb_strict_mode[[:space:]]*=[[:space:]]*('|\\\\')?(0|off)\\b" "$file" 2>/dev/null
+}
+
+# Makes after_connect_d7.php set the session modes. Keeps the existing lines
+# (charset and collation from the archive stay as they are) and appends only
+# what is missing, in the style the file already uses. Sets
+# BX_AFTER_CONNECT_RESULT; returns 1 when the file could not be updated.
+bitrix_after_connect_session_modes_ensure() {
+  local file="$1" php_bin="${2:-php}"
+  local dir
+  dir=$(dirname "$file")
+  BX_AFTER_CONNECT_RESULT="failed"
+  if [[ -L "$file" || -L "$dir" ]]; then
+    BX_AFTER_CONNECT_RESULT="failed (symlink is not changed)"
+    return 1
+  fi
+  local need_sql="yes" need_strict="yes" existing="no"
+  if [[ -f "$file" ]]; then
+    existing="yes"
+    bitrix_after_connect_has_sql_mode "$file" && need_sql="no"
+    bitrix_after_connect_has_strict_off "$file" && need_strict="no"
+    if [[ "$need_sql" == "no" && "$need_strict" == "no" ]]; then
+      BX_AFTER_CONNECT_RESULT="unchanged (session modes present)"
+      return 0
+    fi
+    if ! grep -q '<?' "$file" 2>/dev/null; then
+      BX_AFTER_CONNECT_RESULT="failed (not a PHP file)"
+      return 1
+    fi
+  elif [[ -e "$file" ]]; then
+    BX_AFTER_CONNECT_RESULT="failed (not a regular file)"
+    return 1
+  fi
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir" || return 1
+    chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$dir" 2>/dev/null || true
+    chmod 0775 "$dir" 2>/dev/null || true
+  fi
+
+  local tmp
+  tmp=$(mktemp "${dir}/.after_connect_d7.php.XXXXXX") || return 1
+  local -a added=()
+  if [[ "$existing" == "no" ]]; then
+    bitrix_after_connect_template >"$tmp"
+    added=("created")
+  else
+    local style="generic"
+    if grep -Eq '\$this->queryExecute' "$file"; then
+      style="this"
+    elif grep -Eq '\$connection[[:space:]]*=' "$file" && grep -Eq '\$connection->queryExecute' "$file"; then
+      style="connection"
+    fi
+    # A trailing closing tag would turn appended code into page output.
+    if ! perl -0777 -pe 's/\?>\s*\z/\n/' "$file" >"$tmp"; then
+      rm -f "$tmp"
+      return 1
+    fi
+    [[ -s "$tmp" && "$(tail -c1 "$tmp" | od -An -c | tr -d ' ')" != '\n' ]] && printf '\n' >>"$tmp"
+    local -a statements=()
+    [[ "$need_sql" == "yes" ]] && statements+=("SET SESSION sql_mode=''") && added+=("sql_mode")
+    [[ "$need_strict" == "yes" ]] && statements+=("SET SESSION innodb_strict_mode=0") && added+=("innodb_strict_mode")
+    local stmt
+    {
+      printf '\n// simai-managed: MySQL session modes required by Bitrix\n'
+      case "$style" in
+        this)
+          for stmt in "${statements[@]}"; do printf '$this->queryExecute("%s");\n' "$stmt"; done
+          ;;
+        connection)
+          for stmt in "${statements[@]}"; do printf '$connection->queryExecute("%s");\n' "$stmt"; done
+          ;;
+        *)
+          printf 'if (isset($this) && $this instanceof \\Bitrix\\Main\\DB\\Connection) {\n'
+          for stmt in "${statements[@]}"; do printf '    $this->queryExecute("%s");\n' "$stmt"; done
+          printf '}\n'
+          ;;
+      esac
+    } >>"$tmp"
+  fi
+
+  if ! "$php_bin" -d short_open_tag=1 -l "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    BX_AFTER_CONNECT_RESULT="failed (php -l rejected the result; file left unchanged)"
+    return 1
+  fi
+  if [[ "$existing" == "yes" ]]; then
+    chmod --reference="$file" "$tmp" 2>/dev/null || chmod 0640 "$tmp"
+    chown --reference="$file" "$tmp" 2>/dev/null || true
+  else
+    chmod 0640 "$tmp"
+    chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$tmp" 2>/dev/null || true
+  fi
+  if ! mv -f "$tmp" "$file"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ "$existing" == "yes" ]]; then
+    local IFS=', '
+    BX_AFTER_CONNECT_RESULT="appended (${added[*]})"
+  else
+    BX_AFTER_CONNECT_RESULT="created"
+  fi
+  return 0
+}
+
+# Host time zone for PHP, so PHP and MySQL (system zone) agree.
+bitrix_host_timezone() {
+  local php_bin="${1:-php}" tz=""
+  if command -v timedatectl >/dev/null 2>&1; then
+    tz=$(timedatectl show -p Timezone --value 2>/dev/null || true)
+  fi
+  if [[ -z "$tz" && -r /etc/timezone ]]; then
+    tz=$(head -n1 /etc/timezone 2>/dev/null | tr -d '[:space:]')
+  fi
+  if [[ -z "$tz" && -L /etc/localtime ]]; then
+    tz=$(readlink -f /etc/localtime 2>/dev/null || true)
+    tz="${tz#/usr/share/zoneinfo/}"
+  fi
+  if ! bitrix_timezone_valid "$tz" "$php_bin"; then
+    tz="UTC"
+  fi
+  printf '%s\n' "$tz"
+}
+
+bitrix_timezone_valid() {
+  local tz="$1" php_bin="${2:-php}"
+  [[ -n "$tz" && ${#tz} -le 64 && "$tz" =~ ^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$ ]] || return 1
+  validate_ini_key "date.timezone" >/dev/null 2>&1 || return 1
+  validate_ini_value "$tz" >/dev/null 2>&1 || return 1
+  if command -v "$php_bin" >/dev/null 2>&1; then
+    "$php_bin" -r 'exit(in_array($argv[1], DateTimeZone::listIdentifiers(DateTimeZone::ALL_WITH_BC), true) ? 0 : 1);' "$tz" >/dev/null 2>&1
+    return $?
+  fi
+  return 0
+}
+
+# Sets the site database default (never the tables) to the profile charset.
+# A restored *_after_connect.sql can switch it to utf8mb3. Sets
+# BX_DB_CHARSET_RESULT and BX_DB_UTF8MB3_TABLES.
+bitrix_db_default_charset_ensure() {
+  local domain="$1" charset="${2:-utf8mb4}" collation="${3:-utf8mb4_unicode_ci}"
+  BX_DB_CHARSET_RESULT="failed"
+  BX_DB_UTF8MB3_TABLES="n/a"
+  local engine
+  engine=$(site_db_engine "$domain")
+  if [[ "$engine" != "mysql" ]]; then
+    BX_DB_CHARSET_RESULT="skipped (${engine})"
+    return 0
+  fi
+  local db_name="" entry
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == "DB_NAME" ]] && db_name="${entry#*|}"
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  if [[ -z "$db_name" ]]; then
+    BX_DB_CHARSET_RESULT="skipped (no db.env)"
+    return 0
+  fi
+  if ! db_validate_db_name "$db_name" 2>/dev/null; then
+    BX_DB_CHARSET_RESULT="failed (invalid database name in db.env)"
+    return 1
+  fi
+  if [[ ! "$charset" =~ ^[a-z0-9_]+$ || ! "$collation" =~ ^[a-z0-9_]+$ ]]; then
+    BX_DB_CHARSET_RESULT="failed (invalid profile charset)"
+    return 1
+  fi
+  local current
+  if ! current=$(mysql_root_query_stdin "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${db_name}'"); then
+    BX_DB_CHARSET_RESULT="failed (cannot query MySQL)"
+    return 1
+  fi
+  if [[ -z "$current" ]]; then
+    BX_DB_CHARSET_RESULT="failed (database ${db_name} not found)"
+    return 1
+  fi
+  local cur_charset="${current%%$'\t'*}" cur_collation="${current#*$'\t'}"
+  if [[ "$cur_charset" == "$charset" && "$cur_collation" == "$collation" ]]; then
+    BX_DB_CHARSET_RESULT="unchanged (${charset}/${collation})"
+  elif mysql_root_exec_stdin "ALTER DATABASE \`${db_name}\` CHARACTER SET ${charset} COLLATE ${collation};"; then
+    BX_DB_CHARSET_RESULT="changed (${cur_charset}/${cur_collation} -> ${charset}/${collation})"
+  else
+    BX_DB_CHARSET_RESULT="failed (ALTER DATABASE)"
+    return 1
+  fi
+  local count
+  count=$(mysql_root_query_stdin "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${db_name}' AND TABLE_TYPE='BASE TABLE' AND (TABLE_COLLATION LIKE 'utf8\\_%' OR TABLE_COLLATION LIKE 'utf8mb3\\_%')" || true)
+  [[ "$count" =~ ^[0-9]+$ ]] && BX_DB_UTF8MB3_TABLES="$count"
+  return 0
+}
+
+# Restore leftovers in the web root: backup volumes (<name>_<type>_<id>.tar.gz
+# and .tar.gz.N, also .enc.gz), restore.php and the dump in bitrix/backup.
+bitrix_restore_leftovers_list() {
+  local doc_root="$1" path name
+  local volume_re='^[A-Za-z0-9._-]+_[A-Za-z]+_[A-Za-z0-9]+\.(tar\.gz|enc\.gz)(\.[0-9]+)?$'
+  shopt -s nullglob
+  for path in "${doc_root}"/*.tar.gz "${doc_root}"/*.tar.gz.* "${doc_root}"/*.enc.gz "${doc_root}"/*.enc.gz.* "${doc_root}/restore.php" "${doc_root}"/bitrix/backup/*.sql; do
+    [[ -f "$path" && ! -L "$path" ]] || continue
+    name=$(basename "$path")
+    case "$path" in
+      "${doc_root}/restore.php"|"${doc_root}"/bitrix/backup/*.sql) ;;
+      *)
+        [[ "$name" =~ $volume_re ]] || continue
+        [[ "$name" == *_encode.tar.gz* ]] && continue
+        ;;
+    esac
+    printf '%s\n' "$path"
+  done | awk '!seen[$0]++'
+  shopt -u nullglob
+}
+
+# Moves (never deletes) restore leftovers into <site root>/restore-archive,
+# next to but outside the docroot. Sets BX_LEFTOVERS_RESULT.
+bitrix_restore_leftovers_move() {
+  local site_root="$1" doc_root="$2"
+  local dest="${site_root}/restore-archive"
+  BX_LEFTOVERS_RESULT="failed"
+  local -a files=()
+  mapfile -t files < <(bitrix_restore_leftovers_list "$doc_root")
+  if [[ ${#files[@]} -eq 0 ]]; then
+    BX_LEFTOVERS_RESULT="none in docroot"
+    return 0
+  fi
+  local real_root real_doc
+  real_root=$(readlink -f "$site_root" 2>/dev/null || echo "$site_root")
+  real_doc=$(readlink -f "$doc_root" 2>/dev/null || echo "$doc_root")
+  if [[ "$real_root" == "$real_doc" || "$real_root/" == "$real_doc"/* ]]; then
+    BX_LEFTOVERS_RESULT="not moved: ${#files[@]} file(s), the docroot is the site root"
+    return 1
+  fi
+  if [[ -L "$dest" || ( -e "$dest" && ! -d "$dest" ) ]]; then
+    BX_LEFTOVERS_RESULT="failed (${dest} is not a directory)"
+    return 1
+  fi
+  install -d -m 0700 "$dest" || return 1
+  chmod 0700 "$dest"
+  chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$dest" 2>/dev/null || true
+  local stamp path name target moved=0 failed=0
+  stamp=$(date +%Y%m%d-%H%M%S)
+  for path in "${files[@]}"; do
+    name=$(basename "$path")
+    target="${dest}/${name}"
+    [[ -e "$target" || -L "$target" ]] && target="${dest}/${stamp}-${name}"
+    if mv -n -- "$path" "$target" && [[ ! -e "$path" ]]; then
+      moved=$((moved + 1))
+      info "Moved ${path} -> ${target}"
+    else
+      failed=$((failed + 1))
+      warn "Could not move ${path}"
+    fi
+  done
+  if (( failed > 0 )); then
+    BX_LEFTOVERS_RESULT="moved ${moved}, failed ${failed} (to ${dest})"
+    return 1
+  fi
+  BX_LEFTOVERS_RESULT="moved ${moved} file(s) to ${dest}"
+  return 0
 }
 
 bitrix_perf_cache_dirs_state() {
@@ -847,6 +1113,23 @@ bitrix_restore_ready_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+# Host-wide part of the Bitrix PHP baseline: OPcache memory and the realpath
+# cache are set per PHP version (PHP_INI_SYSTEM), not per pool.
+bitrix_php_host_baseline_sync() {
+  local d ver
+  local -A seen=()
+  for d in "$@"; do
+    bitrix_prepare_site "$d" >/dev/null 2>&1 || continue
+    ver="${BX_PHP_VERSION:-}"
+    [[ -n "$ver" && "$ver" != none && -z "${seen[$ver]:-}" ]] || continue
+    seen[$ver]=1
+    if [[ "$(php_fpm_opcache_baseline_ensure "$ver")" == changed ]]; then
+      info "PHP ${ver}: OPcache baseline written to $(php_fpm_opcache_baseline_path "$ver")"
+    fi
+  done
+  return 0
+}
+
 bitrix_php_baseline_sync_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -890,6 +1173,7 @@ bitrix_php_baseline_sync_handler() {
   fi
 
   ui_header "SIMAI ENV · Bitrix PHP baseline sync"
+  bitrix_php_host_baseline_sync "${targets[@]}"
   local ok=0 fail=0 d
   local -a failed=()
   for d in "${targets[@]}"; do
@@ -899,7 +1183,14 @@ bitrix_php_baseline_sync_handler() {
       if bitrix_prepare_site "$d"; then
         local socket_project="${SITE_META[php_socket_project]:-${SITE_META[project]:-$(project_slug_from_domain "$d")}}"
         if [[ -n "${BX_PHP_VERSION:-}" && "${BX_PHP_VERSION:-none}" != "none" ]]; then
-          write_site_php_ini_overrides "$d" \
+          # Keep the site's other overrides; the baseline keys win.
+          local -A ini_kv=()
+          local ini_entry ini_key
+          while IFS= read -r ini_entry; do
+            [[ -z "$ini_entry" ]] && continue
+            ini_kv["${ini_entry%%|*}"]="${ini_entry#*|}"
+          done < <(read_site_php_ini_overrides "$d")
+          for ini_entry in \
             "short_open_tag|1" \
             "memory_limit|512M" \
             "max_input_vars|10000" \
@@ -908,7 +1199,20 @@ bitrix_php_baseline_sync_handler() {
             "post_max_size|64M" \
             "upload_max_filesize|64M" \
             "opcache.validate_timestamps|1" \
-            "opcache.revalidate_freq|0"
+            "opcache.revalidate_freq|0"; do
+            ini_kv["${ini_entry%%|*}"]="${ini_entry#*|}"
+          done
+          # PHP without date.timezone runs in UTC while MySQL uses the system
+          # zone; an existing site override is left as it is.
+          if [[ -z "${ini_kv[date.timezone]:-}" ]]; then
+            ini_kv["date.timezone"]=$(bitrix_host_timezone "$(resolve_php_bin "$BX_PHP_VERSION")")
+          fi
+          local -a ini_out=()
+          for ini_key in "${!ini_kv[@]}"; do
+            ini_out+=("${ini_key}|${ini_kv[$ini_key]}")
+          done
+          write_site_php_ini_overrides "$d" "${ini_out[@]}"
+          unset ini_kv
           if apply_site_php_ini_overrides_to_pool "$d" "$BX_PHP_VERSION" "$socket_project" "yes"; then
             ok=$((ok + 1))
           else
@@ -1098,6 +1402,11 @@ bitrix_perf_status_handler() {
     short_install=$(bitrix_dbconn_const_state "$BX_DBCONN_FILE" "SHORT_INSTALL")
   fi
   after_connect_state=$(bitrix_perf_after_connect_state "${BX_DOC_ROOT}/bitrix/php_interface/after_connect_d7.php")
+  # A restored .settings.php has no init_commands; the session modes in
+  # after_connect_d7.php cover them.
+  if [[ "$settings_present" == "yes" && "$settings_init_state" != "ready" && "$after_connect_state" == "ready" ]]; then
+    settings_init_state="ready (via after_connect_d7.php)"
+  fi
   if [[ -f "$BX_CRON_FILE" ]]; then
     cron_file_state="present"
     bitrix_cron_markers "$BX_CRON_FILE" "$BX_DOMAIN" "$BX_SLUG"
@@ -1310,11 +1619,58 @@ bitrix_finalize_handler() {
   local php_status="failed"
   local agents_status="failed"
   local ssl_status="skipped"
+  local step_failures=0
+
+  # Restore leftovers first: archive volumes, restore.php and the dump are
+  # downloadable from the docroot until they are moved out.
+  if ! bitrix_restore_leftovers_move "$BX_ROOT" "$BX_DOC_ROOT"; then
+    step_failures=$((step_failures + 1))
+    warn "Restore leftovers: ${BX_LEFTOVERS_RESULT}"
+  fi
+  local leftovers_status="$BX_LEFTOVERS_RESULT"
+
+  local php_bin
+  php_bin=$(resolve_php_bin "$BX_PHP_VERSION")
+  if ! bitrix_after_connect_session_modes_ensure "${BX_DOC_ROOT}/bitrix/php_interface/after_connect_d7.php" "$php_bin"; then
+    step_failures=$((step_failures + 1))
+    warn "after_connect_d7.php: ${BX_AFTER_CONNECT_RESULT}"
+  fi
+  local after_connect_status="$BX_AFTER_CONNECT_RESULT"
+
+  local db_charset="utf8mb4" db_collation="utf8mb4_unicode_ci"
+  if load_profile "bitrix" >/dev/null 2>&1; then
+    db_charset="${PROFILE_DB_CHARSET:-utf8mb4}"
+    db_collation="${PROFILE_DB_COLLATION:-utf8mb4_unicode_ci}"
+  fi
+  if ! bitrix_db_default_charset_ensure "$BX_DOMAIN" "$db_charset" "$db_collation"; then
+    step_failures=$((step_failures + 1))
+    warn "Database default charset: ${BX_DB_CHARSET_RESULT}"
+  fi
+  local db_charset_status="$BX_DB_CHARSET_RESULT"
+  local db_tables_status="$BX_DB_UTF8MB3_TABLES"
+  if [[ "$db_tables_status" =~ ^[0-9]+$ ]] && (( db_tables_status > 0 )); then
+    info "${db_tables_status} table(s) still use utf8mb3; they are not converted (only the database default changed)."
+    db_tables_status="${db_tables_status} (not converted)"
+  fi
+
+  local tz_before="" tz_after="" entry
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == "date.timezone" ]] && tz_before="${entry#*|}"
+  done < <(read_site_php_ini_overrides "$BX_DOMAIN")
   if run_command bitrix php-baseline-sync --domain "$BX_DOMAIN"; then
     php_status="ok"
   else
     error "Bitrix PHP baseline sync failed for ${BX_DOMAIN}"
     return 1
+  fi
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == "date.timezone" ]] && tz_after="${entry#*|}"
+  done < <(read_site_php_ini_overrides "$BX_DOMAIN")
+  local tz_status="not set"
+  if [[ -n "$tz_after" && -n "$tz_before" ]]; then
+    tz_status="${tz_after} (kept site override)"
+  elif [[ -n "$tz_after" ]]; then
+    tz_status="${tz_after} (set from host)"
   fi
 
   if run_command bitrix agents-sync --domain "$BX_DOMAIN" --apply yes --confirm yes; then
@@ -1345,6 +1701,11 @@ bitrix_finalize_handler() {
   ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Web state|${web_state}" \
+    "Restore leftovers|${leftovers_status}" \
+    "after_connect_d7.php|${after_connect_status}" \
+    "Database default charset|${db_charset_status}" \
+    "Tables still utf8mb3|${db_tables_status}" \
+    "PHP date.timezone|${tz_status}" \
     "PHP baseline|${php_status}" \
     "Agents sync|${agents_status}" \
     "SSL|${ssl_status}"
@@ -1352,6 +1713,10 @@ bitrix_finalize_handler() {
   ui_kv "Bitrix status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
   ui_kv "Checker" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/site_checker.php"
   ui_kv "Perfmon" "$(site_primary_url "$BX_DOMAIN")/bitrix/admin/perfmon_panel.php"
+  if (( step_failures > 0 )); then
+    error "Bitrix finalize finished with ${step_failures} failed step(s) for ${BX_DOMAIN}; see the table above."
+    return 1
+  fi
 }
 
 register_cmd "bitrix" "status" "Show Bitrix status" "bitrix_status_handler" "domain" "" "effects:read"

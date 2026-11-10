@@ -13,8 +13,19 @@ database and files use the `data` commands below.
 ## data
 Back up one site's database (`mysqldump --single-transaction`), project files
 and managed config into `/var/backups/simai/<domain>/<timestamp>/`
-(root-only, `SHA256SUMS` included). Caches, logs, `node_modules` and Bitrix
-`bitrix/backup` are excluded. Older backups beyond `--keep` are removed.
+(root-only, `SHA256SUMS` included). Caches, logs, `node_modules`, Bitrix
+`bitrix/backup` and `<site root>/restore-archive/` (the already compressed
+backup that `bitrix finalize` moves out of the docroot after a restore) are
+excluded. Older backups beyond `--keep` are removed.
+
+The heavy work (database dump and its compression, file archiving,
+encryption, checksums, and the checks of `data-verify`) runs at low priority:
+`nice -n 10` and, when `ionice` (util-linux) is available, the idle I/O class
+`ionice -c3`. This applies to manual, scheduled and panel backups alike, so
+sites and the panel stay responsive on small servers. Set
+`SIMAI_BACKUP_NICE=0..19` in `/etc/simai-env.conf` to change the CPU niceness
+(`0` keeps normal CPU priority). The database server's own work is not
+reniced, and `data-restore` imports run at normal priority.
 
 ```bash
 sudo /root/simai-env/simai-admin.sh backup data --domain example.com

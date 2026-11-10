@@ -53,6 +53,12 @@ Behavior:
 - installs PHP CLI/FPM and the standard common extension set when requested
 - validates `php-fpm`
 - enables and starts `php<version>-fpm`
+- sets `process_control_timeout = 10s` in the `[global]` section of
+  `/etc/php/<version>/fpm/php-fpm.conf` (validated with `php-fpm<version> -t`,
+  restored on failure), so a reload by the toolkit lets busy requests finish
+  instead of answering 502; a non-zero value set by an administrator stays.
+  The installer (`simai-env.sh`) does the same, and `self migrate` adds it on
+  existing hosts
 
 Typical use:
 ```bash

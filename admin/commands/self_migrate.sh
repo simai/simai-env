@@ -252,6 +252,48 @@ self_migrate_app_routes_charset() {
   return 0
 }
 
+# Bitrix sites rendered before 1.53.1 refused every ".default" folder as a
+# hidden file, so admin styles and scripts (tables, filters) did not load.
+self_migrate_bitrix_dot_default() {
+  local cfg domain backup
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" ]] || continue
+    grep -q '^# simai-nginx-template: bitrix$' "$cfg" || continue
+    grep -qF 'location ~ /\.(?!well-known/) {' "$cfg" || continue
+    domain=$(basename "$cfg" .conf)
+    backup="${cfg}.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$cfg" "$backup" || continue
+    sed -i 's#location ~ /\\.(?!well-known/) {#location ~ /\\.(?!well-known/|default/) {#' "$cfg"
+    if grep -qF 'location ~ /\.(?!well-known/|default/) {' "$cfg" && nginx -t >>"$LOG_FILE" 2>&1; then
+      SELF_MIGRATE_CHANGES+=("${domain}: Bitrix .default folders served (admin styles and scripts)")
+      SELF_MIGRATE_RELOAD_NGINX=1
+    else
+      cp -p "$backup" "$cfg"
+      warn "Could not allow .default folders in ${cfg}; previous configuration restored"
+    fi
+  done
+  return 0
+}
+
+# Hosts set up by earlier releases: an FPM reload killed busy workers (nginx
+# answered 502), and Bitrix hosts ran with the default OPcache memory.
+self_migrate_php_fpm_host() {
+  local ver
+  while IFS= read -r ver; do
+    [[ -n "$ver" ]] || continue
+    if [[ "$(php_fpm_process_control_timeout_ensure "$ver")" == changed ]]; then
+      SELF_MIGRATE_CHANGES+=("php${ver}-fpm: busy requests finish on reload (process_control_timeout ${PHP_FPM_PROCESS_CONTROL_TIMEOUT})")
+    fi
+  done < <(php_fpm_host_versions)
+  while IFS= read -r ver; do
+    [[ -n "$ver" ]] || continue
+    if [[ "$(php_fpm_opcache_baseline_ensure "$ver")" == changed ]]; then
+      SELF_MIGRATE_CHANGES+=("php ${ver}: OPcache baseline for Bitrix sites ($(php_fpm_opcache_baseline_path "$ver"))")
+    fi
+  done < <(php_fpm_bitrix_versions)
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -271,10 +313,12 @@ self_migrate_handler() {
   self_migrate_static_charset
   self_migrate_static_font_cors
   self_migrate_app_routes_charset
+  self_migrate_bitrix_dot_default
   if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
     os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the static site migrations"
   fi
   self_migrate_nginx_hardening
+  self_migrate_php_fpm_host
   self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"

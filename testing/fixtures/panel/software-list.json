@@ -48,7 +48,7 @@
         "package": null,
         "installed": false,
         "version": null,
-        "candidate": "2.4.58-1ubuntu8.17",
+        "candidate": "2.4.58-1ubuntu8.18",
         "update": false,
         "service": null,
         "unit": "apache2",
@@ -604,7 +604,7 @@
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 1964
+      "index_age_seconds": 3796
     }
   },
   "command_status": "success",

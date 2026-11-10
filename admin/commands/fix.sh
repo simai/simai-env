@@ -164,6 +164,11 @@ site_fix_handler() {
     key="${parsed%%|*}"; expected="${parsed#*|}"
     actual=$(doctor_php_ini_effective_get "$php_bin" "$pool_file" "$key" || true)
     cmp=$(doctor_compare_ini "$key" "$expected" "$actual")
+    # A pool value cannot change these (shared OPcache memory of the version).
+    if [[ "$cmp" == bad ]] && php_fpm_master_only_key "$key"; then
+      warn "${key}=${actual} is set per PHP version, not per pool; apply: simai-admin.sh bitrix php-baseline-sync --domain ${domain} (Bitrix) or a conf.d file in /etc/php/${php_version}/fpm/conf.d"
+      continue
+    fi
     case "$cmp" in
       ok) ini_ok+=("${key}=${actual}") ;;
       bad) ini_to_apply+=("${key}|${expected}") ;;

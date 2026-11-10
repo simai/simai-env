@@ -1335,6 +1335,8 @@ EOF
     # site overrides (written before this block) still win.
     bitrix_profile_ini_block >>"$pool_file"
     site_ensure_bitrix_cli_ini "$php_version"
+    # OPcache memory is per PHP version (the reload below applies it).
+    php_fpm_opcache_baseline_ensure "$php_version" no >/dev/null || warn "OPcache baseline not applied for PHP ${php_version}"
     local clamd_sock=""
     if declare -F security_clamd_socket >/dev/null; then clamd_sock=$(security_clamd_socket); fi
     if [[ -n "$clamd_sock" ]]; then
@@ -3798,6 +3800,23 @@ bitrix_prepare_restore_writable_paths() {
   done
 }
 
+# Connection initialization written by the toolkit (preseed, or finalize
+# when the file is missing). Bitrix includes this file from the connection
+# object right after it connects.
+bitrix_after_connect_template() {
+  cat <<'EOF'
+<?php
+if (!class_exists('\Bitrix\Main\Application')) {
+    return;
+}
+
+$connection = \Bitrix\Main\Application::getConnection();
+$connection->queryExecute("SET SESSION sql_mode=''");
+$connection->queryExecute("SET SESSION innodb_strict_mode=0");
+$connection->queryExecute("SET SESSION collation_connection='utf8mb4_unicode_ci'");
+EOF
+}
+
 bitrix_write_db_preseed_files() {
   local domain="$1" doc_root="$2" overwrite="${3:-no}" short_install="${4:-yes}" write_dbconn="${5:-yes}"
   local db_name="" db_user="" db_pass="" db_host="localhost"
@@ -3902,17 +3921,7 @@ if (!defined("SHORT_INSTALL")) {
 EOF
   fi
 
-  cat >"$tmp_after_connect" <<'EOF'
-<?php
-if (!class_exists('\Bitrix\Main\Application')) {
-    return;
-}
-
-$connection = \Bitrix\Main\Application::getConnection();
-$connection->queryExecute("SET SESSION sql_mode=''");
-$connection->queryExecute("SET SESSION innodb_strict_mode=0");
-$connection->queryExecute("SET SESSION collation_connection='utf8mb4_unicode_ci'");
-EOF
+  bitrix_after_connect_template >"$tmp_after_connect"
 
   if ! php -l "$tmp_settings" >/dev/null 2>&1 \
     || ! php -l "$tmp_after_connect" >/dev/null 2>&1; then
@@ -3924,11 +3933,20 @@ EOF
     return 1
   fi
 
-  mv "$tmp_settings" "$settings_file"
-  if [[ "$write_dbconn" == "yes" ]]; then
-    mv "$tmp_dbconn" "$dbconn_file"
+  # Move every linted file into place; on any failure remove the temp files
+  # that are left so nothing leaks into /tmp.
+  local moved="yes"
+  mv -f "$tmp_settings" "$settings_file" || moved="no"
+  if [[ "$moved" == "yes" && "$write_dbconn" == "yes" ]]; then
+    mv -f "$tmp_dbconn" "$dbconn_file" || moved="no"
   fi
-  mv "$tmp_after_connect" "$after_connect_file"
+  if [[ "$moved" == "yes" ]]; then
+    mv -f "$tmp_after_connect" "$after_connect_file" || moved="no"
+  fi
+  if [[ "$moved" != "yes" ]]; then
+    rm -f "$tmp_settings" "$tmp_dbconn" "$tmp_after_connect"
+    return 1
+  fi
   local -a written_files=("$settings_file" "$after_connect_file")
   [[ "$write_dbconn" == "yes" ]] && written_files+=("$dbconn_file")
   chmod 0640 "${written_files[@]}"

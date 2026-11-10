@@ -37,6 +37,31 @@ backup_data_validate_offsite() {
   fi
 }
 
+# Heavy backup work (archiving, compression, dumps, checksums, checks) runs
+# at low CPU and I/O priority so the sites and the panel stay responsive.
+# SIMAI_BACKUP_NICE: 0-19 (default 10; 0 keeps normal CPU priority). ionice
+# (util-linux) is used when present and allowed, otherwise silently skipped.
+# Each process of a pipeline is wrapped on its own, so exit codes and
+# pipefail checks stay as they were.
+backup_data_lowprio_init() {
+  [[ "${BACKUP_LOWPRIO_READY:-0}" == 1 ]] && return 0
+  BACKUP_LOWPRIO=()
+  local n="${SIMAI_BACKUP_NICE:-10}"
+  if [[ "$n" =~ ^[0-9]{1,2}$ ]] && (( 10#$n <= 19 )); then n=$((10#$n)); else n=10; fi
+  if (( n > 0 )) && nice -n "$n" true >/dev/null 2>&1; then
+    BACKUP_LOWPRIO+=(nice -n "$n")
+  fi
+  if command -v ionice >/dev/null 2>&1 && ionice -c3 true >/dev/null 2>&1; then
+    BACKUP_LOWPRIO+=(ionice -c3)
+  fi
+  BACKUP_LOWPRIO_READY=1
+}
+
+backup_lowprio() {
+  backup_data_lowprio_init
+  ${BACKUP_LOWPRIO[@]+"${BACKUP_LOWPRIO[@]}"} "$@"
+}
+
 backup_data_dump_cli() {
   mysql_root_detect_cli || return 1
   BACKUP_DATA_DUMP_CLI=("${MYSQL_ROOT_CLI[@]}")
@@ -45,7 +70,9 @@ backup_data_dump_cli() {
 
 backup_data_file_excludes() {
   local profile="$1"
-  printf '%s\n' './.git' '*/node_modules' './storage/logs' './storage/framework/cache' \
+  # restore-archive: an already compressed backup kept next to the docroot
+  # after a restore; packing it again only doubles the size and the load.
+  printf '%s\n' './.git' './restore-archive' '*/node_modules' './storage/logs' './storage/framework/cache' \
     './storage/framework/sessions' './storage/framework/views'
   if [[ "$profile" == "bitrix" ]]; then
     printf '%s\n' './public/bitrix/cache' './public/bitrix/managed_cache' './public/bitrix/stack_cache' \
@@ -62,11 +89,11 @@ backup_data_dump_db() {
   backup_data_dump_cli || return 1
   local rc=0
   if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
-    MYSQL_PWD="$MYSQL_ROOT_PWD" "${BACKUP_DATA_DUMP_CLI[@]}" --single-transaction --quick --routines --triggers \
-      --events --hex-blob --no-tablespaces --default-character-set=utf8mb4 "$db_name" 2>>"$LOG_FILE" | gzip -c >"$out" || rc=$?
+    MYSQL_PWD="$MYSQL_ROOT_PWD" backup_lowprio "${BACKUP_DATA_DUMP_CLI[@]}" --single-transaction --quick --routines --triggers \
+      --events --hex-blob --no-tablespaces --default-character-set=utf8mb4 "$db_name" 2>>"$LOG_FILE" | backup_lowprio gzip -c >"$out" || rc=$?
   else
-    "${BACKUP_DATA_DUMP_CLI[@]}" --single-transaction --quick --routines --triggers \
-      --events --hex-blob --no-tablespaces --default-character-set=utf8mb4 "$db_name" 2>>"$LOG_FILE" | gzip -c >"$out" || rc=$?
+    backup_lowprio "${BACKUP_DATA_DUMP_CLI[@]}" --single-transaction --quick --routines --triggers \
+      --events --hex-blob --no-tablespaces --default-character-set=utf8mb4 "$db_name" 2>>"$LOG_FILE" | backup_lowprio gzip -c >"$out" || rc=$?
   fi
   return "$rc"
 }
@@ -88,7 +115,7 @@ backup_data_archive_files() {
     done
   fi
   local rc=0
-  tar -czf "$out" --warning=no-file-changed --warning=no-file-removed "${excludes[@]}" -C "$root" . 2>>"$LOG_FILE" || rc=$?
+  backup_lowprio tar -czf "$out" --warning=no-file-changed --warning=no-file-removed "${excludes[@]}" -C "$root" . 2>>"$LOG_FILE" || rc=$?
   # GNU tar exits 1 when files changed while being read on a live site.
   (( rc == 0 || rc == 1 ))
 }
@@ -108,14 +135,14 @@ backup_data_encrypt() {
   command -v age >/dev/null 2>&1 || { error "age is not installed (apt-get install age)"; return 1; }
   for f in db.sql.gz files.tar.gz config.tar.gz; do
     [[ -f "${dir}/${f}" ]] || continue
-    age -r "$recipient" -o "${dir}/${f}.age" "${dir}/${f}" || return 1
+    backup_lowprio age -r "$recipient" -o "${dir}/${f}.age" "${dir}/${f}" || return 1
     rm -f -- "${dir:?}/${f}"
   done
 }
 
 backup_data_write_checksums() {
   local dir="$1"
-  (cd "$dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | xargs -r sha256sum >SHA256SUMS)
+  (cd "$dir" && find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | backup_lowprio xargs -r sha256sum >SHA256SUMS)
 }
 
 # Backup directories live under the default destination or the one the
@@ -232,6 +259,7 @@ backup_data_run() {
   dir="${domain_dir}/${ts}"
   install -d -m 0700 "$dir" || return 1
 
+  backup_data_lowprio_init
   ui_header "SIMAI ENV · Data backup"
   local failed=""
   if [[ -n "$db_name" ]]; then
@@ -318,14 +346,15 @@ backup_data_verify_dir() {
   validate_path "$dir" || return 1
   [[ -f "${dir}/SHA256SUMS" ]] || { error "SHA256SUMS not found in ${dir}"; return 1; }
   ui_header "SIMAI ENV · Verify data backup"
-  (cd "$dir" && sha256sum --quiet -c SHA256SUMS) || { error "Checksum mismatch in ${dir}"; return 1; }
+  backup_data_lowprio_init
+  (cd "$dir" && backup_lowprio sha256sum --quiet -c SHA256SUMS) || { error "Checksum mismatch in ${dir}"; return 1; }
   echo "PASS checksums"
   if [[ -f "${dir}/db.sql.gz" ]]; then
-    gzip -t "${dir}/db.sql.gz" || { error "db.sql.gz is corrupt"; return 1; }
+    backup_lowprio gzip -t "${dir}/db.sql.gz" || { error "db.sql.gz is corrupt"; return 1; }
     echo "PASS db.sql.gz integrity"
   fi
   if [[ -f "${dir}/files.tar.gz" ]]; then
-    tar -tzf "${dir}/files.tar.gz" >/dev/null || { error "files.tar.gz is corrupt"; return 1; }
+    backup_lowprio tar -tzf "${dir}/files.tar.gz" >/dev/null || { error "files.tar.gz is corrupt"; return 1; }
     echo "PASS files.tar.gz integrity"
   fi
   [[ "${restore_test,,}" == auto && -f "${dir}/db.sql.gz" ]] && restore_test=yes
@@ -351,9 +380,9 @@ backup_data_verify_dir() {
     mysql_root_exec_stdin "CREATE DATABASE \`${scratch}\` CHARACTER SET utf8mb4;" || { error "Cannot create scratch database"; return 1; }
     local rc=0 tables=0
     if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
-      gzip -dc "${dir}/db.sql.gz" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
+      backup_lowprio gzip -dc "${dir}/db.sql.gz" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
     else
-      gzip -dc "${dir}/db.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
+      backup_lowprio gzip -dc "${dir}/db.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
     fi
     tables=$(mysql_root_query_stdin "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${scratch}'" || echo 0)
     mysql_root_exec_stdin "DROP DATABASE \`${scratch}\`;" || warn "Drop scratch database ${scratch} manually"

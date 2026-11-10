@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=29
+FIXTURE_SET=30
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -63,6 +63,7 @@ command -v sshd >/dev/null || { apt-get update -qq >/dev/null; apt-get install -
 systemctl enable --now ssh >/dev/null 2>&1 || true
 [[ -f /root/stand-owner ]] || ssh-keygen -q -t ed25519 -N '' -C stand-owner -f /root/stand-owner
 cli profile enable --id redirect --confirm yes
+cli profile enable --id bitrix --confirm yes
 ./simai-admin.sh owner list 2>/dev/null | grep -q demo || cli owner create --name demo --pubkey-file /root/stand-owner.pub --confirm yes
 site() { [[ -f "/etc/nginx/sites-available/$1.conf" ]] || cli site add --domain "$@" --confirm yes; }
 site demo-static.test --profile static
@@ -257,6 +258,7 @@ FW
     "self-profiles.owner-demo|\"demo\"|self:profiles|{}"
     "plan.site-add-proxy|null|site:add|{\"domain\":\"demo-proxy.test\",\"profile\":\"proxy\",\"upstream-port\":\"3000\",\"websockets\":\"yes\"}"
     "plan.site-add-bitrix|null|site:add|{\"domain\":\"demo-bitrix.test\",\"profile\":\"bitrix\",\"bitrix-files\":\"setup\"}"
+    "plan.site-add-disabled-profile|null|site:add|{\"domain\":\"demo-wp.test\",\"profile\":\"wordpress\"}"
     "refused.owner-scope.access-create-project|\"demo\"|access:create-project|{\"domain\":\"demo-php.test\",\"login\":\"x-staff\",\"pubkey\":\"${key}\"}"
   )
   # An owner is refused on another owner's site, for every site command.
