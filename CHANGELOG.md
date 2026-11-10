@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 1.54.1 - 2026-11-10
+
+- Larena Panel 0.4.3: while the server does not answer in time, panel pages
+  show its last answers under a "silent since" line.
+
+- The installer sets PHP-FPM `process_control_timeout = 10s` on a new
+  server too (existing servers already get it from `self migrate`).
+
 ## 1.54.0 - 2026-11-10
 
 - Bitrix sites: nginx refused every `.default` folder as a hidden file, so

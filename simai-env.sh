@@ -46,6 +46,7 @@ source "${SCRIPT_DIR}/lib/site_metadata.sh"
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
 source "${SIMAI_ENV_ROOT}/admin/lib/scheduler_utils.sh"
+source "${SIMAI_ENV_ROOT}/admin/lib/php_fpm_host.sh"
 if [[ -f /etc/simai-env.conf ]]; then
   # shellcheck disable=SC1091
   source /etc/simai-env.conf
@@ -579,6 +580,7 @@ install_php_stack() {
     PHP_BIN=$(command -v php || echo "/usr/bin/php")
   fi
   os_svc_enable_now "php${PHP_VERSION}-fpm" || true
+  php_fpm_process_control_timeout_ensure "$PHP_VERSION" >/dev/null || warn "process_control_timeout not set for php${PHP_VERSION}-fpm"
 }
 
 install_nginx() {
