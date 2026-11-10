@@ -6,11 +6,11 @@
   "data": {
     "schema": "simai-site-check/1",
     "id": "bitrix.db-charset",
-    "state": "ok",
-    "detail": "utf8mb4/utf8mb4_unicode_ci",
+    "state": "needed",
+    "detail": "utf8mb3/utf8mb3_general_ci (expected utf8mb4/utf8mb4_unicode_ci)",
     "title": "Bitrix database default charset",
     "plan": "Set the database default to the profile charset (tables are not converted).",
-    "refusal": "check_ok"
+    "refusal": null
   },
   "command_status": "success",
   "operation_id": "fixture"

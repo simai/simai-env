@@ -8,9 +8,9 @@
     "profile": "bitrix",
     "status": "FAIL",
     "summary": {
-      "PASS": 43,
-      "WARN": 3,
-      "FAIL": 10,
+      "PASS": 39,
+      "WARN": 4,
+      "FAIL": 13,
       "SKIP": 2
     },
     "checks": [
@@ -58,19 +58,19 @@
       },
       {
         "id": 8,
-        "status": "PASS",
+        "status": "FAIL",
         "area": "fs",
         "title": "Writable path"
       },
       {
         "id": 9,
-        "status": "PASS",
+        "status": "FAIL",
         "area": "fs",
         "title": "Writable path"
       },
       {
         "id": 10,
-        "status": "PASS",
+        "status": "FAIL",
         "area": "fs",
         "title": "Writable path"
       },
@@ -130,33 +130,33 @@
       },
       {
         "id": 18,
-        "status": "PASS",
+        "status": "WARN",
         "area": "rules",
         "title": "Bitrix MySQL session modes",
         "key": "bitrix.db-session-modes",
         "fix": "bitrix.db-session-modes",
-        "since": null,
-        "detail": "sql_mode and innodb_strict_mode set"
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "after_connect_d7.php: partial"
       },
       {
         "id": 19,
-        "status": "PASS",
+        "status": "WARN",
         "area": "rules",
         "title": "Bitrix database default charset",
         "key": "bitrix.db-charset",
         "fix": "bitrix.db-charset",
-        "since": null,
-        "detail": "utf8mb4/utf8mb4_unicode_ci"
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "utf8mb3/utf8mb3_general_ci (expected utf8mb4/utf8mb4_unicode_ci)"
       },
       {
         "id": 20,
-        "status": "WARN",
+        "status": "PASS",
         "area": "rules",
         "title": "Bitrix PHP time zone",
         "key": "bitrix.timezone",
         "fix": "bitrix.timezone",
-        "since": "2026-01-01T00:00:00Z",
-        "detail": "PHP UTC, server and MySQL Etc/UTC"
+        "since": null,
+        "detail": "UTC"
       },
       {
         "id": 21,

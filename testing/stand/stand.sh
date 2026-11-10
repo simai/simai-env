@@ -356,7 +356,7 @@ FW
   bx_status bitrix-status.run-restore
   # What the restore wizard leaves: an installed database with a utf8mb3
   # default, the archive's own after_connect_d7.php, files in the web root.
-  in_stand bash -s "$B" "$bx" <<'BX' >/dev/null 2>&1
+  docker exec -i "$NAME" bash -s "$B" "$bx" <<'BX' >/dev/null 2>&1
 B=$1 bx=$2
 db=$(sed -n 's/^DB_NAME=//p' "/etc/simai-env/sites/$B/db.env")
 mysql -e "CREATE TABLE IF NOT EXISTS \`$db\`.b_user (ID INT PRIMARY KEY); INSERT IGNORE INTO \`$db\`.b_user VALUES (1); ALTER DATABASE \`$db\` COLLATE utf8mb3_general_ci;"

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 1.55.1 - 2026-11-10
+
+- `bitrix.timezone` warned when PHP said `UTC` and the server `Etc/UTC`
+  (one zone, two names).
+- Fixture set 31 re-recorded: the restored-site step of the recording did
+  not run in 1.55.0, so `bitrix-status.finalize`, `bitrix-status.done`,
+  `plan.site-check-fix`, `job-site-check-fix*` and the Bitrix doctor answer
+  showed the wrong state.
+
 ## 1.55.0 - 2026-11-10
 
 - Profile rules with a one-click fix. `site doctor` reports Bitrix rules

@@ -54,11 +54,16 @@ sed -i 's#location ~ /\\.(?!well-known/|default/) {#location ~ /\\.(?!well-known
 rm -f "$opc"; systemctl reload php8.3-fpm 2>/dev/null || true
 sed -i '/process_control_timeout/d' "$fpm"
 cli site php-ini-unset --domain "$D" --name date.timezone --apply yes --confirm yes >/dev/null 2>&1 || true
-# Server zone Europe/Moscow (MySQL follows it); PHP left at its UTC default.
-ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime && echo Europe/Moscow >/etc/timezone
 # No time zone anywhere PHP-FPM reads (php.ini, conf.d, the pool).
 grep -rlE '^[[:space:]]*date\.timezone' /etc/php/8.3/fpm | xargs -r sed -i -E '/^[[:space:]]*date\.timezone/d'
 sed -i '/date.timezone/d' /etc/php/8.3/fpm/pool.d/bxchecks-test.conf
+# UTC under another name is the same zone.
+settz() { timedatectl set-timezone "$1" 2>/dev/null || { ln -sf "/usr/share/zoneinfo/$1" /etc/localtime && echo "$1" >/etc/timezone; }; }
+settz Etc/UTC
+[[ "$(cli site check-state --domain "$D" --id bitrix.timezone --output json 2>/dev/null | j "d['data']['state']")" == ok ]] \
+  && ok 'PHP UTC and server Etc/UTC agree' || bad 'UTC alias'
+# Server zone Europe/Moscow (MySQL follows it); PHP left at its UTC default.
+settz Europe/Moscow
 
 s=$(cli bitrix status --domain "$D" --output json 2>/dev/null)
 [[ "$(j "d['data']['step']" <<<"$s")" == finalize ]] && ok 'restored site: step finalize' || bad "finalize step: ${s:0:600}"

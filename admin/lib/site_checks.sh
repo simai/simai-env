@@ -115,6 +115,14 @@ bitrix_db_default_charset_state() {
   fi
 }
 
+# UTC has several names (Etc/UTC from timedatectl, UTC from PHP).
+site_check_tz_canonical() {
+  case "$1" in
+    UTC|Etc/UTC|Etc/UCT|UCT|Etc/Universal|Universal|Etc/Zulu|Zulu|GMT|Etc/GMT|Etc/GMT0|Etc/GMT+0|Etc/GMT-0|GMT0|Greenwich|Etc/Greenwich) echo UTC ;;
+    *) echo "$1" ;;
+  esac
+}
+
 php_fpm_process_control_timeout_get() {
   local conf="/etc/php/$1/fpm/php-fpm.conf"
   [[ -f "$conf" ]] || return 1
@@ -201,7 +209,7 @@ site_check_state() {
       host=$(bitrix_host_timezone "$(resolve_php_bin "$SC_PHP")")
       if [[ -n "$own" ]]; then
         SC_STATE="ok"; SC_DETAIL="${own} (site setting)"
-      elif [[ -n "$have" && "$have" == "$host" ]]; then
+      elif [[ -n "$have" && "$(site_check_tz_canonical "$have")" == "$(site_check_tz_canonical "$host")" ]]; then
         SC_STATE="ok"; SC_DETAIL="$have"
       else
         SC_STATE="needed"; SC_DETAIL="PHP ${have:-UTC}, server and MySQL ${host}"

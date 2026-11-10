@@ -3,7 +3,7 @@
   "set_version": 31,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.55.0",
+  "simai_env": "1.55.1",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -18,11 +18,11 @@
       "status": "ok"
     },
     "bitrix-status.done.json": {
-      "sha256": "665989d4a5dae45a96cbc13e33c05dbdf974182c9b54a90a3095357783af004e",
+      "sha256": "4bc75733da3580bb8be3561baa0d31177939b58e1dbe5d5e06cd303f0755aeb1",
       "status": "ok"
     },
     "bitrix-status.finalize.json": {
-      "sha256": "df847860be81aef71ce2477d61cba8c99d52613986258bb4e75016fe97af93ed",
+      "sha256": "d2261f884ebc60197535250478881eefc7639ffbe946bbb301d531e45401a7b8",
       "status": "ok"
     },
     "bitrix-status.prepare.json": {
@@ -42,7 +42,7 @@
       "status": "ok"
     },
     "change-status.json": {
-      "sha256": "7e13231817220d5dba4f05838d3fa36bd150e5c16625a107bab03f1bd0ae4799",
+      "sha256": "af00336307ce9e9855db7e1dbd855627309910c9aab2c71c5a1b0a7981632619",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -62,15 +62,15 @@
       "status": "ok"
     },
     "file-list.demo-owned.test.json": {
-      "sha256": "c82d459cab53c16016d849a355379b94cf2fcd31f6a3d327e5080d1c3d8deac6",
+      "sha256": "30cea268b652dabb0f583531bafc24876a544420f139f053205f5f950761b89f",
       "status": "ok"
     },
     "file-stat.demo-owned.test.json": {
-      "sha256": "9ad411d8c5ce5ae43362db3e8f4ea06773523f2e5116225974ffd39076f9af87",
+      "sha256": "69ea21a062cd33b7520b165fa5f8cf79ad62a263a0cb65ce91560b48fba32e86",
       "status": "ok"
     },
     "firewall-status.json": {
-      "sha256": "f55938ed920f72ed71d081cee7ab823d611d99652e103e3e2d823b5a708470fb",
+      "sha256": "e7ff87f3310381fdb718877fc7eddc63ad18496e1974b21b159b94441c0ee6b3",
       "status": "ok"
     },
     "job-log.json": {
@@ -78,12 +78,12 @@
       "status": "ok"
     },
     "job-site-check-fix-status.json": {
-      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
-      "status": "refused"
+      "sha256": "628fdae7a45c541d7d9c019d3a5ecc85292d1fe3babd821351b0e25938e03c5e",
+      "status": "ok"
     },
     "job-site-check-fix.json": {
-      "sha256": "2e72107c1c749a539d33dcb401aed0a0ff06a0d3eb596533fa7726b65cca831f",
-      "status": "refused"
+      "sha256": "9e74f122e044b82d6e5cd4911f9e4eb33feedbe499be028e256031af00354719",
+      "status": "ok"
     },
     "job-site-name-add-status.json": {
       "sha256": "47d210b5ad9a4b05043d37a7033e8665dd78cb12627f805650a7a93e20fb4457",
@@ -174,7 +174,7 @@
       "status": "ok"
     },
     "plan.change-confirm.json": {
-      "sha256": "170c72009661056008a9f1a6a7a0d89981f86828a0ddb4098a0b34b325c99f2c",
+      "sha256": "39a40be0760bce97b84f20ba343c06a1e7d099b1d341fcae2c340006d2f53564",
       "status": "ok"
     },
     "plan.cron-job-add.json": {
@@ -286,7 +286,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "bcd6d029801ae2cc5aab0a1322d342cb9af570b191ea469db4b5fa42479486f2",
+      "sha256": "9c311820e0c821aede1c5030d6b3cd65f0428fb14bae1ba558a36563cb47e240",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -322,8 +322,8 @@
       "status": "ok"
     },
     "plan.site-check-fix.json": {
-      "sha256": "1505dfd4294772fedddd11720a6b6bb9ff859182706aba6c9b1cb35fb578cafe",
-      "status": "refused"
+      "sha256": "d0bc24166f424aec415c3897396ca83b945129d2e49dc2004d2af86a317e3913",
+      "status": "ok"
     },
     "plan.site-db-rotate.json": {
       "sha256": "4aee0d8a00a05d8b77beb33eeebc735f7af8b6ea2e382dacdbc1389a029c1ba7",
@@ -366,7 +366,7 @@
       "status": "ok"
     },
     "plan.software-update.json": {
-      "sha256": "15f5167915d4244d56f938e4fb8971a736b537095e25eec5d425b4c1c2a54951",
+      "sha256": "d710063f263e3d5d8e2caf2a15f88c2cd16e807097a51554a72fcf73197c362e",
       "status": "ok"
     },
     "plan.ssl-dns-credentials.json": {
@@ -542,7 +542,7 @@
       "status": "ok"
     },
     "security-status.json": {
-      "sha256": "aeb326354ba42e0c7705293063eb70499ed5daf684a97f4e2f0e27f660797d6e",
+      "sha256": "93132c6567843e28c256aaa23983e74f5f904444b50ae75523d56057f52cc262",
       "status": "ok"
     },
     "self-alerts.json": {
@@ -558,11 +558,11 @@
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "7034d13d1f8bc55e8da6f505be9c3f20c8d46f5d8a273d1394cacd8ef56a55fc",
+      "sha256": "b3803078c00892af024d779566aa61f1d3545bafaea71bf18f4ba61ff34cfff7",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "23d1c4332d93fa993a38fdb68a41332f3aa6d703f4ee9e98e17894da78090e44",
+      "sha256": "056edd55474f3fb12eeca7e4fc58e4aa2a895629d1acc5d657d2b8e08b695d13",
       "status": "ok"
     },
     "self-metrics-history.hour.json": {
@@ -590,7 +590,7 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "309ddc0be952102bd3398e968b4342802e16270e02cc92dd97e5722e4bf63649",
+      "sha256": "6e5b5ec1d9edfc72ca1f76bf1225ec0f265e9c2752ffdf2de66423fdcdc51fe6",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
@@ -606,7 +606,7 @@
       "status": "ok"
     },
     "site-check-state.bitrix-db-charset.json": {
-      "sha256": "4fd76b18e379824e253e2f6ec0385885d0e28630a247a78f8626fc8ce0047a95",
+      "sha256": "0bf24a6efa0dd2b01b7e468ad819f5f3b9751f79fbc88aa87e550640e8ec246d",
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {
@@ -614,7 +614,7 @@
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "9e7ddb36313bfd9bb48678acd6847edcc5e6e82c29a50dc21a58fa5d673f1c6a",
+      "sha256": "e43756930ea381001d642325bb2031edf9a3f0fdae6b968b55701b8fe5fbbdda",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
@@ -622,11 +622,11 @@
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "289162b9949643d2b1a80c7fd130a5169914c0b77b6129d9f2b5131219694393",
+      "sha256": "89d40b23c85dd199df6231e9a736d2d154bc916baec24d396af024ef76f13395",
       "status": "ok"
     },
     "site-doctor.demo-bitrix.test.json": {
-      "sha256": "ac79d0f637add20ce5176385615bd70186b5d08c0508db1dba9381ddf8b5c22b",
+      "sha256": "85be19ad29ee9864471ec414727f2216c11abacca850b3557a3ecfc3750e4ad3",
       "status": "ok"
     },
     "site-doctor.demo-owned.test.json": {
@@ -662,7 +662,7 @@
       "status": "ok"
     },
     "software-list.json": {
-      "sha256": "3ae9c4ff8998088830288adf589ee42be7158cb55dde62c118413db9301bdec0",
+      "sha256": "0d93be1492834025565ce058d13163feec8eaee37df591255c3324001c609985",
       "status": "ok"
     },
     "ssl-dns-status.json": {

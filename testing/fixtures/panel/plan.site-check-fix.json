@@ -1,6 +1,25 @@
 {
   "schema": "simai-panel-answer/1",
   "request_id": "fixture-plan.site-check-fix",
-  "status": "refused",
-  "reason": "check_ok"
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:check-fix",
+    "args": {
+      "domain": "demo-bitrix.test",
+      "id": "bitrix.db-session-modes"
+    },
+    "target": "demo-bitrix.test",
+    "description": "Fix one profile rule reported by site doctor (fix id from the report)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false,
+    "check": {
+      "id": "bitrix.db-session-modes",
+      "title": "Bitrix MySQL session modes",
+      "plan": "Append sql_mode='' and innodb_strict_mode=0 to bitrix/php_interface/after_connect_d7.php (existing lines stay).",
+      "detail": "after_connect_d7.php: partial",
+      "state": "needed"
+    }
+  }
 }
