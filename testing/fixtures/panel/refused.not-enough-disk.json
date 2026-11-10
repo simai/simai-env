@@ -5,11 +5,11 @@
   "reason": "not_enough_disk",
   "data": {
     "resources": {
-      "disk_free_bytes": 1394521817088,
+      "disk_free_bytes": 1394521354240,
       "needed_bytes": 32985348833280,
       "ram_mb": 14963,
-      "ram_min_mb": 0,
-      "ram_recommended_mb": 0,
+      "ram_min_mb": 1536,
+      "ram_recommended_mb": 4096,
       "ok": false,
       "refusal": "not_enough_disk",
       "warnings": []

@@ -44,6 +44,17 @@ PROFILE_ALLOW_PHP_SWITCH="yes"
 PROFILE_ALLOW_SHARED_POOL="no"
 PROFILE_ALLOW_DB_REMOVAL="yes"
 
+# Site creation routes of the panel wizard (self profiles; format in
+# lib/site_profiles.py). Step ids are the steps site status answers.
+PROFILE_ROUTES=("repo|yes|Deploy the application from a Git repository")
+PROFILE_ROUTE_REPO_INPUTS=("domain|yes|text" "php|no|choice" "db-engine|no|choice" "git|yes|url" "ref|yes|text")
+PROFILE_ROUTE_REPO_STEPS=("add|site:add||Create the site: PHP, database, scheduler" "deploy|site:deploy||Deploy the release from Git" "done|site:doctor||Check the site")
+
+# Server resources: memory below the minimum refuses site add and restore
+# plans, below the recommendation warns (MB, 0: no need).
+PROFILE_MIN_RAM_MB="512"
+PROFILE_RECOMMENDED_RAM_MB="1024"
+
 # Hooks (declarative placeholders)
 PROFILE_HOOKS_PRE_CREATE=()
 PROFILE_HOOKS_POST_CREATE=()

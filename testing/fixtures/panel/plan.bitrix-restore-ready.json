@@ -14,11 +14,11 @@
     "lock": "site",
     "applied": false,
     "resources": {
-      "disk_free_bytes": 1394521845760,
+      "disk_free_bytes": 1394521382912,
       "needed_bytes": 483,
       "ram_mb": 14963,
-      "ram_min_mb": 0,
-      "ram_recommended_mb": 0,
+      "ram_min_mb": 1536,
+      "ram_recommended_mb": 4096,
       "ok": true,
       "refusal": null,
       "warnings": []

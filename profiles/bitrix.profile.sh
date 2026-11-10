@@ -43,6 +43,21 @@ PROFILE_ALLOW_PHP_SWITCH="yes"
 PROFILE_ALLOW_SHARED_POOL="no"
 PROFILE_ALLOW_DB_REMOVAL="yes"
 
+# Site creation routes of the panel wizard (self profiles; format in
+# lib/site_profiles.py). Step ids are the steps site status answers.
+PROFILE_ROUTES=("new|yes|New site: the Bitrix installer sets it up" "restore|yes|Restore from a Bitrix backup")
+PROFILE_ROUTE_NEW_INPUTS=("domain|yes|text" "php|no|choice")
+PROFILE_ROUTE_NEW_STEPS=("add|site:add|bitrix-files=setup|Create the site: PHP, database, scheduler, installer" "run_setup|open_url|installer_url|Install Bitrix in the browser" "finalize|bitrix:finalize||Finish the setup" "done|site:doctor||Check the site")
+PROFILE_ROUTE_RESTORE_INPUTS=("domain|yes|text" "php|no|choice" "archive|yes|file_on_server")
+PROFILE_ROUTE_RESTORE_STEPS=("add|site:add|bitrix-files=restore|Create the site: PHP, database, scheduler, restore.php" "upload|file:upload||Upload the backup archive to the site root" "validate|bitrix:restore-ready||Check the archive" "run_restore|open_url|restore_url|Restore the backup in the browser" "finalize|bitrix:finalize||Finish the setup" "done|site:doctor||Check the site")
+
+# Server resources: memory below the minimum refuses site add and restore
+# plans, below the recommendation warns (MB, 0: no need).
+# A restore unpacks the archive and imports the dump: a 2 GB server (it
+# reports about 1.9 GB) works with care, 4 GB is comfortable.
+PROFILE_MIN_RAM_MB="1536"
+PROFILE_RECOMMENDED_RAM_MB="4096"
+
 # Hooks (declarative placeholders)
 PROFILE_HOOKS_PRE_CREATE=()
 PROFILE_HOOKS_POST_CREATE=()

@@ -42,6 +42,11 @@ PROFILE_ALLOW_PHP_SWITCH="no"
 PROFILE_ALLOW_SHARED_POOL="yes"
 PROFILE_ALLOW_DB_REMOVAL="no"
 
+# Server resources: memory below the minimum refuses site add and restore
+# plans, below the recommendation warns (MB, 0: no need).
+PROFILE_MIN_RAM_MB="0"
+PROFILE_RECOMMENDED_RAM_MB="0"
+
 # Hooks (declarative placeholders)
 PROFILE_HOOKS_PRE_CREATE=()
 PROFILE_HOOKS_POST_CREATE=()

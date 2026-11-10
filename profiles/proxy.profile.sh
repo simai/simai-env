@@ -41,6 +41,17 @@ PROFILE_ALLOW_PHP_SWITCH="no"
 PROFILE_ALLOW_SHARED_POOL="no"
 PROFILE_ALLOW_DB_REMOVAL="no"
 
+# Site creation routes of the panel wizard (self profiles; format in
+# lib/site_profiles.py).
+PROFILE_ROUTES=("new|yes|Proxy the domain to a service on this host")
+PROFILE_ROUTE_NEW_INPUTS=("domain|yes|text" "upstream-port|yes|text" "upstream-path|no|text" "websockets|no|choice")
+PROFILE_ROUTE_NEW_STEPS=("add|site:add||Create the site" "done|site:doctor||Check the site")
+
+# Server resources: memory below the minimum refuses site add and restore
+# plans, below the recommendation warns (MB, 0: no need).
+PROFILE_MIN_RAM_MB="0"
+PROFILE_RECOMMENDED_RAM_MB="0"
+
 # Hooks (declarative placeholders)
 PROFILE_HOOKS_PRE_CREATE=()
 PROFILE_HOOKS_POST_CREATE=()

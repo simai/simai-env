@@ -80,7 +80,125 @@
             "description": "a daily data backup from the start"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "New site: the Bitrix installer sets it up",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP, database, scheduler, installer",
+                "command": "site:add",
+                "args": {
+                  "bitrix-files": "setup"
+                }
+              },
+              {
+                "id": "run_setup",
+                "title": "Install Bitrix in the browser",
+                "command": "open_url",
+                "url_from": "installer_url"
+              },
+              {
+                "id": "finalize",
+                "title": "Finish the setup",
+                "command": "bitrix:finalize",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          },
+          {
+            "id": "restore",
+            "title": "Restore from a Bitrix backup",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "archive",
+                "required": true,
+                "kind": "file_on_server"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP, database, scheduler, restore.php",
+                "command": "site:add",
+                "args": {
+                  "bitrix-files": "restore"
+                }
+              },
+              {
+                "id": "upload",
+                "title": "Upload the backup archive to the site root",
+                "command": "file:upload",
+                "args": {}
+              },
+              {
+                "id": "validate",
+                "title": "Check the archive",
+                "command": "bitrix:restore-ready",
+                "args": {}
+              },
+              {
+                "id": "run_restore",
+                "title": "Restore the backup in the browser",
+                "command": "open_url",
+                "url_from": "restore_url"
+              },
+              {
+                "id": "finalize",
+                "title": "Finish the setup",
+                "command": "bitrix:finalize",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "generic",
@@ -143,7 +261,115 @@
             "description": "a daily data backup from the start"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "New site: PHP and a database, upload the code yourself",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "create-db",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "yes",
+                  "no"
+                ],
+                "default": "yes"
+              },
+              {
+                "name": "db-engine",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "mysql"
+                ],
+                "default": "mysql"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP and a database",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          },
+          {
+            "id": "restore",
+            "title": "Restore from a files archive and an SQL dump",
+            "available": false,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "archive",
+                "required": true,
+                "kind": "file_on_server"
+              },
+              {
+                "name": "dump",
+                "required": true,
+                "kind": "file_on_server"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP and a database",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "upload",
+                "title": "Upload the files archive and the SQL dump",
+                "command": "file:upload",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "laravel",
@@ -205,7 +431,69 @@
             "description": "a daily data backup from the start"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "repo",
+            "title": "Deploy the application from a Git repository",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "db-engine",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "mysql"
+                ],
+                "default": "mysql"
+              },
+              {
+                "name": "git",
+                "required": true,
+                "kind": "url"
+              },
+              {
+                "name": "ref",
+                "required": true,
+                "kind": "text"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP, database, scheduler",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "deploy",
+                "title": "Deploy the release from Git",
+                "command": "site:deploy",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "proxy",
@@ -248,7 +536,59 @@
             "pattern": "^[a-z][a-z0-9_-]{0,31}$"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "Proxy the domain to a service on this host",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "upstream-port",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[1-9][0-9]{0,4}$",
+                "description": "port of the service on 127.0.0.1 (1-65535, not 80 or 443); nothing outside this host"
+              },
+              {
+                "name": "upstream-path",
+                "required": false,
+                "kind": "text",
+                "default": "/",
+                "pattern": "^/[A-Za-z0-9._~/-]{0,200}$"
+              },
+              {
+                "name": "websockets",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "yes",
+                  "no"
+                ],
+                "default": "no"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "redirect",
@@ -297,7 +637,65 @@
             "pattern": "^[a-z][a-z0-9_-]{0,31}$"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "Redirect the domain to another address",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "redirect-to",
+                "required": true,
+                "kind": "url",
+                "pattern": "^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$",
+                "description": "the origin every request goes to, such as https://example.com"
+              },
+              {
+                "name": "redirect-code",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "301",
+                  "302",
+                  "307",
+                  "308"
+                ],
+                "default": "301"
+              },
+              {
+                "name": "redirect-path",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "keep",
+                  "drop"
+                ],
+                "default": "keep",
+                "description": "keep: path and query go along; drop: every request goes to the target's root page"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "static",
@@ -329,7 +727,73 @@
             "description": "a daily data backup from the start"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "New site: upload the files with the file manager",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          },
+          {
+            "id": "repo",
+            "title": "Deploy a built archive as a release",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "archive",
+                "required": true,
+                "kind": "upload"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "deploy",
+                "title": "Deploy the archive",
+                "command": "site:deploy",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "wordpress",
@@ -391,7 +855,140 @@
             "description": "a daily data backup from the start"
           }
         ],
-        "routes": []
+        "routes": [
+          {
+            "id": "new",
+            "title": "New site: WordPress is installed automatically",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "title",
+                "required": true,
+                "kind": "text"
+              },
+              {
+                "name": "admin-user",
+                "required": true,
+                "kind": "text"
+              },
+              {
+                "name": "admin-email",
+                "required": true,
+                "kind": "text"
+              },
+              {
+                "name": "locale",
+                "required": false,
+                "kind": "text"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP, database, scheduler",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "prepare",
+                "title": "Install WordPress: core, configuration, administrator (password shown once)",
+                "command": "wp:install",
+                "args": {}
+              },
+              {
+                "id": "finalize",
+                "title": "Finish the setup",
+                "command": "wp:finalize",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          },
+          {
+            "id": "restore",
+            "title": "Restore from a files archive and an SQL dump",
+            "available": true,
+            "inputs": [
+              {
+                "name": "domain",
+                "required": true,
+                "kind": "text",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?)+$"
+              },
+              {
+                "name": "php",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "8.3"
+                ],
+                "default": "8.3"
+              },
+              {
+                "name": "files",
+                "required": true,
+                "kind": "file_on_server"
+              },
+              {
+                "name": "dump",
+                "required": true,
+                "kind": "file_on_server"
+              }
+            ],
+            "steps": [
+              {
+                "id": "add",
+                "title": "Create the site: PHP, database, scheduler",
+                "command": "site:add",
+                "args": {}
+              },
+              {
+                "id": "upload",
+                "title": "Put the files archive and the SQL dump into the site directory",
+                "command": "file:upload",
+                "args": {}
+              },
+              {
+                "id": "install",
+                "title": "Restore files and database, rewrite the site address",
+                "command": "wp:restore-ready",
+                "args": {}
+              },
+              {
+                "id": "finalize",
+                "title": "Finish the setup",
+                "command": "wp:finalize",
+                "args": {}
+              },
+              {
+                "id": "done",
+                "title": "Check the site",
+                "command": "site:doctor",
+                "args": {}
+              }
+            ]
+          }
+        ]
       }
     ]
   },

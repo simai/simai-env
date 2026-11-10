@@ -15,11 +15,11 @@
     "lock": "host",
     "applied": false,
     "resources": {
-      "disk_free_bytes": 1394522492928,
+      "disk_free_bytes": 1394522189824,
       "needed_bytes": 0,
       "ram_mb": 14963,
-      "ram_min_mb": 0,
-      "ram_recommended_mb": 0,
+      "ram_min_mb": 512,
+      "ram_recommended_mb": 1024,
       "ok": true,
       "refusal": null,
       "warnings": []

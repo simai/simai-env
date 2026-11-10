@@ -1,27 +1,17 @@
 {
   "schema": "simai-panel-answer/1",
   "request_id": "fixture-refused.not-enough-ram",
-  "status": "ok",
-  "kind": "plan",
+  "status": "refused",
+  "reason": "not_enough_ram",
   "data": {
-    "command": "site:add",
-    "args": {
-      "domain": "new-bitrix.test",
-      "profile": "bitrix"
-    },
-    "target": "new-bitrix.test",
-    "description": "Create site scaffolding (nginx/php-fpm)",
-    "effects": "write",
-    "lock": "host",
-    "applied": false,
     "resources": {
-      "disk_free_bytes": 1394521804800,
+      "disk_free_bytes": 1394521341952,
       "needed_bytes": 0,
       "ram_mb": 14963,
-      "ram_min_mb": 0,
-      "ram_recommended_mb": 0,
-      "ok": true,
-      "refusal": null,
+      "ram_min_mb": 9999998,
+      "ram_recommended_mb": 9999998,
+      "ok": false,
+      "refusal": "not_enough_ram",
       "warnings": []
     }
   }

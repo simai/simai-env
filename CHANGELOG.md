@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.56.1 - 2026-11-10
+
+- 1.56.0 shipped without its profile files: `self profiles` had no
+  `routes`, and the memory check had no profile minimum. They are in now;
+  fixture set 32 is re-recorded with routes and resources.
+
 ## 1.56.0 - 2026-11-10
 
 - Site creation routes for the panel wizard (1.56.0). `self profiles`
