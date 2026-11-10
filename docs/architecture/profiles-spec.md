@@ -16,6 +16,7 @@ Profiles are declarative bash-compatible data files describing requirements and 
 - Database: `PROFILE_DB_ENGINE`, `PROFILE_DB_CHARSET`, `PROFILE_DB_COLLATION`, `PROFILE_DB_REQUIRED_PRIVILEGES`
 - Background: `PROFILE_SUPPORTS_CRON`, `PROFILE_CRON_RECOMMENDED`, `PROFILE_SUPPORTS_QUEUE`, `PROFILE_QUEUE_SYSTEM`
 - Security: `PROFILE_ALLOW_ALIAS`, `PROFILE_ALLOW_PHP_SWITCH`, `PROFILE_ALLOW_SHARED_POOL`, `PROFILE_ALLOW_DB_REMOVAL`
+- Server resources (1.56.0): `PROFILE_MIN_RAM_MB` (below it `site add` and `bitrix restore-ready` refuse `not_enough_ram`), `PROFILE_RECOMMENDED_RAM_MB` (below it their plans warn); MB, `0` or unset: no need
 - Hooks (placeholders): `PROFILE_HOOKS_PRE_CREATE/POST_CREATE/PRE_REMOVE/POST_REMOVE`
 
 ## Rules

@@ -1,0 +1,24 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-wp-status.prepare",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-wp-status/1",
+    "domain": "demo-wp.test",
+    "route": "none",
+    "step": "prepare",
+    "next": "wp:install",
+    "url": null,
+    "pending": [],
+    "files": [],
+    "dumps": [],
+    "db_state": "empty",
+    "web_state": "placeholder",
+    "core": false,
+    "config": "placeholder",
+    "wp_cli": false
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

@@ -21,11 +21,17 @@ Usage: site_files.py OP ROOT PATH [ARG]
   extract PATH DEST OVERWRITE  unpack a .tar.gz/.tgz/.tar/.zip into the directory
                        DEST (created if missing); only files and directories, names
                        that stay inside DEST; OVERWRITE yes|no
+  volumes PATH         the volumes of one backup archive (simai-file-volumes/1): PATH
+                       is the base volume (<name>.tar.gz, .tgz, .tar or .enc.gz, or
+                       one of its parts .N) or a directory holding exactly one
+  gather PATH DEST     move those volumes into the directory DEST (same answer, with
+                       "moved"); a name that already exists in DEST is refused
 Errors go to stderr as "error: <code>: <message>", exit code 2.
 """
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 import tarfile
@@ -545,6 +551,146 @@ def op_extract(root_fd, names, dest, overwrite):
             "skipped": skipped}
 
 
+# A backup archive: base volume and its parts <base>.1 .. <base>.N (Bitrix
+# multi-volume backups). Distribution archives (*_encode.tar.gz) are not backups.
+ARCHIVE_BASE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar|enc\.gz)$")
+MAX_VOLUMES = 10000
+
+
+def is_base(name):
+    return bool(ARCHIVE_BASE.match(name)) and not name.endswith("_encode.tar.gz")
+
+
+def volumes_at(root_fd, names):
+    """(directory fd, directory names, base name, [(name, size)]) of one archive."""
+    if names:
+        parent = walk(root_fd, names)
+        try:
+            st = lstat(parent, names[-1])
+            if stat.S_ISLNK(st.st_mode):
+                raise Fail("link", f"{names[-1]} is a symbolic link")
+            if stat.S_ISDIR(st.st_mode):
+                fd, dir_names, base = os.open(names[-1], DIR_FLAGS, dir_fd=parent), names, None
+            elif stat.S_ISREG(st.st_mode):
+                fd, dir_names, base = os.dup(parent), names[:-1], re.sub(r"\.[0-9]+$", "", names[-1])
+                if not is_base(base):
+                    raise Fail("not_an_archive", f"{names[-1]} is not a backup archive volume")
+            else:
+                raise Fail("not_a_file", f"{names[-1]} is not a file or a directory")
+        finally:
+            os.close(parent)
+    else:
+        fd, dir_names, base = os.dup(root_fd), [], None
+    try:
+        present = set(os.listdir(fd))
+        if base is None:
+            found = sorted(n for n in present if is_base(n))
+            if not found:
+                raise Fail("no_archive", "no backup archive (.tar.gz, .tgz, .tar, .enc.gz) in the directory")
+            if len(found) > 1:
+                raise Fail("ambiguous", "more than one backup archive: " + ", ".join(found[:5]))
+            base = found[0]
+        vols, index = [], 0
+        while index <= MAX_VOLUMES:
+            name = base if index == 0 else f"{base}.{index}"
+            if name not in present:
+                if index == 0:
+                    raise Fail("not_found", f"{base} does not exist")
+                break
+            st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+            if stat.S_ISLNK(st.st_mode):
+                raise Fail("link", f"{name} is a symbolic link")
+            if not stat.S_ISREG(st.st_mode):
+                raise Fail("not_a_file", f"{name} is not a regular file")
+            if st.st_nlink != 1:
+                raise Fail("hardlinked", f"{name} has other hard links")
+            vols.append((name, st.st_size))
+            index += 1
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd, dir_names, base, vols
+
+
+def volumes_answer(dir_names, base, vols):
+    return {"schema": "simai-file-volumes/1", "dir": "/".join(dir_names), "base": base,
+            "encrypted": base.endswith(".enc.gz"),
+            "volumes": [{"name": n, "size": s} for n, s in vols], "count": len(vols),
+            "total_bytes": sum(s for _, s in vols)}
+
+
+def op_volumes(root_fd, names):
+    fd, dir_names, base, vols = volumes_at(root_fd, names)
+    os.close(fd)
+    return volumes_answer(dir_names, base, vols)
+
+
+def move_one(src_fd, dst_fd, name):
+    """Link then unlink: never replaces a file; a copy across filesystems."""
+    try:
+        os.link(name, name, src_dir_fd=src_fd, dst_dir_fd=dst_fd, follow_symlinks=False)
+    except FileExistsError:
+        raise Fail("exists", f"{name} already exists in the destination")
+    except OSError as e:
+        if e.errno != 18:  # EXDEV: another filesystem
+            raise
+        sfd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=src_fd)
+        try:
+            dfd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644,
+                          dir_fd=dst_fd)
+        except FileExistsError:
+            os.close(sfd)
+            raise Fail("exists", f"{name} already exists in the destination")
+        try:
+            with os.fdopen(sfd, "rb") as src, os.fdopen(dfd, "wb") as out:
+                while True:
+                    chunk = src.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                out.flush()
+                os.fsync(out.fileno())
+        except BaseException:
+            os.unlink(name, dir_fd=dst_fd)
+            raise
+    os.unlink(name, dir_fd=src_fd)
+
+
+def op_gather(root_fd, names, dest):
+    fd, dir_names, base, vols = volumes_at(root_fd, names)
+    try:
+        if dest:
+            parent = walk(root_fd, dest)
+            try:
+                dst_fd = os.open(dest[-1], DIR_FLAGS, dir_fd=parent)
+            except OSError as e:
+                raise Fail(code(e, "not_a_directory"), f"{dest[-1]}: {e.strerror}")
+            finally:
+                os.close(parent)
+        else:
+            dst_fd = os.dup(root_fd)
+        moved = []
+        try:
+            a, b = os.fstat(fd), os.fstat(dst_fd)
+            if (a.st_dev, a.st_ino) != (b.st_dev, b.st_ino):
+                for name, _ in vols:
+                    try:
+                        os.stat(name, dir_fd=dst_fd, follow_symlinks=False)
+                        raise Fail("exists", f"{name} already exists in the destination")
+                    except FileNotFoundError:
+                        pass
+                for name, _ in vols:
+                    move_one(fd, dst_fd, name)
+                    moved.append(name)
+        finally:
+            os.close(dst_fd)
+    finally:
+        os.close(fd)
+    answer = volumes_answer(dest, base, vols)
+    answer.update({"from": "/".join(dir_names), "moved": moved})
+    return answer
+
+
 def main(argv):
     op, root, rel = argv[0], argv[1], argv[2]
     names = parts(rel)
@@ -562,9 +708,11 @@ def main(argv):
         result = op_extract(root_fd, names, parts(argv[3]), argv[4])
     elif op == "rename":
         result = op_rename(root_fd, names, parts(argv[3]))
+    elif op == "gather":
+        result = op_gather(root_fd, names, parts(argv[3]))
     else:
         result = {"list": op_list, "stat": op_stat, "read": op_read, "mkdir": op_mkdir,
-                  "remove": op_remove}[op](root_fd, names)
+                  "remove": op_remove, "volumes": op_volumes}[op](root_fd, names)
     print(json.dumps(result, ensure_ascii=False))
 
 

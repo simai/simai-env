@@ -12,6 +12,31 @@
     "description": "Prepare Bitrix restore.php flow",
     "effects": "write",
     "lock": "site",
-    "applied": false
+    "applied": false,
+    "resources": {
+      "disk_free_bytes": 1394521845760,
+      "needed_bytes": 483,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": true,
+      "refusal": null,
+      "warnings": []
+    },
+    "archive": {
+      "base": "demo_20260101_full_abc.tar.gz",
+      "dir": "public",
+      "source": null,
+      "url": null,
+      "volumes": [
+        {
+          "name": "demo_20260101_full_abc.tar.gz",
+          "size": 161
+        }
+      ],
+      "count": 1,
+      "total_bytes": 161,
+      "encrypted": false
+    }
   }
 }

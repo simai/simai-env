@@ -18,6 +18,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -104,7 +105,18 @@ PORT = re.compile(r"^[1-9][0-9]{0,4}$")
 UPSTREAM_PATH = re.compile(r"^/[A-Za-z0-9._~/-]{0,200}$")
 BITRIX_FILES = re.compile(r"^(none|setup|restore)$")
 CHECK_ID = re.compile(r"^[a-z0-9]{1,16}\.[a-z0-9-]{1,40}$")  # a profile rule (admin/lib/site_checks.sh)
-BITRIX_ARCHIVE = re.compile(r"^(?:auto|[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar))$")
+BITRIX_ARCHIVE = re.compile(r"^(?:auto|[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar|enc\.gz))$")
+# bitrix:restore-ready (1.56.0): the volumes at a path of the site directory
+# (relative, no ".."), or the base volume at an https URL (no redirects; the
+# command also refuses hosts that resolve to non-public addresses).
+BITRIX_SOURCE = re.compile(r"^(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9._-][A-Za-z0-9._/-]{0,1023}$")
+BITRIX_URL = re.compile(r"^https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/(?:[A-Za-z0-9._~/%+=&-]{0,1000}/)?"
+                        r"[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar|enc\.gz)(\?[A-Za-z0-9._~%+=&/-]{0,1500})?$")
+WP_TITLE = re.compile(r"^(?!-)[^\x00-\x1f\x7f]{1,200}$")
+WP_USER = re.compile(r"^[A-Za-z0-9._@-]{1,60}$")
+WP_LOCALE = re.compile(r"^[a-z]{2,3}(_[A-Z]{2})?(_[a-z0-9]{2,12})?$")
+# A file in the site directory for wp:restore-ready (checked again by the command).
+SITE_FILE = re.compile(r"^(?!-)(?!.*(?:^|/)\.{1,2}(?:/|$))[^\x00-\x1f\x7f]{1,1024}$")
 CRON_ID = re.compile(r"^[a-f0-9]{8}$")
 CRON_SCHEDULE = re.compile(r"^[0-9*/,-]{1,40}( [0-9*/,-]{1,40}){4}$")  # checked fully by the command
 CRON_COMMAND = re.compile(r"^[!-,.-~][ -~]{0,999}$")
@@ -173,8 +185,21 @@ ALLOW = {
     "site:check-state": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "read"),
     "site:check-fix": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "action"),
     "bitrix:status": ({"domain": DOMAIN}, {"domain"}, "read"),
-    "bitrix:restore-ready": ({"domain": DOMAIN, "archive": BITRIX_ARCHIVE}, {"domain"}, "action"),
+    "bitrix:restore-ready": ({"domain": DOMAIN, "archive": BITRIX_ARCHIVE, "source": BITRIX_SOURCE, "url": BITRIX_URL},
+                             {"domain"}, "action"),
     "bitrix:finalize": ({"domain": DOMAIN}, {"domain"}, "action"),
+    # 1.56.0: a Laravel site deployed from the panel gets its APP_KEY and baseline.
+    "laravel:finalize": ({"domain": DOMAIN, "migrate": YES_NO}, {"domain"}, "action"),
+    # 1.56.0: where a site of any profile stands on its creation route.
+    "site:status": ({"domain": DOMAIN}, {"domain"}, "read"),
+    # 1.56.0: WordPress by one click. The generated admin password is in the
+    # job result only: job:status hands it out once (ONCE_RESULT).
+    "wp:status": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "wp:install": ({"domain": DOMAIN, "title": WP_TITLE, "admin-user": WP_USER, "admin-email": EMAIL,
+                    "locale": WP_LOCALE}, {"domain", "title", "admin-user", "admin-email"}, "action"),
+    "wp:restore-ready": ({"domain": DOMAIN, "files": SITE_FILE, "dump": SITE_FILE, "overwrite": YES_NO},
+                         {"domain", "files", "dump"}, "action"),
+    "wp:finalize": ({"domain": DOMAIN}, {"domain"}, "action"),
     # A site's extra names (1.53.0): www and other domains, the certificate follows.
     "site:names": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:name-add": ({"domain": DOMAIN, "name": DOMAIN, "mode": NAME_MODE, "check-dns": YES_NO}, {"domain", "name"}, "action"),
@@ -337,11 +362,20 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
           "site:php-ini-unset": {"apply": "yes"}, "self:update": {"check-sites": "yes"}}
 # Stopping these midway could leave the toolkit or the panel half replaced.
 NO_CANCEL = {"self:update"}
+# Job result values shown once: the first job:status of a finished job
+# returns them and removes them from the result file; job:list never does.
+ONCE_RESULT = {"admin_password"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file",
-             "access-key": "access-key-file", "secret-key": "secret-key-file"}  # passed as a file
-SECRET_ARGS = {"token", "access-key", "secret-key"}  # never kept in a job record, and their file goes when the job ends
+             "access-key": "access-key-file", "secret-key": "secret-key-file",
+             "url": "url-file"}  # passed as a file (a signed URL is not for a command line)
+SECRET_ARGS = {"token", "access-key", "secret-key", "url"}  # never kept in a job record, and their file goes when the job ends
+URL_ARGS = {"url"}  # shown without the query string (a signature) instead of "(stored)"
+# Plans that check the server first (admin/lib/site_resources.sh): their
+# refusals are named before a plan or a job, with what the check found.
+RESOURCE_CHECKED = {"site:add", "bitrix:restore-ready"}
+PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_invalid"}
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -355,7 +389,9 @@ CRON_JOBS = Path(os.environ.get("SIMAI_CRON_JOBS_DIR", "/etc/simai-env/cron-jobs
 
 
 class Refused(Exception):
-    pass
+    def __init__(self, reason, data=None):
+        super().__init__(reason)
+        self.data = data  # what the refusal is based on, for the answer
 
 
 class Done(Exception):
@@ -420,6 +456,8 @@ def parse(raw):
         raise Refused("invalid_argument")
     if command == "site:php-ini-set" and not INI_RULES[args["name"]].match(args["value"]):
         raise Refused("invalid_argument")
+    if command == "bitrix:restore-ready" and "source" in args and "url" in args:
+        raise Refused("invalid_argument")  # one place the archive comes from
     if owner is not None:
         if os.path.isfile(os.path.join(BLOCKS, owner)):
             raise Refused("owner_blocked")
@@ -469,9 +507,43 @@ def registry_entry(command):
     return {}
 
 
+def shown_url(value):
+    return value.split("?", 1)[0] + "?***" if "?" in value else value
+
+
 def shown_args(args):
-    return {k: "(stored)" if k in SECRET_ARGS else f"({len(v.encode())} bytes)" if k in BULK_ARGS else v
+    return {k: shown_url(v) if k in URL_ARGS else "(stored)" if k in SECRET_ARGS
+            else f"({len(v.encode())} bytes)" if k in BULK_ARGS else v
             for k, v in args.items()}
+
+
+def plan_run(command, args, files=None):
+    """The command's JSON plan. A URL goes in a file, as it does for a job."""
+    tmp = None
+    try:
+        if URL_ARGS & set(args):
+            tmp = tempfile.mkdtemp(prefix="simai-gate-")
+            files = dict(files or {})
+            for key in URL_ARGS & set(args):
+                path = os.path.join(tmp, f"{key}.txt")
+                fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(fd, "w") as out:
+                    out.write(args[key] + "\n")
+                files[key] = path
+        return run(command, args, files)
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+def plan_refusal(command, result):
+    """A refusal that the plan check of a resource-checked command names
+    (not_enough_disk, not_enough_ram, source_invalid, url_invalid)."""
+    if command not in RESOURCE_CHECKED or not isinstance(result, dict) or result.get("status") != "failed":
+        return
+    data = result.get("data")
+    if isinstance(data, dict) and data.get("refusal") in PLAN_REFUSALS:
+        raise Refused(data["refusal"], {k: data[k] for k in ("resources", "archive", "detail") if k in data})
 
 
 def plan(command, args, attachment=None):
@@ -485,7 +557,8 @@ def plan(command, args, attachment=None):
                 "description": entry.get("description"), "effects": entry.get("effects"),
                 "lock": entry.get("lock"), "applied": False, "preview": True}
     files = {"attachment": {ATTACHMENT[command]: "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
-    result = run(command, args, files)
+    result = plan_run(command, args, files)
+    plan_refusal(command, result)
     if result is None or result.get("status") != "planned":
         return None
     entry = registry_entry(command)
@@ -493,6 +566,11 @@ def plan(command, args, attachment=None):
     answer = {"command": command, "args": shown, "target": result.get("target"),
               "description": entry.get("description"), "effects": result.get("effects"),
               "lock": entry.get("lock"), "applied": False}
+    if command in RESOURCE_CHECKED and isinstance(result.get("data"), dict):
+        # Free disk, memory against the profile, warnings; what a restore found.
+        answer["resources"] = result["data"].get("resources")
+        if command == "bitrix:restore-ready":
+            answer["archive"] = result["data"].get("archive")
     if command == "self:update":
         # Versions, release notes, what restarts and which sites are checked.
         answer["update"] = (run("self:update-plan", {"target": args["target"]}) or {}).get("data")
@@ -594,7 +672,37 @@ def read_job(job_id):
         return None
 
 
-def job_state(job_id):
+def take_once(d):
+    """The job result with its ONCE_RESULT values, for one caller only: the
+    file is renamed away first (only one rename wins), and what goes back
+    names the values in `shown_once` instead of holding them."""
+    src, held = d / "result.json", d / f".result-{secrets.token_hex(6)}"
+    try:
+        os.rename(src, held)
+    except OSError:  # another job:status took it a moment ago
+        try:
+            data = json.loads(src.read_text()[:4096])
+        except (OSError, ValueError):
+            return None
+        return {k: v for k, v in data.items() if k not in ONCE_RESULT} if isinstance(data, dict) else None
+    try:
+        data = json.loads(held.read_text()[:4096])
+    except (OSError, ValueError):
+        data = None
+    if isinstance(data, dict):
+        rest = {k: v for k, v in data.items() if k not in ONCE_RESULT}
+        rest["shown_once"] = sorted(ONCE_RESULT & set(data))
+        try:
+            fd = os.open(src, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            with os.fdopen(fd, "w") as out:
+                json.dump(rest, out)
+        except OSError:
+            pass
+    held.unlink(missing_ok=True)
+    return data if isinstance(data, dict) else None
+
+
+def job_state(job_id, reveal=False):
     d = job_dir(job_id)
     meta = read_job(job_id) or {}
     def exit_code():
@@ -627,6 +735,9 @@ def job_state(job_id):
         result = json.loads((d / "result.json").read_text()[:4096])
     except (OSError, ValueError):
         pass
+    if isinstance(result, dict) and ONCE_RESULT & set(result):
+        result = take_once(d) if reveal and state != "running" else \
+            {k: v for k, v in result.items() if k not in ONCE_RESULT}
     return {"job_id": job_id, "state": state, "exit_code": code, "command": meta.get("command"),
             "args": meta.get("args"), "created_at": meta.get("created_at"),
             "request_id": meta.get("request_id"), "actor": meta.get("actor"),
@@ -647,7 +758,7 @@ def job_answer(command, args, owner):
     if not job_visible(job_id, owner):
         raise Refused("unknown_job")
     if command == "job:status":
-        return job_state(job_id)
+        return job_state(job_id, reveal=True)
     if command == "job:log":
         after = int(args.get("after", "0"))
         try:
@@ -925,6 +1036,8 @@ def handle(raw, stream, started, reads_only=False):
                         data["check"] = check  # title and one line: what the button does
                     answer.update(status="ok", kind="plan", data=data)
                 raise Done
+            if command in RESOURCE_CHECKED:
+                plan_refusal(command, plan_run(command, args))  # the server can still take it
             job_id, started_ok = start_job(req, command, args, stream)
             entry["job_id"] = job_id
             if started_ok:
@@ -967,6 +1080,8 @@ def handle(raw, stream, started, reads_only=False):
         pass
     except Refused as refusal:
         answer.update(status="refused", reason=str(refusal))
+        if refusal.data:
+            answer["data"] = refusal.data
     entry.update(status=answer["status"], reason=answer.get("reason"),
                  operation_id=answer.get("operation_id"), ms=int((time.time() - started) * 1000))
     log(entry)

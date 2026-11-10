@@ -14,6 +14,16 @@
     "description": "Create site scaffolding (nginx/php-fpm)",
     "effects": "write",
     "lock": "host",
-    "applied": false
+    "applied": false,
+    "resources": {
+      "disk_free_bytes": 1394522464256,
+      "needed_bytes": 0,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": true,
+      "refusal": null,
+      "warnings": []
+    }
   }
 }

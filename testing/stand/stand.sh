@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=31
+FIXTURE_SET=32
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -276,6 +276,7 @@ FW
   for d in demo-static.test demo-php.test demo-owned.test demo-redirect.test; do
     requests+=("site-describe.${d}|null|site:describe|{\"domain\":\"${d}\"}")
     requests+=("site-doctor.${d}|null|site:doctor|{\"domain\":\"${d}\"}")
+    requests+=("site-status.${d}|null|site:status|{\"domain\":\"${d}\"}")
   done
   local row name owner command args
   for row in "${requests[@]}"; do
@@ -336,9 +337,11 @@ FW
   # A Bitrix site walked through its restore steps, then its profile rules
   # and their fixes. It lives only for this recording.
   local B=demo-bitrix.test bx="/home/simai/www/demo-bitrix.test/public"
-  bx_status() {  # fixture name: bitrix:status now
+  bx_status() {  # fixture name: bitrix:status now, and site:status as site-status.<site>.<step>
     printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":null},"command":"bitrix:status","args":{"domain":"%s"}}' \
       "$1" "$B" | gate >"${FIXTURES}/$1.json"
+    printf '{"schema":"simai-panel-request/1","request_id":"fixture-site-status-%s","actor":{"user":"admin@stand.test","owner":null},"command":"site:status","args":{"domain":"%s"}}' \
+      "${1#bitrix-status.}" "$B" | gate >"${FIXTURES}/site-status.${B}.${1#bitrix-status.}.json"
   }
   bx_req() {  # fixture name, command, args
     printf '{"schema":"simai-panel-request/1","request_id":"fixture-%s","actor":{"user":"admin@stand.test","owner":null},"command":"%s","args":%s}' \
@@ -352,6 +355,22 @@ FW
   in_stand bash -c "mkdir -p /tmp/bxa/bitrix && echo x >/tmp/bxa/bitrix/x.txt && tar -C /tmp/bxa -czf $bx/demo_20260101_full_abc.tar.gz . && chown simai:www-data $bx/demo_20260101_full_abc.tar.gz"
   bx_status bitrix-status.validate
   bx_req plan.bitrix-restore-ready bitrix:restore-ready "{\"domain\":\"${B}\"}"
+  # 1.56.0: volumes uploaded over SFTP into the site directory (--source),
+  # refusals named before a plan or a job, resources in the plans. A sparse
+  # 10 TB volume stands for an archive the disk cannot take.
+  local bxroot="/home/simai/www/${B}"
+  in_stand bash -c "mkdir -p $bxroot/upload/backup $bxroot/upload/huge && tar -C /tmp/bxa -czf $bxroot/upload/backup/demo_20260102_full_def.tar.gz . \
+    && truncate -s 10T $bxroot/upload/huge/demo_20260103_full_ghi.tar.gz && ln -sfn /etc $bxroot/upload/etc-link \
+    && chown -R simai:www-data $bxroot/upload"
+  bx_req plan.bitrix-restore-ready-source bitrix:restore-ready "{\"domain\":\"${B}\",\"source\":\"upload/backup\"}"
+  bx_req refused.source-invalid bitrix:restore-ready "{\"domain\":\"${B}\",\"source\":\"upload/etc-link\"}"
+  bx_req refused.url-invalid bitrix:restore-ready "{\"domain\":\"${B}\",\"url\":\"https://127.0.0.1/demo_20260101_full_abc.tar.gz\"}"
+  bx_req refused.not-enough-disk bitrix:restore-ready "{\"domain\":\"${B}\",\"source\":\"upload/huge\"}"
+  bx_req plan.site-add-bitrix site:add '{"domain":"new-bitrix.test","profile":"bitrix"}'
+  in_stand bash -c "cp /root/simai-env/profiles/bitrix.profile.sh /tmp/bitrix.profile.sh \
+    && sed -i 's/^PROFILE_MIN_RAM_MB=.*/PROFILE_MIN_RAM_MB=\"9999998\"/' /root/simai-env/profiles/bitrix.profile.sh"
+  bx_req refused.not-enough-ram site:add '{"domain":"new-bitrix.test","profile":"bitrix"}'
+  in_stand bash -c "cp /tmp/bitrix.profile.sh /root/simai-env/profiles/bitrix.profile.sh && rm -rf $bxroot/upload"
   in_stand /root/simai-env/simai-admin.sh bitrix restore-ready --domain "$B" --confirm yes >/dev/null 2>&1
   bx_status bitrix-status.run-restore
   # What the restore wizard leaves: an installed database with a utf8mb3
@@ -378,6 +397,47 @@ BX
   done
   bx_status bitrix-status.done
   in_stand /root/simai-env/simai-admin.sh site remove --domain "$B" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
+  # WordPress sites: the steps of a new install (a job; its one-time admin
+  # password is pinned below), the steps of a restore on a second site, the
+  # profile rules. They live only for this recording.
+  local W=demo-wp.test WC=demo-wp-copy.test wc="/home/simai/www/demo-wp-copy.test"
+  wp_status() {  # fixture name, domain: wp:status now
+    bx_req "$1" wp:status "{\"domain\":\"$2\"}"
+  }
+  in_stand bash -c "cd /root/simai-env && ./simai-admin.sh profile enable --id wordpress --confirm yes; \
+    ./simai-admin.sh site add --domain $W --profile wordpress --php 8.3 --create-db yes --confirm yes \
+    && ./simai-admin.sh site add --domain $WC --profile wordpress --php 8.3 --create-db yes --confirm yes" >/dev/null 2>&1 \
+    || echo "[stand] the WordPress demo sites were not made" >&2
+  wp_status wp-status.prepare "$W"
+  local wpi="{\"domain\":\"${W}\",\"title\":\"Demo WordPress\",\"admin-user\":\"admin\",\"admin-email\":\"admin@stand.test\",\"locale\":\"en_US\"}"
+  bx_req plan.wp-install wp:install "$wpi"
+  bx_req refused.invalid-argument.wp-title wp:install "{\"domain\":\"${W}\",\"title\":\"-x\",\"admin-user\":\"a\",\"admin-email\":\"a@stand.test\"}"
+  names_job job-wp-install wp:install "$wpi"
+  # A second job:status: the password is gone, shown_once names it.
+  # shellcheck disable=SC2059 # the format is the request template above
+  printf "$req" job-wp-install-status-again job:status "{\"job_id\":\"$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("job_id", ""))' "${FIXTURES}/job-wp-install.json")\"}" '' \
+    | gate >"${FIXTURES}/job-wp-install-status-again.json"
+  wp_status wp-status.done "$W"
+  bx_req site-check-state.wordpress-config-perms site:check-state "{\"domain\":\"${W}\",\"id\":\"wordpress.config-perms\"}"
+  bx_req plan.wp-finalize wp:finalize "{\"domain\":\"${W}\"}"
+  # The copy: an archive of the first site, then its dump, then the restore plan.
+  in_stand bash -c "o=\$(stat -c %U:%G $wc/public) && tar -C /home/simai/www/$W/public -czf $wc/copy.tar.gz . && chown \$o $wc/copy.tar.gz" >/dev/null 2>&1
+  wp_status wp-status.upload "$WC"
+  in_stand bash -c "o=\$(stat -c %U:%G $wc/public) && db=\$(sed -n 's/^DB_NAME=//p' /etc/simai-env/sites/$W/db.env) \
+    && mysqldump --single-transaction \"\$db\" | gzip -c >$wc/public/dump.sql.gz && chown \$o $wc/public/dump.sql.gz" >/dev/null 2>&1
+  wp_status wp-status.restore-install "$WC"
+  bx_req plan.wp-restore-ready wp:restore-ready "{\"domain\":\"${WC}\",\"files\":\"copy.tar.gz\",\"dump\":\"public/dump.sql.gz\"}"
+  bx_req refused.invalid-argument.wp-restore-path wp:restore-ready "{\"domain\":\"${WC}\",\"files\":\"../copy.tar.gz\",\"dump\":\"public/dump.sql.gz\"}"
+  in_stand /root/simai-env/simai-admin.sh wp restore-ready --domain "$WC" --files copy.tar.gz --dump public/dump.sql.gz --confirm yes >/dev/null 2>&1
+  wp_status wp-status.restore-done "$WC"
+  in_stand bash -c "chmod 0644 $wc/public/wp-config.php" >/dev/null 2>&1
+  wp_status wp-status.finalize "$WC"
+  bx_req plan.site-check-fix.wordpress site:check-fix "{\"domain\":\"${WC}\",\"id\":\"wordpress.config-perms\"}"
+  bx_req site-doctor.${WC} site:doctor "{\"domain\":\"${WC}\"}"
+  local ws
+  for ws in "$W" "$WC"; do
+    in_stand /root/simai-env/simai-admin.sh site remove --domain "$ws" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
+  done
   # Every answer must be valid JSON; a recording with stray output is useless.
   # manifest.json pins the set: larena/env checks its copy against it.
   python3 - "$FIXTURES" "$(cat "${ROOT_DIR}/VERSION")" "$FIXTURE_SET" <<'PY'
@@ -392,6 +452,9 @@ for f in sorted(root.glob("*.json")):
     if "operation_id" in d:
         d["operation_id"] = "fixture"
     data = d.get("data") if isinstance(d.get("data"), dict) else {}
+    # The one-time admin password of a wp:install job (a fixture is public).
+    if isinstance(data.get("result"), dict) and data["result"].get("admin_password"):
+        data["result"]["admin_password"] = "fixture-password-not-real"
     if "generated_at" in data:
         data["generated_at"] = "2026-01-01T00:00:00Z"
     for check in data.get("checks", []) if isinstance(data.get("checks"), list) else []:

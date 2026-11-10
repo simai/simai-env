@@ -6,6 +6,17 @@ built from the server instead of a copy of these rules.
 Usage: site_profiles.py json|human
 Reads profiles/*.profile.sh (plain KEY="value" lines), the allowlist
 /etc/simai-env/profiles.enabled and the installed PHP versions.
+
+Each profile also answers `routes`: the ways the panel wizard creates a site
+of it (new, restore, repo), declared in the profile file:
+  PROFILE_ROUTES=("id|available|title" ...)
+  PROFILE_ROUTE_<ID>_INPUTS=("name|required|kind[|value,value]" ...)
+  PROFILE_ROUTE_<ID>_STEPS=("id|command|arguments|title" ...)
+kind is text, choice, file_on_server, url or upload; arguments are k=v,k=v
+fixed arguments of the command; for the command open_url the third field
+names the site:status key that holds the address (installer_url,
+restore_url). An input named like a site add argument gets its values,
+default and pattern. A route's last step is always site:doctor.
 """
 import json
 import os
@@ -61,6 +72,51 @@ def read_profile(path):
     return meta
 
 
+ROUTE_IDS = ("new", "restore", "repo")
+INPUT_KINDS = ("text", "choice", "file_on_server", "url", "upload")
+STEP_ID = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+COMMAND = re.compile(r"^([a-z]+:[a-z0-9-]+|open_url)$")
+
+
+def routes(meta, args):
+    """The wizard routes declared in the profile; malformed lines are skipped."""
+    by_name = {a["name"]: a for a in args}
+    out = []
+    for line in meta.get("ROUTES") or []:
+        parts = line.split("|", 2)
+        if len(parts) != 3 or parts[0] not in ROUTE_IDS or parts[1] not in ("yes", "no"):
+            continue
+        rid, available, title = parts
+        inputs = []
+        for item in meta.get(f"ROUTE_{rid.upper()}_INPUTS") or []:
+            f = item.split("|")
+            if len(f) not in (3, 4) or f[1] not in ("yes", "no") or f[2] not in INPUT_KINDS:
+                continue
+            entry = {"name": f[0], "required": f[1] == "yes", "kind": f[2]}
+            arg = by_name.get(f[0], {})
+            for k in ("values", "default", "pattern", "description"):
+                if k in arg:
+                    entry[k] = arg[k]
+            if len(f) == 4 and f[3]:
+                entry["values"] = f[3].split(",")
+            inputs.append(entry)
+        steps = []
+        for item in meta.get(f"ROUTE_{rid.upper()}_STEPS") or []:
+            f = item.split("|", 3)
+            if len(f) != 4 or not STEP_ID.match(f[0]) or not COMMAND.match(f[1]):
+                continue
+            step = {"id": f[0], "title": f[3], "command": f[1]}
+            if f[1] == "open_url":
+                step["url_from"] = f[2] or None
+            else:
+                step["args"] = dict(kv.split("=", 1) for kv in f[2].split(",") if "=" in kv)
+            steps.append(step)
+        if not steps or steps[-1]["command"] != "site:doctor":
+            steps.append({"id": "done", "title": "Check the site", "command": "site:doctor", "args": {}})
+        out.append({"id": rid, "title": title, "available": available == "yes", "inputs": inputs, "steps": steps})
+    return out
+
+
 def php_versions():
     found = [p.parent.parent.name for p in Path("/etc/php").glob("*/fpm/php-fpm.conf")] if Path("/etc/php").is_dir() else []
     return sorted({v for v in found if re.fullmatch(r"\d\.\d", v)}, key=lambda v: tuple(map(int, v.split("."))))
@@ -92,7 +148,7 @@ def describe(pid, meta, installed, pgsql):
                      "description": "a daily data backup from the start"})
     return {"id": pid, "title": meta.get("TITLE") or pid, "php": php, "db": db_mode,
             "cron": meta.get("SUPPORTS_CRON") == "yes", "queue": meta.get("SUPPORTS_QUEUE") == "yes",
-            "alias": meta.get("IS_ALIAS") == "yes", "args": args}
+            "alias": meta.get("IS_ALIAS") == "yes", "args": args, "routes": routes(meta, args)}
 
 
 def main():
@@ -114,6 +170,9 @@ def main():
     for p in profiles:
         own = ", ".join(a["name"] for a in p["args"] if a["name"] not in ("domain", "owner", "backup"))
         print(f"{p['id']:<10} {p['title']}" + (f"  [{own}]" if own else ""))
+        for r in p["routes"]:
+            print(f"{'':<10}   {r['id']}{'' if r['available'] else ' (planned)'}: "
+                  + " -> ".join(s["command"] for s in r["steps"]))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,34 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.not-enough-disk",
+  "status": "refused",
+  "reason": "not_enough_disk",
+  "data": {
+    "resources": {
+      "disk_free_bytes": 1394521817088,
+      "needed_bytes": 32985348833280,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": false,
+      "refusal": "not_enough_disk",
+      "warnings": []
+    },
+    "archive": {
+      "base": "demo_20260103_full_ghi.tar.gz",
+      "dir": "upload/huge",
+      "source": "upload/huge",
+      "url": null,
+      "volumes": [
+        {
+          "name": "demo_20260103_full_ghi.tar.gz",
+          "size": 10995116277760
+        }
+      ],
+      "count": 1,
+      "total_bytes": 10995116277760,
+      "encrypted": false
+    },
+    "detail": "Not enough free disk: 1298.7 GB free on the site filesystem, 30720.0 GB needed (three times the archive)"
+  }
+}

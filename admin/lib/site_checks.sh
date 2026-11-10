@@ -7,7 +7,8 @@
 # site_check_state <id> <domain>  -> SC_STATE ok|needed|n/a, SC_DETAIL
 # site_check_apply <id> <domain>  -> SC_RESULT; returns 1 when the fix failed
 #
-# Needs admin/commands/bitrix.sh, admin/lib/php_fpm_host.sh and
+# Needs admin/commands/bitrix.sh, admin/commands/wp.sh,
+# admin/commands/wp_install.sh, admin/lib/php_fpm_host.sh and
 # admin/lib/doctor_utils.sh (all sourced by simai-admin.sh).
 
 SITE_CHECK_IDS_BITRIX=(
@@ -18,6 +19,12 @@ SITE_CHECK_IDS_BITRIX=(
   bitrix.timezone
   bitrix.opcache
 )
+SITE_CHECK_IDS_WORDPRESS=(
+  wordpress.leftovers
+  wordpress.config-perms
+  wordpress.debug-off
+  wordpress.cron
+)
 SITE_CHECK_IDS_PHP=(php.fpm-graceful-reload)
 
 # Rules that apply to a profile, in report order.
@@ -26,6 +33,8 @@ site_check_ids_for_profile() {
   case "$profile" in
     bitrix)
       for id in "${SITE_CHECK_IDS_BITRIX[@]}"; do printf '%s\n' "$id"; done ;;
+    wordpress)
+      for id in "${SITE_CHECK_IDS_WORDPRESS[@]}"; do printf '%s\n' "$id"; done ;;
   esac
   case "$profile" in
     bitrix|wordpress|laravel|generic)
@@ -35,7 +44,7 @@ site_check_ids_for_profile() {
 
 site_check_known() {
   local id="$1" known
-  for known in "${SITE_CHECK_IDS_BITRIX[@]}" "${SITE_CHECK_IDS_PHP[@]}"; do
+  for known in "${SITE_CHECK_IDS_BITRIX[@]}" "${SITE_CHECK_IDS_WORDPRESS[@]}" "${SITE_CHECK_IDS_PHP[@]}"; do
     [[ "$known" == "$id" ]] && return 0
   done
   return 1
@@ -49,6 +58,10 @@ site_check_title() {
     bitrix.db-charset) echo "Bitrix database default charset" ;;
     bitrix.timezone) echo "Bitrix PHP time zone" ;;
     bitrix.opcache) echo "PHP OPcache baseline for Bitrix" ;;
+    wordpress.leftovers) echo "WordPress copies and dumps outside the web root" ;;
+    wordpress.config-perms) echo "wp-config.php is not readable by other accounts" ;;
+    wordpress.debug-off) echo "WordPress debug output is off" ;;
+    wordpress.cron) echo "WordPress scheduler runs from system cron" ;;
     php.fpm-graceful-reload) echo "PHP-FPM reload lets requests finish" ;;
     *) return 1 ;;
   esac
@@ -60,9 +73,13 @@ site_check_plan_text() {
     bitrix.docroot-leftovers) echo "Move backup archives, restore.php and SQL dumps from the web root to <site>/restore-archive (nothing is deleted)." ;;
     bitrix.dot-default) echo "Allow .default folders in the nginx hidden-file rule (.env, .git stay closed), test nginx and reload it." ;;
     bitrix.db-session-modes) echo "Append sql_mode='' and innodb_strict_mode=0 to bitrix/php_interface/after_connect_d7.php (existing lines stay)." ;;
-    bitrix.db-charset) echo "Set the database default to the profile charset (tables are not converted)." ;;
+    bitrix.db-charset) echo "Set the database default to the profile charset, e.g. utf8mb3 -> utf8mb4 (tables are not converted)." ;;
     bitrix.timezone) echo "Set the site's PHP date.timezone to the server time zone (MySQL uses it too) and reload PHP-FPM." ;;
     bitrix.opcache) echo "Write the host OPcache baseline for this PHP version (never lowers a value) and reload PHP-FPM." ;;
+    wordpress.leftovers) echo "Move SQL dumps and site archives from the web root (and dumps from wp-content) to <site>/restore-archive (nothing is deleted)." ;;
+    wordpress.config-perms) echo "Remove access for other accounts from wp-config.php (chmod o-rwx); the site user and its group keep reading it." ;;
+    wordpress.debug-off) echo "Set WP_DEBUG and WP_DEBUG_DISPLAY to false in wp-config.php and turn the site's display_errors override off." ;;
+    wordpress.cron) echo "Set DISABLE_WP_CRON to true in wp-config.php and rewrite the site's system cron entry for wp-cron.php." ;;
     php.fpm-graceful-reload) echo "Set process_control_timeout in php-fpm.conf so a reload waits for busy requests, then reload PHP-FPM." ;;
     *) return 1 ;;
   esac
@@ -71,7 +88,7 @@ site_check_plan_text() {
 # FAIL rules break the site or expose data; the others are WARN.
 site_check_severity() {
   case "$1" in
-    bitrix.docroot-leftovers|bitrix.dot-default) echo "FAIL" ;;
+    bitrix.docroot-leftovers|bitrix.dot-default|wordpress.leftovers|wordpress.config-perms) echo "FAIL" ;;
     *) echo "WARN" ;;
   esac
 }
@@ -108,8 +125,10 @@ bitrix_db_default_charset_state() {
   [[ -n "$db_name" ]] && db_validate_db_name "$db_name" 2>/dev/null || { echo "n/a"; return 0; }
   current=$(mysql_root_query_stdin "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${db_name}'" 2>/dev/null) || { echo "n/a"; return 0; }
   [[ -n "$current" ]] || { echo "n/a"; return 0; }
-  if [[ "${current%%$'\t'*}" == "$charset" && "${current#*$'\t'}" == "$collation" ]]; then
-    echo "ok"
+  # Only the charset matters: MySQL 8 sites (and their tables) often use
+  # utf8mb4_0900_ai_ci, which is as good as the profile collation.
+  if [[ "${current%%$'\t'*}" == "$charset" ]]; then
+    echo "ok ${current#*$'\t'}"
   else
     echo "needed ${current%%$'\t'*}/${current#*$'\t'}"
   fi
@@ -158,6 +177,7 @@ site_check_state() {
   site_check_load_site "$domain" || return 0
   case "$id" in
     bitrix.*) [[ "$SC_PROFILE" == bitrix && -n "$SC_DOC_ROOT" ]] || return 0 ;;
+    wordpress.*) [[ "$SC_PROFILE" == wordpress && -n "$SC_DOC_ROOT" ]] || return 0 ;;
     php.*) [[ -n "$SC_PHP" ]] || return 0 ;;
   esac
   local installed="no"
@@ -193,7 +213,7 @@ site_check_state() {
       fi
       state=$(bitrix_db_default_charset_state "$domain" "$charset" "$collation")
       case "$state" in
-        ok) SC_STATE="ok"; SC_DETAIL="${charset}/${collation}" ;;
+        ok*) SC_STATE="ok"; SC_DETAIL="${charset}/${state#ok }" ;;
         needed*) SC_STATE="needed"; SC_DETAIL="${state#needed } (expected ${charset}/${collation})" ;;
       esac ;;
     bitrix.timezone)
@@ -225,6 +245,56 @@ site_check_state() {
           break
         fi
       done ;;
+    wordpress.leftovers)
+      local -a wfiles=()
+      mapfile -t wfiles < <(wordpress_leftovers_list "$SC_DOC_ROOT")
+      if (( ${#wfiles[@]} > 1 )); then
+        SC_STATE="needed"; SC_DETAIL="${#wfiles[@]} file(s) in the web root: $(basename "${wfiles[0]}"), ..."
+      elif (( ${#wfiles[@]} == 1 )); then
+        SC_STATE="needed"; SC_DETAIL="1 file in the web root: $(basename "${wfiles[0]}")"
+      else
+        SC_STATE="ok"; SC_DETAIL="none in the web root"
+      fi ;;
+    wordpress.config-perms|wordpress.debug-off|wordpress.cron)
+      local cfg="${SC_DOC_ROOT}/wp-config.php"
+      if [[ ! -f "$cfg" ]] || grep -q "SIMAI placeholder" "$cfg" 2>/dev/null; then
+        return 0
+      fi
+      case "$id" in
+        wordpress.config-perms)
+          local mode
+          mode=$(stat -c %a "$cfg" 2>/dev/null || echo "")
+          if [[ -L "$cfg" ]]; then
+            SC_STATE="needed"; SC_DETAIL="wp-config.php is a symlink"
+          elif [[ "$mode" =~ ^[0-7]+$ ]] && (( (8#$mode & 8#007) != 0 )); then
+            SC_STATE="needed"; SC_DETAIL="mode ${mode}: other accounts can read the database password"
+          else
+            SC_STATE="ok"; SC_DETAIL="mode ${mode}"
+          fi ;;
+        wordpress.debug-off)
+          local -a shown=()
+          wordpress_config_define_true "$cfg" WP_DEBUG && shown+=("WP_DEBUG")
+          wordpress_config_define_true "$cfg" WP_DEBUG_DISPLAY && shown+=("WP_DEBUG_DISPLAY")
+          while IFS= read -r entry; do
+            [[ "${entry%%|*}" == display_errors && "${entry#*|}" =~ ^(1|on|On|ON|true|yes)$ ]] && shown+=("display_errors=on")
+          done < <(read_site_php_ini_overrides "$domain" 2>/dev/null)
+          if (( ${#shown[@]} > 0 )); then
+            SC_STATE="needed"; SC_DETAIL="${shown[*]} (errors and paths reach visitors or debug.log)"
+          else
+            SC_STATE="ok"; SC_DETAIL="debug off"
+          fi ;;
+        wordpress.cron)
+          local slug cron_mode
+          slug=$(site_check_wp_slug "$domain")
+          cron_mode=$(wordpress_wp_config_cron_mode "$cfg")
+          if [[ "$cron_mode" != true ]]; then
+            SC_STATE="needed"; SC_DETAIL="DISABLE_WP_CRON is ${cron_mode}: visits run the scheduler"
+          elif ! grep -Eq 'wp-cron\.php' "/etc/cron.d/${slug}" 2>/dev/null; then
+            SC_STATE="needed"; SC_DETAIL="no wp-cron.php entry in /etc/cron.d/${slug}"
+          else
+            SC_STATE="ok"; SC_DETAIL="system cron, DISABLE_WP_CRON true"
+          fi ;;
+      esac ;;
     php.fpm-graceful-reload)
       php_fpm_host_bin "$SC_PHP" >/dev/null 2>&1 || return 0
       have=$(php_fpm_process_control_timeout_get "$SC_PHP" 2>/dev/null || true)
@@ -235,6 +305,13 @@ site_check_state() {
       fi ;;
   esac
   return 0
+}
+
+# Cron file name of a WordPress site (as wp_prepare_site computes it).
+site_check_wp_slug() {
+  local slug="${SITE_META[slug]:-${SITE_META[project]:-$(project_slug_from_domain "$1")}}"
+  validate_project_slug "$slug" >/dev/null 2>&1 || slug="$(project_slug_from_domain "$1")"
+  printf '%s\n' "$slug"
 }
 
 # shellcheck disable=SC2034 # SC_RESULT is read by the callers
@@ -276,6 +353,38 @@ site_check_apply() {
         SC_RESULT="baseline in $(php_fpm_opcache_baseline_path "$SC_PHP")"; return 0
       fi
       SC_RESULT="failed (php-fpm rejected the baseline; file restored)"; return 1 ;;
+    wordpress.leftovers)
+      rc=0; bitrix_restore_leftovers_move "$SC_ROOT" "$SC_DOC_ROOT" wordpress_leftovers_list || rc=$?
+      SC_RESULT="$BX_LEFTOVERS_RESULT"; return $rc ;;
+    wordpress.config-perms)
+      local cfg="${SC_DOC_ROOT}/wp-config.php"
+      if [[ -L "$cfg" || ! -f "$cfg" ]]; then
+        SC_RESULT="failed (wp-config.php is a symlink or missing; put the file itself there)"; return 1
+      fi
+      chmod o-rwx -- "$cfg" || { SC_RESULT="failed (chmod)"; return 1; }
+      SC_RESULT="mode $(stat -c %a "$cfg")"; return 0 ;;
+    wordpress.debug-off)
+      local cfg="${SC_DOC_ROOT}/wp-config.php" entry
+      if wordpress_config_define_true "$cfg" WP_DEBUG || wordpress_config_define_true "$cfg" WP_DEBUG_DISPLAY; then
+        wordpress_config_owner_set_bools "$cfg" WP_DEBUG=false WP_DEBUG_DISPLAY=false \
+          || { SC_RESULT="failed (cannot edit wp-config.php)"; return 1; }
+      fi
+      while IFS= read -r entry; do
+        if [[ "${entry%%|*}" == display_errors && "${entry#*|}" =~ ^(1|on|On|ON|true|yes)$ ]]; then
+          run_command site php-ini-set --domain "$domain" --name display_errors --value off --apply yes --confirm yes >/dev/null \
+            || { SC_RESULT="failed (site php-ini-set display_errors)"; return 1; }
+        fi
+      done < <(read_site_php_ini_overrides "$domain" 2>/dev/null)
+      SC_RESULT="WP_DEBUG false, display off"; return 0 ;;
+    wordpress.cron)
+      local cfg="${SC_DOC_ROOT}/wp-config.php" slug
+      slug=$(site_check_wp_slug "$domain")
+      [[ -n "$SC_PHP" ]] || { SC_RESULT="failed (the site has no PHP version)"; return 1; }
+      cron_site_write "$domain" "$slug" wordpress "$SC_ROOT" "$SC_PHP" >/dev/null || { SC_RESULT="failed (cron file)"; return 1; }
+      if [[ "$(wordpress_wp_config_cron_mode "$cfg")" != true ]]; then
+        wordpress_config_owner_set_bools "$cfg" DISABLE_WP_CRON=true || { SC_RESULT="failed (cannot edit wp-config.php)"; return 1; }
+      fi
+      SC_RESULT="DISABLE_WP_CRON true; /etc/cron.d/${slug} rewritten"; return 0 ;;
     php.fpm-graceful-reload)
       if php_fpm_process_control_timeout_ensure "$SC_PHP" >/dev/null; then
         SC_RESULT="process_control_timeout $(php_fpm_process_control_timeout_get "$SC_PHP")"; return 0

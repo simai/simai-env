@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.55.1",
+      "version": "1.56.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -166,9 +166,9 @@
         "database": null,
         "layout": "releases",
         "release": {
-          "current": "20261110125753",
-          "previous": "20261110125752-initial",
-          "deployed_at": "2026-11-10T12:57:53Z",
+          "current": "20261110134930",
+          "previous": "20261110134928-initial",
+          "deployed_at": "2026-11-10T13:49:30Z",
           "source": "archive stand-art.tgz"
         },
         "workers": [],
@@ -247,6 +247,7 @@
         "job:list",
         "job:log",
         "job:status",
+        "laravel:finalize",
         "logs:nginx",
         "mcp:disable",
         "mcp:enable",
@@ -324,6 +325,7 @@
         "site:remove",
         "site:service-restart",
         "site:set-php",
+        "site:status",
         "software:install",
         "software:list",
         "software:refresh",
@@ -333,7 +335,11 @@
         "ssl:dns-status",
         "ssl:letsencrypt",
         "ssl:remove",
-        "ssl:renew"
+        "ssl:renew",
+        "wp:finalize",
+        "wp:install",
+        "wp:restore-ready",
+        "wp:status"
       ]
     }
   },

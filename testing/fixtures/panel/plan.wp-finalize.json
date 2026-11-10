@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.wp-finalize",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "wp:finalize",
+    "args": {
+      "domain": "demo-wp.test"
+    },
+    "target": "demo-wp.test",
+    "description": "Complete WordPress post-install baseline",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

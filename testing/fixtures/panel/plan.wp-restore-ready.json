@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.wp-restore-ready",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "wp:restore-ready",
+    "args": {
+      "domain": "demo-wp-copy.test",
+      "files": "copy.tar.gz",
+      "dump": "public/dump.sql.gz"
+    },
+    "target": "demo-wp-copy.test",
+    "description": "Restore a WordPress copy from a files archive and a database dump, then finalize",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

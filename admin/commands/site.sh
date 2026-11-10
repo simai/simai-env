@@ -96,7 +96,20 @@ site_add_plan_check() {
   profile=$(command_arg profile "$@")
   [[ -n "$profile" ]] || profile=generic
   is_profile_known "$profile" || return 0
-  site_add_require_enabled_profile "$profile"
+  site_add_require_enabled_profile "$profile" || return 1
+  site_add_resources_check "$profile"
+}
+
+# Memory against the profile's need and free disk where sites live: below
+# PROFILE_MIN_RAM_MB refuses, below PROFILE_RECOMMENDED_RAM_MB warns. The
+# plan leaves the numbers for the JSON plan ("resources").
+site_add_resources_check() {
+  local profile="$1" rc=0 refusal=null
+  site_resources_check "$WWW_ROOT" 0 "$profile" || rc=$?
+  site_resources_report
+  [[ -z "$RES_REFUSAL" ]] || refusal="\"${RES_REFUSAL}\""
+  site_plan_data_write "{\"resources\": $(site_resources_json), \"refusal\": ${refusal}}"
+  return "$rc"
 }
 
 site_add_confirm_creation() {
@@ -783,6 +796,7 @@ site_add_handler_impl() {
   fi
 
   load_profile "$profile" || return 1
+  site_add_resources_check "$profile" || return 1
 
   if [[ "$profile" == "bitrix" ]]; then
     if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" && -z "${PARSED_ARGS["bitrix-files"]:-}" ]]; then

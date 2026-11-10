@@ -38,6 +38,8 @@ Behavior:
   - `setup`: download current `bitrixsetup.php` from the official Bitrix URL and write DB preseed files when managed DB credentials exist.
   - `restore`: download current `restore.php` from the official Bitrix URLs, prepare restore-writable paths, and write `.settings.php` plus connection initialization from managed DB credentials without creating a premature `dbconn.php`. The archive restores its own `dbconn.php`; this avoids legacy `mbstring.func_overload` checks on PHP 8. After uploading every archive volume, run `bitrix restore-ready` again; the browser URL is shown only after the archive passes integrity validation.
   CLI default is `none`. Use `bitrix installer-ready` or `bitrix restore-ready` later if the choice changes.
+  A large archive goes over SFTP into the site directory and is brought in by `bitrix restore-ready --source <path>` (see `docs/commands/bitrix.md`).
+- Resources (1.56.0): the plan and the handler compare the server's memory with the profile's need. Below `PROFILE_MIN_RAM_MB` the site is refused (`not_enough_ram`), below `PROFILE_RECOMMENDED_RAM_MB` the plan warns (`ram_below_recommended`). Needs: `bitrix` 1536 / 4096 MB, `laravel`, `wordpress` and `node` 512 / 1024 MB, `generic` 256 / 512 MB, the others none. The JSON plan (`--output json` without `--confirm`) carries `data.resources` `{disk_free_bytes, needed_bytes, ram_mb, ram_min_mb, ram_recommended_mb, ok, refusal, warnings[{code, message}]}` (free disk where sites live; `needed_bytes` is 0 for a new site) and `data.refusal`; a refused plan is `failed` with the same data.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
 - After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
@@ -521,6 +523,31 @@ what the fix does and why a fix would be refused (`unknown_check`,
 fix and checks the rule again (without `--confirm` a plan, which is refused
 the same way). The fixes are the toolkit's own steps (`bitrix finalize`,
 `self migrate`), one at a time.
+
+## status
+Where a site stands on its creation route (1.56.0), one answer for every
+profile, so the panel draws one step tracker:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site status --domain example.com --output json
+```
+
+`simai-site-status/1`: `domain`, `profile`, `route`
+(`new|restore|repo|installed|none`), `step` (a step id of the route in `self
+profiles`, or `done`), `next` (the gateway command of that step, `open_url`
+or null), `restore_url` / `installer_url` (for an `open_url` step),
+`pending` (what the next step changes) and `detail` (profile facts, no
+secrets).
+
+| Profile | Steps |
+| --- | --- |
+| bitrix | as `bitrix status`: `prepare`, `upload`, `validate`, `run_restore`, `run_setup`, `finalize`, `done`; route `setup` is answered as `new` |
+| laravel | `deploy` (no application yet, next `site:deploy`), `configure` (no `APP_KEY` in the shared `.env`; `laravel finalize` generates it), `finalize` (the scheduler the application wants is missing, next `cron:add`), `done`; route `repo` with releases |
+| others | `prepare` (the placeholder page is still there; next `site:deploy` for static and node, `file:upload` otherwise) or `done`; redirect and proxy sites are always `done` |
+
+A profile adds its own answer with a function
+`site_status_profile_<profile>` that fills the `SS_*` variables (see
+`admin/commands/site_flow.sh`); WordPress gets one with its own steps.
 
 ## nginx-custom
 Set a site's own nginx directives, included at server level of the site's

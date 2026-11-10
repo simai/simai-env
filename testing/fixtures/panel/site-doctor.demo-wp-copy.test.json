@@ -1,0 +1,239 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-doctor.demo-wp-copy.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-diagnostics/1",
+    "profile": "wordpress",
+    "status": "FAIL",
+    "summary": {
+      "PASS": 29,
+      "WARN": 1,
+      "FAIL": 2,
+      "SKIP": 1
+    },
+    "checks": [
+      {
+        "id": 1,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Project slug"
+      },
+      {
+        "id": 2,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Project root"
+      },
+      {
+        "id": 3,
+        "status": "PASS",
+        "area": "profile",
+        "title": "Profile"
+      },
+      {
+        "id": 4,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Root directory"
+      },
+      {
+        "id": 5,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Docroot"
+      },
+      {
+        "id": 6,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Bootstrap files"
+      },
+      {
+        "id": 7,
+        "status": "PASS",
+        "area": "fs",
+        "title": "Writable path"
+      },
+      {
+        "id": 8,
+        "status": "PASS",
+        "area": "fs",
+        "title": ".env permissions"
+      },
+      {
+        "id": 9,
+        "status": "PASS",
+        "area": "fs",
+        "title": "World-writable files"
+      },
+      {
+        "id": 10,
+        "status": "PASS",
+        "area": "app",
+        "title": "WordPress cron mode"
+      },
+      {
+        "id": 11,
+        "status": "PASS",
+        "area": "app",
+        "title": "WordPress cron entrypoint"
+      },
+      {
+        "id": 12,
+        "status": "PASS",
+        "area": "rules",
+        "title": "WordPress copies and dumps outside the web root",
+        "key": "wordpress.leftovers",
+        "fix": "wordpress.leftovers",
+        "since": null,
+        "detail": "none in the web root"
+      },
+      {
+        "id": 13,
+        "status": "FAIL",
+        "area": "rules",
+        "title": "wp-config.php is not readable by other accounts",
+        "key": "wordpress.config-perms",
+        "fix": "wordpress.config-perms",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "mode 644: other accounts can read the database password"
+      },
+      {
+        "id": 14,
+        "status": "PASS",
+        "area": "rules",
+        "title": "WordPress debug output is off",
+        "key": "wordpress.debug-off",
+        "fix": "wordpress.debug-off",
+        "since": null,
+        "detail": "debug off"
+      },
+      {
+        "id": 15,
+        "status": "PASS",
+        "area": "rules",
+        "title": "WordPress scheduler runs from system cron",
+        "key": "wordpress.cron",
+        "fix": "wordpress.cron",
+        "since": null,
+        "detail": "system cron, DISABLE_WP_CRON true"
+      },
+      {
+        "id": 16,
+        "status": "WARN",
+        "area": "rules",
+        "title": "PHP-FPM reload lets requests finish",
+        "key": "php.fpm-graceful-reload",
+        "fix": "php.fpm-graceful-reload",
+        "since": "2026-01-01T00:00:00Z",
+        "detail": "a reload kills busy requests (502)"
+      },
+      {
+        "id": 17,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Config exists"
+      },
+      {
+        "id": 18,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Enabled link"
+      },
+      {
+        "id": 19,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "Healthcheck location"
+      },
+      {
+        "id": 20,
+        "status": "PASS",
+        "area": "nginx",
+        "title": "nginx -t"
+      },
+      {
+        "id": 21,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP version"
+      },
+      {
+        "id": 22,
+        "status": "PASS",
+        "area": "php",
+        "title": "PHP binary"
+      },
+      {
+        "id": 23,
+        "status": "PASS",
+        "area": "php",
+        "title": "php-fpm service"
+      },
+      {
+        "id": 24,
+        "status": "PASS",
+        "area": "php",
+        "title": "Pool config"
+      },
+      {
+        "id": 25,
+        "status": "PASS",
+        "area": "php",
+        "title": "Socket"
+      },
+      {
+        "id": 26,
+        "status": "FAIL",
+        "area": "php",
+        "title": "Required extensions"
+      },
+      {
+        "id": 27,
+        "status": "PASS",
+        "area": "php",
+        "title": "Recommended extensions"
+      },
+      {
+        "id": 28,
+        "status": "PASS",
+        "area": "cron",
+        "title": "Cron file"
+      },
+      {
+        "id": 29,
+        "status": "SKIP",
+        "area": "ssl",
+        "title": "SSL"
+      },
+      {
+        "id": 30,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL service"
+      },
+      {
+        "id": 31,
+        "status": "PASS",
+        "area": "db",
+        "title": "MySQL network exposure"
+      },
+      {
+        "id": 32,
+        "status": "PASS",
+        "area": "db",
+        "title": "db.env"
+      },
+      {
+        "id": 33,
+        "status": "PASS",
+        "area": "db",
+        "title": ".env presence"
+      }
+    ]
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

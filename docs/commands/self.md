@@ -525,6 +525,44 @@ A site wizard builds its form from this answer. `--output json` answers
 sudo /root/simai-env/simai-admin.sh self profiles
 ```
 
+Each profile also answers `routes` (1.56.0): the ways a site of it is
+created, so the wizard needs no copy of them.
+
+| Route | Meaning |
+| --- | --- |
+| `new` | simai-env prepares PHP, the database, the scheduler; the application installs itself (Bitrix installer) or the files are uploaded |
+| `restore` | from a copy (a Bitrix backup archive and `restore.php`) |
+| `repo` | a release from Git (`site deploy --git --ref`), or a built archive for static sites |
+
+A route is `{id, title, available, inputs, steps}`:
+
+- `available: false` marks a planned route (WordPress `new` and `restore`,
+  generic PHP `restore` from a files archive and an SQL dump): the wizard
+  shows it greyed out.
+- `inputs [{name, required, kind, values?, default?, pattern?}]`; `kind` is
+  `text`, `choice`, `url`, `file_on_server` (a file the route puts on the
+  server first, such as a backup archive uploaded to the site root) or
+  `upload` (bytes sent with the step, the static archive of `site:deploy`).
+  An input named like a `site add` argument carries its values and pattern
+  (PHP versions installed here).
+- `steps [{id, title, command, args | url_from}]`: `command` is a panel
+  gateway command (`site:add`, `file:upload`, `bitrix:restore-ready`,
+  `bitrix:finalize`, `site:deploy`, `site:doctor`) or `open_url`, which opens
+  the address named by `url_from` in the `site:status` answer
+  (`installer_url`, `restore_url`). `args` are fixed arguments of the step
+  (`bitrix-files: setup`). Step ids are the `step` values of `site status`,
+  so the panel marks where a site is. The last step is always `site:doctor`.
+
+Routes are declared in the profile file:
+
+```bash
+PROFILE_ROUTES=("new|yes|New site: the Bitrix installer sets it up" "restore|yes|Restore from a Bitrix backup")
+PROFILE_ROUTE_NEW_INPUTS=("domain|yes|text" "php|no|choice")
+PROFILE_ROUTE_NEW_STEPS=("add|site:add|bitrix-files=setup|Create the site" "run_setup|open_url|installer_url|Install Bitrix" "finalize|bitrix:finalize||Finish the setup" "done|site:doctor||Check the site")
+```
+
+`self profiles` (human output) lists each route's commands under its profile.
+
 ## settings / setting-set
 
 ```bash

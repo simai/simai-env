@@ -6,14 +6,23 @@
   "data": {
     "command": "site:add",
     "args": {
-      "domain": "demo-bitrix.test",
-      "profile": "bitrix",
-      "bitrix-files": "setup"
+      "domain": "new-bitrix.test",
+      "profile": "bitrix"
     },
-    "target": "demo-bitrix.test",
+    "target": "new-bitrix.test",
     "description": "Create site scaffolding (nginx/php-fpm)",
     "effects": "write",
     "lock": "host",
-    "applied": false
+    "applied": false,
+    "resources": {
+      "disk_free_bytes": 1394521808896,
+      "needed_bytes": 0,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": true,
+      "refusal": null,
+      "warnings": []
+    }
   }
 }

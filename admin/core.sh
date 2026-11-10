@@ -431,14 +431,23 @@ run_command() {
   if [[ "$preview" == yes && -n "${CMD_PLAN_HANDLER[$key]:-}" && "$output" != json ]]; then
     preview=no
   fi
-  if [[ "$preview" == yes ]] && ! command_plan_check "$key" "${command_args[@]}"; then
-    [[ "$output" != json ]] || command_result failed 1 "$key" "$target" "$corr_id" "$effect" ''
-    return 1
-  fi
   if [[ "$preview" == yes ]]; then
+    # A plan check may leave data for the JSON plan (resources, what a
+    # restore found); lib/command_contract.py passes it on for audited plans.
+    local plan_data plan_rc=0
+    plan_data=$(mktemp)
+    chmod 0600 "$plan_data"
+    SIMAI_PLAN_DATA="$plan_data" command_plan_check "$key" "${command_args[@]}" || plan_rc=$?
+    if (( plan_rc != 0 )); then
+      [[ "$output" != json ]] || command_result failed 1 "$key" "$target" "$corr_id" "$effect" "$plan_data"
+      rm -f "$plan_data"
+      return 1
+    fi
     if [[ "$output" == json ]]; then
-      command_result planned 0 "$key" "$target" "$corr_id" "$effect" ''
+      command_result planned 0 "$key" "$target" "$corr_id" "$effect" "$plan_data"
+      rm -f "$plan_data"
     else
+      rm -f "$plan_data"
       command_preview "$key" "$target" "${command_args[@]}"
     fi
     return 0
@@ -607,6 +616,9 @@ redact_by_key() {
   local key="$1" value="$2"
   if [[ "$key" =~ (pass|password|secret|token|key|cert|value) ]]; then
     echo "***"
+  elif [[ "$key" == url && "$value" == *\?* ]]; then
+    # A signed URL: the query string is the signature.
+    printf '%s?***\n' "${value%%\?*}" | sed -E 's#(https?://)[^/[:space:]]*@#\1***@#g'
   else
     printf '%s\n' "$value" | sed -E 's#(https?://)[^/[:space:]]*@#\1***@#g'
   fi

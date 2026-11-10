@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 276,
+    "count": 279,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -910,7 +910,10 @@
           "--overwrite": null,
           "--preseed": null,
           "--short-install": null,
-          "--archive": null
+          "--archive": null,
+          "--source": null,
+          "--url": null,
+          "--url-file": null
         },
         "flags": [
           "menu:confirm"
@@ -6140,6 +6143,30 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh site status",
+        "description": "Show where a site stands on its creation route: route, step, next command (JSON with --output json)",
+        "required": [
+          "--domain"
+        ],
+        "optional": {},
+        "flags": [
+          "tier:advanced",
+          "effects:read"
+        ],
+        "effects": "read",
+        "authorization": "root",
+        "confirmation": "not-required",
+        "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh site usage-set",
         "description": "Set user-facing site usage class",
         "required": [],
@@ -6623,6 +6650,35 @@
         "conditional_effects": null
       },
       {
+        "command": "simai-admin.sh wp install",
+        "description": "Install WordPress end to end: core, wp-config, admin (password shown once), finalize",
+        "required": [
+          "--domain",
+          "--title",
+          "--admin-user",
+          "--admin-email"
+        ],
+        "optional": {
+          "--locale": null,
+          "--confirm": null
+        },
+        "flags": [
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
         "command": "simai-admin.sh wp installer-ready",
         "description": "Prepare WordPress installer files (core + config + wp-cli)",
         "required": [
@@ -6689,6 +6745,34 @@
         "authorization": "root",
         "confirmation": "not-required",
         "lock": "none",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh wp restore-ready",
+        "description": "Restore a WordPress copy from a files archive and a database dump, then finalize",
+        "required": [
+          "--domain",
+          "--files",
+          "--dump"
+        ],
+        "optional": {
+          "--overwrite": null,
+          "--confirm": null
+        },
+        "flags": [
+          "plan:handler"
+        ],
+        "effects": "write",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
         "verification": "exit status; inspect the target with site describe/doctor or self describe",
         "global_options": {
           "--confirm": "yes|no",

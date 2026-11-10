@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.55.1",
+      "version": "1.56.0",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -100,6 +100,7 @@
         "job:list",
         "job:log",
         "job:status",
+        "laravel:finalize",
         "logs:nginx",
         "php:extensions",
         "queue:restart",
@@ -129,10 +130,15 @@
         "site:remove",
         "site:service-restart",
         "site:set-php",
+        "site:status",
         "ssl:dns-status",
         "ssl:letsencrypt",
         "ssl:remove",
-        "ssl:renew"
+        "ssl:renew",
+        "wp:finalize",
+        "wp:install",
+        "wp:restore-ready",
+        "wp:status"
       ]
     }
   },

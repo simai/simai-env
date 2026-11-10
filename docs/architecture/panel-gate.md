@@ -188,7 +188,7 @@ simai-env result status: `site doctor` answers `ok` with
 | `status` | Meaning |
 | --- | --- |
 | `ok` | `kind` is `result` (data), `plan` (what an action would do) or `job` (`job_id` of a started action) |
-| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `owner_blocked`, `attachment_mismatch`, `unknown_job`, `not_running`; for site names `name_taken`, `name_is_primary`, `name_limit`, `name_unknown` |
+| `refused` | not run; `reason`: `bad_request`, `too_large`, `bad_actor`, `not_allowed`, `invalid_argument`, `owner_scope`, `owner_blocked`, `attachment_mismatch`, `unknown_job`, `not_running`; for site names `name_taken`, `name_is_primary`, `name_limit`, `name_unknown`; before `site:add` / `bitrix:restore-ready` `not_enough_disk`, `not_enough_ram`, `source_invalid`, `url_invalid` (with `data`: what the check found) |
 | `failed` | ran and failed; `reason`: the simai-env error code, `invalid_output`, `plan_failed` or `job_not_started` |
 
 Secrets are never part of an answer: no `.env` values, database passwords,
@@ -285,7 +285,7 @@ human output and exit code are in `/var/lib/simai-env/panel-jobs/<job_id>/`
 
 | Command | Answer |
 | --- | --- |
-| `job:status` `{job_id}` | `state`: `running`, `succeeded`, `failed`, `busy` (target locked), `cancelled`; exit code, command, arguments, actor |
+| `job:status` `{job_id}` | `state`: `running`, `succeeded`, `failed`, `busy` (target locked), `cancelled`; exit code, command, arguments, actor; `result` when the command left one (values such as `wp:install`'s `admin_password` only in the first answer after the job ended) |
 | `job:log` `{job_id, after}` | up to 1000 output lines after the cursor and `next`, for a live view |
 | `job:cancel` `{job_id}` | stops the unit; refused `not_running` for a finished job |
 | `job:list` | the last 100 jobs |
@@ -399,7 +399,15 @@ Host services and site profiles (1.33.0):
   and `profiles [{id, title, php {versions, min, default} | null, db:
   no|optional|required, cron, queue, alias, args [{name, required, values |
   pattern, default, description}]}]`. Only the profiles `site:add` accepts
-  through the gateway (no `alias`). Build the site wizard from it.
+  through the gateway (no `alias`). Build the site wizard from it. Since
+  1.56.0 each profile also carries `routes [{id: new|restore|repo, title,
+  available, inputs [{name, required, kind, values?}], steps [{id, title,
+  command, args | url_from}]}]` (docs/commands/self.md): every step is a
+  gateway command or `open_url`, the last one `site:doctor`.
+- `site:status {domain}` (1.56.0, read, `simai-site-status/1`): `route`,
+  `step`, `next`, `restore_url`, `installer_url`, `pending`, `detail` for a
+  site of any profile; `step` is a step id of the route, so the panel draws
+  one step tracker for every profile (docs/commands/site.md).
 - `site:add` takes `profile: proxy` with `upstream-port` (a service on
   127.0.0.1, not 80 or 443), `upstream-path`, `websockets: yes|no`, and
   `profile: bitrix` with `bitrix-files: none|setup|restore`. A profile the
@@ -677,6 +685,61 @@ action, job). Everything else is refused.
   (the command for the step, or `open_url`), `restore_url` /
   `installer_url` for the wizard steps and `pending` (rules `bitrix:finalize`
   will fix).
+- 1.56.0: `laravel:finalize {domain, migrate}` (APP_KEY and the Laravel
+  baseline after a panel deploy; `site:status` answers it as `next` of the
+  `configure` step);
+- 1.56.0: `site:status {domain}` (read, `simai-site-status/1`, the same
+  keys for every profile); `self:profiles` answers `routes` per profile
+  (`new`, `restore`, `repo` with inputs and steps). Fixture set 32 adds
+  `site-status.<site>` for the demo sites and
+  `site-status.demo-bitrix.test.<step>` along the Bitrix restore.
+
+- 1.56.0: `bitrix:restore-ready {domain, archive, source, url}`: `source`
+  is a path relative to the site directory (letters, digits, `._/-`, no
+  `..`, no leading `/`) holding the volumes uploaded over SFTP; `url` an
+  https address ending with the archive name (`.tar.gz`, `.tgz`, `.tar`,
+  `.enc.gz`), with an optional query string; not both. The URL goes to the
+  command as a file (`--url-file`, removed when the job ends), and plans
+  and job records show it without its query string. `archive` also accepts
+  `.enc.gz`. Plans of `site:add` and `bitrix:restore-ready` carry
+  `resources` `{disk_free_bytes, needed_bytes, ram_mb, ram_min_mb,
+  ram_recommended_mb, ok, refusal, warnings: [{code, message}]}`
+  (warnings `ram_below_recommended`, `size_unknown`, `disk_unknown`);
+  the `bitrix:restore-ready` plan also `archive` `{base, dir, source, url,
+  volumes: [{name, size}], count, total_bytes, encrypted}` (null when
+  nothing was found). Before a plan and again before a job the gateway
+  refuses `not_enough_disk` (free disk on the docroot filesystem below
+  three times the archive), `not_enough_ram` (memory below the profile's
+  minimum), `source_invalid` (a link, a path outside the site directory or
+  inside another site's, no or several archives) and `url_invalid` (a host
+  that does not resolve to public addresses only); the refused answer
+  carries `data` `{resources, archive, detail}`. The job log lists the
+  volumes moved, their size, encryption and the SQL dump; `bitrix:status`
+  then shows the step.
+- 1.56.0: WordPress by one click. `wp:status {domain}` (read,
+  `simai-wp-status/1`: `route` new|restore|installed|none, `step`
+  prepare|upload|install|finalize|done, `next` (`wp:install`,
+  `file:upload`, `wp:restore-ready`, `wp:finalize` or null), `url`,
+  `pending` (rules `wp:finalize` will fix), `files` and `dumps` found in the
+  site directory); `wp:install {domain, title, admin-user, admin-email,
+  locale}` (a title may not start with `-`); `wp:restore-ready {domain,
+  files, dump, overwrite}` (`files` and `dump` are paths in the site
+  directory without `.`/`..` parts; the command refuses symlinks and other
+  file types again); `wp:finalize {domain}`. Profile rules
+  `wordpress.leftovers`, `wordpress.config-perms`, `wordpress.debug-off`,
+  `wordpress.cron` work with `site:check-state` / `site:check-fix`.
+  The admin password `wp:install` generates is delivered in the job result
+  only. The job's human output (its log) says "in the job result"; the
+  command writes `{admin_user, admin_password, login_url}` to the job's
+  root-only `result.json`, and the first `job:status` of the finished job
+  (succeeded or failed) returns it as `result`. That call moves the file
+  away first, so only one caller gets it, and writes back the result
+  without the password plus `shown_once: ["admin_password"]`; later
+  `job:status` calls and `job:list` never carry it. A panel that misses the
+  answer cannot ask again: the password is reset in WordPress ("Lost your
+  password?") or with `wp user update`. Chosen over an `admin-password`
+  argument so that no password is typed, sent to the gateway or kept in a
+  job record at all.
 
 Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always

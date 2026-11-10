@@ -9,6 +9,14 @@
     "domain": "demo-owned.test",
     "runs": [
       {
+        "started_at": "2026-11-10T13:50:01Z",
+        "finished_at": "2026-11-10T13:50:01Z",
+        "exit_code": 1,
+        "output": [
+          "Could not open input file: artisan"
+        ]
+      },
+      {
         "started_at": "2026-01-01T00:00:00Z",
         "finished_at": "2026-01-01T00:00:02Z",
         "exit_code": 0,

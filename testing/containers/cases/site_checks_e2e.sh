@@ -135,6 +135,10 @@ done
 grep -qF 'location ~ /\.(?!well-known/|default/) {' "$conf" && ok '.default rule restored' || bad '.default rule'
 [[ "$(mysql -NBe "SELECT DEFAULT_CHARACTER_SET_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='${db}'")" == utf8mb4 ]] \
   && ok 'database default is utf8mb4' || bad 'db charset'
+mysql -e "ALTER DATABASE \`${db}\` COLLATE utf8mb4_0900_ai_ci" 2>/dev/null \
+  && [[ "$(cli site check-state --domain "$D" --id bitrix.db-charset --output json 2>/dev/null | j "d['data']['state']")" == ok ]] \
+  && ok 'utf8mb4 with the MySQL 8 collation holds' || bad 'utf8mb4_0900_ai_ci flagged'
+mysql -e "ALTER DATABASE \`${db}\` COLLATE utf8mb4_unicode_ci" 2>/dev/null
 grep -q '^date.timezone=' "/etc/simai-env/sites/$D/php.ini" && ok 'timezone set for the site' || { bad 'timezone'; cat "/tmp/sc-fix-bitrix.timezone.out"; cat "/etc/simai-env/sites/$D/php.ini"; }
 [[ -f $opc ]] && grep -q '^process_control_timeout' "$fpm" && ok 'OPcache baseline and graceful reload back' || bad 'host fixes'
 d2=$(doctor)

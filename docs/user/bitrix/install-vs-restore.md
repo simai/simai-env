@@ -105,6 +105,15 @@ What `restore-ready` prepares:
 
 Upload every archive volume and run `restore-ready` again before opening the browser wizard. A missing or corrupt part stops the flow and identifies the first bad filename.
 
+For a large archive, do not upload it through a browser. Copy the volumes over SFTP into any folder of the site directory and let `restore-ready` move them into the docroot (or fetch the archive from an https link with `--url`):
+
+```bash
+sudo /root/simai-env/simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup
+sudo /root/simai-env/simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup --confirm yes
+```
+
+The plan says what was found (volumes, size, encrypted, SQL dump) and refuses when the server cannot take it: less free disk than three times the archive, or less memory than the Bitrix profile needs (1536 MB; 4096 MB recommended, below that it warns).
+
 The Bitrix restore wizard still runs in the browser. It may unpack files, restore database content, and change application configuration.
 
 ## When The Site Already Has Files

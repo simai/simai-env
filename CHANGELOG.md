@@ -2,6 +2,98 @@
 
 ## Unreleased
 
+## 1.56.0 - 2026-11-10
+
+- Site creation routes for the panel wizard (1.56.0). `self profiles`
+  answers `routes` per profile: `new` (simai-env prepares PHP, database,
+  scheduler; the application installs itself), `restore` (from a copy) and
+  `repo` (a Git or archive release), each with its inputs and steps (gateway
+  commands or `open_url`, always ending on `site:doctor`). Declared in the
+  profile files (`PROFILE_ROUTES`, `PROFILE_ROUTE_<ID>_INPUTS`,
+  `PROFILE_ROUTE_<ID>_STEPS`). Bitrix: new and restore; Laravel and Node:
+  repo; static: new and repo; generic PHP: new, restore planned (`available: false`);
+  WordPress (see below): new and restore.
+
+- New `site status --domain D` (`--output json`: `simai-site-status/1`):
+  route, step, next command, wizard URL and pending items in one shape for
+  every profile. Bitrix follows `bitrix status`, Laravel answers deploy,
+  configure, finalize, done; other profiles prepare or done. A profile adds
+  its own answer with `site_status_profile_<profile>`. Panel gateway:
+  `site:status` (read). Test `routes_e2e`; fixture set 32 (not recorded
+  yet).
+
+- `bitrix restore-ready --source <path>`: restore from an archive already on
+  the server. Volumes uploaded over SFTP anywhere in the site directory
+  (`<name>.tar.gz`, `.tgz`, `.tar` or `.enc.gz` with parts `.1 .. .N`) are
+  moved into the docroot as the site user; `..`, paths outside the site or in
+  another site's directory, symbolic links and hard-linked volumes are refused
+  (`source_invalid`), an existing name in the docroot is never replaced.
+  `--url <https URL>` (or `--url-file`) downloads the base volume (and the
+  parts of an unsigned URL) as the site user into `restore-download`, at low
+  priority and resumable: https only, no redirects, public addresses only,
+  `SIMAI_BITRIX_URL_MAX_GB` per file; the URL never goes on a command line and
+  is logged without its query string. Encrypted `.enc.gz` archives are
+  recognized and validated.
+- `bitrix restore-ready` names what it found (volumes, count, total size,
+  encrypted, SQL dump in the archive) and answers it with `--output json`
+  (`simai-bitrix-restore-ready/1`).
+- Resources in plans. `site add` and `bitrix restore-ready` refuse when the
+  server cannot take the site: free disk on the docroot filesystem below three
+  times the archive (`not_enough_disk`), memory below the profile's new
+  `PROFILE_MIN_RAM_MB` (`not_enough_ram`; bitrix 1536 MB), and warn below
+  `PROFILE_RECOMMENDED_RAM_MB` (bitrix 4096 MB). Their JSON plans carry
+  `data.resources`; the handlers check again before changing anything.
+- Panel gateway: plans of `site:add` and `bitrix:restore-ready` carry
+  `resources` (and `archive` for a restore); `not_enough_disk`,
+  `not_enough_ram`, `source_invalid` and `url_invalid` are refused before a
+  plan and before a job, with what the check found. `bitrix:restore-ready`
+  takes `source` and `url`. Test `bitrix_restore_source_e2e`.
+- Data backups skip `restore-download` (an archive download in progress).
+- WordPress by one click. `wp install --domain D --title T --admin-user U
+  --admin-email E [--locale ru_RU]` (plan without `--confirm yes`): the
+  official core package for the locale checked against its published SHA-1,
+  `wp-config.php` from `db.env` with fresh salts, `wp core install` as the
+  site user, then `wp finalize`. The generated admin password is shown once,
+  only in the result (human output, `data.admin_password` of `--output
+  json`, or a panel job's result) and never in a log, the audit log, a job
+  log or a file kept on disk.
+
+- `wp restore-ready --domain D --files <archive> --dump <sql|sql.gz>`: a
+  copy of a site from files inside the site directory (no `..`, no
+  symlinks), unpacked and imported as the site user with the site's own
+  credentials, `wp-config.php` DB constants from `db.env`, `home`/`siteurl`
+  and links rewritten with `wp search-replace` when the domain changed, then
+  `wp finalize`; `--overwrite yes` backs the current site up first.
+
+- `wp status --output json` (`simai-wp-status/1`): route
+  new|restore|installed|none and step prepare|upload|install|finalize|done
+  with `next`, `url`, `pending` and the uploaded `files`/`dumps`.
+
+- WordPress profile rules for `site doctor` and `site check-fix`:
+  `wordpress.leftovers`, `wordpress.config-perms`, `wordpress.debug-off`,
+  `wordpress.cron`; `wp finalize` applies them. `wp-config.php` edits run as
+  its owner and never follow a symlink.
+
+- WP-CLI is the official phar checked against its published SHA-512, kept
+  root-owned in `/usr/local/lib/simai-env/wp-cli.phar`, and always run as
+  the site user; `wp installer-ready` checks the core package's SHA-1 too.
+
+- Panel gateway: `wp:status`, `wp:install`, `wp:restore-ready`,
+  `wp:finalize`; job results can hold values shown once (`job:status`
+  returns `admin_password` in the first answer after the job ended, then
+  `shown_once`). Test `wp_install_e2e`.
+
+- `bitrix.db-charset` warned on a utf8mb4 database with the MySQL 8
+  collation `utf8mb4_0900_ai_ci` (a real restored site): only the charset
+  counts now, and `bitrix finalize` keeps such a database as it is.
+
+- Panel gateway: `laravel:finalize {domain, migrate}`, the `next` command of
+  the Laravel `configure` step (APP_KEY after a deploy from the panel).
+
+- `wordpress.leftovers` moves dumps, `.wpress` and archives whose name says
+  they are a copy of the site (backup, dump, full, site, ...); other zip or
+  tar files the site serves stay.
+
 ## 1.55.1 - 2026-11-10
 
 - `bitrix.timezone` warned when PHP said `UTC` and the server `Etc/UTC`

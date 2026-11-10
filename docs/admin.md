@@ -96,6 +96,8 @@ See `docs/architecture/profiles.md`.
 - `laravel finalize --domain <domain> --confirm yes [--migrate yes] [--ssl yes --email <email>]`: complete Laravel post-bootstrap baseline (APP_KEY, storage link, scheduler, baseline optimization, optional migrations and Let's Encrypt).
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel optimization status and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress optimization status and apply flow.
+- `wp install --domain <domain> --title <t> --admin-user <u> --admin-email <e> --confirm yes`: install WordPress end to end (checked core package, wp-config from db.env, admin with a password shown once, finalize).
+- `wp restore-ready --domain <domain> --files <archive> --dump <sql|sql.gz> --confirm yes`: restore a copy of a WordPress site from files in the site directory, rewriting its URL to the domain, then finalize.
 - `wp installer-ready --domain <domain>`: prepare WordPress core files, generated `wp-config.php`, and `wp-cli` so the browser installer can run cleanly.
 - `wp finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: complete a finished WordPress web install in one step (optimization baseline + scheduler baseline + optional Let's Encrypt).
 - `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix optimization status and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).

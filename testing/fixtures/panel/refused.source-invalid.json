@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.source-invalid",
+  "status": "refused",
+  "reason": "source_invalid",
+  "data": {
+    "resources": {
+      "disk_free_bytes": 1394521825280,
+      "needed_bytes": 0,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": true,
+      "refusal": null,
+      "warnings": []
+    },
+    "archive": null,
+    "detail": "--source upload/etc-link: etc-link is a symbolic link"
+  }
+}

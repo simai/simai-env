@@ -72,7 +72,8 @@ backup_data_file_excludes() {
   local profile="$1"
   # restore-archive: an already compressed backup kept next to the docroot
   # after a restore; packing it again only doubles the size and the load.
-  printf '%s\n' './.git' './restore-archive' '*/node_modules' './storage/logs' './storage/framework/cache' \
+  # restore-download: a download for bitrix restore-ready --url in progress.
+  printf '%s\n' './.git' './restore-archive' './restore-download' '*/node_modules' './storage/logs' './storage/framework/cache' \
     './storage/framework/sessions' './storage/framework/views'
   if [[ "$profile" == "bitrix" ]]; then
     printf '%s\n' './public/bitrix/cache' './public/bitrix/managed_cache' './public/bitrix/stack_cache' \

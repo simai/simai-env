@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-status.demo-redirect.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-status/1",
+    "domain": "demo-redirect.test",
+    "profile": "redirect",
+    "route": "installed",
+    "step": "done",
+    "next": null,
+    "restore_url": null,
+    "installer_url": null,
+    "pending": [],
+    "detail": {}
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

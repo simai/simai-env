@@ -1,0 +1,22 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-status.demo-owned.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-status/1",
+    "domain": "demo-owned.test",
+    "profile": "generic",
+    "route": "none",
+    "step": "prepare",
+    "next": "file:upload",
+    "restore_url": null,
+    "installer_url": null,
+    "pending": [],
+    "detail": {
+      "index": "index.php"
+    }
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

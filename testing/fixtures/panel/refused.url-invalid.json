@@ -1,0 +1,20 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.url-invalid",
+  "status": "refused",
+  "reason": "url_invalid",
+  "data": {
+    "resources": {
+      "disk_free_bytes": 1394521812992,
+      "needed_bytes": 0,
+      "ram_mb": 14963,
+      "ram_min_mb": 0,
+      "ram_recommended_mb": 0,
+      "ok": true,
+      "refusal": null,
+      "warnings": []
+    },
+    "archive": null,
+    "detail": "--url host 127.0.0.1 does not resolve to a public address"
+  }
+}

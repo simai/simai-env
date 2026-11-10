@@ -163,6 +163,7 @@ Notes:
 
 ```bash
 simai-admin.sh bitrix restore-ready --domain <domain> [--overwrite yes] [--preseed auto|yes|no] [--short-install yes|no] [--archive auto|none|<filename>]
+  [--source <path in the site directory> | --url <https URL> | --url-file <file with the URL>] [--output json]
 ```
 
 Prepares a Bitrix site for restore from an existing backup archive:
@@ -179,6 +180,77 @@ Notes:
 - With the default `--archive auto`, run the command again after uploading all archive volumes. If no archive is present, it prints upload and validation steps instead of inviting the operator to open the wizard.
 - A missing or corrupt volume fails closed and names the first bad file. `--archive <filename>` selects one base archive when several are present. `--archive none` is an explicit advanced bypass.
 - After the browser restore wizard finishes, run `bitrix finalize --domain <domain> --confirm yes`.
+
+### Archive already on the server (1.56.0)
+
+A large archive should not go through a browser. Upload it over SFTP into the
+site directory (any folder, for example `upload/backup`), then:
+
+```bash
+simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup             # plan: what was found, resources
+simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup --confirm yes
+```
+
+- `--source` is a path relative to the site directory (an absolute path must
+  be inside it): the base volume (`<name>.tar.gz`, `.tgz`, `.tar` or the
+  encrypted `.enc.gz`, or one of its parts `.N`) or a folder holding exactly
+  one base volume. Its parts `<name>.1 .. <name>.N` are taken with it.
+- The volumes are moved (link and unlink on one filesystem, a copy across
+  filesystems) into the docroot as the site user. Nothing is replaced: a
+  volume name that already exists in the docroot refuses the move.
+- Refused (`source_invalid`, the reason in the answer): `..`, a path outside
+  the site directory or inside another site's directory, a symbolic link
+  anywhere on the way or as a volume, a volume with other hard links, no or
+  several base volumes in the folder.
+- `--url https://...` downloads the base volume into `<site>/restore-download`
+  (excluded from data backups) as the site user, at low CPU and I/O priority,
+  resumable (run the command again after an interruption), then moves it in
+  like `--source`. https only, no redirects, the host must resolve only to
+  public addresses (curl is pinned to the checked one), size limit
+  `SIMAI_BITRIX_URL_MAX_GB` per file (default 50). A multi-volume archive is
+  fetched as `<url>.1 .. <url>.N` only from an unsigned URL; a signed URL
+  covers one file, so upload such volumes over SFTP. The URL is passed to
+  curl on stdin, and plans, answers and logs show it without its query string
+  (a signature). `--url-file` reads the URL from a file instead of the
+  command line (the panel gateway uses it).
+
+Resources, in the plan and again before anything is moved or downloaded:
+
+- free disk on the docroot filesystem below three times the archive refuses
+  (`not_enough_disk`): the archive, the unpacked files and the database
+  import need room at once;
+- memory below `PROFILE_MIN_RAM_MB` of the bitrix profile (1536 MB) refuses
+  (`not_enough_ram`); below `PROFILE_RECOMMENDED_RAM_MB` (4096 MB) the plan
+  warns (`ram_below_recommended`); for `--url` an unknown size warns
+  (`size_unknown`) and the disk is checked again after the first volume.
+
+What it found is printed (volumes, count, size, encrypted, SQL dump) and,
+with `--output json`, answered as data:
+
+```json
+{"schema": "simai-bitrix-restore-ready/1", "domain": "example.com", "status": "ready",
+ "restore_url": "https://example.com/restore.php",
+ "archive": {"state": "ready", "name": "site_20261110_full_abc.tar.gz", "parts": 2,
+             "volumes": [{"name": "site_20261110_full_abc.tar.gz", "size": 1048576000},
+                         {"name": "site_20261110_full_abc.tar.gz.1", "size": 52428800}],
+             "count": 2, "total_bytes": 1101004800, "encrypted": false, "sql_dump": true,
+             "detail": "All archive volumes passed gzip integrity checks"},
+ "moved": ["site_20261110_full_abc.tar.gz", "site_20261110_full_abc.tar.gz.1"],
+ "found": {"base": "...", "dir": "public", "source": "upload/backup", "url": null, "volumes": [...],
+           "count": 2, "total_bytes": 1101004800, "encrypted": false},
+ "resources": {"disk_free_bytes": 9000000000, "needed_bytes": 3303014400, "ram_mb": 1963,
+               "ram_min_mb": 1536, "ram_recommended_mb": 4096, "ok": true, "refusal": null,
+               "warnings": [{"code": "ram_below_recommended", "message": "..."}]},
+ "restore_php": "ready", "preseed": "ready", "writable": "ready", "refusal": null, "detail": null}
+```
+
+`status` is `ready`, `waiting_for_archive`, `partial` or `refused` (then
+`refusal` and `detail` say why). `sql_dump` is `true` when the archive lists
+`bitrix/backup/*.sql`, `false` when a fully listed archive has none, `null`
+when it cannot be read without unpacking (encrypted, or not in the first of
+several volumes). The plan (`--output json` without `--confirm`) carries
+`data.resources`, `data.archive` (what was found, as `found` above),
+`data.refusal` and `data.detail`; a refused plan is `failed` with the same data.
 
 ## Finalize
 

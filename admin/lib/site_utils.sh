@@ -2676,40 +2676,146 @@ wordpress_wp_cli_url() {
   echo "${SIMAI_WORDPRESS_WPCLI_URL:-https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar}"
 }
 
-wordpress_wp_cli_install() {
-  if command -v wp >/dev/null 2>&1; then
-    return 0
-  fi
-  if ! command -v php >/dev/null 2>&1; then
+# The toolkit's own WP-CLI: the official phar, checked against the SHA-512
+# published next to it, root-owned; /usr/local/bin/wp points to it.
+WORDPRESS_WP_CLI_PHAR="/usr/local/lib/simai-env/wp-cli.phar"
+
+# Downloads a URL to a file (curl or wget); 1 when it fails or is empty.
+wordpress_fetch() {
+  local url="$1" dest="$2" max="${3:-600}"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL --max-time "$max" --retry 2 "$url" -o "$dest" 2>>"${LOG_FILE:-/dev/null}" || return 1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url" 2>>"${LOG_FILE:-/dev/null}" || return 1
+  else
     return 1
   fi
-  local url tmp target
+  [[ -s "$dest" ]]
+}
+
+# Checks a file against a published checksum (the first hex word of the
+# checksum file at sum_url, or the value given).
+wordpress_checksum_ok() {
+  local file="$1" algo="$2" sum_url="$3" want="${4:-}" sum_file have
+  if [[ -z "$want" ]]; then
+    sum_file=$(mktemp)
+    if ! wordpress_fetch "$sum_url" "$sum_file" 60; then
+      rm -f "$sum_file"
+      warn "Cannot download the published checksum ${sum_url}"
+      return 1
+    fi
+    want=$(grep -Eo '[0-9a-fA-F]{32,128}' "$sum_file" | head -n1 || true)
+    rm -f "$sum_file"
+  fi
+  have=$("${algo}sum" "$file" | awk '{print $1}')
+  if [[ -z "$want" || "${have,,}" != "${want,,}" ]]; then
+    warn "Checksum mismatch for $(basename "$file") (${algo})"
+    return 1
+  fi
+  return 0
+}
+
+# Path of a usable WP-CLI phar, or 1.
+wordpress_wp_cli_bin() {
+  local bin
+  if [[ -f "$WORDPRESS_WP_CLI_PHAR" ]]; then
+    echo "$WORDPRESS_WP_CLI_PHAR"
+    return 0
+  fi
+  bin=$(command -v wp 2>/dev/null || true)
+  [[ -n "$bin" ]] || return 1
+  echo "$bin"
+}
+
+wordpress_wp_cli_install() {
+  if wordpress_wp_cli_bin >/dev/null; then
+    return 0
+  fi
+  command -v php >/dev/null 2>&1 || return 1
+  local url tmp
   url=$(wordpress_wp_cli_url)
-  target="/usr/local/bin/wp"
   tmp=$(mktemp)
-  if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL "$url" -o "$tmp"; then
-      rm -f "$tmp"
-      return 1
-    fi
-  elif command -v wget >/dev/null 2>&1; then
-    if ! wget -qO "$tmp" "$url"; then
-      rm -f "$tmp"
-      return 1
-    fi
-  else
+  if ! wordpress_fetch "$url" "$tmp" 300; then
     rm -f "$tmp"
     return 1
   fi
-  chmod 0755 "$tmp"
+  if ! wordpress_checksum_ok "$tmp" sha512 "${SIMAI_WORDPRESS_WPCLI_SHA512_URL:-${url}.sha512}" "${SIMAI_WORDPRESS_WPCLI_SHA512:-}"; then
+    rm -f "$tmp"
+    return 1
+  fi
   if ! php "$tmp" --info >/dev/null 2>&1; then
     rm -f "$tmp"
     return 1
   fi
-  mv "$tmp" "$target"
-  chmod 0755 "$target"
-  chown root:root "$target" 2>/dev/null || true
+  install -d -m 0755 -o root -g root "$(dirname "$WORDPRESS_WP_CLI_PHAR")" || { rm -f "$tmp"; return 1; }
+  install -m 0755 -o root -g root "$tmp" "$WORDPRESS_WP_CLI_PHAR" || { rm -f "$tmp"; return 1; }
+  rm -f "$tmp"
+  if [[ ! -e /usr/local/bin/wp ]]; then
+    ln -s "$WORDPRESS_WP_CLI_PHAR" /usr/local/bin/wp 2>/dev/null || true
+  fi
   return 0
+}
+
+# Runs WP-CLI as the site user (SIMAI_USER) in the docroot with the site's
+# PHP; stdin passes through (for --prompt). Never as root.
+wordpress_wp_cli_run() {
+  local doc_root="$1" php_version="$2"
+  shift 2
+  local bin php_bin
+  bin=$(wordpress_wp_cli_bin) || return 127
+  php_bin=$(resolve_php_bin "$php_version")
+  [[ -n "${SIMAI_USER:-}" && "${SIMAI_USER}" != root ]] || return 1
+  (cd "$doc_root" && sudo -u "$SIMAI_USER" -H env WP_CLI_DISABLE_AUTO_CHECK_UPDATE=1 \
+    "WP_CLI_CACHE_DIR=/tmp/wp-cli-cache-${SIMAI_USER}" "$php_bin" "$bin" --path="$doc_root" "$@")
+}
+
+# The official core package of the newest release for a locale: sets
+# WP_CORE_URL and WP_CORE_VERSION from the version-check API; en_US falls
+# back to latest.tar.gz when the API does not answer.
+# shellcheck disable=SC2034 # WP_CORE_URL and WP_CORE_VERSION are read by wp_install.sh
+wordpress_core_resolve() {
+  local locale="${1:-en_US}" answer parsed
+  WP_CORE_URL=""
+  WP_CORE_VERSION=""
+  if [[ -n "${SIMAI_WORDPRESS_ARCHIVE_URL:-}" ]]; then
+    WP_CORE_URL="$SIMAI_WORDPRESS_ARCHIVE_URL"
+    WP_CORE_VERSION="custom"
+    return 0
+  fi
+  answer=$(curl -fsSL --max-time 30 "https://api.wordpress.org/core/version-check/1.7/?locale=${locale}" 2>>"${LOG_FILE:-/dev/null}" || true)
+  parsed=$(printf '%s' "$answer" | python3 -I -c '
+import json, re, sys
+locale = sys.argv[1]
+try:
+    offers = json.load(sys.stdin).get("offers", [])
+except ValueError:
+    sys.exit(1)
+for o in offers:
+    url, version = str(o.get("download", "")), str(o.get("version", ""))
+    if o.get("locale") == locale and re.match(r"^[0-9]+\.[0-9]+(\.[0-9]+)?$", version) \
+            and re.match(r"^https://downloads\.wordpress\.org/release/([A-Za-z_]+/)?wordpress-[0-9.]+\.zip$", url):
+        print(version, url[:-4] + ".tar.gz")
+        sys.exit(0)
+sys.exit(1)' "$locale" 2>/dev/null || true)
+  if [[ -n "$parsed" ]]; then
+    WP_CORE_VERSION="${parsed%% *}"
+    WP_CORE_URL="${parsed#* }"
+    return 0
+  fi
+  if [[ "$locale" == en_US ]]; then
+    WP_CORE_URL="https://wordpress.org/latest.tar.gz"
+    WP_CORE_VERSION="latest"
+    return 0
+  fi
+  return 1
+}
+
+# Downloads a core package and checks it against its published SHA-1.
+wordpress_core_fetch() {
+  local url="$1" dest="$2"
+  wordpress_fetch "$url" "$dest" 600 || return 1
+  wordpress_checksum_ok "$dest" sha1 "${url}.sha1" "${SIMAI_WORDPRESS_ARCHIVE_SHA1:-}" || return 1
+  tar -tzf "$dest" >/dev/null 2>&1
 }
 
 wordpress_distribution_archive_url() {
@@ -2958,21 +3064,7 @@ wordpress_download_distribution_archive() {
     return 0
   fi
   tmp=$(mktemp)
-  if command -v curl >/dev/null 2>&1; then
-    if ! curl -fsSL "$url" -o "$tmp"; then
-      rm -f "$tmp"
-      return 1
-    fi
-  elif command -v wget >/dev/null 2>&1; then
-    if ! wget -qO "$tmp" "$url"; then
-      rm -f "$tmp"
-      return 1
-    fi
-  else
-    rm -f "$tmp"
-    return 1
-  fi
-  if [[ ! -s "$tmp" ]] || ! tar -tzf "$tmp" >/dev/null 2>&1; then
+  if ! wordpress_core_fetch "$url" "$tmp"; then
     rm -f "$tmp"
     return 1
   fi
@@ -2983,9 +3075,9 @@ wordpress_download_distribution_archive() {
 }
 
 wordpress_unpack_distribution_archive() {
-  local doc_root="$1" overwrite="${2:-no}"
-  local archive tmpdir src
-  archive=$(wordpress_distribution_archive_path "$doc_root")
+  local doc_root="$1" overwrite="${2:-no}" archive="${3:-}"
+  local tmpdir src
+  [[ -n "$archive" ]] || archive=$(wordpress_distribution_archive_path "$doc_root")
   [[ -s "$archive" ]] || return 1
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
   if [[ "$overwrite" != "yes" && -d "${doc_root}/wp-includes" && -f "${doc_root}/wp-admin/install.php" ]]; then
@@ -3124,6 +3216,7 @@ define( 'NONCE_SALT',       ${q_nonce_salt} );
 \$table_prefix = 'wp_';
 
 define( 'DISABLE_WP_CRON', true );
+define( 'WP_DEBUG', false );
 
 if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', __DIR__ . '/' );
@@ -3661,6 +3754,33 @@ bitrix_download_restore_script() {
   return 1
 }
 
+# Heavy archive reads (gzip -t, tar listings) at low priority when the
+# backup helper is loaded (admin/commands/backup_data.sh).
+bitrix_restore_lowprio() {
+  if declare -F backup_lowprio >/dev/null; then
+    backup_lowprio "$@"
+  else
+    "$@"
+  fi
+}
+
+# Sets BITRIX_RESTORE_ARCHIVE_SQL from a tar listing file: yes when the
+# Bitrix dump (bitrix/backup/*.sql) is listed.
+bitrix_restore_listing_has_sql() {
+  if grep -qE '(^|/)bitrix/backup/[^/]+\.sql$' "$1"; then
+    BITRIX_RESTORE_ARCHIVE_SQL="yes"
+    return 0
+  fi
+  return 1
+}
+
+# Validates the base archive in the docroot (auto: the only one, or a
+# filename; .tar.gz, .tgz, .tar, .enc.gz with Bitrix parts .1 .. .N).
+# Sets BITRIX_RESTORE_ARCHIVE_STATE, _PATH, _PARTS, _DETAIL and what was
+# found: _VOLUMES ("name size" rows), _BYTES, _ENCRYPTED (yes|no) and _SQL
+# (yes: the dump is in the archive, no: it is not, unknown: not readable
+# without unpacking, e.g. encrypted or listed beyond the first volume).
+# Returns 0 ready or skipped, 1 a problem, 2 no archive yet.
 bitrix_restore_archive_validate() {
   local doc_root="$1" requested="${2:-auto}"
   local requested_normalized
@@ -3669,8 +3789,14 @@ bitrix_restore_archive_validate() {
   BITRIX_RESTORE_ARCHIVE_PATH=""
   BITRIX_RESTORE_ARCHIVE_PARTS="0"
   BITRIX_RESTORE_ARCHIVE_DETAIL="Upload the archive, then run restore-ready again"
+  BITRIX_RESTORE_ARCHIVE_VOLUMES=""
+  BITRIX_RESTORE_ARCHIVE_BYTES="0"
+  BITRIX_RESTORE_ARCHIVE_ENCRYPTED="no"
+  BITRIX_RESTORE_ARCHIVE_SQL="unknown"
   export BITRIX_RESTORE_ARCHIVE_STATE BITRIX_RESTORE_ARCHIVE_PATH
   export BITRIX_RESTORE_ARCHIVE_PARTS BITRIX_RESTORE_ARCHIVE_DETAIL
+  export BITRIX_RESTORE_ARCHIVE_VOLUMES BITRIX_RESTORE_ARCHIVE_BYTES
+  export BITRIX_RESTORE_ARCHIVE_ENCRYPTED BITRIX_RESTORE_ARCHIVE_SQL
 
   if [[ "$requested_normalized" == "none" ]]; then
     BITRIX_RESTORE_ARCHIVE_STATE="skipped"
@@ -3682,7 +3808,7 @@ bitrix_restore_archive_validate() {
   if [[ "$requested_normalized" == "auto" ]]; then
     local candidates=() file
     shopt -s nullglob
-    for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar; do
+    for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar "${doc_root}/"*.enc.gz; do
       [[ "$file" == *_encode.tar.gz ]] && continue
       candidates+=("$file")
     done
@@ -3707,7 +3833,8 @@ bitrix_restore_archive_validate() {
   fi
 
   BITRIX_RESTORE_ARCHIVE_PATH="$archive"
-  if [[ ! -s "$archive" ]]; then
+  [[ "$archive" == *.enc.gz ]] && BITRIX_RESTORE_ARCHIVE_ENCRYPTED="yes"
+  if [[ -L "$archive" || ! -s "$archive" ]]; then
     BITRIX_RESTORE_ARCHIVE_STATE="missing"
     BITRIX_RESTORE_ARCHIVE_DETAIL="Base archive is missing or empty"
     return 1
@@ -3715,14 +3842,22 @@ bitrix_restore_archive_validate() {
 
   case "$archive" in
     *.tar)
-      if tar -tf "$archive" >/dev/null 2>&1; then
+      BITRIX_RESTORE_ARCHIVE_VOLUMES="$(basename "$archive") $(stat -c %s "$archive" 2>/dev/null || echo 0)"
+      BITRIX_RESTORE_ARCHIVE_BYTES=$(stat -c %s "$archive" 2>/dev/null || echo 0)
+      local listing tar_rc=0
+      listing=$(mktemp)
+      bitrix_restore_lowprio tar -tf "$archive" >"$listing" 2>/dev/null || tar_rc=$?
+      if (( tar_rc == 0 )); then
+        bitrix_restore_listing_has_sql "$listing" || BITRIX_RESTORE_ARCHIVE_SQL="no"
+        rm -f "$listing"
         BITRIX_RESTORE_ARCHIVE_STATE="ready"
         BITRIX_RESTORE_ARCHIVE_PARTS="1"
         BITRIX_RESTORE_ARCHIVE_DETAIL="Single-volume tar archive passed integrity check"
         return 0
       fi
+      rm -f "$listing"
       ;;
-    *.tar.gz|*.tgz)
+    *.tar.gz|*.tgz|*.enc.gz)
       local extra_signature last_low last_high last_part=0
       extra_signature=$(od -An -tx1 -j12 -N2 "$archive" 2>/dev/null | tr -d '[:space:]')
       if [[ "$extra_signature" == "4c4e" ]]; then
@@ -3741,17 +3876,28 @@ bitrix_restore_archive_validate() {
         fi
       fi
 
-      local part index part_count=$((last_part + 1))
+      local part index size part_count=$((last_part + 1)) bytes=0 rows=""
       for ((index = 0; index <= last_part; index++)); do
         part="$archive"
         (( index > 0 )) && part="${archive}.${index}"
-        if [[ ! -s "$part" ]]; then
+        if [[ -L "$part" || ! -s "$part" ]]; then
           BITRIX_RESTORE_ARCHIVE_STATE="missing part"
           BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
           BITRIX_RESTORE_ARCHIVE_DETAIL="Missing or empty archive part: $(basename "$part")"
+          BITRIX_RESTORE_ARCHIVE_VOLUMES="$rows"
+          BITRIX_RESTORE_ARCHIVE_BYTES="$bytes"
           return 1
         fi
-        if ! gzip -t "$part" >/dev/null 2>&1; then
+        size=$(stat -c %s "$part" 2>/dev/null || echo 0)
+        bytes=$((bytes + size))
+        rows+="$(basename "$part") ${size}"$'\n'
+      done
+      BITRIX_RESTORE_ARCHIVE_VOLUMES="$rows"
+      BITRIX_RESTORE_ARCHIVE_BYTES="$bytes"
+      for ((index = 0; index <= last_part; index++)); do
+        part="$archive"
+        (( index > 0 )) && part="${archive}.${index}"
+        if ! bitrix_restore_lowprio gzip -t "$part" >/dev/null 2>&1; then
           BITRIX_RESTORE_ARCHIVE_STATE="corrupt part"
           BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
           BITRIX_RESTORE_ARCHIVE_DETAIL="Integrity check failed: $(basename "$part")"
@@ -3759,16 +3905,32 @@ bitrix_restore_archive_validate() {
         fi
       done
 
-      if (( last_part == 0 )) && ! tar -tzf "$archive" >/dev/null 2>&1; then
-        BITRIX_RESTORE_ARCHIVE_STATE="invalid archive"
-        BITRIX_RESTORE_ARCHIVE_PARTS="1"
-        BITRIX_RESTORE_ARCHIVE_DETAIL="The gzip stream is valid but does not contain a readable tar archive"
-        return 1
+      if [[ "$BITRIX_RESTORE_ARCHIVE_ENCRYPTED" != yes ]]; then
+        local listing tar_rc=0
+        listing=$(mktemp)
+        if (( last_part == 0 )); then
+          bitrix_restore_lowprio tar -tzf "$archive" >"$listing" 2>/dev/null || tar_rc=$?
+          if (( tar_rc != 0 )); then
+            rm -f "$listing"
+            BITRIX_RESTORE_ARCHIVE_STATE="invalid archive"
+            BITRIX_RESTORE_ARCHIVE_PARTS="1"
+            BITRIX_RESTORE_ARCHIVE_DETAIL="The gzip stream is valid but does not contain a readable tar archive"
+            return 1
+          fi
+          bitrix_restore_listing_has_sql "$listing" || BITRIX_RESTORE_ARCHIVE_SQL="no"
+        else
+          # The first volume alone: tar stops at its end; the dump is usually there.
+          { bitrix_restore_lowprio gzip -dc "$archive" 2>/dev/null | tar -t >"$listing" 2>/dev/null; } || true
+          bitrix_restore_listing_has_sql "$listing" || true
+        fi
+        rm -f "$listing"
       fi
 
       BITRIX_RESTORE_ARCHIVE_STATE="ready"
       BITRIX_RESTORE_ARCHIVE_PARTS="$part_count"
       BITRIX_RESTORE_ARCHIVE_DETAIL="All archive volumes passed gzip integrity checks"
+      [[ "$BITRIX_RESTORE_ARCHIVE_ENCRYPTED" == yes ]] \
+        && BITRIX_RESTORE_ARCHIVE_DETAIL="All archive volumes passed gzip integrity checks (encrypted: restore.php asks for the password)"
       return 0
       ;;
   esac

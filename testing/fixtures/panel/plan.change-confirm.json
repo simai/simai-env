@@ -6,7 +6,7 @@
   "data": {
     "command": "change:confirm",
     "args": {
-      "change_id": "9bac067a8100"
+      "change_id": "9c68ea80f94c"
     },
     "target": "host",
     "description": "Keep a firewall or panel access change before its undo timer runs",

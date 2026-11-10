@@ -377,8 +377,10 @@ bitrix_db_default_charset_ensure() {
     return 1
   fi
   local cur_charset="${current%%$'\t'*}" cur_collation="${current#*$'\t'}"
-  if [[ "$cur_charset" == "$charset" && "$cur_collation" == "$collation" ]]; then
-    BX_DB_CHARSET_RESULT="unchanged (${charset}/${collation})"
+  # Same charset with another collation (utf8mb4_0900_ai_ci on MySQL 8)
+  # stays: the tables use it too.
+  if [[ "$cur_charset" == "$charset" ]]; then
+    BX_DB_CHARSET_RESULT="unchanged (${cur_charset}/${cur_collation})"
   elif mysql_root_exec_stdin "ALTER DATABASE \`${db_name}\` CHARACTER SET ${charset} COLLATE ${collation};"; then
     BX_DB_CHARSET_RESULT="changed (${cur_charset}/${cur_collation} -> ${charset}/${collation})"
   else
@@ -413,13 +415,14 @@ bitrix_restore_leftovers_list() {
 }
 
 # Moves (never deletes) restore leftovers into <site root>/restore-archive,
-# next to but outside the docroot. Sets BX_LEFTOVERS_RESULT.
+# next to but outside the docroot. Sets BX_LEFTOVERS_RESULT. The third
+# argument names another list function (wordpress_leftovers_list).
 bitrix_restore_leftovers_move() {
-  local site_root="$1" doc_root="$2"
+  local site_root="$1" doc_root="$2" list_fn="${3:-bitrix_restore_leftovers_list}"
   local dest="${site_root}/restore-archive"
   BX_LEFTOVERS_RESULT="failed"
   local -a files=()
-  mapfile -t files < <(bitrix_restore_leftovers_list "$doc_root")
+  mapfile -t files < <("$list_fn" "$doc_root")
   if [[ ${#files[@]} -eq 0 ]]; then
     BX_LEFTOVERS_RESULT="none in docroot"
     return 0
@@ -497,7 +500,7 @@ bitrix_restore_base_archive() {
   local doc_root="$1" file
   local -a candidates=()
   shopt -s nullglob
-  for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar; do
+  for file in "${doc_root}/"*.tar.gz "${doc_root}/"*.tgz "${doc_root}/"*.tar "${doc_root}/"*.enc.gz; do
     [[ "$file" == *_encode.tar.gz ]] && continue
     [[ -f "$file" && ! -L "$file" ]] && candidates+=("$file")
   done
@@ -566,6 +569,17 @@ bitrix_flow_state() {
   return 0
 }
 
+# The command of a flow step (bitrix status and site status answer it as next).
+bitrix_flow_next() {
+  case "$1" in
+    upload) echo "file:upload" ;;
+    validate|prepare) echo "bitrix:restore-ready" ;;
+    run_restore|run_setup) echo "open_url" ;;
+    finalize) echo "bitrix:finalize" ;;
+    *) echo "" ;;
+  esac
+}
+
 bitrix_status_json() {
   local db_state web_state
   db_state=$(bitrix_db_state_probe "$BX_DOMAIN")
@@ -573,14 +587,8 @@ bitrix_status_json() {
   bitrix_flow_state "$BX_DOMAIN" "$web_state"
   local settings="no" core="$BX_HAS_CORE"
   [[ -f "$BX_SETTINGS_FILE" ]] && settings="yes"
-  local next=""
-  case "$BX_FLOW_STEP" in
-    upload) next="file:upload" ;;
-    validate) next="bitrix:restore-ready" ;;
-    run_restore|run_setup) next="open_url" ;;
-    finalize) next="bitrix:finalize" ;;
-    prepare) next="bitrix:restore-ready" ;;
-  esac
+  local next
+  next=$(bitrix_flow_next "$BX_FLOW_STEP")
   python3 -c '
 import json, sys
 domain, route, step, url, archive, db, web, settings, core, nxt = sys.argv[1:11]
@@ -1127,7 +1135,519 @@ bitrix_installer_ready_handler() {
   ui_kv "Check status" "simai-admin.sh bitrix status --domain ${BX_DOMAIN}"
 }
 
+# Restore from an archive already on the server (1.56.0). The volumes come
+# from a path inside the site directory (uploaded over SFTP, --source) or
+# from an https URL (--url / --url-file); they are moved into the docroot
+# for restore.php. Every file operation on the site directory runs as the
+# site user through lib/site_files.py (no links followed, nothing outside
+# the site directory), never as root.
+BITRIX_RESTORE_URL_RE='^https://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?/[A-Za-z0-9._~/%+=&-]{1,1000}(\?[A-Za-z0-9._~%+=&/-]{0,1500})?$'
+BITRIX_RESTORE_NAME_RE='^[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(tar\.gz|tgz|tar|enc\.gz)$'
+BITRIX_RESTORE_STAGING="restore-download"
+
+# The docroot relative to the site root ("" when they are the same).
+bitrix_restore_docroot_rel() {
+  if [[ "$BX_DOC_ROOT" == "$BX_ROOT" ]]; then
+    printf '\n'
+  else
+    printf '%s\n' "${BX_DOC_ROOT#"$BX_ROOT"/}"
+  fi
+}
+
+# --source as a path relative to the site root (BX_RR_REL): relative, or
+# absolute inside the site root; no "..", no control characters.
+bitrix_restore_source_rel() {
+  local src="$1" real_root part
+  local -a kept=() comps=()
+  BX_RR_REL=""
+  if [[ "$src" =~ [[:cntrl:]] ]]; then
+    BX_RR_DETAIL="--source contains control characters"
+    return 1
+  fi
+  real_root=$(readlink -f "$BX_ROOT" 2>/dev/null || printf '%s' "$BX_ROOT")
+  case "$src" in
+    "$BX_ROOT") src="" ;;
+    "$BX_ROOT"/*) src="${src#"$BX_ROOT"/}" ;;
+    "$real_root") src="" ;;
+    "$real_root"/*) src="${src#"$real_root"/}" ;;
+    /*)
+      BX_RR_DETAIL="--source must be inside the site directory ${BX_ROOT} (or relative to it)"
+      return 1
+      ;;
+  esac
+  IFS=/ read -r -a comps <<<"$src"
+  for part in ${comps[@]+"${comps[@]}"}; do
+    case "$part" in
+      ""|.) continue ;;
+      ..)
+        BX_RR_DETAIL="--source must not contain '..'"
+        return 1
+        ;;
+    esac
+    kept+=("$part")
+  done
+  local IFS=/
+  BX_RR_REL="${kept[*]}"
+  return 0
+}
+
+# A path of this site that is also the directory of another site is refused.
+bitrix_restore_source_other_site() {
+  local abs="$1" d r
+  local -A other_meta=()
+  while IFS= read -r d; do
+    [[ -n "$d" && "$d" != "$BX_DOMAIN" ]] || continue
+    other_meta=()
+    site_nginx_metadata_parse "/etc/nginx/sites-available/${d}.conf" other_meta 2>/dev/null || continue
+    r="${other_meta[root]:-}"
+    [[ -n "$r" && "$r" != "$BX_ROOT" ]] || continue
+    if [[ "$abs" == "$r" || "$abs" == "$r"/* ]]; then
+      BX_RR_DETAIL="--source is inside the directory of another site (${d})"
+      return 1
+    fi
+  done < <(list_sites 2>/dev/null || true)
+  return 0
+}
+
+# Fills BX_RR_FOUND_* from a simai-file-volumes/1 answer.
+bitrix_restore_found_from_json() {
+  local key a b
+  BX_RR_FOUND_VOLUMES=""
+  while IFS=$'\t' read -r key a b; do
+    case "$key" in
+      dir) BX_RR_FOUND_DIR="$a" ;;
+      base) BX_RR_FOUND_BASE="$a" ;;
+      enc) BX_RR_FOUND_ENCRYPTED="$a" ;;
+      total) BX_RR_FOUND_BYTES="$a" ;;
+      count) BX_RR_FOUND_COUNT="$a" ;;
+      vol) BX_RR_FOUND_VOLUMES+="${a} ${b}"$'\n' ;;
+    esac
+  done < <(python3 -I -c '
+import json, sys
+d = json.loads(sys.argv[1])
+print("dir\t" + d.get("dir", ""))
+print("base\t" + d["base"])
+print("enc\t" + ("yes" if d.get("encrypted") else "no"))
+print("total\t%d" % d.get("total_bytes", 0))
+print("count\t%d" % d.get("count", 0))
+for v in d.get("volumes", []):
+    print("vol\t%s\t%d" % (v["name"], v["size"]))' "$1" 2>/dev/null || true)
+  [[ -n "${BX_RR_FOUND_BASE:-}" ]]
+}
+
+# Volumes already in the docroot (no --source, no --url).
+bitrix_restore_found_in_docroot() {
+  local requested="$1" base="" index part size
+  if [[ "${requested,,}" == auto || -z "$requested" ]]; then
+    base=$(bitrix_restore_base_archive "$BX_DOC_ROOT" 2>/dev/null || true)
+  elif [[ "$requested" != */* && "${requested,,}" != none ]]; then
+    base="${BX_DOC_ROOT}/$(printf '%s' "$requested" | sed -E 's/\.[0-9]+$//')"
+  fi
+  [[ -n "$base" && -f "$base" && ! -L "$base" ]] || return 0
+  BX_RR_FOUND_DIR=$(bitrix_restore_docroot_rel)
+  BX_RR_FOUND_BASE=$(basename "$base")
+  BX_RR_FOUND_ENCRYPTED=no
+  [[ "$base" == *.enc.gz ]] && BX_RR_FOUND_ENCRYPTED=yes
+  for ((index = 0; index <= 9999; index++)); do
+    part="$base"
+    (( index > 0 )) && part="${base}.${index}"
+    [[ -f "$part" && ! -L "$part" ]] || break
+    size=$(stat -c %s "$part" 2>/dev/null || echo 0)
+    BX_RR_FOUND_BYTES=$((BX_RR_FOUND_BYTES + size))
+    BX_RR_FOUND_COUNT=$((index + 1))
+    BX_RR_FOUND_VOLUMES+="$(basename "$part") ${size}"$'\n'
+  done
+  return 0
+}
+
+# --url or the first line of --url-file (the panel passes the URL as a file:
+# a signed URL is a secret and a command line is visible to every user).
+bitrix_restore_url_arg() {
+  BX_RR_URL="${PARSED_ARGS[url]:-}"
+  local file="${PARSED_ARGS[url-file]:-}"
+  if [[ -n "$file" ]]; then
+    if [[ -n "$BX_RR_URL" ]]; then
+      error "Use --url or --url-file, not both"
+      return 1
+    fi
+    if [[ ! -f "$file" || -L "$file" ]]; then
+      error "--url-file must be a file"
+      return 1
+    fi
+    BX_RR_URL=$(head -c 4096 "$file" | head -n 1 | tr -d '\r')
+  fi
+  return 0
+}
+
+# A URL shown in plans, answers and logs: no query string (signatures).
+bitrix_restore_url_shown() {
+  local url="$1"
+  if [[ "$url" == *\?* ]]; then
+    printf '%s?***\n' "${url%%\?*}"
+  else
+    printf '%s\n' "$url"
+  fi
+}
+
+# Sets BX_URL_HOST, BX_URL_PORT, BX_URL_NAME, BX_URL_QUERY and BX_URL_ADDR (a
+# public address the host resolves to; every answer must be public, so the
+# server cannot be pointed at itself or a private network). curl is pinned to
+# that address.
+bitrix_restore_url_parse() {
+  local url="$1" rest hostport path
+  BX_URL_HOST=""; BX_URL_PORT=443; BX_URL_NAME=""; BX_URL_QUERY=no; BX_URL_ADDR=""
+  if [[ ! "$url" =~ $BITRIX_RESTORE_URL_RE ]]; then
+    BX_RR_DETAIL="--url must be an https:// address of the archive (letters, digits and ._~/%+=&- only)"
+    return 1
+  fi
+  rest="${url#https://}"
+  hostport="${rest%%/*}"
+  path="/${rest#*/}"
+  if [[ "$path" == *\?* ]]; then
+    BX_URL_QUERY=yes
+    path="${path%%\?*}"
+  fi
+  BX_URL_HOST="${hostport%%:*}"
+  [[ "$hostport" == *:* ]] && BX_URL_PORT="${hostport##*:}"
+  if (( 10#$BX_URL_PORT < 1 || 10#$BX_URL_PORT > 65535 )); then
+    BX_RR_DETAIL="--url has an invalid port"
+    return 1
+  fi
+  BX_URL_NAME="${path##*/}"
+  if [[ ! "$BX_URL_NAME" =~ $BITRIX_RESTORE_NAME_RE || "$BX_URL_NAME" == *_encode.tar.gz ]]; then
+    BX_RR_DETAIL="--url must end with the archive file name (<name>.tar.gz, .tgz, .tar or .enc.gz)"
+    return 1
+  fi
+  BX_URL_ADDR=$(python3 -I -c '
+import ipaddress, socket, sys
+try:
+    infos = socket.getaddrinfo(sys.argv[1], int(sys.argv[2]), proto=socket.IPPROTO_TCP)
+except (OSError, UnicodeError):
+    sys.exit(3)
+addrs = sorted({ipaddress.ip_address(i[4][0].split("%")[0]) for i in infos}, key=lambda a: a.version)
+if not addrs:
+    sys.exit(3)
+if any(not a.is_global for a in addrs):
+    sys.exit(4)
+print(addrs[0])' "$BX_URL_HOST" "$BX_URL_PORT" 2>/dev/null) || {
+    BX_RR_DETAIL="--url host ${BX_URL_HOST} does not resolve to a public address"
+    return 1
+  }
+  return 0
+}
+
+bitrix_restore_url_resolve_arg() {
+  local addr="$BX_URL_ADDR"
+  [[ "$addr" == *:* ]] && addr="[${addr}]"
+  printf '%s:%s:%s\n' "$BX_URL_HOST" "$BX_URL_PORT" "$addr"
+}
+
+# curl with the URL in a config on stdin (never on a command line), https
+# only, no redirects, pinned to the checked address.
+bitrix_restore_url_curl() {
+  local url="$1" output="$2" user="$3"
+  shift 3
+  local -a opts=(--config - --proto "=https" --max-redirs 0 --silent --show-error --connect-timeout 20
+    --resolve "$(bitrix_restore_url_resolve_arg)")
+  local config
+  config=$(printf 'url = "%s"\n' "$url")
+  [[ -z "$output" ]] || config+=$'\n'"output = \"${output}\""
+  if [[ -n "$user" ]]; then
+    printf '%s\n' "$config" | bitrix_restore_lowprio runuser -u "$user" -- curl "${opts[@]}" "$@"
+  else
+    printf '%s\n' "$config" | curl "${opts[@]}" "$@"
+  fi
+}
+
+# Size of the file at the URL in bytes, or nothing when the server does not say.
+bitrix_restore_url_size() {
+  local url="$1" headers code len total
+  headers=$(bitrix_restore_url_curl "$url" "" "" --head --max-time 30 2>/dev/null || true)
+  code=$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { c = $2 } END { print c }')
+  len=$(printf '%s\n' "$headers" | tr -d '\r' | awk -F': *' 'tolower($1) == "content-length" { v = $2 } END { print v }')
+  if [[ "$code" == 200 && "$len" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$len"
+    return 0
+  fi
+  # Signed URLs often allow GET only: one byte, the total in Content-Range.
+  headers=$(bitrix_restore_url_curl "$url" /dev/null "" --range 0-0 --dump-header - --max-time 30 2>/dev/null || true)
+  code=$(printf '%s\n' "$headers" | awk 'toupper($1) ~ /^HTTP\// { c = $2 } END { print c }')
+  total=$(printf '%s\n' "$headers" | tr -d '\r' | awk -F': *' 'tolower($1) == "content-range" { v = $2 } END { print v }')
+  total="${total##*/}"
+  if [[ "$code" == 206 && "$total" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "$total"
+  fi
+  return 0
+}
+
+# Downloads one file as the site user, resuming a partial download.
+bitrix_restore_url_fetch_one() {
+  local url="$1" target="$2" expected="$3" max="$4" have code rc attempt
+  local -a resume=(--continue-at -)
+  have=$(stat -c %s "$target" 2>/dev/null || echo 0)
+  if [[ -n "$expected" ]]; then
+    [[ "$have" == "$expected" ]] && return 0
+    if (( have > expected )); then
+      runuser -u "$FILE_USER" -- rm -f "$target"
+    fi
+  fi
+  for attempt in 1 2; do
+    rc=0
+    code=$(bitrix_restore_url_curl "$url" "$target" "$FILE_USER" --fail --retry 3 --retry-delay 5 \
+      --speed-limit 1024 --speed-time 120 --max-filesize "$max" "${resume[@]}" --write-out '%{http_code}') || rc=$?
+    if (( rc == 0 )) && [[ "$code" == 200 || "$code" == 206 ]]; then
+      break
+    fi
+    if (( rc == 22 )) && [[ "$code" == 416 && -z "$expected" && -s "$target" ]]; then
+      break  # already complete
+    fi
+    if (( rc == 0 )) && [[ "$code" == 3* ]]; then
+      BX_RR_DETAIL="The URL redirects (HTTP ${code}); give the final address of the archive"
+      return 1
+    fi
+    if (( attempt == 1 )) && [[ "$rc" == 33 || "$code" == 416 ]]; then
+      runuser -u "$FILE_USER" -- rm -f "$target"
+      resume=()
+      continue
+    fi
+    BX_RR_DETAIL="Download of $(basename "$target") failed (curl exit ${rc}, HTTP ${code:-none})"
+    (( rc == 63 )) && BX_RR_DETAIL="$(basename "$target") is larger than the limit (SIMAI_BITRIX_URL_MAX_GB)"
+    return 1
+  done
+  have=$(stat -c %s "$target" 2>/dev/null || echo 0)
+  if [[ -n "$expected" && "$have" != "$expected" ]]; then
+    BX_RR_DETAIL="Download of $(basename "$target") is incomplete (${have} of ${expected} bytes); run restore-ready again to resume"
+    return 1
+  fi
+  return 0
+}
+
+# Number of the last Bitrix volume from the base volume's gzip header (0: one volume).
+bitrix_restore_last_part() {
+  local archive="$1" sig low high
+  sig=$(od -An -tx1 -j12 -N2 "$archive" 2>/dev/null | tr -d '[:space:]')
+  if [[ "$sig" != 4c4e ]]; then
+    printf '0\n'
+    return 0
+  fi
+  low=$(od -An -tu1 -j14 -N1 "$archive" 2>/dev/null | tr -d '[:space:]')
+  high=$(od -An -tu1 -j15 -N1 "$archive" 2>/dev/null | tr -d '[:space:]')
+  [[ "$low" =~ ^[0-9]+$ && "$high" =~ ^[0-9]+$ ]] || { printf '0\n'; return 0; }
+  printf '%s\n' "$((low + high * 256))"
+}
+
+# Moves the volumes at <rel> (relative to the site root) into the docroot as
+# the site user. Sets BX_RR_MOVED and BX_RR_FOUND_*.
+bitrix_restore_gather() {
+  local rel="$1" out err rc=0
+  err=$(mktemp)
+  out=$(file_helper gather "$rel" "$(bitrix_restore_docroot_rel)" 2>"$err") || rc=$?
+  if (( rc != 0 )); then
+    BX_RR_DETAIL=$(sed -n '1s/^error: [a-z_]*: //p' "$err")
+    [[ -n "$BX_RR_DETAIL" ]] || BX_RR_DETAIL="The volumes could not be moved into the docroot"
+    rm -f "$err"
+    return 1
+  fi
+  rm -f "$err"
+  bitrix_restore_found_from_json "$out" || true
+  BX_RR_MOVED=$(python3 -I -c 'import json, sys; print("\n".join(json.loads(sys.argv[1]).get("moved", [])))' "$out" 2>/dev/null || true)
+  return 0
+}
+
+# Fetches the base volume (and parts <url>.1 .. .N of an unsigned URL) into
+# <site root>/restore-download as the site user, then moves them into the docroot.
+bitrix_restore_fetch() {
+  local url="$1" max_gb="${SIMAI_BITRIX_URL_MAX_GB:-50}" staging target last index rc=0
+  [[ "$max_gb" =~ ^[0-9]{1,5}$ ]] || max_gb=50
+  local max=$((10#$max_gb * 1073741824))
+  staging="${BX_ROOT}/${BITRIX_RESTORE_STAGING}"
+  runuser -u "$FILE_USER" -- mkdir -p "$staging" || { BX_RR_DETAIL="Cannot create ${staging}"; return 1; }
+  if [[ -L "$staging" || ! -d "$staging" ]]; then
+    BX_RR_DETAIL="${staging} is not a directory"
+    return 1
+  fi
+  target="${staging}/${BX_URL_NAME}"
+  info "Downloading ${BX_URL_NAME} from $(bitrix_restore_url_shown "$url") (low priority, resumable)"
+  bitrix_restore_url_fetch_one "$url" "$target" "${BX_RR_URL_SIZE:-}" "$max" || return 1
+  last=$(bitrix_restore_last_part "$target")
+  if (( last > 0 )); then
+    if [[ "$BX_URL_QUERY" == yes ]]; then
+      BX_RR_DETAIL="The archive has $((last + 1)) volumes; a signed URL covers only the first. Upload the volumes over SFTP and use --source"
+      return 1
+    fi
+    local size
+    size=$(stat -c %s "$target" 2>/dev/null || echo 0)
+    site_resources_check "$BX_DOC_ROOT" $((size * last * 3)) bitrix || rc=$?
+    if (( rc != 0 )); then
+      BX_RR_REFUSAL="$RES_REFUSAL"
+      BX_RR_DETAIL="$RES_REFUSAL_TEXT"
+      return 1
+    fi
+    for ((index = 1; index <= last; index++)); do
+      bitrix_restore_url_fetch_one "${url}.${index}" "${target}.${index}" "" "$max" || return 1
+    done
+  fi
+  bitrix_restore_gather "${BITRIX_RESTORE_STAGING}/${BX_URL_NAME}" || return 1
+  runuser -u "$FILE_USER" -- rmdir "$staging" 2>/dev/null || true
+  return 0
+}
+
+# What a restore would use and whether the server can take it: the volumes
+# at --source, the size at --url, or the volumes already in the docroot;
+# free disk on the docroot filesystem against three times the archive and
+# memory against the bitrix profile. Needs bitrix_prepare_site. Sets
+# BX_RR_REFUSAL (not_enough_disk, not_enough_ram, source_invalid,
+# url_invalid), BX_RR_DETAIL, BX_RR_SOURCE_REL, BX_RR_FOUND_* and RES_*.
+bitrix_restore_ready_inspect() {
+  local source="$1" url="$2" archive="${3:-auto}" rel json err rc=0
+  BX_RR_REFUSAL=""; BX_RR_DETAIL=""; BX_RR_SOURCE_REL=""; BX_RR_URL_SIZE=""
+  BX_RR_FOUND_DIR=""; BX_RR_FOUND_BASE=""; BX_RR_FOUND_ENCRYPTED=""; BX_RR_FOUND_BYTES=0
+  BX_RR_FOUND_COUNT=0; BX_RR_FOUND_VOLUMES=""
+  if [[ -n "$source" && -n "$url" ]]; then
+    BX_RR_REFUSAL="source_invalid"
+    BX_RR_DETAIL="Use --source or --url, not both"
+  elif [[ -n "$source" ]]; then
+    if ! file_site "$BX_DOMAIN" >/dev/null 2>&1; then
+      BX_RR_REFUSAL="source_invalid"
+      BX_RR_DETAIL="Site files of ${BX_DOMAIN} are not available"
+    elif ! bitrix_restore_source_rel "$source"; then
+      BX_RR_REFUSAL="source_invalid"
+    elif ! bitrix_restore_source_other_site "${BX_ROOT}${BX_RR_REL:+/${BX_RR_REL}}"; then
+      BX_RR_REFUSAL="source_invalid"
+    else
+      rel="$BX_RR_REL"
+      BX_RR_SOURCE_REL="$rel"
+      err=$(mktemp)
+      json=$(file_helper volumes "$rel" 2>"$err") || rc=$?
+      if (( rc != 0 )) || ! bitrix_restore_found_from_json "$json"; then
+        BX_RR_REFUSAL="source_invalid"
+        BX_RR_DETAIL="--source ${rel:-.}: $(sed -n '1s/^error: [a-z_]*: //p' "$err")"
+      fi
+      rm -f "$err"
+    fi
+  elif [[ -n "$url" ]]; then
+    if ! file_site "$BX_DOMAIN" >/dev/null 2>&1; then
+      BX_RR_REFUSAL="url_invalid"
+      BX_RR_DETAIL="Site files of ${BX_DOMAIN} are not available"
+    elif ! bitrix_restore_url_parse "$url"; then
+      BX_RR_REFUSAL="url_invalid"
+    else
+      BX_RR_URL_SIZE=$(bitrix_restore_url_size "$url")
+      BX_RR_FOUND_BASE="$BX_URL_NAME"
+      BX_RR_FOUND_ENCRYPTED=no
+      [[ "$BX_URL_NAME" == *.enc.gz ]] && BX_RR_FOUND_ENCRYPTED=yes
+      BX_RR_FOUND_BYTES="${BX_RR_URL_SIZE:-0}"
+    fi
+  else
+    bitrix_restore_found_in_docroot "$archive"
+  fi
+  rc=0
+  site_resources_check "$BX_DOC_ROOT" $((BX_RR_FOUND_BYTES * 3)) bitrix || rc=$?
+  if [[ -n "$url" && -z "$BX_RR_REFUSAL" && -z "$BX_RR_URL_SIZE" ]]; then
+    RES_WARNINGS+=("size_unknown|The server did not say the archive size; free disk is checked again after the first volume")
+  fi
+  if [[ -z "$BX_RR_REFUSAL" && $rc -ne 0 ]]; then
+    BX_RR_REFUSAL="$RES_REFUSAL"
+    BX_RR_DETAIL="$RES_REFUSAL_TEXT"
+  fi
+  [[ -z "$BX_RR_REFUSAL" ]]
+}
+
+# Errors and warnings of an inspection on stderr.
+bitrix_restore_ready_report() {
+  site_resources_report
+  if [[ -n "$BX_RR_REFUSAL" && "$BX_RR_REFUSAL" != "${RES_REFUSAL:-}" && -n "$BX_RR_DETAIL" ]]; then
+    error "$BX_RR_DETAIL"
+  fi
+  return 0
+}
+
+# The found volumes as JSON (null when nothing was found).
+bitrix_restore_found_json() {
+  python3 -I -c '
+import json, sys
+base, d, enc, total, count, rows, source, url, size_known = sys.argv[1:10]
+if not base:
+    print("null")
+    raise SystemExit
+vols = [{"name": r.rsplit(" ", 1)[0], "size": int(r.rsplit(" ", 1)[1])} for r in rows.splitlines() if r.strip()]
+print(json.dumps({"base": base, "dir": d, "source": source or None, "url": url or None,
+                  "volumes": vols, "count": int(count) if vols else None,
+                  "total_bytes": int(total) if size_known == "yes" else None,
+                  "encrypted": enc == "yes"}))' \
+    "${BX_RR_FOUND_BASE:-}" "${BX_RR_FOUND_DIR:-}" "${BX_RR_FOUND_ENCRYPTED:-no}" "${BX_RR_FOUND_BYTES:-0}" \
+    "${BX_RR_FOUND_COUNT:-0}" "${BX_RR_FOUND_VOLUMES:-}" "${BX_RR_SOURCE_REL_SHOWN:-}" "${BX_RR_URL_SHOWN:-}" \
+    "$( [[ -z "${BX_RR_URL_SHOWN:-}" || -n "${BX_RR_URL_SIZE:-}" ]] && echo yes || echo no )"
+}
+
+# Plan of bitrix restore-ready: refuse what the handler would refuse before
+# moving or downloading anything, and leave what was found for the JSON plan.
+bitrix_restore_ready_plan_check() {
+  local domain source archive url="" file rc=0 refusal=null
+  domain=$(command_arg domain "$@")
+  source=$(command_arg source "$@")
+  archive=$(command_arg archive "$@")
+  url=$(command_arg url "$@")
+  file=$(command_arg url-file "$@")
+  if [[ -z "$url" && -n "$file" && -f "$file" && ! -L "$file" ]]; then
+    url=$(head -c 4096 "$file" | head -n 1 | tr -d '\r')
+  fi
+  [[ -n "$domain" ]] || return 0
+  bitrix_prepare_site "$domain" >/dev/null 2>&1 || return 0  # the handler names the problem
+  bitrix_restore_ready_inspect "$source" "$url" "${archive:-auto}" || rc=$?
+  bitrix_restore_ready_report
+  BX_RR_SOURCE_REL_SHOWN=""
+  [[ -z "$source" || "$BX_RR_REFUSAL" == source_invalid ]] || BX_RR_SOURCE_REL_SHOWN="${BX_RR_SOURCE_REL:-.}"
+  BX_RR_URL_SHOWN=""
+  [[ -z "$url" ]] || BX_RR_URL_SHOWN=$(bitrix_restore_url_shown "$url")
+  if [[ -n "$BX_RR_FOUND_BASE" ]]; then
+    info "Archive: ${BX_RR_FOUND_BASE} (${BX_RR_FOUND_COUNT} volume(s), $(site_resources_human "$BX_RR_FOUND_BYTES"), encrypted: ${BX_RR_FOUND_ENCRYPTED})"
+  fi
+  [[ -z "$BX_RR_REFUSAL" ]] || refusal="\"${BX_RR_REFUSAL}\""
+  site_plan_data_write "$(python3 -I -c '
+import json, sys
+print(json.dumps({"resources": json.loads(sys.argv[1]), "archive": json.loads(sys.argv[2]),
+                  "refusal": json.loads(sys.argv[3]), "detail": sys.argv[4] or None}))' \
+    "$(site_resources_json)" "$(bitrix_restore_found_json)" "$refusal" "${BX_RR_DETAIL:-}")"
+  return "$rc"
+}
+
+# The answer of restore-ready --output json (simai-bitrix-restore-ready/1).
+bitrix_restore_ready_json() {
+  local status="$1"
+  python3 -I -c '
+import json, sys
+(domain, status, url, state, name, parts, detail, enc, sql, total, rows, moved, found, resources,
+ restore_php, preseed, writable, refusal, refusal_detail) = sys.argv[1:20]
+vols = [{"name": r.rsplit(" ", 1)[0], "size": int(r.rsplit(" ", 1)[1])} for r in rows.splitlines() if r.strip()]
+print(json.dumps({
+    "schema": "simai-bitrix-restore-ready/1", "domain": domain, "status": status,
+    "restore_url": url if status == "ready" else None,
+    "archive": {"state": state, "name": name or None, "parts": int(parts or 0), "volumes": vols,
+                "count": len(vols), "total_bytes": int(total or 0), "encrypted": enc == "yes",
+                "sql_dump": {"yes": True, "no": False}.get(sql), "detail": detail},
+    "moved": [m for m in moved.splitlines() if m], "found": json.loads(found),
+    "resources": json.loads(resources), "restore_php": restore_php, "preseed": preseed,
+    "writable": writable, "refusal": refusal or None, "detail": refusal_detail or None}, indent=2))' \
+    "$BX_DOMAIN" "$status" "$(site_primary_url "$BX_DOMAIN")/restore.php" "${BITRIX_RESTORE_ARCHIVE_STATE:-}" \
+    "$(basename "${BITRIX_RESTORE_ARCHIVE_PATH:-}")" "${BITRIX_RESTORE_ARCHIVE_PARTS:-0}" "${BITRIX_RESTORE_ARCHIVE_DETAIL:-}" \
+    "${BITRIX_RESTORE_ARCHIVE_ENCRYPTED:-no}" "${BITRIX_RESTORE_ARCHIVE_SQL:-unknown}" "${BITRIX_RESTORE_ARCHIVE_BYTES:-0}" \
+    "${BITRIX_RESTORE_ARCHIVE_VOLUMES:-}" "${BX_RR_MOVED:-}" "$(bitrix_restore_found_json)" "$(site_resources_json)" \
+    "${BX_RR_RESTORE_STATE:-}" "${BX_RR_PRESEED_STATE:-}" "${BX_RR_WRITABLE_STATE:-}" "${BX_RR_REFUSAL:-}" "${BX_RR_DETAIL:-}"
+}
+
 bitrix_restore_ready_handler() {
+  local rc=0
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    # Human lines go to stderr, the answer to the captured stdout.
+    bitrix_restore_ready_run "$@" 3>&1 1>&2 || rc=$?
+  else
+    bitrix_restore_ready_run "$@" 3>/dev/null || rc=$?
+  fi
+  return "$rc"
+}
+
+bitrix_restore_ready_run() {
   parse_kv_args "$@"
   require_args "domain" || return 1
   local domain="${PARSED_ARGS[domain]:-}"
@@ -1135,6 +1655,7 @@ bitrix_restore_ready_handler() {
   local preseed="${PARSED_ARGS[preseed]:-auto}"
   local short_install="${PARSED_ARGS[short-install]:-no}"
   local archive="${PARSED_ARGS[archive]:-auto}"
+  local source="${PARSED_ARGS[source]:-}"
   [[ "${overwrite,,}" == "yes" ]] || overwrite="no"
   case "${preseed,,}" in
     yes|no|auto) preseed="${preseed,,}" ;;
@@ -1144,12 +1665,52 @@ bitrix_restore_ready_handler() {
       ;;
   esac
   [[ "${short_install,,}" == "yes" ]] && short_install="yes" || short_install="no"
+  bitrix_restore_url_arg || return 1
+  local url="$BX_RR_URL"
 
-  bitrix_prepare_site "$domain"
-  local rc=$?
+  local rc=0
+  bitrix_prepare_site "$domain" || rc=$?
   (( rc == 0 )) || return $rc
 
+  BX_RR_MOVED=""; BX_RR_RESTORE_STATE=""; BX_RR_PRESEED_STATE=""; BX_RR_WRITABLE_STATE=""
+  BX_RR_SOURCE_REL_SHOWN=""; BX_RR_URL_SHOWN=""
+  [[ -z "$url" ]] || BX_RR_URL_SHOWN=$(bitrix_restore_url_shown "$url")
+  local inspect_rc=0
+  bitrix_restore_ready_inspect "$source" "$url" "$archive" || inspect_rc=$?
+  [[ -z "$source" || "$BX_RR_REFUSAL" == source_invalid ]] || BX_RR_SOURCE_REL_SHOWN="${BX_RR_SOURCE_REL:-.}"
+  bitrix_restore_ready_report
+  if (( inspect_rc != 0 )); then
+    bitrix_restore_ready_json refused >&3
+    return 1
+  fi
+
   ui_header "SIMAI ENV · Bitrix restore ready"
+
+  # Bring the volumes into the docroot first: a failure leaves restore.php
+  # and the rest as they were.
+  local bring_state="in docroot"
+  if [[ -n "$source" ]]; then
+    bring_state="moved from ${BX_RR_SOURCE_REL:-.}"
+    if bitrix_restore_gather "$BX_RR_SOURCE_REL"; then
+      archive="$BX_RR_FOUND_BASE"
+    else
+      bring_state="failed: ${BX_RR_DETAIL}"
+      error "$BX_RR_DETAIL"
+    fi
+  elif [[ -n "$url" ]]; then
+    bring_state="downloaded from ${BX_RR_URL_SHOWN}"
+    if bitrix_restore_fetch "$url"; then
+      archive="$BX_RR_FOUND_BASE"
+    else
+      bring_state="failed: ${BX_RR_DETAIL}"
+      error "$BX_RR_DETAIL"
+      if [[ "$BX_RR_REFUSAL" == not_enough_disk ]]; then
+        bitrix_restore_ready_json refused >&3
+        return 1
+      fi
+    fi
+  fi
+  [[ -z "$BX_RR_MOVED" ]] || bring_state+=" ($(printf '%s\n' "$BX_RR_MOVED" | awk 'NF { n++ } END { print n + 0 }') file(s) moved)"
 
   local writable_state="ready"
   if ! bitrix_prepare_restore_writable_paths "$BX_DOC_ROOT"; then
@@ -1189,9 +1750,10 @@ bitrix_restore_ready_handler() {
   archive_parts="$BITRIX_RESTORE_ARCHIVE_PARTS"
   archive_detail="$BITRIX_RESTORE_ARCHIVE_DETAIL"
   [[ -n "$BITRIX_RESTORE_ARCHIVE_PATH" ]] && archive_path="$BITRIX_RESTORE_ARCHIVE_PATH"
+  BX_RR_RESTORE_STATE="$restore_state"; BX_RR_PRESEED_STATE="$preseed_state"; BX_RR_WRITABLE_STATE="$writable_state"
 
   local status="ready"
-  if [[ "$writable_state" != "ready" || "$restore_state" != "ready" || "$preseed_state" == "failed" || $archive_rc -eq 1 ]]; then
+  if [[ "$writable_state" != "ready" || "$restore_state" != "ready" || "$preseed_state" == "failed" || $archive_rc -eq 1 || "$bring_state" == failed:* ]]; then
     status="partial"
   elif [[ $archive_rc -eq 2 ]]; then
     status="waiting for archive"
@@ -1201,9 +1763,21 @@ bitrix_restore_ready_handler() {
     bitrix_restore_marker_write "$BX_DOMAIN" "$BITRIX_RESTORE_ARCHIVE_PATH" "$archive_parts"
   fi
 
+  local archive_bytes="n/a" sql_state="unknown"
+  if [[ "${BITRIX_RESTORE_ARCHIVE_BYTES:-0}" != 0 ]]; then
+    archive_bytes="$(site_resources_human "$BITRIX_RESTORE_ARCHIVE_BYTES") (${BITRIX_RESTORE_ARCHIVE_BYTES} bytes)"
+  fi
+  case "${BITRIX_RESTORE_ARCHIVE_SQL:-unknown}" in
+    yes) sql_state="yes (bitrix/backup/*.sql)" ;;
+    no) sql_state="no" ;;
+    *) sql_state="unknown (encrypted or beyond the first volume)" ;;
+  esac
+  local volume_names
+  volume_names=$(printf '%s' "${BITRIX_RESTORE_ARCHIVE_VOLUMES:-}" | awk 'NF { printf "%s%s", sep, $1; sep = ", " }')
   ui_result_table \
     "Domain|${BX_DOMAIN}" \
     "Docroot|${BX_DOC_ROOT}" \
+    "Archive source|${bring_state}" \
     "Writable paths|${writable_state}" \
     "DB preseed|${preseed_state}" \
     "SHORT_INSTALL|${short_install}" \
@@ -1211,8 +1785,16 @@ bitrix_restore_ready_handler() {
     "Archive|${archive_state}" \
     "Archive path|${archive_path}" \
     "Archive parts|${archive_parts}" \
+    "Volumes|${volume_names:-none}" \
+    "Archive size|${archive_bytes}" \
+    "Encrypted|${BITRIX_RESTORE_ARCHIVE_ENCRYPTED:-no}" \
+    "SQL dump|${sql_state}" \
     "Archive check|${archive_detail}" \
+    "Free disk|$(site_resources_human "${RES_DISK_FREE:-0}") (needed $(site_resources_human "${RES_NEEDED:-0}"))" \
+    "Memory|${RES_RAM_MB:-?} MB (bitrix: ${RES_RAM_MIN} MB minimum, ${RES_RAM_REC} MB recommended)" \
     "Status|${status}"
+
+  bitrix_restore_ready_json "${status// /_}" >&3
 
   if [[ "$status" == "partial" ]]; then
     warn "Restore ready is partial. Check network access, restore.php download, db.env, and writable path permissions."
@@ -1221,8 +1803,8 @@ bitrix_restore_ready_handler() {
 
   ui_next_steps
   if [[ "$status" == "waiting for archive" ]]; then
-    ui_kv "Upload archive" "Copy every archive volume into ${BX_DOC_ROOT}"
-    ui_kv "Validate archive" "simai-admin.sh bitrix restore-ready --domain ${BX_DOMAIN}"
+    ui_kv "Upload archive" "Copy every archive volume over SFTP into the site directory"
+    ui_kv "Validate archive" "simai-admin.sh bitrix restore-ready --domain ${BX_DOMAIN} --source <path in the site directory>"
   else
     ui_kv "Open restore wizard" "$(site_primary_url "$BX_DOMAIN")/restore.php"
   fi
@@ -1844,7 +2426,7 @@ register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" "" "menu:confirm"
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install=" "menu:confirm"
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack=" "menu:confirm"
-register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive=" "menu:confirm"
+register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive= source= url= url-file=" "menu:confirm"
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended=" "menu:confirm menu:bulk"
 register_cmd "bitrix" "ownership" "Check/repair Bitrix file ownership drift" "bitrix_ownership_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" "" "effects:read"

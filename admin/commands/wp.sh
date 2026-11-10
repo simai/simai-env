@@ -116,6 +116,90 @@ wp_apply_optimization_mode() {
   fi
 }
 
+# Restore inputs uploaded to the site directory or the web root (top level):
+# site archives (not WordPress core packages) or SQL dumps, relative to
+# the site directory.
+wp_restore_candidates() {
+  local kind="$1" dir path name
+  shopt -s nullglob
+  for dir in "$WP_ROOT" "$WP_DOC_ROOT"; do
+    if [[ "$kind" == files ]]; then
+      set -- "$dir"/*.tar.gz "$dir"/*.tgz "$dir"/*.tar
+    else
+      set -- "$dir"/*.sql "$dir"/*.sql.gz
+    fi
+    for path in "$@"; do
+      [[ -f "$path" && ! -L "$path" ]] || continue
+      name=$(basename "$path")
+      [[ "$kind" == files && ( "$name" == latest*.tar.gz || "$name" == wordpress-*.tar.gz ) ]] && continue
+      printf '%s\n' "${path#"${WP_ROOT%/}"/}"
+    done
+  done
+  shopt -u nullglob
+}
+
+# Where a WordPress site is on its way, for the panel's step tracker:
+# route new|restore|installed|none, step prepare|upload|install|finalize|done.
+# Sets WP_FLOW_ROUTE, WP_FLOW_STEP, WP_FLOW_NEXT, WP_FLOW_URL, WP_FLOW_PENDING,
+# WP_FLOW_FILES and WP_FLOW_DUMPS.
+wp_flow_state() {
+  local id route
+  WP_FLOW_ROUTE="none"; WP_FLOW_STEP="prepare"; WP_FLOW_NEXT="wp:install"; WP_FLOW_URL=""
+  WP_FLOW_PENDING=(); WP_FLOW_FILES=(); WP_FLOW_DUMPS=()
+  if [[ "$WP_DB_STATE" == installed ]]; then
+    route=$(wp_flow_marker_route "$WP_DOMAIN")
+    WP_FLOW_ROUTE="${route:-installed}"
+    for id in "${SITE_CHECK_IDS_WORDPRESS[@]}"; do
+      site_check_state "$id" "$WP_DOMAIN"
+      [[ "$SC_STATE" == needed ]] && WP_FLOW_PENDING+=("$id")
+    done
+    WP_FLOW_URL="$WP_ADMIN_URL"
+    if (( ${#WP_FLOW_PENDING[@]} > 0 )); then
+      WP_FLOW_STEP="finalize"; WP_FLOW_NEXT="wp:finalize"
+    else
+      WP_FLOW_STEP="done"; WP_FLOW_NEXT=""
+    fi
+    return 0
+  fi
+  mapfile -t WP_FLOW_FILES < <(wp_restore_candidates files)
+  mapfile -t WP_FLOW_DUMPS < <(wp_restore_candidates dumps)
+  if (( ${#WP_FLOW_FILES[@]} > 0 || ${#WP_FLOW_DUMPS[@]} > 0 )); then
+    WP_FLOW_ROUTE="restore"
+    if (( ${#WP_FLOW_FILES[@]} > 0 && ${#WP_FLOW_DUMPS[@]} > 0 )); then
+      WP_FLOW_STEP="install"; WP_FLOW_NEXT="wp:restore-ready"
+    else
+      WP_FLOW_STEP="upload"; WP_FLOW_NEXT="file:upload"
+    fi
+  elif [[ "$WP_HAS_CORE" == yes ]]; then
+    WP_FLOW_ROUTE="new"; WP_FLOW_STEP="install"; WP_FLOW_URL="$WP_INSTALLER_URL"
+  fi
+  return 0
+}
+
+wp_status_json() {
+  wp_state_summary
+  wp_flow_state
+  local cli="no"
+  wordpress_wp_cli_bin >/dev/null && cli="yes"
+  python3 -I -c '
+import json, sys
+a = sys.argv[1:]
+domain, route, step, nxt, url, db, web, core, config, cli = a[:10]
+lists, cur = {"pending": [], "files": [], "dumps": []}, None
+for item in a[10:]:
+    if item in ("--pending", "--files", "--dumps"):
+        cur = item[2:]
+    elif cur and item:
+        lists[cur].append(item)
+print(json.dumps({"schema": "simai-wp-status/1", "domain": domain, "route": route, "step": step,
+                  "next": nxt or None, "url": url or None, "pending": lists["pending"],
+                  "files": lists["files"], "dumps": lists["dumps"],
+                  "db_state": db, "web_state": web, "core": core == "yes", "config": config, "wp_cli": cli == "yes"}, indent=2))' \
+    "$WP_DOMAIN" "$WP_FLOW_ROUTE" "$WP_FLOW_STEP" "$WP_FLOW_NEXT" "$WP_FLOW_URL" "$WP_DB_STATE" "$WP_WEB_STATE" \
+    "$WP_HAS_CORE" "$WP_CONFIG_READY" "$cli" \
+    --pending "${WP_FLOW_PENDING[@]}" --files "${WP_FLOW_FILES[@]}" --dumps "${WP_FLOW_DUMPS[@]}"
+}
+
 wp_status_handler() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -126,6 +210,10 @@ wp_status_handler() {
   else
     rc=$?
     return $rc
+  fi
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    wp_status_json
+    return
   fi
 
   ui_header "SIMAI ENV · WordPress status"
@@ -324,34 +412,13 @@ wp_perf_read_mode() {
   echo "$mode"
 }
 
+# Edits wp-config.php as its owner (wp_install.sh), never through a symlink.
 wp_perf_set_disable_cron_true() {
-  [[ -f "$WP_CONFIG_FILE" ]] || return 1
-  if grep -Eqi "DISABLE_WP_CRON[[:space:]]*,[[:space:]]*true" "$WP_CONFIG_FILE"; then
+  [[ -f "$WP_CONFIG_FILE" && ! -L "$WP_CONFIG_FILE" ]] || return 1
+  if [[ "$(wordpress_wp_config_cron_mode "$WP_CONFIG_FILE")" == true ]]; then
     return 0
   fi
-  if grep -Eqi "DISABLE_WP_CRON" "$WP_CONFIG_FILE"; then
-    perl -0pi -e "s/define\\((['\\\"])DISABLE_WP_CRON\\1\\s*,\\s*(true|false)\\s*\\);/define('DISABLE_WP_CRON', true);/ig" "$WP_CONFIG_FILE"
-    return 0
-  fi
-  python3 - "$WP_CONFIG_FILE" <<'PY'
-from pathlib import Path
-import sys
-path = Path(sys.argv[1])
-text = path.read_text()
-needle = "/* That's all, stop editing!"
-insert = "define('DISABLE_WP_CRON', true);\n\n"
-if needle in text:
-    text = text.replace(needle, insert + needle, 1)
-else:
-    needle2 = "require_once ABSPATH . 'wp-settings.php';"
-    if needle2 in text:
-        text = text.replace(needle2, insert + needle2, 1)
-    else:
-        if not text.endswith("\n"):
-            text += "\n"
-        text += "\n" + insert
-path.write_text(text)
-PY
+  wordpress_config_owner_set_bools "$WP_CONFIG_FILE" DISABLE_WP_CRON=true
 }
 
 wp_perf_status_handler() {
@@ -643,6 +710,23 @@ wp_finalize_handler() {
     return 1
   fi
 
+  # Profile rules (admin/lib/site_checks.sh): the same fixes as the panel
+  # buttons; copies and dumps leave the web root first.
+  local id rule_failures=0
+  local -a rule_rows=()
+  for id in "${SITE_CHECK_IDS_WORDPRESS[@]}"; do
+    site_check_state "$id" "$WP_DOMAIN"
+    [[ "$SC_STATE" == needed ]] || continue
+    if site_check_apply "$id" "$WP_DOMAIN"; then
+      rule_rows+=("${id}|${SC_RESULT}")
+    else
+      rule_failures=$((rule_failures + 1))
+      rule_rows+=("${id}|${SC_RESULT}")
+      warn "${id}: ${SC_RESULT}"
+    fi
+  done
+  (( ${#rule_rows[@]} > 0 )) || rule_rows=("Profile rules|all hold")
+
   local ssl_status="not requested"
   if [[ "$ssl" == "yes" ]]; then
     if [[ -z "$email" ]]; then
@@ -665,10 +749,15 @@ wp_finalize_handler() {
     "Optimization|applied (${mode})" \
     "Scheduler sync|${WP_OPTIMIZATION_CRON_SYNC:-ok}" \
     "DISABLE_WP_CRON|${WP_OPTIMIZATION_DISABLE_CRON:-skipped}" \
+    "${rule_rows[@]}" \
     "SSL|${ssl_status}"
   ui_next_steps
   ui_kv "Open admin" "${WP_ADMIN_URL}"
   ui_kv "Status" "simai-admin.sh wp status --domain ${WP_DOMAIN}"
+  if (( rule_failures > 0 )); then
+    error "WordPress finalize: ${rule_failures} profile rule(s) could not be fixed for ${WP_DOMAIN}; see the table above."
+    return 1
+  fi
 }
 
 register_cmd "wp" "status" "Show WordPress status" "wp_status_handler" "domain" "" "effects:read"

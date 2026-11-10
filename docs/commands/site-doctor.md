@@ -37,7 +37,18 @@ Profile rules with a one-click fix (1.55.0):
   `innodb_strict_mode=0`), `bitrix.db-charset` (database default is not the
   profile charset), `bitrix.timezone` (PHP runs in another zone than the
   server and MySQL, and the site sets none), `bitrix.opcache` (host OPcache
-  baseline not met). PHP sites: `php.fpm-graceful-reload` (a reload kills
+  baseline not met).
+- WordPress (1.56.0): `wordpress.leftovers` (FAIL: SQL dumps, `.tar`,
+  `.tar.gz`, `.tgz`, `.zip`, `.wpress` files at the top of the web root or
+  dumps in `wp-content`; moved to `<site>/restore-archive`, nothing deleted),
+  `wordpress.config-perms` (FAIL: `wp-config.php` readable by other accounts
+  or a symlink; the fix removes access for others, `chmod o-rwx`),
+  `wordpress.debug-off` (`WP_DEBUG` or `WP_DEBUG_DISPLAY` true, or the site's
+  `display_errors` override on; the fix sets both constants false and turns
+  the override off), `wordpress.cron` (`DISABLE_WP_CRON` not true or no
+  `wp-cron.php` entry in `/etc/cron.d/<slug>`; the fix sets the constant and
+  rewrites the entry). `wp-config.php` is edited as its owner, never through
+  a symlink. `wp finalize` runs the same fixes. PHP sites: `php.fpm-graceful-reload` (a reload kills
   busy requests). Keyed rules without a fix: `bitrix.upload-limit`,
   `bitrix.sef-fallback`, `bitrix.static-gzip`, `bitrix.static-cache`,
   `bitrix.ownership`.

@@ -1,0 +1,27 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-status-finalize",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-status/1",
+    "domain": "demo-bitrix.test",
+    "profile": "bitrix",
+    "route": "restore",
+    "step": "finalize",
+    "next": "bitrix:finalize",
+    "restore_url": null,
+    "installer_url": null,
+    "pending": [
+      "bitrix.docroot-leftovers",
+      "bitrix.db-session-modes",
+      "bitrix.db-charset"
+    ],
+    "detail": {
+      "web_state": "installed",
+      "archive": null
+    }
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

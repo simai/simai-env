@@ -1,0 +1,28 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-wp-status.restore-install",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-wp-status/1",
+    "domain": "demo-wp-copy.test",
+    "route": "restore",
+    "step": "install",
+    "next": "wp:restore-ready",
+    "url": null,
+    "pending": [],
+    "files": [
+      "copy.tar.gz"
+    ],
+    "dumps": [
+      "public/dump.sql.gz"
+    ],
+    "db_state": "empty",
+    "web_state": "placeholder",
+    "core": false,
+    "config": "placeholder",
+    "wp_cli": true
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

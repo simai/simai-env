@@ -1,0 +1,22 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-site-status.demo-static.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-site-status/1",
+    "domain": "demo-static.test",
+    "profile": "static",
+    "route": "repo",
+    "step": "done",
+    "next": null,
+    "restore_url": null,
+    "installer_url": null,
+    "pending": [],
+    "detail": {
+      "release": "20261110134930"
+    }
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

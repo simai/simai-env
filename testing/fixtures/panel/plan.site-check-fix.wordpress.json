@@ -1,0 +1,25 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-check-fix.wordpress",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:check-fix",
+    "args": {
+      "domain": "demo-wp-copy.test",
+      "id": "wordpress.config-perms"
+    },
+    "target": "demo-wp-copy.test",
+    "description": "Fix one profile rule reported by site doctor (fix id from the report)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false,
+    "check": {
+      "id": "wordpress.config-perms",
+      "title": "wp-config.php is not readable by other accounts",
+      "plan": "Remove access for other accounts from wp-config.php (chmod o-rwx); the site user and its group keep reading it.",
+      "detail": "mode 644: other accounts can read the database password",
+      "state": "needed"
+    }
+  }
+}

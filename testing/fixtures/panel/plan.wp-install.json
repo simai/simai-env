@@ -1,0 +1,21 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.wp-install",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "wp:install",
+    "args": {
+      "domain": "demo-wp.test",
+      "title": "Demo WordPress",
+      "admin-user": "admin",
+      "admin-email": "admin@stand.test",
+      "locale": "en_US"
+    },
+    "target": "demo-wp.test",
+    "description": "Install WordPress end to end: core, wp-config, admin (password shown once), finalize",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

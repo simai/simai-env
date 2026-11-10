@@ -79,7 +79,8 @@
             "default": "yes",
             "description": "a daily data backup from the start"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "generic",
@@ -141,7 +142,8 @@
             "default": "yes",
             "description": "a daily data backup from the start"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "laravel",
@@ -202,7 +204,8 @@
             "default": "yes",
             "description": "a daily data backup from the start"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "proxy",
@@ -244,7 +247,8 @@
             "required": false,
             "pattern": "^[a-z][a-z0-9_-]{0,31}$"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "redirect",
@@ -292,7 +296,8 @@
             "required": false,
             "pattern": "^[a-z][a-z0-9_-]{0,31}$"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "static",
@@ -323,7 +328,8 @@
             "default": "yes",
             "description": "a daily data backup from the start"
           }
-        ]
+        ],
+        "routes": []
       },
       {
         "id": "wordpress",
@@ -384,7 +390,8 @@
             "default": "yes",
             "description": "a daily data backup from the start"
           }
-        ]
+        ],
+        "routes": []
       }
     ]
   },
