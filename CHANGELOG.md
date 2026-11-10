@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.56.3 - 2026-11-10
+
+- `panel install` and `panel update` install Larena Panel 0.4.5: profile
+  rules with one-click fixes and create-site ways (Bitrix, WordPress,
+  Laravel) on the site card.
+
 ## 1.56.2 - 2026-11-10
 
 - The Laravel create-site route ends with `laravel:finalize` (app key,
