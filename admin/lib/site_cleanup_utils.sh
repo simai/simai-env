@@ -8,7 +8,7 @@ site_remove_metadata_cleanup() {
 
   [[ -d "$config_dir" ]] || return 0
 
-  rm -f -- "${config_dir}/perf.env" "${config_dir}/runtime.env" "${config_dir}/app.env" "${config_dir}/deploy.env" "${config_dir}/service.env" "${config_dir}/.deploy.lock" "${config_dir}/redirect.env" "${config_dir}/proxy.env" "${config_dir}/redirects" "${config_dir}/paths-allow" "${config_dir}/web.env"
+  rm -f -- "${config_dir}/perf.env" "${config_dir}/runtime.env" "${config_dir}/app.env" "${config_dir}/deploy.env" "${config_dir}/service.env" "${config_dir}/.deploy.lock" "${config_dir}/redirect.env" "${config_dir}/proxy.env" "${config_dir}/redirects" "${config_dir}/paths-allow" "${config_dir}/web.env" "${config_dir}/php.ini" "${config_dir}/bitrix-restore.env" "${config_dir}/names.json" "${config_dir}/ssl.env"
   if [[ "$remove_db_env" == "yes" ]]; then
     rm -f -- "${config_dir}/db.env"
   elif [[ -e "${config_dir}/db.env" ]]; then

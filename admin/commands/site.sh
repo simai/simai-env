@@ -498,9 +498,9 @@ site_print_add_next_steps() {
       echo "Status      : Applications -> Laravel status"
       ;;
     wordpress)
-      echo "Open site   : https://${domain}/wp-admin/install.php"
-      echo "Complete    : Applications -> WordPress complete setup"
-      echo "Status      : Applications -> WordPress status"
+      echo "Install     : simai-admin.sh wp install --domain ${domain} --title <title> --admin-user <login> --admin-email <email> [--locale ru_RU]"
+      echo "Restore     : simai-admin.sh wp restore-ready --domain ${domain} --files <archive> --dump <dump.sql.gz>"
+      echo "Status      : simai-admin.sh site status --domain ${domain}"
       ;;
     bitrix)
       case "$bitrix_files" in

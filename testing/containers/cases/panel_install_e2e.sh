@@ -112,6 +112,13 @@ cli panel status 2>&1 | grep 'build' >/dev/null && ok "status shows the build" |
 grep -q "^${user2} ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate \"\"" /etc/sudoers.d/simai-panel && ok "gateway rule follows the build's account" || bad "sudoers: $(cat /etc/sudoers.d/simai-panel)"
 grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' $env && ok "the build gets a setup token in .env" || bad "token for build"
 [[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p2","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user2" sudo -n /usr/local/sbin/simai-panel-gate | field 'd["status"]')" == ok ]] && ok "the build calls the gateway" || bad "build gateway call"
+# Uploads up to 1 GB: PHP and nginx limits of the panel site.
+grep -qE 'upload_max_filesize.*1024M' /etc/php/*/fpm/pool.d/${project}.conf && grep -qE 'post_max_size.*1100M' /etc/php/*/fpm/pool.d/${project}.conf \
+  && ok "the panel's PHP takes 1 GB uploads" || bad "panel php limits: $(grep -hE 'upload_max|post_max' /etc/php/*/fpm/pool.d/${project}.conf)"
+grep -qE '^client_max_body_size 1100m;' /etc/nginx/simai-custom/${project}.conf && ok "the panel's nginx takes 1 GB uploads" || bad "panel nginx limit: $(cat /etc/nginx/simai-custom/${project}.conf 2>&1)"
+head -c 5242880 /dev/zero >/tmp/body5m
+[[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $P" --data-binary @/tmp/body5m http://127.0.0.1/up)" != 413 ]] && ok "a 5 MB request is not refused as too large" || bad "5 MB request refused (413)"
+[[ -z "$(python3 -I /root/simai-env/lib/timed_change.py pending nginx_custom 2>/dev/null)" ]] && ok "the nginx limit is confirmed, not waiting to be undone" || bad "nginx limit change still pending"
 s2=$(mk_build v1 broken)
 cli panel install --domain $P --archive /root/build-v1.tgz --sha256 "$s2" --confirm yes >/dev/null 2>&1 && bad "a second build install accepted" || ok "installing over a build points at panel update"
 
@@ -122,6 +129,7 @@ cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/tmp
 [[ "$(page '')" == panel-v2 ]] && ok "the new release is served" || bad "after update: $(page '' | head -c 120)"
 [[ -n "$(ls -A /var/backups/simai/$P 2>/dev/null)" ]] && ok "update backs up the panel data first" || bad "no backup before the update"
 grep -q '^APP_KEY=base64:' $env && grep -q '^SIMAI_PANEL_SETUP_TOKEN=' $env && ok "the update keeps .env" || bad ".env changed by the update"
+[[ "$(grep -c "^client_max_body_size" /etc/nginx/simai-custom/${project}.conf)" == 1 ]] && ok "the update keeps one upload limit" || bad "upload limit after update: $(cat /etc/nginx/simai-custom/${project}.conf)"
 # A rollback before the broken update: the newest other release is then not
 # the one that was serving.
 cli site deploy-rollback --domain $P --confirm yes >/dev/null 2>&1
@@ -132,7 +140,7 @@ cli panel update --archive /root/build-v3.tgz --sha256 "$s4" --confirm yes >/tmp
 grep -q 'rolled back' /tmp/pu3 && ok "the rollback is reported" || bad "rollback message: $(tail -3 /tmp/pu3)"
 
 cli panel remove >/dev/null 2>&1; [[ -f /etc/nginx/sites-available/$P.conf ]] && ok "remove without confirm changes nothing" || bad "remove ran without confirm"
-cli panel remove --confirm yes >/tmp/pr 2>&1 && ok "panel remove" || { bad "panel remove"; tail -10 /tmp/pr; }
+cli panel remove --confirm yes >/tmp/pr 2>&1 && ok "panel remove" || { bad "panel remove"; tail -10 /tmp/pr; grep -E "ERROR|WARN" /var/log/simai-admin.log | tail -8; }
 [[ ! -f /etc/nginx/sites-available/$P.conf && ! -d /home/simai/www/$P ]] && ok "panel site removed" || bad "panel site left"
 [[ ! -f /etc/sudoers.d/simai-panel && ! -f /usr/local/sbin/simai-panel-gate ]] && ok "gateway removed with the panel" || bad "gateway left"
 [[ "$(curl -s -H 'Host: keep.test' http://127.0.0.1/)" == keep-site ]] && ok "other sites keep working" || bad "keep.test broken"

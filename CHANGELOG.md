@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 1.56.4 - 2026-11-13
+
+- `site remove` no longer stops half way for a site with its own PHP
+  settings (`site php-ini-set`), a Bitrix restore marker, extra names or a
+  certificate record: their files in `/etc/simai-env/sites/<domain>/` are
+  removed with the site.
+- `panel install` and `panel update` install Larena Panel 0.4.6 (0.4.5 had
+  an empty New site form).
+- `panel install` and `panel update` raise the panel site's upload limits
+  for its file manager (up to 1 GB): PHP `upload_max_filesize` 1024M and
+  `post_max_size` 1100M, nginx `client_max_body_size 1100m` as the site's
+  own directive, confirmed at once.
+- `site add` for a WordPress site names `wp install` and `wp restore-ready`
+  as the next step instead of the web installer.
+
 ## 1.56.3 - 2026-11-10
 
 - `panel install` and `panel update` install Larena Panel 0.4.5: profile

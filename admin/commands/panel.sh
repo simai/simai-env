@@ -282,6 +282,34 @@ panel_health_ok() {
   return 1
 }
 
+# Uploads in the panel's file manager go up to 1 GB (file:upload): PHP and
+# nginx must take a request that large. nginx gets it as the site's own
+# directive, a timed change that is confirmed at once once the site answers.
+SIMAI_PANEL_UPLOAD_MAX="${SIMAI_PANEL_UPLOAD_MAX:-1024M}"
+SIMAI_PANEL_POST_MAX="${SIMAI_PANEL_POST_MAX:-1100M}"
+SIMAI_PANEL_BODY_MAX="${SIMAI_PANEL_BODY_MAX:-1100m}"
+
+panel_upload_limits_ensure() {
+  local domain="$1" content="" tmp rc=0 pending id
+  panel_admin site php-ini-set --domain "$domain" --name upload_max_filesize --value "$SIMAI_PANEL_UPLOAD_MAX" --apply yes --confirm yes >>"$LOG_FILE" 2>&1 \
+    && panel_admin site php-ini-set --domain "$domain" --name post_max_size --value "$SIMAI_PANEL_POST_MAX" --apply yes --confirm yes >>"$LOG_FILE" 2>&1 \
+    || { warn "Could not raise the panel's PHP upload limits; see ${LOG_FILE}"; return 1; }
+  nginx_custom_site "$domain" || return 1
+  [[ -f "$NGINX_CUSTOM_FILE" ]] && content=$(grep -v '^# simai-env: own directives' "$NGINX_CUSTOM_FILE" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}')
+  grep -qE '^[[:space:]]*client_max_body_size[[:space:]]' <<<"$content" && return 0
+  tmp=$(mktemp) || return 1
+  { [[ -n "$content" ]] && printf '%s\n' "$content"; printf 'client_max_body_size %s;\n' "$SIMAI_PANEL_BODY_MAX"; } >"$tmp"
+  chmod 0644 "$tmp"
+  panel_admin site nginx-custom --domain "$domain" --content-file "$tmp" --confirm yes >>"$LOG_FILE" 2>&1 || rc=$?
+  rm -f -- "$tmp"
+  (( rc == 0 )) || { warn "Could not raise the panel's nginx upload limit; see ${LOG_FILE}"; return 1; }
+  pending=$(python3 -I "$TIMED_CHANGE_PY" pending nginx_custom 2>/dev/null || true)
+  id=$(python3 -c 'import json,sys; d=json.loads(sys.argv[1] or "{}"); print(d.get("change_id","") if d.get("domain")==sys.argv[2] else "")' "$pending" "$domain" 2>/dev/null || true)
+  [[ -n "$id" ]] && panel_admin change confirm --id "$id" >>"$LOG_FILE" 2>&1 && return 0
+  warn "The panel's nginx upload limit is not confirmed and will be undone; see ${LOG_FILE}"
+  return 1
+}
+
 panel_install_handler() {
   local rc=0
   panel_install_run "$@" || rc=$?
@@ -382,6 +410,7 @@ panel_install_run() {
     panel_install_abort "$domain"
     return 1
   fi
+  [[ "$source" == build ]] && { panel_upload_limits_ensure "$domain" || true; }
   progress_step "Letting the panel account ${user} call the gateway"
   panel_state_set PANEL_DOMAIN "$domain" && panel_state_set PANEL_USER "$user" && panel_state_set SOURCE "$source" || return 1
   panel_state_set INSTALLED_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)" && panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
@@ -463,6 +492,7 @@ panel_update_run() {
     return 1
   fi
   panel_state_set VERSION "${PANEL_RELEASE_VERSION:-}" || return 1
+  panel_upload_limits_ensure "$domain" || true
   panel_address_sync >/dev/null || true
   current=$(sed -n 's/^CURRENT=//p' "$deploy_file" | tail -n1)
   ui_result_table "Panel|${domain}" "Version|${PANEL_RELEASE_VERSION:-custom}" "Release|${current}" "Previous|${previous}"
