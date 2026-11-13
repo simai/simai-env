@@ -1,0 +1,194 @@
+[
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.status",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: status",
+    "predicate": "draft_specifies_at_revision",
+    "value": "Status: draft for SIMAI ENV Panel stage 0. Nothing here is implemented yet\nexcept the read-only commands and recordings listed under \"Recorded answers\".",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=0-152"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0b50b48113.2",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:50b481134b49cf0620c8feffb6c6c0ab8186cd93c9e8f0a8709904680b1ca974",
+        "start": 0,
+        "end": 152,
+        "quote": "Status: draft for SIMAI ENV Panel stage 0. Nothing here is implemented yet\nexcept the read-only commands and recordings listed under \"Recorded answers\"."
+      }
+    ],
+    "assertion_id": "assertion.c8dbf7d33ac3485d5ce93a8262c55d262ce41e21556fb743863fda8ae40cb1c3"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.application",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: application",
+    "predicate": "draft_specifies_at_revision",
+    "value": "SIMAI ENV Panel is a Larena application (package `larena/env`) installed by\nsimai-env as an ordinary site.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=0-106"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0b1386ea5e.3",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:1386ea5e24428ff87c36a6c47cd74a5f9e1f0215f9128f1901bda9d90c733223",
+        "start": 0,
+        "end": 106,
+        "quote": "SIMAI ENV Panel is a Larena application (package `larena/env`) installed by\nsimai-env as an ordinary site."
+      }
+    ],
+    "assertion_id": "assertion.98466482af3c70849ab21b409f711e617d22f15cdf3a73f30c908113bd7e9ca6"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.protocol",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: protocol",
+    "predicate": "draft_specifies_at_revision",
+    "value": "The gateway reads one JSON request on stdin and writes one JSON answer on\n  stdout.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=390-473"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0bd58ba893.5",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:d58ba89337e8c382c4f1eea65f4fe75d9ada96de1ddea26978e6fc30905293db",
+        "start": 390,
+        "end": 473,
+        "quote": "The gateway reads one JSON request on stdin and writes one JSON answer on\n  stdout."
+      }
+    ],
+    "assertion_id": "assertion.b7f4c08ad98d6f922a7046c023db91225e8e9cd0c3c0de9c248c22ea4c39e4b4"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.arguments",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: arguments",
+    "predicate": "draft_specifies_at_revision",
+    "value": "`args` maps option names without `--` to strings; unknown options are\n  refused before any handler runs.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=71-175"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0b4e406eae.8",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:4e406eaea8c14a609413eb07125911f0ed76c74ad44292f10939cbb31f1162fd",
+        "start": 71,
+        "end": 175,
+        "quote": "`args` maps option names without `--` to strings; unknown options are\n  refused before any handler runs."
+      }
+    ],
+    "assertion_id": "assertion.c0f4fb5031747f6d65b77cdf4c6835b9a19c2a82ade15abda2b3bd1f951e60b3"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.confirmation",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: confirmation",
+    "predicate": "draft_specifies_at_revision",
+    "value": "`confirm: false` on a state-changing command returns the plan only, as the\n  CLI does without `--confirm yes`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=369-479"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0b4e406eae.8",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:4e406eaea8c14a609413eb07125911f0ed76c74ad44292f10939cbb31f1162fd",
+        "start": 369,
+        "end": 479,
+        "quote": "`confirm: false` on a state-changing command returns the plan only, as the\n  CLI does without `--confirm yes`."
+      }
+    ],
+    "assertion_id": "assertion.d6a8d3ca9deccf30cb4745340b3e1fb999c4a238831bc52aae6819efdc9ee3a8"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.secrets",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: secrets",
+    "predicate": "draft_specifies_at_revision",
+    "value": "Secrets are never part of an answer: no `.env` values, database passwords,\nprivate keys or deploy keys.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=0-103"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0bc56e8e68.12",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:c56e8e6856b4c2002d9ef24b1b73cd0e0d0278ec4a60e42e8215289fc314d366",
+        "start": 0,
+        "end": 103,
+        "quote": "Secrets are never part of an answer: no `.env` values, database passwords,\nprivate keys or deploy keys."
+      }
+    ],
+    "assertion_id": "assertion.f28d4d9c25479bae7bab65f77325a1604b9584064809476a639d3ffd8e84d7f1"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.operator-only",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: operator-only",
+    "predicate": "draft_specifies_at_revision",
+    "value": "Interactive and operator-only commands (menus, `self bootstrap`,\n`access reset-password`, `self ssh-hardening-ensure`, …) are never exposed.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=0-140"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0bed5d71f1.19",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:ed5d71f11f091069ad0e3d98afa828ffd33552d4f749c40977bd9c9344ebbe2f",
+        "start": 0,
+        "end": 140,
+        "quote": "Interactive and operator-only commands (menus, `self bootstrap`,\n`access reset-password`, `self ssh-hardening-ensure`, …) are never exposed."
+      }
+    ],
+    "assertion_id": "assertion.c4ceffeda7ba780f2533307cf33d44c9f79b3043924a439b31979df0c23b8067"
+  },
+  {
+    "id": "object.ordering.laravel-env.52eb531f7a.fixtures",
+    "kind": "documented_draft_contract",
+    "title": "Draft stage 0 panel contract: fixtures",
+    "predicate": "draft_specifies_at_revision",
+    "value": "Re-record\nafter a change of the answer shape, never edit the files by hand.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md#chars=362-437"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a095da0b7761d3b1.21",
+        "source_ref": "repo://laravel-env@52eb531f7a48e4ffd5c3b6dad078d167a8a903bd/docs/architecture/panel-gate.md",
+        "content_digest": "sha256:7761d3b185d19166b7cbdf5d044b7bc7c46393591f832b2c861850928bc22103",
+        "start": 362,
+        "end": 437,
+        "quote": "Re-record\nafter a change of the answer shape, never edit the files by hand."
+      }
+    ],
+    "assertion_id": "assertion.fffee4ad68dabbd1ec5dee2eca4058142be5551cbefe2bc650b8e2cbe3ec0319"
+  }
+]
