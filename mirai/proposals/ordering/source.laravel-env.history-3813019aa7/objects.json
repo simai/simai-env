@@ -1,0 +1,194 @@
+[
+  {
+    "id": "object.laravel-env.historical.3813019aa7.release-index",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: release-index",
+    "predicate": "source_reports_at_revision",
+    "value": "- [v1.18.2](v1.18.2.md) — charset utf-8 on node sites with a static root.\n- [v1.18.1](v1.18.1.md) — deny rules cover prefix locations.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/README.md#chars=0-134"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.7b3fb23a84e7efdf.2",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/README.md",
+        "content_digest": "sha256:84e7efdf3bb80e5e1684b294ebf38eb36397ad61b88a850deb00ef8013e7c063",
+        "start": 0,
+        "end": 134,
+        "quote": "- [v1.18.2](v1.18.2.md) — charset utf-8 on node sites with a static root.\n- [v1.18.1](v1.18.1.md) — deny rules cover prefix locations."
+      }
+    ],
+    "assertion_id": "assertion.382b91efda9b23092c5beb730d896b08aacd37603b79561f5ff533c9d2f09259"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.deny-fix",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: deny-fix",
+    "predicate": "source_reports_at_revision",
+    "value": "Deny patterns now run at\nserver level before location selection, and hidden files are always denied\non these sites (ACME challenges excepted).",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md#chars=277-419"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a4b0e968325acea1.4",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md",
+        "content_digest": "sha256:325acea1e7ceb9fc0782f309f7dbffb422d3946a3472b17c20b46852320f2e39",
+        "start": 277,
+        "end": 419,
+        "quote": "Deny patterns now run at\nserver level before location selection, and hidden files are always denied\non these sites (ACME challenges excepted)."
+      }
+    ],
+    "assertion_id": "assertion.b45db116aeb8f6e8321580942402173ce335545751c9c7ca4ecb593071ad2450"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.host-scope",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: host-scope",
+    "predicate": "source_reports_at_revision",
+    "value": "No site on a released host used 1.18.0 routes before this fix.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md#chars=0-62"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a4b0e968639fec7e.5",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md",
+        "content_digest": "sha256:639fec7eb9e603fdd42c6bf8b7401150d062199a9085703f900afd039b9b025c",
+        "start": 0,
+        "end": 62,
+        "quote": "No site on a released host used 1.18.0 routes before this fix."
+      }
+    ],
+    "assertion_id": "assertion.93df50b26ad322e2e85450f3e85068b293cfba0561bfc9184fca0bba061e2fc9"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.deploy-timing",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: deploy-timing",
+    "predicate": "source_reports_at_revision",
+    "value": "Sites pick the new routes up on their next deploy.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md#chars=0-50"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a4b0e968e75049cc.8",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md",
+        "content_digest": "sha256:e75049cca08dec33b14a77a7a1d6018157d58bd84508ed899e42e8947c2a4cd6",
+        "start": 0,
+        "end": 50,
+        "quote": "Sites pick the new routes up on their next deploy."
+      }
+    ],
+    "assertion_id": "assertion.8cffcebddc682bc425e15e46c3439bdf2b2d7fdd390331accb8e66cbe1d7fa32"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.deny-verification",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: deny-verification",
+    "predicate": "source_reports_at_revision",
+    "value": "- `app_e2e` (26 checks) on Ubuntu 24.04 and 26.04: `/simai/.htaccess` and\n  `/runner/.env` answer 404 inside prefix locations.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md#chars=0-126"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.a4b0e968f85ca2f5.10",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.1.md",
+        "content_digest": "sha256:f85ca2f59ba338c3ec61f8a2e58f46f8b17f45c1ff5cf16691da74af40acbb72",
+        "start": 0,
+        "end": 126,
+        "quote": "- `app_e2e` (26 checks) on Ubuntu 24.04 and 26.04: `/simai/.htaccess` and\n  `/runner/.env` answer 404 inside prefix locations."
+      }
+    ],
+    "assertion_id": "assertion.9054c6f56a3cd1fec909d8dbd6d2588447ae7496781256bcc3452a744a509b56"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.charset",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: charset",
+    "predicate": "source_reports_at_revision",
+    "value": "They now set `charset utf-8` for HTML, plain\ntext, XML, CSS, JavaScript, JSON and SVG.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md#chars=182-268"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.744333f50252f4a0.4",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md",
+        "content_digest": "sha256:0252f4a09d3a4591423dc131583e064b5676185a41678fc4b6a02005fd7a3f5a",
+        "start": 182,
+        "end": 268,
+        "quote": "They now set `charset utf-8` for HTML, plain\ntext, XML, CSS, JavaScript, JSON and SVG."
+      }
+    ],
+    "assertion_id": "assertion.c27240e862cea4c7c3a1b7ec31d7f03b98b1370b560f711d86f863cc8e6fd9be"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.migrate-rollback",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: migrate-rollback",
+    "predicate": "source_reports_at_revision",
+    "value": "`self migrate` (run by\n`self update`) renders the routes of existing sites again from their current\nrelease, with `nginx -t` and the previous files restored on failure.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md#chars=269-437"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.744333f50252f4a0.4",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md",
+        "content_digest": "sha256:0252f4a09d3a4591423dc131583e064b5676185a41678fc4b6a02005fd7a3f5a",
+        "start": 269,
+        "end": 437,
+        "quote": "`self migrate` (run by\n`self update`) renders the routes of existing sites again from their current\nrelease, with `nginx -t` and the previous files restored on failure."
+      }
+    ],
+    "assertion_id": "assertion.5a3d36af0bc41363cb42817efc7f733938e45951ec5bd0191b370e9fc6055537"
+  },
+  {
+    "id": "object.laravel-env.historical.3813019aa7.charset-verification",
+    "kind": "historical_release_note",
+    "title": "Release notes at revision 3813019aa7: charset-verification",
+    "predicate": "source_reports_at_revision",
+    "value": "- `app_e2e` (29 checks) on Ubuntu 24.04 and 26.04: HTML and JavaScript carry\n  `charset=utf-8`; routes without it are rendered again by `self migrate`\n  exactly once. `upgrade_e2e`.",
+    "lifecycle": "reviewed",
+    "confidence": 0.95,
+    "evidence_status": "cited_by_mirai_admission",
+    "source_refs": [
+      "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md#chars=0-181"
+    ],
+    "source_spans": [
+      {
+        "unit_id": "unit.744333f5de9b7c2b.8",
+        "source_ref": "repo://laravel-env@3813019aa79bf97aa93cb3cc4ef04677c8ef6b7d/docs/releases/v1.18.2.md",
+        "content_digest": "sha256:de9b7c2b9e5fc9eaccc8eed6b431b9c2e87ce3f622dd18b1f4a3fc8cd8fac576",
+        "start": 0,
+        "end": 181,
+        "quote": "- `app_e2e` (29 checks) on Ubuntu 24.04 and 26.04: HTML and JavaScript carry\n  `charset=utf-8`; routes without it are rendered again by `self migrate`\n  exactly once. `upgrade_e2e`."
+      }
+    ],
+    "assertion_id": "assertion.5f1ddee26572cc834512d09b1e83c6bb9fe476d29c89350be043fa88a7e565ed"
+  }
+]
