@@ -28,6 +28,20 @@ Shows:
 - nginx SEF fallback state for Bitrix URLs (`/bitrix/urlrewrite.php`)
 - nginx static asset compression/cache hints for first page load performance
 
+With `--output json` (`simai-bitrix-status/1`, also `bitrix:status` in the
+panel gateway) it answers where the site is on its way:
+- `route`: `restore` (restore.php in the web root, or a site restored
+  earlier), `setup` (bitrixsetup.php), `installed`, `none`;
+- `step`: `prepare` (no wizard yet: `bitrix restore-ready` or
+  `installer-ready`), `upload` (restore.php, no archive), `validate`
+  (archive uploaded, not checked by `restore-ready` yet, or changed since),
+  `run_restore` (open `restore_url`), `run_setup` (open `installer_url`),
+  `finalize` (installed; `pending` lists the profile rules `bitrix finalize`
+  fixes), `done`;
+- `next`: the command for the step, or `open_url`.
+`restore-ready` remembers the archive it validated (name and size) in
+`/etc/simai-env/sites/<domain>/bitrix-restore.env`.
+
 ## Cron Status
 
 ```bash
@@ -154,6 +168,7 @@ Notes:
 
 ```bash
 simai-admin.sh bitrix restore-ready --domain <domain> [--overwrite yes] [--preseed auto|yes|no] [--short-install yes|no] [--archive auto|none|<filename>]
+  [--source <path in the site directory> | --url <https URL> | --url-file <file with the URL>] [--output json]
 ```
 
 Prepares a Bitrix site for restore from an existing backup archive:
@@ -171,22 +186,116 @@ Notes:
 - A missing or corrupt volume fails closed and names the first bad file. `--archive <filename>` selects one base archive when several are present. `--archive none` is an explicit advanced bypass.
 - After the browser restore wizard finishes, run `bitrix finalize --domain <domain> --confirm yes`.
 
+### Archive already on the server (1.56.0)
+
+A large archive should not go through a browser. Upload it over SFTP into the
+site directory (any folder, for example `upload/backup`), then:
+
+```bash
+simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup             # plan: what was found, resources
+simai-admin.sh bitrix restore-ready --domain <domain> --source upload/backup --confirm yes
+```
+
+- `--source` is a path relative to the site directory (an absolute path must
+  be inside it): the base volume (`<name>.tar.gz`, `.tgz`, `.tar` or the
+  encrypted `.enc.gz`, or one of its parts `.N`) or a folder holding exactly
+  one base volume. Its parts `<name>.1 .. <name>.N` are taken with it.
+- The volumes are moved (link and unlink on one filesystem, a copy across
+  filesystems) into the docroot as the site user. Nothing is replaced: a
+  volume name that already exists in the docroot refuses the move.
+- Refused (`source_invalid`, the reason in the answer): `..`, a path outside
+  the site directory or inside another site's directory, a symbolic link
+  anywhere on the way or as a volume, a volume with other hard links, no or
+  several base volumes in the folder.
+- `--url https://...` downloads the base volume into `<site>/restore-download`
+  (excluded from data backups) as the site user, at low CPU and I/O priority,
+  resumable (run the command again after an interruption), then moves it in
+  like `--source`. https only, no redirects, the host must resolve only to
+  public addresses (curl is pinned to the checked one), size limit
+  `SIMAI_BITRIX_URL_MAX_GB` per file (default 50). A multi-volume archive is
+  fetched as `<url>.1 .. <url>.N` only from an unsigned URL; a signed URL
+  covers one file, so upload such volumes over SFTP. The URL is passed to
+  curl on stdin, and plans, answers and logs show it without its query string
+  (a signature). `--url-file` reads the URL from a file instead of the
+  command line (the panel gateway uses it).
+
+Resources, in the plan and again before anything is moved or downloaded:
+
+- free disk on the docroot filesystem below three times the archive refuses
+  (`not_enough_disk`): the archive, the unpacked files and the database
+  import need room at once;
+- memory below `PROFILE_MIN_RAM_MB` of the bitrix profile (1536 MB) refuses
+  (`not_enough_ram`); below `PROFILE_RECOMMENDED_RAM_MB` (4096 MB) the plan
+  warns (`ram_below_recommended`); for `--url` an unknown size warns
+  (`size_unknown`) and the disk is checked again after the first volume.
+
+What it found is printed (volumes, count, size, encrypted, SQL dump) and,
+with `--output json`, answered as data:
+
+```json
+{"schema": "simai-bitrix-restore-ready/1", "domain": "example.com", "status": "ready",
+ "restore_url": "https://example.com/restore.php",
+ "archive": {"state": "ready", "name": "site_20261110_full_abc.tar.gz", "parts": 2,
+             "volumes": [{"name": "site_20261110_full_abc.tar.gz", "size": 1048576000},
+                         {"name": "site_20261110_full_abc.tar.gz.1", "size": 52428800}],
+             "count": 2, "total_bytes": 1101004800, "encrypted": false, "sql_dump": true,
+             "detail": "All archive volumes passed gzip integrity checks"},
+ "moved": ["site_20261110_full_abc.tar.gz", "site_20261110_full_abc.tar.gz.1"],
+ "found": {"base": "...", "dir": "public", "source": "upload/backup", "url": null, "volumes": [...],
+           "count": 2, "total_bytes": 1101004800, "encrypted": false},
+ "resources": {"disk_free_bytes": 9000000000, "needed_bytes": 3303014400, "ram_mb": 1963,
+               "ram_min_mb": 1536, "ram_recommended_mb": 4096, "ok": true, "refusal": null,
+               "warnings": [{"code": "ram_below_recommended", "message": "..."}]},
+ "restore_php": "ready", "preseed": "ready", "writable": "ready", "refusal": null, "detail": null}
+```
+
+`status` is `ready`, `waiting_for_archive`, `partial` or `refused` (then
+`refusal` and `detail` say why). `sql_dump` is `true` when the archive lists
+`bitrix/backup/*.sql`, `false` when a fully listed archive has none, `null`
+when it cannot be read without unpacking (encrypted, or not in the first of
+several volumes). The plan (`--output json` without `--confirm`) carries
+`data.resources`, `data.archive` (what was found, as `found` above),
+`data.refusal` and `data.detail`; a refused plan is `failed` with the same data.
+
 ## Finalize
 
 ```bash
 simai-admin.sh bitrix finalize --domain <domain> --confirm yes [--ssl yes --email <email>] [--redirect yes|no] [--hsts yes|no] [--staging yes|no]
 ```
 
-Safe post-install orchestration for Bitrix sites after the web installer has finished:
+Safe post-install and post-restore orchestration for Bitrix sites after the web installer or the `restore.php` wizard has finished:
 - verifies that Bitrix web installation is already complete (`web state = installed`)
-- runs `bitrix php-baseline-sync`
+- moves restore leftovers out of the docroot (see below)
+- makes `bitrix/php_interface/after_connect_d7.php` set `SET SESSION sql_mode=''` and `SET SESSION innodb_strict_mode=0`
+- sets the site database default charset/collation to the profile values (`utf8mb4` / `utf8mb4_unicode_ci`)
+- runs `bitrix php-baseline-sync` (including PHP `date.timezone`)
 - applies `bitrix agents-sync --apply yes`
 - optionally issues Let's Encrypt if `--ssl yes --email <email>` is provided
+
+Each step is shown in the result table. The command is idempotent: a second run
+reports every step as unchanged. It is also safe on a fresh install.
+
+Restore leftovers:
+- A restore leaves the archive volumes, `restore.php` and the database dump in the public docroot, where they can be downloaded.
+- Finalize moves (never deletes) them into `<site root>/restore-archive/` (mode `0700`, site user), next to but outside the docroot, and prints the destination.
+- Only these files are moved: top-level backup volumes named like Bitrix backups (`<name>_<type>_<id>.tar.gz`, `.tar.gz.N`, `.enc.gz`, `.enc.gz.N`), top-level `restore.php`, and `bitrix/backup/*.sql`. Distribution archives (`*_encode.tar.gz`), other files and symlinks stay.
+- A file whose name already exists in `restore-archive/` gets a timestamp prefix.
+- When the docroot is the site root itself, nothing is moved and the step fails with a message.
+
+MySQL session modes:
+- The archive replaces `.settings.php` (a connection without the toolkit's `init_commands`) and `after_connect_d7.php` (often only `SET NAMES`). Bitrix then runs under the server's strict `sql_mode` and `innodb_strict_mode=ON`.
+- Finalize appends only the missing statements to `after_connect_d7.php`, in the style the file uses (`$this->queryExecute(...)` or `$connection->queryExecute(...)`), keeps the existing lines (charset and collation are not rewritten), removes a trailing `?>`, checks the result with `php -l`, keeps owner and mode, and replaces the file atomically. A missing file is created from the toolkit template.
+- `.settings.php` and its credentials are never changed or printed.
+
+Database charset:
+- The archive's `*_after_connect.sql` can run `ALTER DATABASE ... COLLATE utf8mb3_general_ci`, so the database default differs from the `utf8mb4` connection (site checker warning).
+- Finalize changes only the database default with `ALTER DATABASE`; tables are never converted. The number of tables that still use `utf8mb3` is reported for information.
 
 Notes:
 - In CLI mode `--confirm yes` is required.
 - If the site is still in installer mode, the command stops with a clear error and prints the correct installer URL.
-- This is the recommended single step after finishing the Bitrix web installer.
+- This is the recommended single step after finishing the Bitrix web installer or the restore wizard.
+- If a step fails, the remaining steps still run, the table names the failure and the command exits non-zero.
 
 ## PHP Baseline Sync
 
@@ -201,11 +310,33 @@ Then enforces critical FPM keys per site:
 - `memory_limit=512M`
 - `opcache.validate_timestamps=1`
 - `opcache.revalidate_freq=0`
+- `date.timezone` set to the host time zone (`timedatectl`, then `/etc/timezone`, then `/etc/localtime`; `UTC` when none is valid), so PHP and MySQL agree on the time. Only added when the site has no `date.timezone` override yet; `site php-ini-set --name date.timezone` keeps the operator's value.
+
+Other per-site overrides set with `site php-ini-set` are kept; the baseline keys win.
+
+Host baseline: OPcache memory cannot be set per pool (one shared memory per
+PHP version), so before the pool step the command writes
+`/etc/php/<version>/fpm/conf.d/99-zz-simai-opcache.ini` for the PHP version of
+each target site:
+- `opcache.memory_consumption=256`
+- `opcache.interned_strings_buffer=16`
+- `opcache.max_accelerated_files=20000`
+- `realpath_cache_ttl=600`
+
+Each value is the larger of the baseline and what the other ini files of that
+version set, so a higher value chosen by an administrator (in their own
+`conf.d` file) stays; the file loads last, so the `self perf-apply` preset
+cannot lower it. It is validated with `php-fpm<version> -t` (restored on
+failure) and PHP-FPM reloads only when it changed. `site add` / `site set-php`
+of a Bitrix site and `self migrate` (for every version that serves a Bitrix
+site) write the same file; `site doctor` then reports these four checks as
+`PASS`.
 
 Notes:
 - Single-domain mode works with `--domain`.
 - Bulk mode (`--all yes`) requires `--confirm yes` in CLI mode.
-- Read-only checks are not changed; only PHP pool INI overrides are updated.
+- Read-only checks are not changed; only PHP pool INI overrides and the host
+  baseline file above are updated.
 - run this after Bitrix web installation, before final `site_checker` / `perfmon` acceptance checks.
 
 ## Perf Status
@@ -218,8 +349,8 @@ Shows:
 - managed site performance mode (`site perf-tune` state)
 - install stage (`installer` vs `post-install`)
 - Bitrix DB/runtime compatibility markers:
-  - `.settings.php` init commands
-  - `after_connect_d7.php`
+  - `.settings.php` init commands (`ready (via after_connect_d7.php)` when a restored `.settings.php` has none but `after_connect_d7.php` sets the session modes)
+  - `after_connect_d7.php` (`ready` when it sets an empty `sql_mode` and `innodb_strict_mode=0`)
   - agents-via-cron readiness
 - effective PHP-FPM runtime values used by Bitrix checker-sensitive paths
 - cache directory presence

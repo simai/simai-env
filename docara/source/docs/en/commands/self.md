@@ -65,10 +65,25 @@ Behavior:
 - runs strict smoke checks before and after activation; a post-activation failure automatically restores the previous tree and returns a non-zero status
 - keeps the timestamped recovery archive after a successful update
 - reloads the menu automatically when the command is run from menu mode
+- `--check-sites yes` asks every site before and after the update (its health path through nginx, any status below 500 counts as answering); if a site that answered stops, the previous tree is restored from the pre-update archive and the command fails. Host migrations the new release applied are not undone
+- `--target panel` updates the Larena Panel build instead (the same as `panel update`: data backup, deploy, health check, rollback)
 
 Typical use:
 ```bash
-sudo /root/simai-env/simai-admin.sh self update
+sudo /root/simai-env/simai-admin.sh self update-plan
+sudo /root/simai-env/simai-admin.sh self update --check-sites yes --confirm yes
+```
+
+## update-plan
+Show what `self update --target env|panel` would do, without changing
+anything: the installed and the available version, the release notes in
+between (the remote CHANGELOG), what is backed up, what restarts, which
+sites are checked after, and how it rolls back. For `panel` the available
+version is the build this simai-env release pins. `--output json` answers
+`simai-update-plan/1`.
+
+```bash
+sudo /root/simai-env/simai-admin.sh self update-plan --target panel
 ```
 
 ## supply-chain-doctor
@@ -236,9 +251,11 @@ sudo /root/simai-env/simai-admin.sh self auto-update-run-check
 Repair or install the base stack.
 
 Options:
-- `--php <version>` (default `8.2`)
-- `--mysql <mysql|mariadb>` (default `mysql`)
-- `--node-version <version>` (default `20`)
+- `--php <version|none>` (default `8.2` where the ondrej/php PPA covers the
+  Ubuntu release, otherwise the release's own PHP: 8.5 on 26.04; `none` skips
+  PHP and Composer)
+- `--mysql <mysql|percona|none>` (default `mysql`; `none` skips the database server)
+- `--node-version <version>` (default `22`)
 
 Behavior:
 - installs/repairs base packages
@@ -462,6 +479,95 @@ SSH rule is added and checked before the policy is enabled. The plan lists
 listening services that would become unreachable, such as a monitoring agent;
 keep one with `--allow <port>/<tcp|udp>@<source-ip[/cidr]>`.
 
+## alerts / alerts-ack / alerts-channel / alerts-test / metrics-history
+```bash
+sudo /root/simai-env/simai-admin.sh self alerts
+sudo /root/simai-env/simai-admin.sh self alerts-ack --id 9147a2749fff --confirm yes
+sudo /root/simai-env/simai-admin.sh self alerts-channel --kind webhook --target https://hooks.example.com/simai --confirm yes
+sudo /root/simai-env/simai-admin.sh self alerts-channel --kind telegram --target -1001234567 --token-file /root/bot.token --confirm yes
+sudo /root/simai-env/simai-admin.sh self alerts-test --confirm yes
+sudo /root/simai-env/simai-admin.sh self metrics-history --period week
+```
+The server watch (`lib/server_watch.py`) runs with `self status-refresh`
+every five minutes from cron, independent of the panel. It opens an alert
+when a disk is 90% full (critical at 95%), a certificate has less than 14
+days left or its last renewal failed, a site or the panel does not answer or
+answers 5xx in two checks in a row, a site with a schedule has no backup in
+48 hours, or the last backup or backup check failed. The same problem keeps
+the same id; an alert is `open`, `acked` or `resolved` (when the condition
+clears; resolved alerts are kept 7 days). New and resolved alerts go to the
+channel: a webhook gets a JSON `simai-alert-event/1` POST, Telegram a short
+text. The webhook URL is shown only as scheme and host; the Telegram bot token
+stays in `/etc/simai-env/alerts-telegram.token` (root, 0600) and is never
+printed. `--kind off` removes the channel and the token.
+
+The same run keeps one load sample in `/var/lib/simai-env/metrics-history.jsonl`
+(31 days); a light cron line (`server_watch.py tick`) keeps one a minute in
+`metrics-fine.jsonl` (3 hours). `metrics-history --period hour` answers
+1-minute points, `6h` and `day` 5-minute points, `week` and `month` hourly
+averages: `simai-metrics-history/1` with `points [{at, load1, cpu_cores,
+memory_used_bytes, memory_total_bytes, swap_used_bytes, disk, cpu_percent,
+net_rx_bytes_per_s, net_tx_bytes_per_s, disk_read_bytes_per_s,
+disk_write_bytes_per_s}]`. The last five are averages since the previous
+sample: the CPU busy share, traffic of the physical network interfaces
+(all but loopback and container ones when none is physical) and reads and
+writes of the whole physical disks. They are `null` for the first sample,
+after a reboot or a gap, and in samples from before 1.50.0. `host` has
+facts for chart titles: `net_interface` (the default route),
+`net_link_bits_per_s` (`null` when the link does not say, as on many VMs),
+`disk_device` and `disk_kind` of the disk holding `/` (`nvme`, `ssd`, `hdd`,
+`virtual` for virtio disks, or `null`).
+
+## profiles
+List the enabled site profiles with the `site add` arguments each one
+takes: whether it is required, its values or pattern, and its default
+(PHP versions installed here and allowed by the profile, database engines,
+`redirect-*`, `upstream-*`, `websockets`, `app-port`, `bitrix-files`).
+A site wizard builds its form from this answer. `--output json` answers
+`simai-site-profiles/1`.
+
+```bash
+sudo /root/simai-env/simai-admin.sh self profiles
+```
+
+Each profile also answers `routes` (1.56.0): the ways a site of it is
+created, so the wizard needs no copy of them.
+
+| Route | Meaning |
+| --- | --- |
+| `new` | simai-env prepares PHP, the database, the scheduler; the application installs itself (Bitrix installer) or the files are uploaded |
+| `restore` | from a copy (a Bitrix backup archive and `restore.php`) |
+| `repo` | a release from Git (`site deploy --git --ref`), or a built archive for static sites |
+
+A route is `{id, title, available, inputs, steps}`:
+
+- `available: false` marks a planned route (WordPress `new` and `restore`,
+  generic PHP `restore` from a files archive and an SQL dump): the wizard
+  shows it greyed out.
+- `inputs [{name, required, kind, values?, default?, pattern?}]`; `kind` is
+  `text`, `choice`, `url`, `file_on_server` (a file the route puts on the
+  server first, such as a backup archive uploaded to the site root) or
+  `upload` (bytes sent with the step, the static archive of `site:deploy`).
+  An input named like a `site add` argument carries its values and pattern
+  (PHP versions installed here).
+- `steps [{id, title, command, args | url_from}]`: `command` is a panel
+  gateway command (`site:add`, `file:upload`, `bitrix:restore-ready`,
+  `bitrix:finalize`, `site:deploy`, `site:doctor`) or `open_url`, which opens
+  the address named by `url_from` in the `site:status` answer
+  (`installer_url`, `restore_url`). `args` are fixed arguments of the step
+  (`bitrix-files: setup`). Step ids are the `step` values of `site status`,
+  so the panel marks where a site is. The last step is always `site:doctor`.
+
+Routes are declared in the profile file:
+
+```bash
+PROFILE_ROUTES=("new|yes|New site: the Bitrix installer sets it up" "restore|yes|Restore from a Bitrix backup")
+PROFILE_ROUTE_NEW_INPUTS=("domain|yes|text" "php|no|choice")
+PROFILE_ROUTE_NEW_STEPS=("add|site:add|bitrix-files=setup|Create the site" "run_setup|open_url|installer_url|Install Bitrix" "finalize|bitrix:finalize||Finish the setup" "done|site:doctor||Check the site")
+```
+
+`self profiles` (human output) lists each route's commands under its profile.
+
 ## settings / setting-set
 
 ```bash
@@ -496,3 +602,12 @@ sudo /root/simai-env/simai-admin.sh self commands
 
 `self migrate` links `/root/AGENTS.md` to the agent guide shipped with
 simai-env unless that file already exists.
+
+`self migrate` also sets `process_control_timeout = 10s` in the `[global]`
+section of `/etc/php/<version>/fpm/php-fpm.conf` for every installed PHP-FPM
+version that has no non-zero value (busy requests finish on reload instead of
+a 502), and writes the Bitrix OPcache host baseline
+(`/etc/php/<version>/fpm/conf.d/99-zz-simai-opcache.ini`, see
+`bitrix php-baseline-sync`) for every version that serves a Bitrix site. Both
+are validated with `php-fpm<version> -t`, restored on failure, and reload
+PHP-FPM only when something changed.

@@ -42,8 +42,7 @@ sha256 from `read` fails `changed` if someone changed the file meanwhile;
 `new` fails `exists` if it is already there. Up to 1 MiB.
 
 ## upload
-`--path P --source F --sha256 S [--expect-sha256 new|any|<sha256>] --confirm
-yes`. Puts any file up to 1 GiB at `P`, written the same atomic way as
+`--path P --source F --sha256 S [--expect-sha256 new|any|<sha256>] --confirm yes`. Puts any file up to 1 GiB at `P`, written the same atomic way as
 `write`. `--sha256` must match `F` before anything is written. By default
 (`new`) an existing file is not replaced; `any` replaces it.
 

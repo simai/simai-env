@@ -12,7 +12,7 @@ description: Admin
   - After each command, menu shows status/output and waits for Enter before returning.
 - Managed file access now lives under `Access`; this batch covers global access to all projects under `WWW_ROOT` and project-scoped access with chroot isolation.
 
-Supported OS: Ubuntu 22.04/24.04. Run as root.
+Supported OS: Ubuntu 22.04/24.04/26.04. Run as root.
 
 ## Profiles
 - Registry-driven: defined in `profiles/*.profile.sh` (declarative `PROFILE_` variables only).
@@ -30,8 +30,14 @@ See `docs/architecture/profiles.md`.
 - Domain -> project slug auto-derived if not provided.
 - PHP version selection from installed `/etc/php/*` when not passed.
 - Healthcheck copied to `public/healthcheck.php` for php-mode profiles; static uses nginx-served `/healthcheck` (local-only); alias inherits target.
-- Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx).
-- Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP, cron, SSL, DB) with PASS/WARN/FAIL summary; for Bitrix it also warns about root-owned docroot files, fails when nginx SEF fallback does not point to `/bitrix/urlrewrite.php`, fails when the nginx upload body limit is missing, and warns when static asset compression/cache headers are missing. It does not apply changes.
+- Site removal cleans nginx and PHP-FPM pools; optional files/DB/user removal via prompts (alias removal only drops nginx). Destructive file removal is constrained to real project directories under the managed web root and refuses symlink roots or resolved paths outside that root.
+- Site doctor: read-only diagnostics against profile (filesystem, nginx, PHP,
+  cron, SSL, DB) with PASS/WARN/FAIL summary; it fails on world-writable
+  project files/directories, warns about public MySQL listeners, and for Bitrix
+  also warns about root-owned docroot files, fails when nginx SEF fallback does
+  not point to `/bitrix/urlrewrite.php`, fails when the nginx upload body limit
+  is missing, and warns when static asset compression/cache headers are
+  missing. It does not apply changes.
 - Laravel daily ops (`laravel status`, `laravel app-ready`, `laravel finalize`, `laravel perf-status`, `laravel perf-apply`) provide low-risk application bootstrap, post-bootstrap baseline, and optimization checks for laravel profile sites.
 - WordPress daily ops (`wp status`, `wp installer-ready`, `wp finalize`, `wp cron-status`, `wp cron-sync`, `wp cache-clear`) provide low-risk operational checks and install/scheduler/cache maintenance for wordpress profile sites.
 - Bitrix daily ops (`bitrix status`, `bitrix finalize`, `bitrix ownership`, `bitrix cron-status`, `bitrix cron-sync`, `bitrix agents-status`, `bitrix agents-sync`, `bitrix cache-clear`) provide low-risk operational checks and post-install/scheduler/cache/ownership maintenance for bitrix profile sites.
@@ -51,9 +57,17 @@ See `docs/architecture/profiles.md`.
 ## Self commands
 - `self update`: update scripts in place (reloads menu when invoked from menu).
   - Honors update source from `/etc/simai-env.conf`: `SIMAI_UPDATE_REF` (`refs/heads/...` or `refs/tags/...`) or `SIMAI_UPDATE_BRANCH`.
+  - Uses the official repo by default, resolves refs to commit SHA when possible, and validates archive entries before extraction.
   - Creates best-effort pre-update backup at `/root/simai-backups/simai-env-preupdate-<timestamp>.tar.gz` for manual rollback.
   - Runs a fast post-update smoke check (`bash -n` + executable presence). Set `SIMAI_UPDATE_SMOKE_STRICT=yes` to fail update on smoke errors.
+- `self supply-chain-doctor`: read-only diagnostics for self-update/install guardrails.
 - `self version`: show local/remote versions to know if an update is available (including configured update ref).
+- `self bootstrap`: installs/enables the managed fail2ban SSH jail as part of the base utility baseline.
+- `self sudo-admin-ensure --login simai-admin --copy-root-keys yes --confirm yes`: create or repair a non-root sudo operator account before any future root SSH lock-down.
+- `self sudo-admin-doctor --login simai-admin`: read-only readiness check for that account.
+- `self ssh-hardening-ensure --confirm yes`: apply operational-safe SSH hardening: root remains key-only as a break-glass path, password login is disabled, and `sshd -t` is checked before reload.
+- `self ssh-hardening-doctor`: read-only SSH hardening check.
+- `self admin-mode-status`: show whether the server is in simple root key-only mode, hardened sudo-admin mode, or a custom SSH state.
 - `self auto-update-status`: show cached automatic update state (`off|check|apply-safe`), last check time, and cached local/remote versions.
 - `self auto-update-enable-check` / `self auto-update-enable-apply` / `self auto-update-disable`: control automatic update checks in `/etc/simai-env.conf`.
 - `self auto-update-run-check`: refresh update availability now without applying the update.
@@ -80,13 +94,15 @@ See `docs/architecture/profiles.md`.
 - `site add --domain <domain> --host-mode wildcard`: create one site that serves both the main domain and all first-level subdomains (`*.domain`) on the same nginx vhost.
 - `ssl letsencrypt --domain <domain> --wildcard yes --dns-provider cloudflare --dns-credentials <file>`: request one Let's Encrypt cert for both the main domain and all first-level subdomains of a wildcard-host site.
 - In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Automatic optimization for this site`, `Site availability`, `Pause site`, `Resume site`, `Optimization plan`, `Database server status`, and `Configuration check`.
-- `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
-- `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
+- `site suspend --domain <domain> --confirm yes` (older name `site runtime-suspend`): pause a site: nginx answers a `503` page with `Retry-After` (ACME validation still reachable), its cron, cron jobs, workers and PHP-FPM pool stop; data is untouched.
+- `site resume --domain <domain> --confirm yes` (older name `site runtime-resume`): start exactly what `site suspend` stopped and remove the `503` page.
 - `laravel status --domain <domain>`: show Laravel lifecycle state (`placeholder`, `app-ready`, `post-install`) and the next practical action.
 - `laravel app-ready --domain <domain>`: bootstrap a real Laravel application via Composer and prepare `.env` from SIMAI DB credentials.
 - `laravel finalize --domain <domain> --confirm yes [--migrate yes] [--ssl yes --email <email>]`: complete Laravel post-bootstrap baseline (APP_KEY, storage link, scheduler, baseline optimization, optional migrations and Let's Encrypt).
 - `laravel perf-status --domain <domain>` / `laravel perf-apply --domain <domain> --mode safe|balanced|aggressive --confirm yes`: Laravel optimization status and apply flow.
 - `wp perf-status --domain <domain>` / `wp perf-apply --domain <domain> --mode standard|woocommerce-safe --confirm yes`: WordPress optimization status and apply flow.
+- `wp install --domain <domain> --title <t> --admin-user <u> --admin-email <e> --confirm yes`: install WordPress end to end (checked core package, wp-config from db.env, admin with a password shown once, finalize).
+- `wp restore-ready --domain <domain> --files <archive> --dump <sql|sql.gz> --confirm yes`: restore a copy of a WordPress site from files in the site directory, rewriting its URL to the domain, then finalize.
 - `wp installer-ready --domain <domain>`: prepare WordPress core files, generated `wp-config.php`, and `wp-cli` so the browser installer can run cleanly.
 - `wp finalize --domain <domain> --confirm yes [--ssl yes --email <email>]`: complete a finished WordPress web install in one step (optimization baseline + scheduler baseline + optional Let's Encrypt).
 - `bitrix perf-status --domain <domain>` / `bitrix perf-apply --domain <domain> --mode standard|high-load --confirm yes`: Bitrix optimization status and apply flow (site tune + PHP baseline + installer-aware agents/cache steps).

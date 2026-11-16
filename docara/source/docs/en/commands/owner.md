@@ -42,10 +42,12 @@ Refuses while the owner still runs sites.
 ## Assigning sites
 ```bash
 sudo /root/simai-env/simai-admin.sh site add --domain shop.example.com --owner acme
-sudo /root/simai-env/simai-admin.sh site isolate --domain old.example.com --owner acme --confirm yes
+sudo /root/simai-env/simai-admin.sh site transfer --domain old.example.com --owner acme --confirm yes
 ```
-`site isolate --owner` moves a site from `simai`, from its own `site-*` user
-(which is then deleted) or from another owner. `site remove` keeps the owner.
+`site transfer` moves a site from `simai`, from its own `site-*` user
+(which is then deleted) or from another owner, after a `backup data`; see
+`docs/commands/site.md#transfer`. (`site isolate --owner` does the same move
+without the backup and the owner checks.) `site remove` keeps the owner.
 
 ## Shared module checkouts and deploy scripts
 

@@ -1,3 +1,4 @@
+
 # site commands
 
 Run with `sudo /root/simai-env/simai-admin.sh site <command> [options]` or via menu.
@@ -10,7 +11,7 @@ Options:
 - `--project-name` (optional; derived from domain if missing)
 - `--path` (optional; default uses path style under `/home/simai/www/`)
 - `--path-style` (`slug`|`domain`) controls default path when `--path` is not set. Default is `domain` (e.g., `/home/simai/www/your-domain.tld`). Use `--path-style slug` to restore legacy slug paths or set `/etc/simai-env.conf` with `SIMAI_DEFAULT_PATH_STYLE=domain|slug`. Menu does not prompt for path style; domain-based default is used unless overridden via CLI/config.
-- `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Supported: `generic`, `laravel`, `static`, `alias` (default `generic`).
+- `--profile` selects site type; profiles are defined declaratively in `profiles/*.profile.sh`. Bundled: `generic`, `laravel`, `static`, `alias`, `wordpress`, `bitrix`, `node`, `redirect`, `proxy` (default `generic`); `self profiles` lists the enabled ones with their arguments.
 - `--host-mode standard|wildcard` controls whether the site serves only the main domain or the main domain plus all first-level subdomains. Default is `standard`.
 - `--wildcard-domain` (optional) overrides the wildcard hostname stored in metadata for `--host-mode wildcard`. Default is `*.your-domain.tld`.
 - `--frame-policy same-origin|any` controls whether browsers may embed the site in an iframe. The safe default is `same-origin`; use `any` only for a dedicated embedded application endpoint.
@@ -20,6 +21,8 @@ Options:
 - SSL (optional): `--ssl=ask|yes|no`, `--ssl-email`, `--ssl-redirect=yes|no`, `--ssl-hsts=yes|no`, `--ssl-staging=yes|no`
 - DB (optional): `--create-db=yes|no` (alias: `--db=yes|no`), `--db-name`, `--db-user`, `--db-pass` (defaults from project; password generated), `--db-export=yes|no` (export to project `.env`; default yes for required DB profiles, no otherwise), `--skip-db-required=yes|no` (default `no`; allow required-DB profiles to be created without DB — for migration only, emits warning)
 - Access (optional): `--access-create=yes|no`, `--access-login`, `--access-password` (create project-scoped SFTP access after site creation; menu prompts when omitted)
+- Backups: `--backup yes|no` (default `yes`): a new site gets the daily data backup with the `backup data-schedule` defaults (03:30, keep 7); redirect, proxy and alias sites never do. `site remove` drops the schedule and keeps the backups already taken.
+- Reverse proxy (profile `proxy`): `--upstream-port P` (required; a service on 127.0.0.1, never 80 or 443), `--upstream-path /` (the path requests are passed to), `--websockets yes|no` (default `no`; `yes` passes WebSocket upgrades and keeps them open for an hour). Nothing outside the host is reachable. Settings live in `/etc/simai-env/sites/<domain>/proxy.env`; certificates still renew over http-01 in front of the service. Proxy sites get no daily backup (they hold no data). Enable the profile first: `profile enable --id proxy`.
 - Bitrix helper files (Bitrix profile only): `--bitrix-files=none|setup|restore`. Default is `none` so new Bitrix sites do not expose public installer/restore scripts until the operator chooses the required flow.
 
 Behavior:
@@ -36,6 +39,8 @@ Behavior:
   - `setup`: download current `bitrixsetup.php` from the official Bitrix URL and write DB preseed files when managed DB credentials exist.
   - `restore`: download current `restore.php` from the official Bitrix URLs, prepare restore-writable paths, and write `.settings.php` plus connection initialization from managed DB credentials without creating a premature `dbconn.php`. The archive restores its own `dbconn.php`; this avoids legacy `mbstring.func_overload` checks on PHP 8. After uploading every archive volume, run `bitrix restore-ready` again; the browser URL is shown only after the archive passes integrity validation.
   CLI default is `none`. Use `bitrix installer-ready` or `bitrix restore-ready` later if the choice changes.
+  A large archive goes over SFTP into the site directory and is brought in by `bitrix restore-ready --source <path>` (see `docs/commands/bitrix.md`).
+- Resources (1.56.0): the plan and the handler compare the server's memory with the profile's need. Below `PROFILE_MIN_RAM_MB` the site is refused (`not_enough_ram`), below `PROFILE_RECOMMENDED_RAM_MB` the plan warns (`ram_below_recommended`). Needs: `bitrix` 1536 / 4096 MB, `laravel`, `wordpress` and `node` 512 / 1024 MB, `generic` 256 / 512 MB, the others none. The JSON plan (`--output json` without `--confirm`) carries `data.resources` `{disk_free_bytes, needed_bytes, ram_mb, ram_min_mb, ram_recommended_mb, ok, refusal, warnings[{code, message}]}` (free disk where sites live; `needed_bytes` is 0 for a new site) and `data.refusal`; a refused plan is `failed` with the same data.
 - If `--ssl=yes`, `site add` issues a Let's Encrypt certificate after the site is created. SSL issuance is best-effort: site creation still succeeds if cert issuance fails. In menu mode, when `--ssl` is not supplied explicitly, the site creation flow now asks whether to issue Let's Encrypt and requests an email if needed. In non-menu CLI, `--ssl=ask` behaves as `no`.
 - After creation, the summary prints profile-aware `Next steps` so the user can move directly to the expected installer or finalize flow.
 - After creation, simai-env automatically stores the selected activity class in `/etc/simai-env/sites/<domain>/perf.env` and applies the mapped site-level performance mode:
@@ -119,6 +124,109 @@ reloads PHP-FPM and runs `artisan queue:restart`. A failed build never touches
 the live release. `--keep` (default 5) limits stored releases. Rollback
 switches code only; database migrations are not reverted.
 
+Without `--confirm yes`, `deploy` and `deploy-rollback` print their detailed
+plan and change nothing.
+
+### Static sites from CI artifacts
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --archive site.tgz --sha256 <sum> --confirm yes
+sudo /root/simai-env/simai-admin.sh site deploy-key-add --domain D --pubkey-file ci.pub --confirm yes
+sudo /root/simai-env/simai-admin.sh site redirect-add --domain D --from / --to /ru/ --code 302 --confirm yes
+```
+
+The artifact is the document root; `<root>/public` points at `current`.
+Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
+`200.html` for single-page apps). Deploy keys, the gate and the workflow
+step: `docs/operations/ci-deploy.md`.
+
+### Extra names (www, other domains) (1.53.0)
+
+```bash
+sudo /root/simai-env/simai-admin.sh site names --domain D
+sudo /root/simai-env/simai-admin.sh site name-add --domain D --name www.D --confirm yes
+sudo /root/simai-env/simai-admin.sh site name-add --domain D --name shop.example.com --mode serve --confirm yes
+sudo /root/simai-env/simai-admin.sh site name-remove --domain D --name www.D --confirm yes
+```
+
+- `--mode redirect` (default): the name answers 301 to the main domain,
+  keeping the path; the usual choice for `www`. It lives in
+  `/etc/nginx/conf.d/simai-site-names-D.conf`, which also serves the site's
+  ACME location.
+- `--mode serve`: the name shows the site; it joins the site's own
+  `server_name` and stays there when nginx is written again (PHP switch,
+  certificate).
+- The name must point to this server (`--check-dns no` skips the check), must
+  not belong to another site or to the panel, and a site has at most 20.
+- A site with a Let's Encrypt certificate gets one certificate for all its
+  names (`certbot --expand`, renewed with them). If the certificate cannot be
+  extended, the new name is taken back and nothing is left of it. Removing a
+  name reissues the certificate without it; if that fails the old one stays.
+- The list is kept in `/etc/simai-env/sites/D/names.json`. `site names
+  --output json` answers `simai-site-names/1`: `{domain, names [{name, kind:
+  primary|extra|wildcard, mode: serve|redirect, dns {points_here, addresses},
+  https}], certificate {names, issuer, auto_renew, not_after} | null, max,
+  suggest}`.
+
+### Serving only some paths
+
+```bash
+sudo /root/simai-env/simai-admin.sh site paths-allow --domain runner.example.com --allow /runner.html,/assets/,/distr/ --confirm yes
+sudo /root/simai-env/simai-admin.sh site paths-allow --domain runner.example.com --clear yes --confirm yes
+```
+
+Exact files and prefixes ending in `/`; every other path answers 404 (ACME
+challenges always pass). The list survives certificate changes and other
+re-renders.
+
+### Node.js services (profile `node`)
+
+```bash
+sudo /root/simai-env/simai-admin.sh profile enable --id node --confirm yes
+sudo /root/simai-env/simai-admin.sh site add --domain D --profile node --confirm yes   # optional --app-port 3189
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git https://github.com/org/service.git --ref v1.0.0 --confirm yes
+sudo /root/simai-env/simai-admin.sh site service-restart --domain D --confirm yes
+journalctl -u simai-app-<project> -n 100
+```
+
+The site gets a local port and an nginx proxy; the release describes the
+service in `.simai/app.json` (`node.start`, dependencies, Python
+requirements, shared paths, health check). Deploy builds as the site user,
+runs `simai-app-<project>.service` from `current` (restarted on failure and
+on boot) and returns to the previous release when the health check fails.
+Details: `docs/architecture/app-manifest.md`.
+
+### From static to node (`set-profile`)
+
+A static site that grows an API keeps its releases and its address:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site set-profile --domain D --profile node              # plan only
+sudo /root/simai-env/simai-admin.sh site set-profile --domain D --profile node --confirm yes  # optional --app-port 3189
+sudo /root/simai-env/simai-admin.sh site deploy --domain D --git URL --ref TAG --confirm yes  # first node release
+```
+
+The switch allocates a port (`service.env`, with `STATIC_RELEASES=yes`),
+renders the vhost from `nginx-node.conf` with the same certificate, HTTPS
+redirect, HSTS, path redirects and path rules, and after one nginx reload
+turns `public/` from the symlink to `current` into the directory node sites
+keep for ACME challenges. `current`, `releases/` and their files do not
+change, and no service runs yet: until a release brings `node.start`, nginx
+serves `current` the way the static profile does (`/dir/` → `dir/index.html`,
+`/page` → `page.html`, `404.html`, static caching and font CORS). Any failure
+(busy port, `nginx -t`, reload) puts back the previous vhost, routes, port
+record and symlink.
+
+Requirements: profile `static` with `public/` and the release layout (deploy
+the site once with `site deploy`), the `node` profile enabled.
+
+`site deploy-rollback --release <static release>` serves an earlier static
+release again and stops the service. While `current` is such a release,
+`site set-profile --profile static` switches back: `public/` becomes the
+symlink again (only empty directories are removed; a file there stops the
+switch), the port, routes and the service unit are removed, releases and
+`shared/` stay.
+
 ## describe
 JSON for people and AI agents: layout, database engine (no secrets), user,
 release, workers, logs, validated manifest and ready-to-run commands.
@@ -148,6 +256,34 @@ others (for example `/home/simai/git/<repo>` with mode `755`). Deploy scripts
 that used to write into the project as `simai` must now run as the site user
 (`sudo -u site-<slug> ...`) or as root followed by
 `chown -R site-<slug>:site-<slug> <project>`.
+
+## transfer
+Hand a site to another owner (see `owner create`). A site of an owner runs
+as the owner's account, so the transfer moves: the project files (become
+`<owner>:<owner>`, closed to others), the PHP-FPM pool, the scheduler cron
+file and the site's own cron jobs, queue and app workers, and the SSH/SFTP
+view: `/home/<owner>/sites/<domain>` appears and the previous owner's link
+goes; the previous owner can no longer read the files. Afterwards the site
+looks exactly like one created with `site add --owner <owner>`, and
+`site describe` / `self describe` show the new owner.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site transfer --domain example.com --owner acme
+sudo /root/simai-env/simai-admin.sh site transfer --domain example.com --owner acme --confirm yes
+```
+
+Without `--confirm yes` only the plan is printed: from whom to whom and
+every item that moves. With it, `backup data` (database and files) is taken
+first, then the move runs with `site isolate --owner` (any failure restores
+the previous owner, pool, cron and units). The site keeps serving: PHP-FPM
+reloads gracefully and the workers restart. The database, its user and
+password stay the same; the credentials in the site's `.env` move with the
+files. Site SFTP accounts (`access`) keep their access. The site may come
+from another owner, its own `site-<slug>` user (which is then removed) or
+the shared `simai` account.
+
+Refused: an unknown or blocked owner, the owner the site already belongs
+to, alias sites (transfer their target) and the panel's own site.
 
 ## frame-policy
 
@@ -338,30 +474,61 @@ Output includes:
 - cron file state
 - queue unit state
 
-## runtime-suspend
-Suspend a site runtime without deleting the site.
+## suspend
+Pause a site without deleting anything (1.57.0). `runtime-suspend` is the
+older name of the same command.
 
 Options:
 - `--domain` (required outside menu)
-- `--confirm` (`yes|no`, default `no`; required outside menu)
+- `--confirm` (`yes|no`; without `yes` only a plan is printed)
+
+```bash
+sudo /root/simai-env/simai-admin.sh site suspend --domain example.com --confirm yes
+```
 
 Behavior:
-- Disables the site PHP-FPM pool by moving it out of active `pool.d`.
-- Adds a managed nginx `503 Site is parked by simai-env` block while keeping ACME validation reachable.
-- Disables site cron/queue where the profile uses them.
-- Stores runtime state in `/etc/simai-env/sites/<domain>/runtime.env`.
+- nginx answers every request with `503` and a small HTML page ("site
+  temporarily unavailable", Russian and English), `Retry-After: 3600`,
+  `Cache-Control: no-store` and `X-Robots-Tag: noindex`. Requests to
+  `/.well-known/acme-challenge/` are still served, so certificates renew.
+- The page lives in `/etc/nginx/simai-suspend/<project>.conf`, included at
+  server level by every site template (configs rendered before 1.57.0 get
+  the include on the first pause). Commands that write the site's nginx
+  again (`set-php`, `ssl`, `name-add`, `nginx-custom`, `apache`) keep it.
+- Stops the scheduler file `/etc/cron.d/<slug>`, the site's cron jobs
+  (`/etc/cron.d/simai-jobs-<slug>`), every queue worker
+  (`laravel-queue-<project>*.service`) and app service
+  (`simai-app-<project>.service`) that was enabled or running, and the
+  site's own PHP-FPM pool (not a pool an alias shares with its target).
+  Files, databases and backups are untouched; scheduled backups go on.
+- What was stopped is recorded in `/etc/simai-env/sites/<domain>/runtime.env`
+  (`SITE_RUNTIME_STATE=suspended`, `SITE_RUNTIME_UNITS`, ...). Everything is
+  kept in files and in systemd's enabled state, so a pause survives a
+  reboot and `self migrate`.
+- While paused: `set-php` and `cron job-*` keep the new pool, cron file,
+  jobs and workers stopped (they start on resume); `site deploy` is refused
+  (resume first).
+- Refused (also in the plan): a site that is already paused, the panel's
+  own site.
+- `site status`, `site describe` and `self describe` answer
+  `suspended: true` (`describe` also `suspended_at`); server alerts do not
+  report a paused site as down.
 
-## runtime-resume
-Resume a previously suspended site runtime.
+## resume
+Resume a paused site (1.57.0). `runtime-resume` is the older name.
 
 Options:
 - `--domain` (required outside menu)
-- `--confirm` (`yes|no`, default `no`; required outside menu)
+- `--confirm` (`yes|no`; without `yes` only a plan is printed)
 
 Behavior:
-- Restores the disabled PHP-FPM pool.
-- Removes the managed nginx suspend block.
-- Re-enables cron/queue if they were disabled by `runtime-suspend`.
+- Starts exactly what `suspend` stopped: the PHP-FPM pool, the scheduler
+  file and cron jobs, and the workers that were enabled or running (a
+  worker that was disabled stays disabled); then removes the 503 page.
+- Refused (also in the plan) when the site is not paused.
+- A site paused by `runtime-suspend` before 1.57.0 (503 block inside the
+  config) resumes the same way; `self migrate` moves such a block to the
+  include so re-rendering commands keep it.
 
 ## fix
 Plan or apply profile-required PHP fixes (PHP extensions and PHP INI overrides). Defaults to plan-only (no changes).
@@ -406,6 +573,156 @@ Checks (non-destructive):
 - Alias profiles: when `--include-target=yes`, performs a prefixed partial check of the target site (root/docroot/markers/healthcheck/nginx/php service/pool/socket) without recursion
 
 Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
+Profile rules carry a fix id; see docs/commands/site-doctor.md.
+
+## check-state / check-fix
+One profile rule of a site (1.55.0):
+`site check-state --domain <d> --id <key>` shows its state (`ok|needed|n/a`),
+what the fix does and why a fix would be refused (`unknown_check`,
+`check_ok`); `site check-fix --domain <d> --id <key> --confirm yes` runs the
+fix and checks the rule again (without `--confirm` a plan, which is refused
+the same way). The fixes are the toolkit's own steps (`bitrix finalize`,
+`self migrate`), one at a time.
+
+## cache-clear
+One site's caches, and nothing of another site (1.57.0):
+
+```bash
+sudo /root/simai-env/simai-admin.sh site cache-clear --domain example.com              # plan
+sudo /root/simai-env/simai-admin.sh site cache-clear --domain example.com --confirm yes
+```
+
+| Item | What is cleared |
+| --- | --- |
+| `opcache` | The site's scripts in the OPcache, invalidated by a small script run inside the site's own PHP-FPM pool (one FastCGI request to its socket, as the pool user). OPcache memory is shared by every pool of a PHP version, so there is no `opcache_reset()` and no PHP-FPM reload. |
+| `nginx_cache` | The `fastcgi_cache` / `proxy_cache` zone the site's own nginx config (or its `site nginx-custom` file) uses: the contents of its `*_cache_path` directory. Skipped when the site uses no cache zone (`none`), when another site uses the same zone (`zone_shared`) or when the path is outside `/var/cache`, `/var/lib/nginx`, `/var/tmp`, `/tmp`, `/run`, `/dev/shm` (`path_not_allowed`). |
+| `framework` | laravel: `php artisan optimize:clear` in the current release; wordpress: `wp cache flush` and `wp transient delete --all` (needs WP-CLI and an installed WordPress); bitrix: the contents of `bitrix/cache`, `bitrix/managed_cache`, `bitrix/stack_cache`. Always as the site user. Other profiles: `none`. |
+
+The result is a table, or `simai-site-cache/1` with `--output json`:
+`domain`, `profile`, `applied`, `items` `[{name, state, target, detail,
+reason}]` (`state` `planned` in a plan, `cleared|skipped|failed` after).
+A failed item makes the command fail; skipped items do not. Alias, redirect
+and proxy sites are refused (`profile_unsupported`): they have no caches of
+their own.
+
+## restore-ready
+
+Restore a plain PHP site (`generic` profile) from a copy (1.57.1). Bitrix
+and WordPress sites have their own restore: `bitrix restore-ready`,
+`wp restore-ready`.
+
+```bash
+simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.tar.gz --dump dump.sql.gz
+simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.tar.gz --dump dump.sql.gz --confirm yes
+```
+
+- `--files`: a `.tar.gz`, `.tgz`, `.tar` or `.zip` archive inside the site
+  directory (uploaded with `file upload` or over SFTP), relative to the site
+  directory or absolute inside it; links and `..` are refused.
+- `--dump` (optional): a `.sql`, `.sql.gz` or `.sql.zip` (exactly one `.sql`
+  inside) file in the site directory,
+  imported into the site's MySQL database with the site's own credentials.
+  The site needs a database (`site db-create`).
+- Everything runs as the site user. A single folder wrapping the archive is
+  stripped. An archive that carries the web root folder itself (for example
+  `public/index.php` and no `index.php` at its top) goes to the site root,
+  any other archive to the web root.
+- A site that already has files or database tables is refused unless
+  `--overwrite yes`; then `backup data` runs first and the database is
+  emptied before the import.
+- Afterwards the archive and the dump go to the site's trash
+  (`file trash-list`), out of the web root.
+- The site's own configuration must use the database credentials of
+  `/etc/simai-env/sites/<domain>/db.env`; the command does not edit it.
+
+Without `--confirm yes` it prints the plan. Panel gateway:
+`site:restore-ready {domain, files, dump?, overwrite?}`.
+
+## status
+Where a site stands on its creation route (1.56.0), one answer for every
+profile, so the panel draws one step tracker:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site status --domain example.com --output json
+```
+
+`simai-site-status/1`: `domain`, `profile`, `suspended` (1.57.0, `site
+suspend`), `route`
+(`new|restore|repo|installed|none`), `step` (a step id of the route in `self
+profiles`, or `done`), `next` (the gateway command of that step, `open_url`
+or null), `restore_url` / `installer_url` (for an `open_url` step),
+`pending` (what the next step changes) and `detail` (profile facts, no
+secrets).
+
+| Profile | Steps |
+| --- | --- |
+| bitrix | as `bitrix status`: `prepare`, `upload`, `validate`, `run_restore`, `run_setup`, `finalize`, `done`; route `setup` is answered as `new` |
+| laravel | `deploy` (no application yet, next `site:deploy`), `configure` (no `APP_KEY` in the shared `.env`; `laravel finalize` generates it), `finalize` (the scheduler the application wants is missing, next `cron:add`), `done`; route `repo` with releases |
+| others | `prepare` (the placeholder page is still there; next `site:deploy` for static and node, `file:upload` otherwise) or `done`; redirect and proxy sites are always `done` |
+
+A profile adds its own answer with a function
+`site_status_profile_<profile>` that fills the `SS_*` variables (see
+`admin/commands/site_flow.sh`); WordPress gets one with its own steps.
+
+## nginx-custom
+Set a site's own nginx directives, included at server level of the site's
+virtual host from `/etc/nginx/simai-custom/<project>.conf` (both the HTTP
+and the HTTPS server). Use it for what the profile does not cover: extra
+`location` blocks, headers, `client_max_body_size`, rewrites.
+
+Options:
+- `--domain <domain>` (required)
+- `--content-file <file>` (required): the directives, text up to 64 KB; an
+  empty file removes them
+- `--window <seconds>` (30-600, default 120)
+- `--confirm yes`
+
+Behavior:
+- the virtual host and the directives file are saved first; a site rendered
+  before 1.41.0 gets the include on first use
+- `nginx -t` must accept the directives, otherwise nothing changes and the
+  nginx error is shown
+- nginx reloads; if the site answered before and no longer does, the change
+  is undone at once
+- otherwise it is a timed change: it is undone after `--window` seconds
+  unless `simai-admin.sh change confirm --id <id> --confirm yes` keeps it, so
+  a mistake that locks you out repairs itself
+- removing the site removes its directives
+
+## nginx-custom-show
+Show a site's own directives. `--output json` answers `simai-nginx-custom/1`:
+`domain, file, present, included, content, sha256, pending_change
+{change_id, expires_at}`.
+
+## apache
+Serve a PHP site (profiles `generic`, `laravel`, `wordpress`, `bitrix`)
+through Apache, for applications that rely on `.htaccess`, or put it back on
+nginx only.
+
+Options:
+- `--domain <domain>` (required)
+- `--enable yes|no` (required)
+- `--confirm yes`; without it only the plan is shown
+
+Behavior:
+- the first time, Apache is installed listening on `127.0.0.1:8088` only;
+  nginx keeps ports 80 and 443
+- nginx stays in front: HTTPS, access rules, own directives, ACME and the
+  health check; every other request goes to Apache, including static files,
+  so `.htaccess` rules apply to them
+- Apache reads `.htaccess` (`AllowOverride All`) and runs PHP through the
+  site's own PHP-FPM pool, so the PHP version, the pool user and PHP
+  settings do not change; `site set-php` updates both servers
+- the client address and scheme come from nginx (`mod_remoteip`,
+  `HTTPS=on` only when nginx served HTTPS); a client cannot fake them
+- Apache's vhost is `/etc/apache2/sites-available/simai-<project>.conf`,
+  its error log `/var/log/apache2/<project>.error.log`; unknown names get
+  403 from Apache
+- if Apache rejects the configuration, or the site answered before and no
+  longer does, everything is put back
+- `--enable no` removes the site's Apache vhost (Apache stays installed);
+  removing the site does the same
+- `site describe` shows `web_server: apache|nginx`
 
 ## Per-site PHP ini overrides
 - Overrides are stored at `/etc/simai-env/sites/<domain>/php.ini` and applied as a managed pool block `simai-site-ini-*` (profile-managed `simai-profile-ini-*` stays last and has higher priority).
@@ -430,34 +747,3 @@ Output: PASS/WARN/FAIL per check with hints; no secrets are shown.
   wins, site overrides are kept). For Bitrix sites it also aligns the request
   budget to 300 seconds in nginx, PHP-FPM and PHP. Every file is backed up
   first and restored if validation or reload fails.
-
-## Node.js services (profile `node`)
-
-```bash
-sudo /root/simai-env/simai-admin.sh profile enable --id node --confirm yes
-sudo /root/simai-env/simai-admin.sh site add --domain D --profile node --confirm yes   # optional --app-port 3189
-sudo /root/simai-env/simai-admin.sh site deploy --domain D --git https://github.com/org/service.git --ref v1.0.0 --confirm yes
-sudo /root/simai-env/simai-admin.sh site service-restart --domain D --confirm yes
-journalctl -u simai-app-<project> -n 100
-```
-
-The site gets a local port and an nginx proxy; the release describes the
-service in `.simai/app.json` (`node.start`, dependencies, Python
-requirements, shared paths, health check). Deploy builds as the site user,
-runs `simai-app-<project>.service` from `current` (restarted on failure and
-on boot) and returns to the previous release when the health check fails.
-Details: `docs/architecture/app-manifest.md`.
-
-## Static sites from CI artifacts
-
-```bash
-sudo /root/simai-env/simai-admin.sh site deploy --domain D --archive site.tgz --sha256 <sum> --confirm yes
-sudo /root/simai-env/simai-admin.sh site deploy-key-add --domain D --pubkey-file ci.pub --confirm yes
-sudo /root/simai-env/simai-admin.sh site redirect-add --domain D --from / --to /ru/ --code 302 --confirm yes
-```
-
-The artifact is the document root; `<root>/public` points at `current`.
-Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
-`200.html` for single-page apps). Deploy keys, the gate and the workflow
-step: `docs/operations/ci-deploy.md`.
-

@@ -1,3 +1,4 @@
+
 # Bitrix Production Runbook
 
 This runbook describes the recommended Bitrix workflow on `simai-env` from fresh provisioning
@@ -5,7 +6,7 @@ to post-install hardening and daily operations.
 
 ## 1) Preconditions
 
-- OS: Ubuntu 22.04/24.04.
+- OS: Ubuntu 22.04/24.04/26.04.
 - Domain points to server IP.
 - TLS email is ready for Let's Encrypt.
 - You have backup/restore path for project files and DB.

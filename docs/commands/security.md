@@ -20,9 +20,8 @@ then by severity), `online {enabled, checked_at, error}`, `checks [{id, check,
 area, title, status: ok|warn|risk|unknown, severity: low|medium|high|critical,
 detail, domain, fix: {command, args} | null, how}]` and `vulnerabilities
 {domain: [{ecosystem, package, version, id, aliases, severity, summary,
-fixed}]}`. `fix` is a panel gateway command that resolves the problem (its
-CLI form is `simai-admin.sh <section> <command> --<arg> <value> --confirm
-yes`); `how` says what to do when there is none.
+fixed}]}`. `fix` is a panel gateway command that resolves the problem (its CLI form is
+`simai-admin.sh <section> <command> --<arg> <value> --confirm yes`); `how` says what to do when there is none.
 
 Checks:
 

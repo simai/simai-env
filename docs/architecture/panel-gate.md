@@ -56,8 +56,8 @@ address and the one-time first sign-in link (see below).
   is left of the domain. The certificate renews with the others
   (`ssl renew-due`). `panel domain --remove yes` takes it away again.
 - **Moving the port.** `panel port --port N` (100-65535, not SSH, web, mail
-  or database ports, not in use) is a timed change: unless `change confirm
-  --id <id>` comes within `--window` seconds (300 by default), the previous
+  or database ports, not in use) is a timed change: unless
+  `change confirm --id <id>` comes within `--window` seconds (300 by default), the previous
   port comes back by itself, so a port the provider's network blocks does not
   lock anyone out. The old port is closed in ufw.
 - **Only the domain.** `panel ip-access --enabled no` (timed as well) turns
@@ -163,8 +163,8 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
   CLI does without `--confirm yes`.
 
 An action that carries a file sends it after the request line: the request
-is one line ending in `\n` with `"attachment": {"sha256": "<hex>", "size":
-<bytes>}`, followed by exactly that many bytes. Only `site:deploy` takes an
+is one line ending in `\n` with
+`"attachment": {"sha256": "<hex>", "size": <bytes>}`, followed by exactly that many bytes. Only `site:deploy` takes an
 attachment (a release `tar.gz`, at most `SIMAI_DEPLOY_MAX_ARCHIVE_MB`, 1024
 MB by default), and only with `confirm: true`; a plan needs the metadata
 only. A wrong size or digest is refused `attachment_mismatch`; bytes after a
@@ -436,8 +436,8 @@ site directory; links are never followed (`docs/commands/file.md`):
 - Reads: `file:list {domain, path}` (`simai-files/1`), `file:stat {domain,
   path}` (`simai-file-stat/1`), `file:read {domain, path}` (`simai-file/1`
   with `sha256` and `content`, UTF-8 up to 1 MiB).
-- Actions: `file:write {domain, path, content, expect-sha256: <sha256>|new|
-  any}` (the content travels in the request, so up to about 60 KB here; a
+- Actions:
+  `file:write {domain, path, content, expect-sha256: <sha256>|new|any}` (the content travels in the request, so up to about 60 KB here; a
   job record keeps only its size, `"(N bytes)"`), `file:mkdir {domain,
   path}`, `file:rename {domain, path, to}`, `file:remove {domain, path}`.
   A failed write answers `changed` or `exists` in the job log.
