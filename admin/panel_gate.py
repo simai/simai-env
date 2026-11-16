@@ -203,6 +203,9 @@ ALLOW = {
     "wp:status": ({"domain": DOMAIN}, {"domain"}, "read"),
     "wp:install": ({"domain": DOMAIN, "title": WP_TITLE, "admin-user": WP_USER, "admin-email": EMAIL,
                     "locale": WP_LOCALE}, {"domain", "title", "admin-user", "admin-email"}, "action"),
+    # 1.57.1: a plain PHP site (generic profile) from a files archive and an optional dump.
+    "site:restore-ready": ({"domain": DOMAIN, "files": SITE_FILE, "dump": SITE_FILE, "overwrite": YES_NO},
+                           {"domain", "files"}, "action"),
     "wp:restore-ready": ({"domain": DOMAIN, "files": SITE_FILE, "dump": SITE_FILE, "overwrite": YES_NO},
                          {"domain", "files", "dump"}, "action"),
     "wp:finalize": ({"domain": DOMAIN}, {"domain"}, "action"),

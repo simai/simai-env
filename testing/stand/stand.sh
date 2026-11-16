@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=34
+FIXTURE_SET=35
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -215,6 +215,8 @@ FW
     "site-redirects.demo-redirect.test|null|site:redirect-list|{\"domain\":\"demo-redirect.test\"}"
     "site-redirects.demo-owned.test|\"demo\"|site:redirect-list|{\"domain\":\"demo-owned.test\"}"
     "refused.owner-scope.site-redirects|\"demo\"|site:redirect-list|{\"domain\":\"demo-php.test\"}"
+    "refused.plan-failed.site-restore-ready|null|site:restore-ready|{\"domain\":\"demo-php.test\",\"files\":\"missing.tar.gz\"}"
+    "refused.invalid-argument.site-restore-path|null|site:restore-ready|{\"domain\":\"demo-php.test\",\"files\":\"../copy.tar.gz\"}"
     "panel-address|null|panel:address|{}"
     "plan.panel-port|null|panel:port|{\"port\":\"8600\"}"
     "plan.panel-ip-access|null|panel:ip-access|{\"enabled\":\"no\"}"

@@ -432,9 +432,8 @@ wp_site_file() {
 wp_restore_kinds() {
   local files="$1" dump="$2"
   case "$files" in
-    *.tar.gz|*.tgz) WP_RESTORE_TAR="z" ;;
-    *.tar) WP_RESTORE_TAR="" ;;
-    *) error "--files must be a .tar.gz, .tgz or .tar archive"; return 1 ;;
+    *.tar.gz|*.tgz|*.tar|*.zip) ;;
+    *) error "--files must be a .tar.gz, .tgz, .tar or .zip archive"; return 1 ;;
   esac
   case "$dump" in
     *.sql.gz) WP_RESTORE_DUMP_GZ=yes ;;
@@ -637,8 +636,7 @@ wp_restore_ready_handler() {
   staging="${WP_ROOT}/.wp-restore-$(date +%Y%m%d%H%M%S)-$$"
   install -d -m 0700 -o "$SIMAI_USER" -g "$SIMAI_WEB_GROUP" "$staging" || { error "Cannot create ${staging}"; return 1; }
   rc=0
-  # shellcheck disable=SC2024 # root opens the file or the log; only the reader runs as the site user
-  sudo -u "$SIMAI_USER" -H tar --no-same-owner -x${WP_RESTORE_TAR}f - -C "$staging" <"$WP_RESTORE_FILES" >>"$LOG_FILE" 2>&1 || rc=$?
+  restore_unpack_as_user "$WP_RESTORE_FILES" "$staging" || rc=$?
   if (( rc != 0 )); then
     rm -rf --one-file-system -- "$staging"
     error "Cannot unpack ${WP_RESTORE_FILES}"
@@ -656,8 +654,10 @@ wp_restore_ready_handler() {
     core_status="$WP_CORE_STATUS"
   fi
   rc=0
-  # shellcheck disable=SC2024 # root opens the file or the log; only the reader runs as the site user
-  sudo -u "$SIMAI_USER" -H cp -af -- "${src}/." "${WP_DOC_ROOT}/" >>"$LOG_FILE" 2>&1 || rc=$?
+  # Copy the entries, not "${src}/.": that would give the web root the
+  # staging directory's 0700 mode.
+  # shellcheck disable=SC2024 # root opens the log; the copy runs as the site user
+  sudo -u "$SIMAI_USER" -H find "$src" -mindepth 1 -maxdepth 1 -exec cp -af -- {} "${WP_DOC_ROOT}/" \; >>"$LOG_FILE" 2>&1 || rc=$?
   rm -rf --one-file-system -- "$staging"
   if (( rc != 0 )); then
     error "Cannot copy the restored files into ${WP_DOC_ROOT} (see ${LOG_FILE})"

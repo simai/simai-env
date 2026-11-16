@@ -604,6 +604,38 @@ A failed item makes the command fail; skipped items do not. Alias, redirect
 and proxy sites are refused (`profile_unsupported`): they have no caches of
 their own.
 
+## restore-ready
+
+Restore a plain PHP site (`generic` profile) from a copy (1.57.1). Bitrix
+and WordPress sites have their own restore: `bitrix restore-ready`,
+`wp restore-ready`.
+
+```bash
+simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.tar.gz --dump dump.sql.gz
+simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.tar.gz --dump dump.sql.gz --confirm yes
+```
+
+- `--files`: a `.tar.gz`, `.tgz`, `.tar` or `.zip` archive inside the site
+  directory (uploaded with `file upload` or over SFTP), relative to the site
+  directory or absolute inside it; links and `..` are refused.
+- `--dump` (optional): a `.sql` or `.sql.gz` file inside the site directory,
+  imported into the site's MySQL database with the site's own credentials.
+  The site needs a database (`site db-create`).
+- Everything runs as the site user. A single folder wrapping the archive is
+  stripped. An archive that carries the web root folder itself (for example
+  `public/index.php` and no `index.php` at its top) goes to the site root,
+  any other archive to the web root.
+- A site that already has files or database tables is refused unless
+  `--overwrite yes`; then `backup data` runs first and the database is
+  emptied before the import.
+- Afterwards the archive and the dump go to the site's trash
+  (`file trash-list`), out of the web root.
+- The site's own configuration must use the database credentials of
+  `/etc/simai-env/sites/<domain>/db.env`; the command does not edit it.
+
+Without `--confirm yes` it prints the plan. Panel gateway:
+`site:restore-ready {domain, files, dump?, overwrite?}`.
+
 ## status
 Where a site stands on its creation route (1.56.0), one answer for every
 profile, so the panel draws one step tracker:

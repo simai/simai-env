@@ -5,7 +5,7 @@
   "kind": "result",
   "data": {
     "schema": "simai-commands/1",
-    "count": 287,
+    "count": 288,
     "commands": [
       {
         "command": "simai-admin.sh access add-key",
@@ -6110,6 +6110,34 @@
         },
         "flags": [],
         "effects": "delete",
+        "authorization": "root",
+        "confirmation": "required",
+        "lock": "site",
+        "verification": "exit status; inspect the target with site describe/doctor or self describe",
+        "global_options": {
+          "--confirm": "yes|no",
+          "--dry-run": "yes|no",
+          "--dry_run": "yes|no (alias)",
+          "--output": "human|json"
+        },
+        "conditional_effects": null
+      },
+      {
+        "command": "simai-admin.sh site restore-ready",
+        "description": "Restore a PHP site (generic profile) from a files archive and an optional SQL dump",
+        "required": [
+          "--domain",
+          "--files"
+        ],
+        "optional": {
+          "--dump": null,
+          "--overwrite": null,
+          "--confirm": null
+        },
+        "flags": [
+          "plan:handler"
+        ],
+        "effects": "write",
         "authorization": "root",
         "confirmation": "required",
         "lock": "site",

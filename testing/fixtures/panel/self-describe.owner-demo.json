@@ -7,7 +7,7 @@
     "schema": "simai-host/1",
     "generated_at": "2026-01-01T00:00:00Z",
     "simai_env": {
-      "version": "1.57.0",
+      "version": "1.57.1",
       "root": "/root/simai-env",
       "cli": "/root/simai-env/simai-admin.sh"
     },
@@ -136,6 +136,7 @@
         "site:redirect-list",
         "site:redirect-remove",
         "site:remove",
+        "site:restore-ready",
         "site:resume",
         "site:service-restart",
         "site:set-php",

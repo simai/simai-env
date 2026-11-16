@@ -25,7 +25,7 @@ routes() { j "{x['id']: [(r['id'], r['available']) for r in x['routes']] for x i
 [[ "$(routes bitrix)" == "[('new', True), ('restore', True)]" ]] && ok 'bitrix: new and restore' || bad "bitrix routes: $(routes bitrix)"
 [[ "$(routes laravel)" == "[('repo', True)]" ]] && ok 'laravel: repo' || bad "laravel routes: $(routes laravel)"
 [[ "$(routes static)" == "[('new', True), ('repo', True)]" ]] && ok 'static: new and repo' || bad "static routes: $(routes static)"
-[[ "$(routes generic)" == "[('new', True), ('restore', False)]" ]] && ok 'generic: new, restore planned' || bad "generic routes: $(routes generic)"
+[[ "$(routes generic)" == "[('new', True), ('restore', True)]" ]] && ok 'generic: new, restore' || bad "generic routes: $(routes generic)"
 [[ "$(routes wordpress)" == "[('new', True), ('restore', True)]" ]] && ok 'wordpress: new and restore available' || bad "wordpress routes: $(routes wordpress)"
 steps() { j "[s['id']+'='+s['command'] for x in d['data']['profiles'] if x['id']=='$1' for r in x['routes'] if r['id']=='$2' for s in r['steps']]" <<<"$p"; }
 [[ "$(steps bitrix new)" == "['add=site:add', 'run_setup=open_url', 'finalize=bitrix:finalize', 'done=site:doctor']" ]] \
@@ -45,7 +45,7 @@ steps() { j "[s['id']+'='+s['command'] for x in d['data']['profiles'] if x['id']
    == "[True]" ]] && ok 'php input takes the installed versions' || bad "php input: $(j "[i for x in d['data']['profiles'] if x['id']=='bitrix' for i in x['routes'][0]['inputs']]" <<<"$p")"
 [[ "$(j "sorted({i['kind'] for x in d['data']['profiles'] for r in x['routes'] for i in r['inputs']})" <<<"$p")" \
    == "['choice', 'file_on_server', 'text', 'upload', 'url']" ]] && ok 'input kinds' || bad 'input kinds'
-cli self profiles 2>/dev/null | grep -q 'restore (planned)' && ok 'human answer lists routes' || bad 'human routes'
+cli self profiles 2>/dev/null | grep -q 'restore' && ok 'human answer lists routes' || bad 'human routes'
 
 # 2. site status: static.
 S=routes-static.test
@@ -53,7 +53,7 @@ cli site add --domain "$S" --profile static --create-db no --confirm yes >/tmp/r
 [[ "$(status "$S" | j "$shape")" == "simai-site-status/1|none|prepare|site:deploy" ]] && ok 'static placeholder: prepare, next site:deploy' || bad "static: $(status "$S")"
 echo '<h1>mine</h1>' >"/home/simai/www/$S/public/index.html"
 [[ "$(status "$S" | j "$shape")" == "simai-site-status/1|installed|done|None" ]] && ok 'static with own page: installed, done' || bad "static own: $(status "$S")"
-[[ "$(status "$S" | j "sorted(d['data'])")" == "['detail', 'domain', 'installer_url', 'next', 'pending', 'profile', 'restore_url', 'route', 'schema', 'step']" ]] \
+[[ "$(status "$S" | j "sorted(d['data'])")" == "['detail', 'domain', 'installer_url', 'next', 'pending', 'profile', 'restore_url', 'route', 'schema', 'step', 'suspended']" ]] \
   && ok 'site status keys' || bad 'keys'
 
 # 3. site status: laravel.

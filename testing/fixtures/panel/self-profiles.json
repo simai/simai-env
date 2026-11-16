@@ -320,7 +320,7 @@
           {
             "id": "restore",
             "title": "Restore from a files archive and an SQL dump",
-            "available": false,
+            "available": true,
             "inputs": [
               {
                 "name": "domain",
@@ -338,13 +338,23 @@
                 "default": "8.3"
               },
               {
-                "name": "archive",
+                "name": "create-db",
+                "required": false,
+                "kind": "choice",
+                "values": [
+                  "yes",
+                  "no"
+                ],
+                "default": "yes"
+              },
+              {
+                "name": "files",
                 "required": true,
                 "kind": "file_on_server"
               },
               {
                 "name": "dump",
-                "required": true,
+                "required": false,
                 "kind": "file_on_server"
               }
             ],
@@ -359,6 +369,12 @@
                 "id": "upload",
                 "title": "Upload the files archive and the SQL dump",
                 "command": "file:upload",
+                "args": {}
+              },
+              {
+                "id": "restore",
+                "title": "Unpack the files and import the dump",
+                "command": "site:restore-ready",
                 "args": {}
               },
               {

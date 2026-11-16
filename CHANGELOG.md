@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.57.1 - 2026-11-16
+
+- `site restore-ready --domain D --files F [--dump S] [--overwrite yes]`
+  restores a plain PHP site (generic profile) from a `.tar.gz`, `.tgz`,
+  `.tar` or `.zip` archive and an optional MySQL dump, as the site user;
+  a backup first when it overwrites; the archive and the dump go to the
+  site's trash. Gateway `site:restore-ready`; the generic `restore` route in
+  `self profiles` is available now.
+- `wp restore-ready` takes a `.zip` files archive too.
+- `wp restore-ready` no longer gives the web root the staging folder's
+  `0700` mode when the archive has no top folder (`./` entry); the site
+  answered 403/404 after such a restore.
+- Stand fixtures set 35: `site:restore-ready` refusals.
 
 ## 1.57.0 - 2026-11-16
 

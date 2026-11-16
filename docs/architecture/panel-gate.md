@@ -693,6 +693,13 @@ action, job). Everything else is refused.
   (`new`, `restore`, `repo` with inputs and steps). Fixture set 32 adds
   `site-status.<site>` for the demo sites and
   `site-status.demo-bitrix.test.<step>` along the Bitrix restore.
+- 1.57.1: `site:restore-ready {domain, files, dump?, overwrite?}` (action):
+  a `generic` site from a files archive (`.tar.gz`, `.tgz`, `.tar`, `.zip`)
+  and an optional MySQL dump inside the site directory; refusals of the
+  plan check come as `plan_failed`. The `generic` profile's `restore` route
+  is now available: `site:add`, `file:upload`, `site:restore-ready`,
+  `site:doctor`, inputs `files` (required) and `dump` (optional).
+  `wp:restore-ready` takes a `.zip` files archive too.
 - 1.57.0: `site:redirect-list {domain}` (read, owner-scoped,
   `simai-site-redirects/1`): `redirects` `[{from, to, code}]` and
   `whole_domain` `{to, code, path}` or null. Fixtures

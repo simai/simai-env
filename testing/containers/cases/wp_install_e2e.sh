@@ -133,7 +133,8 @@ owner2=$(stat -c %U:%G "$root2/public")
 # A fixed home URL in the copy's config must follow the new domain too.
 sed -i "s#^\$table_prefix#define( 'WP_HOME', 'http://$D' );\n\$table_prefix#" "$root/public/wp-config.php"
 grep -q "'WP_HOME'" "$root/public/wp-config.php" || bad 'plant WP_HOME'
-tar -C "$root/public" -czf "$root2/copy.tar.gz" . && chown "$owner2" "$root2/copy.tar.gz"
+# Entries without a "./" top: the web root keeps its own mode.
+(cd "$root/public" && tar -czf "$root2/copy.tar.gz" -- *) && chown "$owner2" "$root2/copy.tar.gz"
 [[ "$(step "$D2")" == restore/upload ]] && ok 'archive uploaded: route restore, step upload' || bad "upload step: $(step "$D2")"
 mysqldump --single-transaction "$db1" | gzip -c >"$root2/public/dump.sql.gz" && chown "$owner2" "$root2/public/dump.sql.gz"
 s=$(status "$D2")
@@ -149,6 +150,7 @@ p=$(cli wp restore-ready --domain "$D2" --files copy.tar.gz --dump public/dump.s
 [[ "$p" == *"Rerun with --confirm yes"* && ! -d $root2/public/wp-includes ]] && ok 'restore-ready without confirm is a plan' || bad "restore plan: ${p:0:500}"
 cli wp restore-ready --domain "$D2" --files copy.tar.gz --dump public/dump.sql.gz --confirm yes >/tmp/wp-rr.out 2>&1 \
   && ok 'wp restore-ready' || { bad 'wp restore-ready'; tail -40 /tmp/wp-rr.out; }
+[[ "$(stat -c %a "$root2/public")" != 700 ]] && ok 'web root mode kept after restore' || bad 'web root became 0700'
 q() { mysql -NBe "SELECT option_value FROM \`$db2\`.wp_options WHERE option_name='$1'"; }
 [[ "$(q home)|$(q siteurl)" == "http://$D2|http://$D2" ]] && ok 'home and siteurl rewritten to the new domain' || bad "urls: $(q home) $(q siteurl)"
 [[ "$(mysql -NBe "SELECT post_content FROM \`$db2\`.wp_posts WHERE ID=1")" == "Visit http://$D2/sample-page/ today" ]] \

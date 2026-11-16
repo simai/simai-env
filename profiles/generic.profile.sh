@@ -47,11 +47,11 @@ PROFILE_ALLOW_DB_REMOVAL="yes"
 # Site creation routes of the panel wizard (self profiles; format in
 # lib/site_profiles.py). restore (files archive and SQL dump) is planned:
 # no command restores them yet.
-PROFILE_ROUTES=("new|yes|New site: PHP and a database, upload the code yourself" "restore|no|Restore from a files archive and an SQL dump")
+PROFILE_ROUTES=("new|yes|New site: PHP and a database, upload the code yourself" "restore|yes|Restore from a files archive and an SQL dump")
 PROFILE_ROUTE_NEW_INPUTS=("domain|yes|text" "php|no|choice" "create-db|no|choice" "db-engine|no|choice")
 PROFILE_ROUTE_NEW_STEPS=("add|site:add||Create the site: PHP and a database" "done|site:doctor||Check the site")
-PROFILE_ROUTE_RESTORE_INPUTS=("domain|yes|text" "php|no|choice" "archive|yes|file_on_server" "dump|yes|file_on_server")
-PROFILE_ROUTE_RESTORE_STEPS=("add|site:add||Create the site: PHP and a database" "upload|file:upload||Upload the files archive and the SQL dump" "done|site:doctor||Check the site")
+PROFILE_ROUTE_RESTORE_INPUTS=("domain|yes|text" "php|no|choice" "create-db|no|choice" "files|yes|file_on_server" "dump|no|file_on_server")
+PROFILE_ROUTE_RESTORE_STEPS=("add|site:add||Create the site: PHP and a database" "upload|file:upload||Upload the files archive and the SQL dump" "restore|site:restore-ready||Unpack the files and import the dump" "done|site:doctor||Check the site")
 
 # Server resources: memory below the minimum refuses site add and restore
 # plans, below the recommendation warns (MB, 0: no need).

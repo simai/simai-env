@@ -1,0 +1,6 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.plan-failed.site-restore-ready",
+  "status": "failed",
+  "reason": "plan_failed"
+}
