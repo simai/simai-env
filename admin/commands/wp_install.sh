@@ -655,9 +655,10 @@ wp_restore_ready_handler() {
   fi
   rc=0
   # Copy the entries, not "${src}/.": that would give the web root the
-  # staging directory's 0700 mode.
+  # staging directory's 0700 mode. From inside $src: the site user cannot
+  # return to root's working directory.
   # shellcheck disable=SC2024 # root opens the log; the copy runs as the site user
-  sudo -u "$SIMAI_USER" -H find "$src" -mindepth 1 -maxdepth 1 -exec cp -af -- {} "${WP_DOC_ROOT}/" \; >>"$LOG_FILE" 2>&1 || rc=$?
+  (cd "$src" && sudo -u "$SIMAI_USER" -H find . -mindepth 1 -maxdepth 1 -exec cp -af -- {} "${WP_DOC_ROOT}/" \;) >>"$LOG_FILE" 2>&1 || rc=$?
   rm -rf --one-file-system -- "$staging"
   if (( rc != 0 )); then
     error "Cannot copy the restored files into ${WP_DOC_ROOT} (see ${LOG_FILE})"

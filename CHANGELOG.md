@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.57.2 - 2026-11-16
+
+- `site restore-ready` and `wp restore-ready` failed on servers where
+  root's home is closed (`find: Failed to restore initial working
+  directory`): the copy as the site user now runs from inside the unpacked
+  archive. The restore tests close `/root` like a server does.
+
 ## 1.57.1 - 2026-11-16
 
 - `site restore-ready --domain D --files F [--dump S] [--overwrite yes]`

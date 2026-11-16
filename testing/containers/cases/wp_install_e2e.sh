@@ -11,6 +11,8 @@ set -uo pipefail
 rm -rf /root/simai-env-wp
 cp -r /src /root/simai-env-wp
 cd /root/simai-env-wp || exit 1
+# As on a server: the site user cannot enter root's working directory.
+chmod 700 /root
 chmod +x ./*.sh
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails + 1)); }
 skip() { echo "SKIP $*"; cleanup; echo "failures=$fails"; exit "$fails"; }

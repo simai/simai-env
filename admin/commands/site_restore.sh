@@ -215,9 +215,10 @@ site_restore_ready_handler() {
   target=$(site_restore_target "$src")
   rc=0
   # Copy the entries, not "${src}/.": that would give the target the
-  # staging directory's 0700 mode.
+  # staging directory's 0700 mode. From inside $src: the site user cannot
+  # return to root's working directory.
   # shellcheck disable=SC2024 # root opens the log; the copy runs as the site user
-  sudo -u "$SIMAI_USER" -H find "$src" -mindepth 1 -maxdepth 1 -exec cp -af -- {} "${target}/" \; >>"$LOG_FILE" 2>&1 || rc=$?
+  (cd "$src" && sudo -u "$SIMAI_USER" -H find . -mindepth 1 -maxdepth 1 -exec cp -af -- {} "${target}/" \;) >>"$LOG_FILE" 2>&1 || rc=$?
   rm -rf --one-file-system -- "$staging"
   (( rc == 0 )) || { error "Cannot copy the restored files into ${target} (see ${LOG_FILE})"; return 1; }
 

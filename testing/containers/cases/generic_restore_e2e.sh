@@ -10,6 +10,8 @@ set -uo pipefail
 rm -rf /root/simai-env-gr
 cp -r /src /root/simai-env-gr
 cd /root/simai-env-gr || exit 1
+# As on a server: the site user cannot enter root's working directory.
+chmod 700 /root
 chmod +x ./*.sh
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails + 1)); }
 cli() { COLUMNS=220 bash ./simai-admin.sh "$@"; }
