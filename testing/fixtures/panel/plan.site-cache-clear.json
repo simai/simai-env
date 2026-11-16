@@ -1,0 +1,40 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-cache-clear",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:cache-clear",
+    "args": {
+      "domain": "demo-bitrix.test"
+    },
+    "target": "demo-bitrix.test",
+    "description": "Clear one site's caches: its OPcache scripts, its nginx cache, the framework cache of its profile",
+    "effects": "write",
+    "lock": "site",
+    "applied": false,
+    "clear": [
+      {
+        "name": "opcache",
+        "state": "planned",
+        "target": "this site's scripts in the OPcache of pool demo-bitrix-test (PHP 8.3)",
+        "detail": null,
+        "reason": null
+      },
+      {
+        "name": "nginx_cache",
+        "state": "skipped",
+        "target": null,
+        "detail": null,
+        "reason": "none"
+      },
+      {
+        "name": "framework",
+        "state": "planned",
+        "target": "contents of bitrix/cache bitrix/managed_cache bitrix/stack_cache in /home/simai/www/demo-bitrix.test/public",
+        "detail": null,
+        "reason": null
+      }
+    ]
+  }
+}

@@ -76,9 +76,15 @@ command_plan_check() {
   case "$key" in
     site:add) site_add_plan_check "$@" || return 1 ;;
     site:check-fix) site_check_fix_plan_check "$@" || return 1 ;;
+    site:cache-clear) site_cache_plan_check "$@" || return 1 ;;
+    site:transfer) site_transfer_plan_check "$@" || return 1 ;;
     bitrix:restore-ready) bitrix_restore_ready_plan_check "$@" || return 1 ;;
     wp:install) wp_install_plan_check "$@" || return 1 ;;
     wp:restore-ready) wp_restore_plan_check "$@" || return 1 ;;
+    site:suspend|site:runtime-suspend) site_suspend_plan_check suspend "$@" || return 1 ;;
+    site:resume|site:runtime-resume) site_suspend_plan_check resume "$@" || return 1 ;;
+    file:copy) file_copy_plan_check "$@" || return 1 ;;
+    file:trash-restore) file_trash_restore_plan_check "$@" || return 1 ;;
   esac
   return 0
 }

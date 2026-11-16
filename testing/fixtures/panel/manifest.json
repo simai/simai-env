@@ -1,9 +1,9 @@
 {
   "schema": "simai-panel-fixtures/1",
-  "set_version": 33,
+  "set_version": 34,
   "request_schema": "simai-panel-request/1",
   "answer_schema": "simai-panel-answer/1",
-  "simai_env": "1.56.2",
+  "simai_env": "1.57.0",
   "files": {
     "access-list.json": {
       "sha256": "d09b72ed91706eb3fb42399d67846dd05022115f2f13ce77ec3fecc6bbffe249",
@@ -42,7 +42,7 @@
       "status": "ok"
     },
     "change-status.json": {
-      "sha256": "1ba9825e91f3c92324e11822b111d600597515dcca21d1f24bbd415e1dc3fd43",
+      "sha256": "07a90e3d1f32ffdf031046466e275a5e77ed569130afd7c000565652b9514e2a",
       "status": "ok"
     },
     "cron-job-runs.json": {
@@ -62,19 +62,31 @@
       "status": "ok"
     },
     "file-list.demo-owned.test.json": {
-      "sha256": "1a8e1b14f842570a058f04522da9a27c4fd4eb131e05228a1ce00e5413781bfe",
+      "sha256": "443772ae060c84a81b26f692760c754af74b1cdf8c3691e2a3bcd06919a25ff8",
       "status": "ok"
     },
     "file-stat.demo-owned.test.json": {
-      "sha256": "b50e03084a4c091609e20c3c00b54a0fded5749eab6a00a7e60454bce2236ee7",
+      "sha256": "9c5bacb1486aead55595766a6d050a6ecc7c4b06f17f4748d51d2fe7d72ccbdc",
+      "status": "ok"
+    },
+    "file-trash-list.demo-owned.test.json": {
+      "sha256": "e53728092dbb46aedae4173ec7e55cc9068ea998ca737a82d08332631e172d46",
       "status": "ok"
     },
     "firewall-status.json": {
-      "sha256": "714f5483331ca250fb5545df364e970868ec0e7701432599ae1de56c372bafee",
+      "sha256": "3a88f5f330ec82f2ad8631ee42e3d43b8b7d6fbb0b6d48c7cb8e2ba4748b13aa",
       "status": "ok"
     },
     "job-log.json": {
       "sha256": "56bb0b566ec62d7a03a739c22df70d5820bd9df346beb8a886332a02e50ff833",
+      "status": "ok"
+    },
+    "job-site-cache-clear-status.json": {
+      "sha256": "1ca7fcffefb20929840f1cde77df44fda6a2c9d8807925d8393b6438ba477ff0",
+      "status": "ok"
+    },
+    "job-site-cache-clear.json": {
+      "sha256": "fafe3c01406ad43db23166f1d6059c0b575aa8ba617dba9c89da829d20ed4ba4",
       "status": "ok"
     },
     "job-site-check-fix-status.json": {
@@ -182,15 +194,15 @@
       "status": "ok"
     },
     "plan.bitrix-restore-ready-source.json": {
-      "sha256": "03697e8342ee2ae0bf667164eaf3f81cc715f6f8e9c6274230f21e2cc314c67b",
+      "sha256": "3d9d43df67307c5a9e9e733f3bd65c4c957f12ace4320bb2148bd554e2f9523f",
       "status": "ok"
     },
     "plan.bitrix-restore-ready.json": {
-      "sha256": "1cd212f7f44133929892c09e352958244400b7185c52bdf1b5aafe7f8cbb6f27",
+      "sha256": "85164232d8439ddf2b5c7b9d9f5d1feefb857e407e035d900fa02e65ef8cd7d0",
       "status": "ok"
     },
     "plan.change-confirm.json": {
-      "sha256": "c9402acac5857bc8b44078fd1e886fdc3c5402e80f444dc0e74677958022b0b6",
+      "sha256": "3f2442acf48bc040d852974610837999a27e378a522361206cc4cabd3c1cc96d",
       "status": "ok"
     },
     "plan.cron-job-add.json": {
@@ -209,12 +221,20 @@
       "sha256": "47deec67f35998dd3f92e50a4f11dcbef339a5a0af0029f9ace78cd0ed900450",
       "status": "ok"
     },
+    "plan.file-copy.json": {
+      "sha256": "e511edec123e91c8a79af53ad4f1284e234f15e9ef732b2c50b83ebc117b0641",
+      "status": "ok"
+    },
     "plan.file-extract.json": {
       "sha256": "de9d4206bb6a692ffc4162e8c387fd640f2bdc44987dc2596a88a2e8764abe2b",
       "status": "ok"
     },
     "plan.file-remove.json": {
-      "sha256": "67e5fe95f3d5729f06f9f648e7496fada2ce48148c3582b7b238a5146d079d6f",
+      "sha256": "18a65b572531dc294293668646f09ca607010eaf2af5da4f8087ea51b9c32e24",
+      "status": "ok"
+    },
+    "plan.file-trash-empty.json": {
+      "sha256": "ce41a684ab5bd96d9deee9e0ed09587b785dab59405a1ff34cf222afdd6b40b7",
       "status": "ok"
     },
     "plan.file-write.json": {
@@ -306,7 +326,7 @@
       "status": "ok"
     },
     "plan.self-update.json": {
-      "sha256": "7ed3d74a506c39100a80103d2608d49736623475352c270f952ac471d3dcc48c",
+      "sha256": "88b6cdd685326245c39c6fb10b65c1472c7f24fbe513d835571f1e5ffe4f592b",
       "status": "ok"
     },
     "plan.service-reload.json": {
@@ -318,27 +338,31 @@
       "status": "ok"
     },
     "plan.site-add-bitrix.json": {
-      "sha256": "6a508722cf050fe099bace1c50d0f81c3707122cfd5b5ac06e70f4f4806ba376",
+      "sha256": "cf35b9b873951fb6504b0440d4965f22b76218fd78ec0c074dc2c1dbc76d4a32",
       "status": "ok"
     },
     "plan.site-add-laravel.json": {
-      "sha256": "d2d3f32f82b6491f3133df78eea3dd3e9707c20519859bbf1cc7297600c7c254",
+      "sha256": "47ae890130f048b83f7e79abf3804d1c14143aac04a31d21e17fe5550786d98a",
       "status": "ok"
     },
     "plan.site-add-no-backup.json": {
-      "sha256": "474d701fe8308c30a1e8a2bfe3a520e4e2a400dbe051061286aad5bf58f111f6",
+      "sha256": "a9a2c12761829e5c534e529d171af6e769979d6403c0bd6f9b2987b198dda6e8",
       "status": "ok"
     },
     "plan.site-add-proxy.json": {
-      "sha256": "d838c2bebaec010e71e4316a80c0329fecb9a2401f48b329fa7f1800560365df",
+      "sha256": "2291e92c00ad2039b2fb8c32edcf5229957112a3a34c25c02715cc96935fbc56",
       "status": "ok"
     },
     "plan.site-add.json": {
-      "sha256": "baa416bcace9fcb1a52002eadb06774303efd1b2f5e21a8dd5a2e83c4859f6c6",
+      "sha256": "c9280d76da29f3a385c12bac1531da6b8f8db934c46f483a1591609c5d2c9b73",
       "status": "ok"
     },
     "plan.site-apache.json": {
       "sha256": "cdee61dff8c801f23ca5c3254139c1adba6f3ebe60503df797ebebd98ab95539",
+      "status": "ok"
+    },
+    "plan.site-cache-clear.json": {
+      "sha256": "f526859273c693f9a4739f1c506d2450103cd71a9c5770bf7061b88e819c1216",
       "status": "ok"
     },
     "plan.site-check-fix.json": {
@@ -381,6 +405,14 @@
       "sha256": "aba65c453fa369808e07962f3ee4e36c7da14285b2404e6cf5bd12c131f9e9dc",
       "status": "ok"
     },
+    "plan.site-suspend.json": {
+      "sha256": "84e72f1417dd04ea37b90f3ea22f1f7aae7ec8c665b2d245a828a7ce8869ef29",
+      "status": "ok"
+    },
+    "plan.site-transfer.json": {
+      "sha256": "5982084efa97b174ed2dbe12b7a8e78f981587f83f59f41145f79bcb86a0ce6d",
+      "status": "ok"
+    },
     "plan.software-install.json": {
       "sha256": "b9be491f45db232551797b71a08d5a2ad8cd617e7500f3878b41f6e56f45e9bd",
       "status": "ok"
@@ -390,7 +422,7 @@
       "status": "ok"
     },
     "plan.software-update.json": {
-      "sha256": "355e0dfb6e50fa1949c5d2d0ebf7ed4486a109d161b22b18707a3777e0a7fc37",
+      "sha256": "0bf2635559d54b046ddd9452da81a80e959a267816d63544faa94bb3fedf69f0",
       "status": "ok"
     },
     "plan.ssl-dns-credentials.json": {
@@ -421,7 +453,19 @@
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
       "status": "refused"
     },
+    "refused.invalid-argument.file-copy.json": {
+      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
+    },
     "refused.invalid-argument.file-read.json": {
+      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
+    },
+    "refused.invalid-argument.file-remove-permanent.json": {
+      "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
+      "status": "refused"
+    },
+    "refused.invalid-argument.file-trash-restore.json": {
       "sha256": "efd5b5c01a5f8e1091212a9fbf298027caed8ba17871beab40863f939246464d",
       "status": "refused"
     },
@@ -462,11 +506,15 @@
       "status": "refused"
     },
     "refused.not-enough-disk.json": {
-      "sha256": "79c9d68ca4dbde3d2e5fa73c3b379682224074f8aebce040f8c1f21e2dc7e92b",
+      "sha256": "0c857d61561eae82cb2b55039d421c90fc3aa8be6d5cb8b78158ce442cd467d8",
       "status": "refused"
     },
     "refused.not-enough-ram.json": {
-      "sha256": "b829fcbcb3eaa7bee15a4c6b029822204a420e8c68aaab9b8937b559e4536485",
+      "sha256": "45881592c771bebbb1f2415350417f649ee3fd3765478c7f79aa866e3487d8f2",
+      "status": "refused"
+    },
+    "refused.not-suspended.json": {
+      "sha256": "d7717fb7a79c5defcfa54410d392a8829146bd454dde2aec352efd669dde49d7",
       "status": "refused"
     },
     "refused.owner-admin-only.alerts-channel.json": {
@@ -502,6 +550,10 @@
       "status": "refused"
     },
     "refused.owner-admin-only.site-nginx-custom-show.json": {
+      "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
+      "status": "refused"
+    },
+    "refused.owner-admin-only.site-transfer.json": {
       "sha256": "d07d9bafcccd3aee7d100e1f42c0232d456737355b6d042365be124d2dc8a94a",
       "status": "refused"
     },
@@ -565,12 +617,24 @@
       "sha256": "32349f5549a1065851173f70516008b6c1db48a50462d0df320db0ade8d709b9",
       "status": "refused"
     },
+    "refused.owner-scope.site-redirects.json": {
+      "sha256": "7aa202dc0ea203ad24ce2142938eba24611f60e0def582c47585d9a021869257",
+      "status": "refused"
+    },
     "refused.profile-disabled.json": {
       "sha256": "24d5662fa64085de4653ed9f61d1a45f74a778c96bc2937b3606237162276e13",
       "status": "refused"
     },
+    "refused.profile-unsupported.json": {
+      "sha256": "723cf2452f5fe26c0e3ce7a892c618e9df382fddb37d373df671b5bd4e0e0bc2",
+      "status": "refused"
+    },
+    "refused.site-transfer.same-owner.json": {
+      "sha256": "617a28d89afe620ac3ba639ba06b3abbd1888b52ab186a96c525797f8c48fb7d",
+      "status": "refused"
+    },
     "refused.source-invalid.json": {
-      "sha256": "0b6794b75d02d2fb6c881c326ee6b6e997523f44ff35ceb42150cbdda7044bd7",
+      "sha256": "3d28df77431831efc92540b43a17a501ed799e4c108b92333c660be3ad1da82f",
       "status": "refused"
     },
     "refused.unknown-access.json": {
@@ -586,7 +650,7 @@
       "status": "refused"
     },
     "refused.url-invalid.json": {
-      "sha256": "63e087e85f5f031ef758867d6b57ed81ef537e1a5f705464ac8d0164e659fa25",
+      "sha256": "203f2eea003215cec1423c13a0df089f4ef9ac131b1a0271289feff9e3b786f1",
       "status": "refused"
     },
     "security-files.json": {
@@ -602,7 +666,7 @@
       "status": "ok"
     },
     "security-status.json": {
-      "sha256": "a44616b992340b647077a080828ceff905126d18b8242c2ed9d9adf31bac5f9f",
+      "sha256": "120b5274acfa967cfdfb0e3c88c6cca9bb1ddfbea55b6e09bfccb9fdd70872f6",
       "status": "ok"
     },
     "self-alerts.json": {
@@ -614,15 +678,15 @@
       "status": "ok"
     },
     "self-commands.json": {
-      "sha256": "8e4d4e06c49b5e2f052adc5c09db37334f299e5367c5d6e325d168fe2d24a563",
+      "sha256": "e4d166f849ff4478619600cee73c5d40ceea840c2cb890bcaf980837f4663bc9",
       "status": "ok"
     },
     "self-describe.json": {
-      "sha256": "7090663bf7475a61aead1df303305cd39621928d7f6c915ddd6eb907e4fc167c",
+      "sha256": "8fc8dfe04771ed00b4b69246fd23474dcf6e250244e065ff062fff97672e64f6",
       "status": "ok"
     },
     "self-describe.owner-demo.json": {
-      "sha256": "0d300d100b7d7e8590877e7d2d1ec8167a8c3621ecb50d0f89b9f6306f30c897",
+      "sha256": "4b283012da2d7f3bc0235ec596466649ab9dfbc14d73581bc87ebc414e67bb9f",
       "status": "ok"
     },
     "self-metrics-history.hour.json": {
@@ -650,11 +714,11 @@
       "status": "ok"
     },
     "self-update-plan.env.json": {
-      "sha256": "5d4ff4922f0cc3f3c86aab82cd85f5f8f3e7f0a9113e91f4825e57c52c476720",
+      "sha256": "68cbee88a12f1a173f0da195da8bc9f80a99083dddf61743e0fa8cb61c371f68",
       "status": "ok"
     },
     "self-update-plan.panel.json": {
-      "sha256": "bd3b96b44d97b3c29a4fc81bef510d2b3e1c1ef92d8645f66aea212d4f08b90f",
+      "sha256": "71c4a6d94bb6386355daf4dd820cfaecc6d5417bfe8abfa0182745f3d1b90f7a",
       "status": "ok"
     },
     "service-list.json": {
@@ -674,19 +738,19 @@
       "status": "ok"
     },
     "site-describe.demo-owned.test.json": {
-      "sha256": "174e28951d1cae47005c0955b3a4f89f384b75c976034a6857bf2fef419d753b",
+      "sha256": "da994bf8c8cca05e3157d188f306c37a7bb50b303cc805844f5f9ba63317a92c",
       "status": "ok"
     },
     "site-describe.demo-php.test.json": {
-      "sha256": "23b328c88033877dc483bfa69b7c028e87c1d7d708995e81e07e353cab884a94",
+      "sha256": "bfff91a71f2fe5716119dfd24a6791ed790ac44f3fb68a3ce78f02cfff27261b",
       "status": "ok"
     },
     "site-describe.demo-redirect.test.json": {
-      "sha256": "965bf18020b3d882f175dda79ecf48fdeb244952c70561ec5426592edf50dcde",
+      "sha256": "11bfad6bfcea4a71571505b370cf9cfd003d3bc1ee7aea280dc76184e6b82eb7",
       "status": "ok"
     },
     "site-describe.demo-static.test.json": {
-      "sha256": "a62951c20bf36eff76d8b66ddbfcbf111d5243765896368dcc24ddea3532fb86",
+      "sha256": "5f863b66e04e75bb309fec8c4f2086252e1901ff8efe56c847195c9a5c450b70",
       "status": "ok"
     },
     "site-doctor.demo-bitrix.test.json": {
@@ -729,80 +793,88 @@
       "sha256": "be563e6373e550268cc109dbe98b26bcb0a7dc775abb876a0ea7eb2f9a49f12e",
       "status": "ok"
     },
+    "site-redirects.demo-owned.test.json": {
+      "sha256": "2a18e28cfcd43975f957c65adee3785b04b5cffe1e2b9a483d09694079da86e6",
+      "status": "ok"
+    },
+    "site-redirects.demo-redirect.test.json": {
+      "sha256": "5c1e9c7734cab319a08eaeb8e9718e2f4242c35620a278623103f210f37ecbf1",
+      "status": "ok"
+    },
     "site-status.demo-bitrix.test.done.json": {
-      "sha256": "f3dc77a5d5a7152093833876586630c74000d68db421f3ece9593ad2baacfbe5",
+      "sha256": "2ad436026fb53a79e21e901560d73e8ce6de8b44f28c143ac68a744a9c66f666",
       "status": "ok"
     },
     "site-status.demo-bitrix.test.finalize.json": {
-      "sha256": "a0fc75ef239b9d40e8ead03e6ae086648f6a0d7263b106347a37be3c0467c910",
+      "sha256": "336cbe35f01cd25875fca4ae4a0f8ee35fc28550d6303acd0814c4f2f91ac822",
       "status": "ok"
     },
     "site-status.demo-bitrix.test.prepare.json": {
-      "sha256": "470e85bc3a65916acb48aa670b9a4ba200d85de1d31a5d8c5ecba403dfc74ab7",
+      "sha256": "c97109cb38e8717472106222e2305bc3d72ef74481b1ee08191cf622e648ad43",
       "status": "ok"
     },
     "site-status.demo-bitrix.test.run-restore.json": {
-      "sha256": "bc9a70ad78b2a63098f10c61e4e6a21998fdca9d0458bcd32b9df9479ce64e1c",
+      "sha256": "7ad5daf5fb053ec5c151657e3f89f83c3ea4bdc1e4b58583eaa98e3e2075c08d",
       "status": "ok"
     },
     "site-status.demo-bitrix.test.upload.json": {
-      "sha256": "25ae241d600e5da266e47ccab1472def0a1441508868dce1f6058615e4c9b094",
+      "sha256": "65b48d7331bd05fee8b59240fde0a48c2a9fb5219c33727a295003e39ef525fe",
       "status": "ok"
     },
     "site-status.demo-bitrix.test.validate.json": {
-      "sha256": "1af36763c233242524e941110b9e2fdb59f2a93571ebe1130876c9e012bce0f5",
+      "sha256": "bc6de8a74c1a09066531f20828e6f8ebce6f9a9909c83b132d4ffd6d88d710ff",
       "status": "ok"
     },
     "site-status.demo-laravel.test.configure.json": {
-      "sha256": "42afe0441d0bce06bf33219bc38f136ebfd85235c0a7d8ef4b571f05ad45f217",
+      "sha256": "5a208f8b12bee533bfc16f7575de5d5e002b644b71e6dce36770f30bfcaf5efe",
       "status": "ok"
     },
     "site-status.demo-laravel.test.deploy.json": {
-      "sha256": "d4843a12480679abc54bd7be3de1420d87360d322b4cc90cb8cadf797ddf90fb",
+      "sha256": "4b6e06ab2bde7d811a91ef9603c321b147cae8260c33e09275d191bcfd0a8e16",
       "status": "ok"
     },
     "site-status.demo-owned.test.json": {
-      "sha256": "5a56fd606e9ff2f4f535d0bd0f590b84fe3c6b35487d359d45920da7af4a0ef4",
+      "sha256": "b2a445c24b1e7d2b6254cfa05a35a8f388ed73aa2d39f3b48365beae9a6ecce7",
       "status": "ok"
     },
     "site-status.demo-php.test.json": {
-      "sha256": "be25c684490fddbd8e32bb8432b8be256b15e2702b604cadb7870853f8157ab3",
+      "sha256": "00464cb6ae9a152297d15bdf666401ff09145e12082646a75c2f6c236e135af4",
       "status": "ok"
     },
     "site-status.demo-redirect.test.json": {
-      "sha256": "162b5336291bac3f7f12b15bd01607c1b9b48bbade6ef68e1427abbf9991ea39",
+      "sha256": "d203e239012224432df597e8b8fafa738698a8f5fca5106c88858dea54c0b55b",
       "status": "ok"
     },
     "site-status.demo-static.test.json": {
-      "sha256": "a85a8f22e6540d00175438f3d009ab23a34c95958c653a441b0008bdc1924bbd",
+      "sha256": "50f4f33872e5f76e60599725d6ae2ee3ad49cfca02e0a3d1486090f84e428d1d",
       "status": "ok"
     },
     "site-status.demo-wp-copy.test.finalize.json": {
-      "sha256": "1da171ca81bcba5c60b9832e91e6c5f4b8ff0d8c5ee2339358968f3dad99c713",
+      "sha256": "2daa28e901ae3ed9a180d9e10b3dae1576d67dac722628c2832ba9a3b4ea3447",
       "status": "ok"
     },
     "site-status.demo-wp-copy.test.restore-done.json": {
-      "sha256": "f39d4f7ff7f050889a06163f3f43e4a4eb33b86a4f0ffd7abe8313f382bfd182",
+      "sha256": "50fa610dae7ea4395946419848003e4b09362cf5c20cafe4dbef2e5d29de88a4",
       "status": "ok"
     },
     "site-status.demo-wp-copy.test.restore-install.json": {
-      "sha256": "6935acc3e03f67552c71cb84a88175a960e194b7e3b63f152e2c590c92fb751d",
+      "sha256": "b610c7b04a0ee65ac3b2d78c37d7cce02ce52072cc06546fb5f2b8291c4fe3c6",
       "status": "ok"
     },
     "site-status.demo-wp-copy.test.upload.json": {
-      "sha256": "0aa83e2d11d33f3f969f460bcd20e9eadc571887739420ac8f683d5bce4c173a",
+      "sha256": "4079a402be7c4ad10f6b03920014d12e9c619114813c7984249149142267edbb",
       "status": "ok"
     },
     "site-status.demo-wp.test.done.json": {
-      "sha256": "3510fc7878014b00ed8da2d5039364fac2941fdee285984373ae820b6a020a39",
+      "sha256": "272eec42fee36ef2a62952fd73dba5faa7964f58efb28b217fa39e351d9069fa",
       "status": "ok"
     },
     "site-status.demo-wp.test.prepare.json": {
-      "sha256": "3cfc6eb0bf54c122f9cbccb523bd6c5a009401586b00c960d3ffd1309dd4423d",
+      "sha256": "2654e51bde49493b6d6d33accd324df62ae1688fd1671454f9f94206739ecae4",
       "status": "ok"
     },
     "software-list.json": {
-      "sha256": "b7350250f0b5a628c08c4f7248a0f25cf4ce19cd6b8f0cfb26d0018dda5c9411",
+      "sha256": "dd4aa9a3144650197e99ba0a596861fa55b5ad28b65ecbcb8573513af0491595",
       "status": "ok"
     },
     "ssl-dns-status.json": {

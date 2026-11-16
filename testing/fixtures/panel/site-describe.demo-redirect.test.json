@@ -26,6 +26,8 @@
     "last_verify": null,
     "last_offsite": null,
     "adopted": null,
+    "suspended": false,
+    "suspended_at": null,
     "answers": {
       "http": 301,
       "path": "/",

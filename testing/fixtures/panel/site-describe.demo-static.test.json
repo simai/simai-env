@@ -18,9 +18,9 @@
     "database": null,
     "layout": "releases",
     "release": {
-      "current": "20261110173259",
-      "previous": "20261110173258-initial",
-      "deployed_at": "2026-11-10T17:32:59Z",
+      "current": "20261116130651",
+      "previous": "20261116130650-initial",
+      "deployed_at": "2026-11-16T13:06:51Z",
       "source": "archive stand-art.tgz"
     },
     "workers": [],
@@ -31,6 +31,8 @@
     "last_verify": null,
     "last_offsite": null,
     "adopted": null,
+    "suspended": false,
+    "suspended_at": null,
     "answers": {
       "http": 200,
       "path": "/",

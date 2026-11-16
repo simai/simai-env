@@ -1,0 +1,19 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-copy",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:copy",
+    "args": {
+      "domain": "demo-owned.test",
+      "path": "public",
+      "to": "public-copy"
+    },
+    "target": "demo-owned.test",
+    "description": "Copy a file or directory within a site (links copied as links)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

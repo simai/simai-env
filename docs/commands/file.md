@@ -12,7 +12,8 @@ outside. Links are listed and can be removed, but are never followed.
 
 Errors read `error: <code>: <message>`: `bad_path`, `not_found`,
 `not_a_directory`, `not_a_file`, `permission_denied`, `exists`, `changed`,
-`too_large`, `not_text`, `bad_archive`.
+`too_large`, `not_text`, `bad_archive`, and for the trash `bad_id`,
+`no_trash`, `cross_device`.
 
 ## list
 `--path P` (default: the site directory). `--output json` answers
@@ -69,10 +70,55 @@ The answer counts `files`, `dirs` and `skipped`.
 directory; fails `exists` if `Q` exists, and a directory cannot move into
 itself.
 
+## copy
+`--path P --to Q --confirm yes` (1.57.0). Copies the file or directory `P`
+to `Q` inside the site directory, keeping modes and file times. Links are
+copied as links and never followed; sockets and devices are left out. Fails
+`exists` if `Q` exists; a directory cannot be copied into itself. The copy is
+written under a hidden name next to `Q` first, so a failed copy leaves
+nothing at `Q`. Without `--confirm yes` the plan already reports a missing
+`P`, an existing `Q` or a bad path.
+
 ## remove
-`--path P --confirm yes`. A file, a link (its target stays) or a directory
-with everything in it. The site directory itself cannot be removed. Take
-`backup data` first when in doubt: there is no trash.
+`--path P [--permanent yes] --confirm yes`. Since 1.57.0 a file, a link (its
+target stays) or a directory with everything in it is moved into the site's
+trash, not deleted; `--permanent yes` deletes it for good (the panel gateway
+never passes it). The site directory itself cannot be removed, nor the trash
+itself. The answer carries `trash_id`.
+
+## Trash (1.57.0)
+The trash is `<site directory>/.simai-trash/` (for example
+`/home/simai/www/example.com/.simai-trash/`), created on the first `remove`,
+owned by the site user with mode 700. It is outside the served `public/`
+directory (and nginx refuses every dot path anyway), outside `releases/`, so
+a release rollback never touches it, and it counts toward the site: its disk
+use, backups and `site remove --remove-files`. Each entry is
+`.simai-trash/<id>/` holding `item` (the removed file or directory, moved
+without copying) and `meta.json` (`path`, `type`, `size`, `deleted_at`). The
+id is the UTC deletion time plus six hex characters, e.g.
+`20261116T120000Z-1a2b3c`. A path on another filesystem (a mount inside the
+site) cannot be moved and is refused `cross_device`; remove it with
+`--permanent yes`.
+
+Retention: entries are kept 30 days. Every trash command (`remove`,
+`trash-list`, `trash-restore`, `trash-empty`) first deletes the entries older
+than that, so there is no cron job; a trash nobody touches keeps its old
+entries until the next trash command. The age comes from the id.
+
+### trash-list
+`--domain D`. `--output json` answers `simai-file-trash/1`: `dir,
+retention_days, entries [{id, path, name, type, size, deleted_at,
+expires_at}] (newest first), count, total_bytes`. Times are Unix seconds.
+
+### trash-restore
+`--domain D --id ID [--to P] --confirm yes`. Moves the entry back to where it
+was, or to `P`; missing parent directories are created. Fails `exists` if the
+target exists (the plan already says so), `not_found` for an unknown id,
+`bad_id` for a malformed one.
+
+### trash-empty
+`--domain D [--id ID] --confirm yes`. Deletes one entry, or the whole trash,
+for good.
 
 ```bash
 sudo /root/simai-env/simai-admin.sh file list --domain example.com --path public

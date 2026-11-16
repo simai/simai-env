@@ -95,6 +95,7 @@ MAJOR = re.compile(r"^[0-9]{2}$")
 FILE_PATH = re.compile(r"^(?!.*(?:^|/)\.\.(?:/|$))[^\x00-\x1f\x7f]{0,1024}$")
 CONTENT = re.compile(r"^[^\x00]*$")
 EXPECT = re.compile(r"^(?:[0-9a-f]{64}|new|any)$")
+TRASH_ID = re.compile(r"^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}$")  # a site trash entry (lib/site_files.py)
 CF_TOKEN = re.compile(r"^[A-Za-z0-9_-]{30,64}$")
 CHALLENGE = re.compile(r"^(http|dns)$")
 DNS_PROVIDER = re.compile(r"^cloudflare$")
@@ -192,6 +193,11 @@ ALLOW = {
     "laravel:finalize": ({"domain": DOMAIN, "migrate": YES_NO}, {"domain"}, "action"),
     # 1.56.0: where a site of any profile stands on its creation route.
     "site:status": ({"domain": DOMAIN}, {"domain"}, "read"),
+    # 1.57.0: one site's caches (its OPcache scripts, its nginx cache, its framework).
+    "site:cache-clear": ({"domain": DOMAIN}, {"domain"}, "action"),
+    # 1.57.0: pause a site (503 page, cron and workers stopped) and resume it.
+    "site:suspend": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "site:resume": ({"domain": DOMAIN}, {"domain"}, "action"),
     # 1.56.0: WordPress by one click. The generated admin password is in the
     # job result only: job:status hands it out once (ONCE_RESULT).
     "wp:status": ({"domain": DOMAIN}, {"domain"}, "read"),
@@ -207,6 +213,7 @@ ALLOW = {
     "site:redirect-add": ({"domain": DOMAIN, "from": URL_PATH, "to": REDIRECT_TO, "code": CODE},
                           {"domain", "from", "to"}, "action"),
     "site:redirect-remove": ({"domain": DOMAIN, "from": URL_PATH}, {"domain", "from"}, "action"),
+    "site:redirect-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:db-create": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-drop": ({"domain": DOMAIN}, {"domain"}, "action"),
     "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
@@ -217,6 +224,8 @@ ALLOW = {
     "owner:remove": ({"name": OWNER}, {"name"}, "action"),
     "owner:block": ({"name": OWNER}, {"name"}, "action"),
     "owner:unblock": ({"name": OWNER}, {"name"}, "action"),
+    # 1.57.0: hand a site to another owner (files, pool, cron, workers, SFTP view).
+    "site:transfer": ({"domain": DOMAIN, "owner": OWNER}, {"domain", "owner"}, "action"),
     # Stage 9: backups, PHP, metrics, databases.
     "backup:data-restore": ({"domain": DOMAIN, "backup": BACKUP, "db": YES_NO, "files": YES_NO},
                             {"domain", "backup"}, "action"),
@@ -243,7 +252,13 @@ ALLOW = {
                    {"domain", "path", "content"}, "action"),
     "file:mkdir": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
     "file:rename": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
+    # 1.57.0: file:remove moves into the site's trash (never --permanent here);
+    # the trash is emptied with file:trash-empty.
     "file:remove": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "action"),
+    "file:copy": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
+    "file:trash-list": ({"domain": DOMAIN}, {"domain"}, "read"),
+    "file:trash-restore": ({"domain": DOMAIN, "id": TRASH_ID, "to": FILE_PATH}, {"domain", "id"}, "action"),
+    "file:trash-empty": ({"domain": DOMAIN, "id": TRASH_ID}, {"domain"}, "action"),
     "file:upload": ({"domain": DOMAIN, "path": FILE_PATH, "expect-sha256": EXPECT}, {"domain", "path"}, "action"),
     "file:archive": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH}, {"domain", "path", "to"}, "action"),
     "file:extract": ({"domain": DOMAIN, "path": FILE_PATH, "to": FILE_PATH, "overwrite": YES_NO},
@@ -340,7 +355,8 @@ ALLOW = {
     "job:list": ({}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
-ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "self:metrics",
+ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "site:transfer",
+              "self:metrics",
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
               "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
@@ -375,7 +391,10 @@ URL_ARGS = {"url"}  # shown without the query string (a signature) instead of "(
 # Plans that check the server first (admin/lib/site_resources.sh): their
 # refusals are named before a plan or a job, with what the check found.
 RESOURCE_CHECKED = {"site:add", "bitrix:restore-ready"}
-PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_invalid"}
+PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_invalid",
+                 "owner_missing", "owner_blocked", "same_owner", "panel_site",  # these four: site:transfer
+                 "profile_unsupported"}  # site:cache-clear of an alias, redirect or proxy site
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -386,6 +405,8 @@ BY_CRON_ID = {"cron:job-remove", "cron:job-enable", "cron:job-disable", "cron:jo
 RENAMED = {"change_id": "id"}  # the request name and the command's option
 LIST_ARGS = {("panel:access", "allow")}  # may come as a JSON list; the command takes a comma list
 CRON_JOBS = Path(os.environ.get("SIMAI_CRON_JOBS_DIR", "/etc/simai-env/cron-jobs"))
+SITES_DIR = Path(os.environ.get("SIMAI_SITES_DIR", "/etc/simai-env/sites"))
+PANEL_STATE = Path(os.environ.get("SIMAI_PANEL_STATE", "/etc/simai-env/panel.env"))
 
 
 class Refused(Exception):
@@ -539,7 +560,7 @@ def plan_run(command, args, files=None):
 def plan_refusal(command, result):
     """A refusal that the plan check of a resource-checked command names
     (not_enough_disk, not_enough_ram, source_invalid, url_invalid)."""
-    if command not in RESOURCE_CHECKED or not isinstance(result, dict) or result.get("status") != "failed":
+    if command not in PLAN_CHECKED or not isinstance(result, dict) or result.get("status") != "failed":
         return
     data = result.get("data")
     if isinstance(data, dict) and data.get("refusal") in PLAN_REFUSALS:
@@ -571,6 +592,12 @@ def plan(command, args, attachment=None):
         answer["resources"] = result["data"].get("resources")
         if command == "bitrix:restore-ready":
             answer["archive"] = result["data"].get("archive")
+    if command == "site:transfer" and isinstance(result.get("data"), dict):
+        # From whom to which owner, and what moves (files, pool, cron, workers, SFTP).
+        answer["transfer"] = result["data"]
+    if command == "site:cache-clear" and isinstance(result.get("data"), dict):
+        # What would be cleared and what is skipped, with the reason.
+        answer["clear"] = result["data"].get("items")
     if command == "self:update":
         # Versions, release notes, what restarts and which sites are checked.
         answer["update"] = (run("self:update-plan", {"target": args["target"]}) or {}).get("data")
@@ -821,6 +848,30 @@ def check_site_name(command, args):
         raise Refused("name_limit")
 
 
+def env_value(path, key):
+    try:
+        lines = path.read_text().splitlines()
+    except OSError:
+        return None
+    values = [line.split("=", 1)[1].strip() for line in lines if line.startswith(key + "=")]
+    return values[-1] if values else None
+
+
+def check_suspend(command, args):
+    """site:suspend / site:resume: refusals the panel can name before a plan
+    or a job (the command checks again)."""
+    domain = args["domain"].lower()
+    paused = env_value(SITES_DIR / domain / "runtime.env", "SITE_RUNTIME_STATE") == "suspended"
+    if command == "site:resume":
+        if not paused:
+            raise Refused("not_suspended")
+        return
+    if paused:
+        raise Refused("already_suspended")
+    if env_value(PANEL_STATE, "PANEL_DOMAIN") == domain:
+        raise Refused("panel_site")
+
+
 def check_profile_enabled(args):
     """site:add of a profile switched off on this server (profile enable)."""
     profiles = ((run("self:profiles", {}) or {}).get("data") or {}).get("profiles") or []
@@ -1019,6 +1070,8 @@ def handle(raw, stream, started, reads_only=False):
             check_site_name(command, args)
         if command == "site:add":
             check_profile_enabled(args)
+        if command in ("site:suspend", "site:resume"):
+            check_suspend(command, args)
         check = check_fix(args) if command == "site:check-fix" else None
         kind = ALLOW[command][2]
         if kind == "download":
@@ -1036,7 +1089,7 @@ def handle(raw, stream, started, reads_only=False):
                         data["check"] = check  # title and one line: what the button does
                     answer.update(status="ok", kind="plan", data=data)
                 raise Done
-            if command in RESOURCE_CHECKED:
+            if command in PLAN_CHECKED:
                 plan_refusal(command, plan_run(command, args))  # the server can still take it
             job_id, started_ok = start_job(req, command, args, stream)
             entry["job_id"] = job_id

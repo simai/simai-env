@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.file-trash-empty",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "file:trash-empty",
+    "args": {
+      "domain": "demo-owned.test"
+    },
+    "target": "demo-owned.test",
+    "description": "Delete one trash entry (--id) or the whole trash of a site for good",
+    "effects": "delete",
+    "lock": "site",
+    "applied": false
+  }
+}

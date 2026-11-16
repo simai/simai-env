@@ -7,7 +7,7 @@ import fcntl
 from pathlib import Path
 
 
-PLAN_DATA = {"site:add", "bitrix:restore-ready"}
+PLAN_DATA = {"site:add", "bitrix:restore-ready", "site:transfer", "site:cache-clear"}
 
 
 def result(args):
@@ -29,7 +29,7 @@ def result(args):
         "verification": "not_run" if status == "planned" else "handler_exit_only",
     }
     # Only these audited handlers return structured, secret-free native data.
-    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "site:nginx-custom-show", "backup:storage-list", "backup:storage-copies", "security:status", "security:files", "security:quarantine-list", "security:geo-status", "security:geo-lookup", "mcp:status", "panel:address", "site:names", "site:check-state", "bitrix:status", "site:status", "bitrix:restore-ready", "wp:status", "wp:install"} or key == "site:doctor" and status in {"success", "failed"}) and output:
+    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "file:trash-list", "site:nginx-custom-show", "backup:storage-list", "backup:storage-copies", "security:status", "security:files", "security:quarantine-list", "security:geo-status", "security:geo-lookup", "mcp:status", "panel:address", "site:names", "site:redirect-list", "site:check-state", "bitrix:status", "site:status", "bitrix:restore-ready", "wp:status", "wp:install", "site:cache-clear"} or key == "site:doctor" and status in {"success", "failed"}) and output:
         try:
             value["data"] = json.loads(Path(output).read_text())
             if key == "site:doctor":
@@ -41,7 +41,8 @@ def result(args):
         except (ValueError, OSError):
             value.update(status="failed", error_code="invalid_json_output", exit_code=1)
     # Plans (and their refusals) of these commands carry what their plan
-    # check found: resources, the archive of a restore (admin/lib/site_resources.sh).
+    # check found: resources, the archive of a restore (admin/lib/site_resources.sh),
+    # what a cache clear would clear (admin/commands/site_cache.sh).
     if key in PLAN_DATA and status in {"planned", "failed"} and "data" not in value and output:
         try:
             data = json.loads(Path(output).read_text())

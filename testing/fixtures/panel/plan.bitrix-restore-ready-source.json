@@ -15,8 +15,8 @@
     "lock": "site",
     "applied": false,
     "resources": {
-      "disk_free_bytes": 1393676804096,
-      "needed_bytes": 483,
+      "disk_free_bytes": 1463651950592,
+      "needed_bytes": 486,
       "ram_mb": 14963,
       "ram_min_mb": 1536,
       "ram_recommended_mb": 4096,
@@ -32,11 +32,11 @@
       "volumes": [
         {
           "name": "demo_20260102_full_def.tar.gz",
-          "size": 161
+          "size": 162
         }
       ],
       "count": 1,
-      "total_bytes": 161,
+      "total_bytes": 162,
       "encrypted": false
     }
   }

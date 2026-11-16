@@ -56,7 +56,7 @@ cli owner remove --name acme --confirm yes >/dev/null 2>&1 && bad "removed owner
 cli site remove --domain a2.test --remove-files yes --confirm yes >/dev/null 2>&1
 id acme >/dev/null 2>&1 && ok "site remove keeps the owner" || bad "owner deleted with site"
 [[ ! -e /home/acme/sites/a2.test ]] && ok "owner link removed with site" || bad "stale link"
-cli owner list 2>/dev/null | grep -q 'acme.*a1-test' && ok "owner list shows projects" || bad "owner list"
+cli owner list 2>/dev/null | grep -q 'acme.*a1-test' && ok "owner list shows projects" || bad "owner list: $(cli owner list 2>&1 | tail -6)"
 cli site remove --domain b1.test --remove-files yes --confirm yes >/dev/null 2>&1
 cli owner remove --name beta --confirm yes >/dev/null 2>&1 && ! id beta >/dev/null 2>&1 && ok "empty owner removed" || bad "owner remove"
 echo "failures=$fails"; exit $fails

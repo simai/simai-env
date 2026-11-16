@@ -256,6 +256,34 @@ that used to write into the project as `simai` must now run as the site user
 (`sudo -u site-<slug> ...`) or as root followed by
 `chown -R site-<slug>:site-<slug> <project>`.
 
+## transfer
+Hand a site to another owner (see `owner create`). A site of an owner runs
+as the owner's account, so the transfer moves: the project files (become
+`<owner>:<owner>`, closed to others), the PHP-FPM pool, the scheduler cron
+file and the site's own cron jobs, queue and app workers, and the SSH/SFTP
+view: `/home/<owner>/sites/<domain>` appears and the previous owner's link
+goes; the previous owner can no longer read the files. Afterwards the site
+looks exactly like one created with `site add --owner <owner>`, and
+`site describe` / `self describe` show the new owner.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site transfer --domain example.com --owner acme
+sudo /root/simai-env/simai-admin.sh site transfer --domain example.com --owner acme --confirm yes
+```
+
+Without `--confirm yes` only the plan is printed: from whom to whom and
+every item that moves. With it, `backup data` (database and files) is taken
+first, then the move runs with `site isolate --owner` (any failure restores
+the previous owner, pool, cron and units). The site keeps serving: PHP-FPM
+reloads gracefully and the workers restart. The database, its user and
+password stay the same; the credentials in the site's `.env` move with the
+files. Site SFTP accounts (`access`) keep their access. The site may come
+from another owner, its own `site-<slug>` user (which is then removed) or
+the shared `simai` account.
+
+Refused: an unknown or blocked owner, the owner the site already belongs
+to, alias sites (transfer their target) and the panel's own site.
+
 ## frame-policy
 
 Change the embedding policy of an existing managed site. The setting is stored
@@ -445,30 +473,61 @@ Output includes:
 - cron file state
 - queue unit state
 
-## runtime-suspend
-Suspend a site runtime without deleting the site.
+## suspend
+Pause a site without deleting anything (1.57.0). `runtime-suspend` is the
+older name of the same command.
 
 Options:
 - `--domain` (required outside menu)
-- `--confirm` (`yes|no`, default `no`; required outside menu)
+- `--confirm` (`yes|no`; without `yes` only a plan is printed)
+
+```bash
+sudo /root/simai-env/simai-admin.sh site suspend --domain example.com --confirm yes
+```
 
 Behavior:
-- Disables the site PHP-FPM pool by moving it out of active `pool.d`.
-- Adds a managed nginx `503 Site is parked by simai-env` block while keeping ACME validation reachable.
-- Disables site cron/queue where the profile uses them.
-- Stores runtime state in `/etc/simai-env/sites/<domain>/runtime.env`.
+- nginx answers every request with `503` and a small HTML page ("site
+  temporarily unavailable", Russian and English), `Retry-After: 3600`,
+  `Cache-Control: no-store` and `X-Robots-Tag: noindex`. Requests to
+  `/.well-known/acme-challenge/` are still served, so certificates renew.
+- The page lives in `/etc/nginx/simai-suspend/<project>.conf`, included at
+  server level by every site template (configs rendered before 1.57.0 get
+  the include on the first pause). Commands that write the site's nginx
+  again (`set-php`, `ssl`, `name-add`, `nginx-custom`, `apache`) keep it.
+- Stops the scheduler file `/etc/cron.d/<slug>`, the site's cron jobs
+  (`/etc/cron.d/simai-jobs-<slug>`), every queue worker
+  (`laravel-queue-<project>*.service`) and app service
+  (`simai-app-<project>.service`) that was enabled or running, and the
+  site's own PHP-FPM pool (not a pool an alias shares with its target).
+  Files, databases and backups are untouched; scheduled backups go on.
+- What was stopped is recorded in `/etc/simai-env/sites/<domain>/runtime.env`
+  (`SITE_RUNTIME_STATE=suspended`, `SITE_RUNTIME_UNITS`, ...). Everything is
+  kept in files and in systemd's enabled state, so a pause survives a
+  reboot and `self migrate`.
+- While paused: `set-php` and `cron job-*` keep the new pool, cron file,
+  jobs and workers stopped (they start on resume); `site deploy` is refused
+  (resume first).
+- Refused (also in the plan): a site that is already paused, the panel's
+  own site.
+- `site status`, `site describe` and `self describe` answer
+  `suspended: true` (`describe` also `suspended_at`); server alerts do not
+  report a paused site as down.
 
-## runtime-resume
-Resume a previously suspended site runtime.
+## resume
+Resume a paused site (1.57.0). `runtime-resume` is the older name.
 
 Options:
 - `--domain` (required outside menu)
-- `--confirm` (`yes|no`, default `no`; required outside menu)
+- `--confirm` (`yes|no`; without `yes` only a plan is printed)
 
 Behavior:
-- Restores the disabled PHP-FPM pool.
-- Removes the managed nginx suspend block.
-- Re-enables cron/queue if they were disabled by `runtime-suspend`.
+- Starts exactly what `suspend` stopped: the PHP-FPM pool, the scheduler
+  file and cron jobs, and the workers that were enabled or running (a
+  worker that was disabled stays disabled); then removes the 503 page.
+- Refused (also in the plan) when the site is not paused.
+- A site paused by `runtime-suspend` before 1.57.0 (503 block inside the
+  config) resumes the same way; `self migrate` moves such a block to the
+  include so re-rendering commands keep it.
 
 ## fix
 Plan or apply profile-required PHP fixes (PHP extensions and PHP INI overrides). Defaults to plan-only (no changes).
@@ -524,6 +583,27 @@ fix and checks the rule again (without `--confirm` a plan, which is refused
 the same way). The fixes are the toolkit's own steps (`bitrix finalize`,
 `self migrate`), one at a time.
 
+## cache-clear
+One site's caches, and nothing of another site (1.57.0):
+
+```bash
+sudo /root/simai-env/simai-admin.sh site cache-clear --domain example.com              # plan
+sudo /root/simai-env/simai-admin.sh site cache-clear --domain example.com --confirm yes
+```
+
+| Item | What is cleared |
+| --- | --- |
+| `opcache` | The site's scripts in the OPcache, invalidated by a small script run inside the site's own PHP-FPM pool (one FastCGI request to its socket, as the pool user). OPcache memory is shared by every pool of a PHP version, so there is no `opcache_reset()` and no PHP-FPM reload. |
+| `nginx_cache` | The `fastcgi_cache` / `proxy_cache` zone the site's own nginx config (or its `site nginx-custom` file) uses: the contents of its `*_cache_path` directory. Skipped when the site uses no cache zone (`none`), when another site uses the same zone (`zone_shared`) or when the path is outside `/var/cache`, `/var/lib/nginx`, `/var/tmp`, `/tmp`, `/run`, `/dev/shm` (`path_not_allowed`). |
+| `framework` | laravel: `php artisan optimize:clear` in the current release; wordpress: `wp cache flush` and `wp transient delete --all` (needs WP-CLI and an installed WordPress); bitrix: the contents of `bitrix/cache`, `bitrix/managed_cache`, `bitrix/stack_cache`. Always as the site user. Other profiles: `none`. |
+
+The result is a table, or `simai-site-cache/1` with `--output json`:
+`domain`, `profile`, `applied`, `items` `[{name, state, target, detail,
+reason}]` (`state` `planned` in a plan, `cleared|skipped|failed` after).
+A failed item makes the command fail; skipped items do not. Alias, redirect
+and proxy sites are refused (`profile_unsupported`): they have no caches of
+their own.
+
 ## status
 Where a site stands on its creation route (1.56.0), one answer for every
 profile, so the panel draws one step tracker:
@@ -532,7 +612,8 @@ profile, so the panel draws one step tracker:
 sudo /root/simai-env/simai-admin.sh site status --domain example.com --output json
 ```
 
-`simai-site-status/1`: `domain`, `profile`, `route`
+`simai-site-status/1`: `domain`, `profile`, `suspended` (1.57.0, `site
+suspend`), `route`
 (`new|restore|repo|installed|none`), `step` (a step id of the route in `self
 profiles`, or `done`), `next` (the gateway command of that step, `open_url`
 or null), `restore_url` / `installer_url` (for an `open_url` step),

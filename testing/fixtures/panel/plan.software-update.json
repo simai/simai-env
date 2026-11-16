@@ -14,56 +14,26 @@
     "lock": "host",
     "applied": false,
     "update": {
-      "updates": 7,
-      "security": 7,
+      "updates": 2,
+      "security": 2,
       "packages": [
         {
-          "name": "libperl5.38t64",
-          "from": "5.38.2-3.2ubuntu0.6",
-          "to": "5.38.2-3.2ubuntu0.7",
+          "name": "libc6",
+          "from": "2.39-0ubuntu8.9",
+          "to": "2.39-0ubuntu8.12",
           "security": true
         },
         {
-          "name": "perl",
-          "from": "5.38.2-3.2ubuntu0.6",
-          "to": "5.38.2-3.2ubuntu0.7",
-          "security": true
-        },
-        {
-          "name": "perl-base",
-          "from": "5.38.2-3.2ubuntu0.6",
-          "to": "5.38.2-3.2ubuntu0.7",
-          "security": true
-        },
-        {
-          "name": "perl-modules-5.38",
-          "from": "5.38.2-3.2ubuntu0.6",
-          "to": "5.38.2-3.2ubuntu0.7",
-          "security": true
-        },
-        {
-          "name": "libapt-pkg6.0t64",
-          "from": "2.8.3",
-          "to": "2.8.4ubuntu0.1",
-          "security": true
-        },
-        {
-          "name": "apt",
-          "from": "2.8.3",
-          "to": "2.8.4ubuntu0.1",
-          "security": true
-        },
-        {
-          "name": "libpcre2-8-0",
-          "from": "10.42-4ubuntu2.1",
-          "to": "10.42-4ubuntu2.2",
+          "name": "libc-bin",
+          "from": "2.39-0ubuntu8.9",
+          "to": "2.39-0ubuntu8.12",
           "security": true
         }
       ],
       "kept_back": [],
       "reboot_required": false,
       "reboot_packages": [],
-      "index_age_seconds": 23551
+      "index_age_seconds": 5552
     }
   }
 }

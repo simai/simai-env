@@ -7,6 +7,7 @@
     "schema": "simai-site-status/1",
     "domain": "demo-static.test",
     "profile": "static",
+    "suspended": false,
     "route": "repo",
     "step": "done",
     "next": null,
@@ -14,7 +15,7 @@
     "installer_url": null,
     "pending": [],
     "detail": {
-      "release": "20261110173259"
+      "release": "20261116130651"
     }
   },
   "command_status": "success",

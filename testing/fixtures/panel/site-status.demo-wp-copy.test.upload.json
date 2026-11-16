@@ -7,6 +7,7 @@
     "schema": "simai-site-status/1",
     "domain": "demo-wp-copy.test",
     "profile": "wordpress",
+    "suspended": false,
     "route": "restore",
     "step": "upload",
     "next": "file:upload",

@@ -693,6 +693,10 @@ action, job). Everything else is refused.
   (`new`, `restore`, `repo` with inputs and steps). Fixture set 32 adds
   `site-status.<site>` for the demo sites and
   `site-status.demo-bitrix.test.<step>` along the Bitrix restore.
+- 1.57.0: `site:redirect-list {domain}` (read, owner-scoped,
+  `simai-site-redirects/1`): `redirects` `[{from, to, code}]` and
+  `whole_domain` `{to, code, path}` or null. Fixtures
+  `site-redirects.<site>`, `refused.owner-scope.site-redirects`.
 - 1.56.2: the Laravel `repo` route lists `laravel:finalize` as its step
   after `site:deploy`. Memory needs are answered in the `resources` block of
   `site:add` plans, not in `self:profiles`; `available` is per route. Fixture
@@ -700,6 +704,15 @@ action, job). Everything else is refused.
   `site-status.demo-wp-copy.test.<step>`,
   `site-status.demo-laravel.test.{deploy,configure}` and
   `plan.laravel-finalize`.
+- 1.57.0: `site:suspend {domain}` and `site:resume {domain}` (actions with
+  plans; owners on their own sites). A paused site answers `503` with
+  `Retry-After` (the ACME challenge still works), its cron, cron jobs,
+  workers and PHP-FPM pool are stopped; resume starts exactly what was
+  stopped. `site:describe`, `self:describe` (per site) and `site:status`
+  answer `suspended` (`describe` also `suspended_at`). Before a plan or a
+  job the gateway refuses `already_suspended`, `not_suspended` and
+  `panel_site` (the panel's own site). Stand fixtures `plan.site-suspend`
+  and `refused.not-suspended`.
 
 - 1.56.0: `bitrix:restore-ready {domain, archive, source, url}`: `source`
   is a path relative to the site directory (letters, digits, `._/-`, no
@@ -747,8 +760,49 @@ action, job). Everything else is refused.
   password?") or with `wp user update`. Chosen over an `admin-password`
   argument so that no password is typed, sent to the gateway or kept in a
   job record at all.
+- 1.57.0: `site:cache-clear {domain}` (action, any owner for their own
+  sites): one site's caches and nothing of another site. The plan carries
+  `clear`, a list of `{name, state, target, detail, reason}` with `name`
+  `opcache` (this site's scripts, invalidated from inside its own PHP-FPM
+  pool; never `opcache_reset()` or a reload, which would empty every pool
+  of that PHP version), `nginx_cache` (the fastcgi/proxy cache zone the
+  site's own config uses) and `framework` (Laravel `optimize:clear`,
+  WordPress object cache and transients through WP-CLI, Bitrix
+  `bitrix/cache`, `managed_cache`, `stack_cache`; as the site user), and
+  `state` `planned` or `skipped` with `reason` (`none`: nothing of that
+  kind is configured; `no_php`, `pool_socket_missing`, `zone_shared`,
+  `zone_path_unknown`, `path_not_allowed`, `artisan_missing`,
+  `wp_cli_missing`, `wordpress_not_installed`, `bitrix_missing`). The
+  finished job's `result` is `simai-site-cache/1` `{domain, profile,
+  applied, items}` with `state` `cleared|skipped|failed` and `detail`
+  (counts). Alias, redirect and proxy sites are refused
+  `profile_unsupported` before a plan and before a job, with `data.detail`.
+- 1.57.0: the site trash and copy. `file:remove {domain, path}` now moves
+  the path into the site's trash (`<site directory>/.simai-trash/`, the
+  site user's, never served, kept across release rollbacks) instead of
+  deleting it; the gateway never deletes for good (`permanent` is refused
+  `invalid_argument`). `file:trash-list {domain}` (read,
+  `simai-file-trash/1`: `dir, retention_days, entries [{id, path, name, type,
+  size, deleted_at, expires_at}], count, total_bytes`),
+  `file:trash-restore {domain, id, to}` (back where it was, or at `to`;
+  missing parents are created), `file:trash-empty {domain, id}` (one entry,
+  or all without `id`) and `file:copy {domain, path, to}` (links copied as
+  links, never followed) are actions answered with plans. `id` is
+  `YYYYMMDDTHHMMSSZ-` plus six hex characters, otherwise `invalid_argument`.
+  The plans of `file:copy` and `file:trash-restore` fail (`plan_failed`)
+  when the source or entry is missing or the target exists. Entries older
+  than 30 days are deleted by the next trash command of that site
+  (`docs/commands/file.md`).
+- 1.57.0: `site:transfer {domain, owner}` (action, administrator only like
+  `owner:*`): the site moves to another owner (files, PHP-FPM pool, cron,
+  workers, the owner's `~/sites` link; a `backup data` is taken first). The
+  plan carries `transfer` `{schema: simai-site-transfer-plan/1, domain,
+  from, from_owner, to_owner, backup, moves: [line]}`. Before a plan and
+  again before a job the gateway refuses `owner_missing`, `owner_blocked`,
+  `same_owner` (the site already belongs to that owner) and `panel_site`
+  (the panel's own site).
 
-Owner requests: `owner:*` is refused (`not_allowed`), and every request of a
+Owner requests: `owner:*` and `site:transfer` are refused (`not_allowed`), and every request of a
 blocked owner is refused (`owner_blocked`); `site:add` always
 creates the site for the requesting owner (another `owner` is refused
 `owner_scope`); every other domain must belong to the owner.

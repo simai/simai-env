@@ -106,7 +106,7 @@ owner_create_handler() {
     "Password login|disabled"
   ui_next_steps
   ui_kv "Add a site" "simai-admin.sh site add --domain <domain> --owner ${name}"
-  ui_kv "Move a site" "simai-admin.sh site isolate --domain <domain> --owner ${name} --confirm yes"
+  ui_kv "Move a site" "simai-admin.sh site transfer --domain <domain> --owner ${name}"
 }
 
 owner_add_key_handler() {

@@ -15,7 +15,14 @@ Usage: site_files.py OP ROOT PATH [ARG]
   put PATH EXPECT      any bytes from stdin (an upload, up to 1 GiB), the same EXPECT
   mkdir PATH
   rename PATH NEWPATH
-  remove PATH          a file, a link, or a directory with everything in it
+  remove PATH          a file, a link, or a directory with everything in it (for good)
+  trash PATH           move it into the site's trash instead (.simai-trash/<id>/)
+  trash-list           the trash entries (simai-file-trash/1)
+  trash-restore ID TO  put an entry back at TO ("" = where it was); TO must not exist
+  trash-empty [ID]     delete one entry or the whole trash for good
+                       (every trash operation first drops entries older than 30 days)
+  copy PATH DEST       copy a file or directory to DEST (new); links are copied as links
+  copy-check, trash-restore-check  the same refusals without changing anything (plans)
   archive PATH DEST    pack a file or directory into DEST (.tar.gz, .tgz or .zip, new);
                        links are stored as links, never followed
   extract PATH DEST OVERWRITE  unpack a .tar.gz/.tgz/.tar/.zip into the directory
@@ -28,8 +35,11 @@ Usage: site_files.py OP ROOT PATH [ARG]
                        "moved"); a name that already exists in DEST is refused
 Errors go to stderr as "error: <code>: <message>", exit code 2.
 """
+import calendar
 import hashlib
+import io
 import json
+import secrets
 import os
 import re
 import stat
@@ -551,6 +561,313 @@ def op_extract(root_fd, names, dest, overwrite):
             "skipped": skipped}
 
 
+# The trash: <root>/.simai-trash/<id>/{item, meta.json}. It sits in the site
+# directory, outside the served public/ directory (nginx refuses dot paths
+# anyway) and outside releases/, so a rollback never touches it; it belongs to
+# the site user and counts toward the site. The id carries the deletion time
+# (UTC), which is what retention goes by.
+TRASH_DIR = ".simai-trash"
+TRASH_DAYS = 30
+TRASH_ID = re.compile(r"^([0-9]{8}T[0-9]{6}Z)-[0-9a-f]{6}$")
+
+
+def trash_id_time(tid):
+    m = TRASH_ID.match(tid)
+    if not m:
+        return None
+    try:
+        return calendar.timegm(time.strptime(m.group(1), "%Y%m%dT%H%M%SZ"))
+    except (ValueError, OverflowError):
+        return None
+
+
+def open_trash(root_fd, create):
+    """A descriptor of the trash directory (None when there is none yet)."""
+    try:
+        if create:
+            try:
+                os.mkdir(TRASH_DIR, 0o700, dir_fd=root_fd)
+            except FileExistsError:
+                pass
+        return os.open(TRASH_DIR, DIR_FLAGS, dir_fd=root_fd)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        raise Fail("no_trash", f"the trash ({TRASH_DIR}) cannot be opened: {e.strerror}; "
+                               "remove for good with --permanent yes")
+
+
+def remove_any(parent, name):
+    st = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    if stat.S_ISDIR(st.st_mode):
+        remove_tree(parent, name)
+    else:
+        os.unlink(name, dir_fd=parent)
+
+
+def tree_size(parent, name):
+    st = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    if not stat.S_ISDIR(st.st_mode):
+        return st.st_size
+    total = 0
+    fd = os.open(name, DIR_FLAGS, dir_fd=parent)
+    try:
+        for _, sub, _, _ in walk_tree(fd, ""):
+            if not stat.S_ISDIR(sub.st_mode):
+                total += sub.st_size
+    finally:
+        os.close(fd)
+    return total
+
+
+def trash_prune(trash_fd):
+    """Drop entries older than TRASH_DAYS and old leftovers without an item."""
+    now = time.time()
+    for name in os.listdir(trash_fd):
+        when = trash_id_time(name)
+        if when is None:
+            continue  # not ours: left alone
+        try:
+            if when < now - TRASH_DAYS * 86400:
+                remove_any(trash_fd, name)
+                continue
+            try:
+                os.stat(f"{name}/item", dir_fd=trash_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                if when < now - 3600:  # an entry being written has no item yet
+                    remove_any(trash_fd, name)
+        except OSError:
+            continue
+
+
+def trash_meta(trash_fd, tid):
+    try:
+        fd = os.open(f"{tid}/meta.json", os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=trash_fd)
+        with os.fdopen(fd, "rb") as f:
+            meta = json.loads(f.read(65536).decode("utf-8"))
+        return meta if isinstance(meta, dict) else {}
+    except (OSError, ValueError, UnicodeDecodeError):
+        return {}
+
+
+def trash_entry(trash_fd, tid):
+    meta, when = trash_meta(trash_fd, tid), trash_id_time(tid)
+    st = os.stat(f"{tid}/item", dir_fd=trash_fd, follow_symlinks=False)
+    path = meta.get("path") if isinstance(meta.get("path"), str) else None
+    size = meta.get("size") if isinstance(meta.get("size"), int) else st.st_size
+    return {"id": tid, "path": path, "name": path.rsplit("/", 1)[-1] if path else None, "type": kind(st.st_mode),
+            "size": size, "deleted_at": when, "expires_at": when + TRASH_DAYS * 86400}
+
+
+def op_trash(root_fd, names):
+    if not names:
+        raise Fail("bad_path", "the site directory itself cannot be removed")
+    if names[0] == TRASH_DIR:
+        raise Fail("bad_path", "this is already in the trash; use trash-empty")
+    parent = walk(root_fd, names)
+    try:
+        st = lstat(parent, names[-1])
+        trash_fd = open_trash(root_fd, True)
+        try:
+            trash_prune(trash_fd)
+            tid = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + secrets.token_hex(3)
+            os.mkdir(tid, 0o700, dir_fd=trash_fd)
+            entry_fd = os.open(tid, DIR_FLAGS, dir_fd=trash_fd)
+            try:
+                try:
+                    os.rename(names[-1], "item", src_dir_fd=parent, dst_dir_fd=entry_fd)
+                except OSError as e:
+                    os.rmdir(tid, dir_fd=trash_fd)
+                    if e.errno == 18:  # EXDEV: a mount point inside the site
+                        raise Fail("cross_device", f"{names[-1]} is on another filesystem; "
+                                                   "remove it for good with --permanent yes")
+                    raise
+                size = tree_size(entry_fd, "item")
+                meta = {"path": "/".join(names), "type": kind(st.st_mode), "size": size,
+                        "deleted_at": trash_id_time(tid)}
+                save(entry_fd, "meta.json", 0o600, io.BytesIO(json.dumps(meta).encode()), 65536)
+            finally:
+                os.close(entry_fd)
+        finally:
+            os.close(trash_fd)
+    finally:
+        os.close(parent)
+    return {"schema": "simai-file-stat/1", "path": "/".join(names), "removed": kind(st.st_mode), "trash_id": tid,
+            "size": size}
+
+
+def op_trash_list(root_fd):
+    trash_fd = open_trash(root_fd, False)
+    rows = []
+    if trash_fd is not None:
+        try:
+            trash_prune(trash_fd)
+            for tid in sorted(os.listdir(trash_fd), reverse=True):
+                if trash_id_time(tid) is None:
+                    continue
+                try:
+                    rows.append(trash_entry(trash_fd, tid))
+                except OSError:
+                    continue
+        finally:
+            os.close(trash_fd)
+    return {"schema": "simai-file-trash/1", "dir": TRASH_DIR, "retention_days": TRASH_DAYS, "entries": rows,
+            "count": len(rows), "total_bytes": sum(r["size"] for r in rows)}
+
+
+def trash_open_entry(root_fd, tid):
+    """A descriptor of the trash when entry tid exists (after pruning)."""
+    if trash_id_time(tid) is None:
+        raise Fail("bad_id", "a trash id looks like 20261116T120000Z-1a2b3c")
+    trash_fd = open_trash(root_fd, False)
+    if trash_fd is None:
+        raise Fail("not_found", f"no trash entry {tid}")
+    try:
+        trash_prune(trash_fd)
+        os.stat(f"{tid}/item", dir_fd=trash_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        os.close(trash_fd)
+        raise Fail("not_found", f"no trash entry {tid}")
+    except BaseException:
+        os.close(trash_fd)
+        raise
+    return trash_fd
+
+
+def op_trash_restore(root_fd, tid, to, check=False):
+    trash_fd = trash_open_entry(root_fd, tid)
+    try:
+        path = trash_meta(trash_fd, tid).get("path")
+        target = parts(to) if to else parts(path) if isinstance(path, str) else []
+        if not target:
+            raise Fail("bad_path", "the original path is unknown; name one with --to")
+        if target[0] == TRASH_DIR:
+            raise Fail("bad_path", "cannot restore into the trash")
+        if check:
+            # Missing parent directories are fine: the restore creates them.
+            try:
+                parent = walk(root_fd, target)
+            except Fail as f:
+                if f.args[0] != "not_found":
+                    raise
+                parent = None
+        else:
+            parent = ensure_dirs(root_fd, target[:-1])
+        if parent is not None:
+            try:
+                try:
+                    os.stat(target[-1], dir_fd=parent, follow_symlinks=False)
+                    raise Fail("exists", f"{'/'.join(target)} already exists")
+                except FileNotFoundError:
+                    pass
+                if not check:
+                    entry_fd = os.open(tid, DIR_FLAGS, dir_fd=trash_fd)
+                    try:
+                        os.rename("item", target[-1], src_dir_fd=entry_fd, dst_dir_fd=parent)
+                    finally:
+                        os.close(entry_fd)
+                    remove_any(trash_fd, tid)
+            finally:
+                os.close(parent)
+    finally:
+        os.close(trash_fd)
+    answer = {"schema": "simai-file-stat/1", "path": "/".join(target), "trash_id": tid}
+    if not check:
+        answer["restored"] = True
+    return answer
+
+
+def op_trash_empty(root_fd, tid):
+    removed = []
+    if tid:
+        trash_fd = trash_open_entry(root_fd, tid)
+        try:
+            remove_any(trash_fd, tid)
+            removed.append(tid)
+        finally:
+            os.close(trash_fd)
+    else:
+        trash_fd = open_trash(root_fd, False)
+        if trash_fd is not None:
+            try:
+                for name in os.listdir(trash_fd):
+                    if trash_id_time(name) is not None:
+                        remove_any(trash_fd, name)
+                        removed.append(name)
+            finally:
+                os.close(trash_fd)
+    return {"schema": "simai-file-trash/1", "dir": TRASH_DIR, "removed": sorted(removed), "count": len(removed)}
+
+
+def copy_into(src_parent, name, dst_parent, dst_name):
+    """Copy name (a file, a link or a directory tree) to dst_name; nothing is followed."""
+    st = os.stat(name, dir_fd=src_parent, follow_symlinks=False)
+    mode = stat.S_IMODE(st.st_mode)
+    if stat.S_ISLNK(st.st_mode):
+        os.symlink(os.readlink(name, dir_fd=src_parent), dst_name, dir_fd=dst_parent)
+        return 1
+    if stat.S_ISREG(st.st_mode):
+        with open_member(src_parent, name) as f:
+            fd = os.open(dst_name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600,
+                         dir_fd=dst_parent)
+            with os.fdopen(fd, "wb") as out:
+                for chunk in iter(lambda: f.read(1 << 20), b""):
+                    out.write(chunk)
+                os.fchmod(out.fileno(), mode)
+        os.utime(dst_name, ns=(st.st_atime_ns, st.st_mtime_ns), dir_fd=dst_parent, follow_symlinks=False)
+        return 1
+    if not stat.S_ISDIR(st.st_mode):
+        return 0  # sockets, devices, pipes are not copied
+    os.mkdir(dst_name, 0o700, dir_fd=dst_parent)
+    sfd = os.open(name, DIR_FLAGS, dir_fd=src_parent)
+    dfd = os.open(dst_name, DIR_FLAGS, dir_fd=dst_parent)
+    count = 1
+    try:
+        with os.scandir(sfd) as it:
+            children = sorted(de.name for de in it)
+        for child in children:
+            count += copy_into(sfd, child, dfd, child)
+        os.fchmod(dfd, mode)
+    finally:
+        os.close(sfd)
+        os.close(dfd)
+    return count
+
+
+def op_copy(root_fd, names, dest, check=False):
+    if not names or not dest:
+        raise Fail("bad_path", "name what to copy and where")
+    if dest[:len(names)] == names:
+        raise Fail("bad_path", "a directory cannot be copied into itself")
+    src, dst = walk(root_fd, names), walk(root_fd, dest)
+    try:
+        st = lstat(src, names[-1])
+        try:
+            os.stat(dest[-1], dir_fd=dst, follow_symlinks=False)
+            raise Fail("exists", f"{dest[-1]} already exists")
+        except FileNotFoundError:
+            pass
+        answer = {"schema": "simai-file-stat/1", "path": "/".join(dest), "from": "/".join(names),
+                  "type": kind(st.st_mode)}
+        if check:
+            return answer
+        # Into a hidden name first, so a failed copy never leaves a half tree at DEST.
+        tmp = f".{dest[-1][:200]}.simai-{os.getpid()}"
+        try:
+            answer["copied"] = copy_into(src, names[-1], dst, tmp)
+            os.rename(tmp, dest[-1], src_dir_fd=dst, dst_dir_fd=dst)
+        except BaseException:
+            try:
+                remove_any(dst, tmp)
+            except OSError:
+                pass
+            raise
+    finally:
+        os.close(src)
+        os.close(dst)
+    return answer
+
+
 # A backup archive: base volume and its parts <base>.1 .. <base>.N (Bitrix
 # multi-volume backups). Distribution archives (*_encode.tar.gz) are not backups.
 ARCHIVE_BASE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,200}\.(?:tar\.gz|tgz|tar|enc\.gz)$")
@@ -710,6 +1027,16 @@ def main(argv):
         result = op_rename(root_fd, names, parts(argv[3]))
     elif op == "gather":
         result = op_gather(root_fd, names, parts(argv[3]))
+    elif op in ("copy", "copy-check"):
+        result = op_copy(root_fd, names, parts(argv[3]), op == "copy-check")
+    elif op == "trash":
+        result = op_trash(root_fd, names)
+    elif op == "trash-list":
+        result = op_trash_list(root_fd)
+    elif op in ("trash-restore", "trash-restore-check"):
+        result = op_trash_restore(root_fd, argv[3], argv[4], op == "trash-restore-check")
+    elif op == "trash-empty":
+        result = op_trash_empty(root_fd, argv[3])
     else:
         result = {"list": op_list, "stat": op_stat, "read": op_read, "mkdir": op_mkdir,
                   "remove": op_remove, "volumes": op_volumes}[op](root_fd, names)

@@ -7,6 +7,7 @@
     "schema": "simai-site-status/1",
     "domain": "demo-laravel.test",
     "profile": "laravel",
+    "suspended": false,
     "route": "none",
     "step": "deploy",
     "next": "site:deploy",

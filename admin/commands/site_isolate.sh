@@ -75,10 +75,12 @@ site_isolate_handler() {
   for pool in /etc/php/*/fpm/pool.d/"${socket_project}".conf; do
     [[ -f "$pool" ]] && pools+=("$pool")
   done
-  local cron_file queue_unit=""
+  local cron_file queue_unit="" worker_unit
   cron_file=$(cron_site_file_path "$slug")
-  queue_unit=$(queue_unit_path "$project" 2>/dev/null || true)
-  [[ -f "$queue_unit" ]] || queue_unit=""
+  # Every worker unit of the project: the queue unit and app manifest workers.
+  local -a worker_units=()
+  mapfile -t worker_units < <(app_project_worker_units "$project")
+  (( ${#worker_units[@]} )) && queue_unit="/etc/systemd/system/${worker_units[0]}"
 
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
@@ -86,7 +88,7 @@ site_isolate_handler() {
     echo "  - chown -R ${user}:${user} ${root}; chmod o-rwx ${root}"
     for pool in "${pools[@]}"; do echo "  - PHP-FPM pool ${pool}: user/group ${user}"; done
     [[ -f "$cron_file" ]] && echo "  - cron ${cron_file}: run as ${user}"
-    [[ -n "$queue_unit" ]] && echo "  - queue unit ${queue_unit}: User/Group ${user}"
+    for worker_unit in "${worker_units[@]}"; do echo "  - worker unit /etc/systemd/system/${worker_unit}: User/Group ${user}"; done
     echo "PHP-FPM is reloaded; running requests finish on the old workers."
     echo "Rerun with --confirm yes to apply."
     return 0
@@ -99,7 +101,7 @@ site_isolate_handler() {
   local i=0
   for pool in "${pools[@]}"; do cp -p "$pool" "${backup_dir}/pool.${i}"; i=$((i + 1)); done
   [[ -f "$cron_file" ]] && cp -p "$cron_file" "${backup_dir}/cron"
-  [[ -n "$queue_unit" ]] && cp -p "$queue_unit" "${backup_dir}/queue"
+  for worker_unit in "${worker_units[@]}"; do cp -p "/etc/systemd/system/${worker_unit}" "${backup_dir}/unit.${worker_unit}"; done
 
   local failed="" created_user=0
   if [[ -n "$owner" ]]; then
@@ -130,8 +132,7 @@ site_isolate_handler() {
     site_isolate_rewrite_cron "$cron_file" "$from" "$user" || failed="cron file"
   fi
   if [[ -z "$failed" && -n "$queue_unit" ]]; then
-    local worker_unit
-    for worker_unit in $(app_project_worker_units "$project"); do
+    for worker_unit in "${worker_units[@]}"; do
       sed -i -E -e "s/^User=.*/User=${user}/" -e "s/^Group=.*/Group=${user}/" "/etc/systemd/system/${worker_unit}" || failed="queue unit"
     done
   fi
@@ -141,7 +142,7 @@ site_isolate_handler() {
     i=0
     for pool in "${pools[@]}"; do cp -p "${backup_dir}/pool.${i}" "$pool"; i=$((i + 1)); done
     [[ -f "${backup_dir}/cron" ]] && cp -p "${backup_dir}/cron" "$cron_file"
-    [[ -f "${backup_dir}/queue" ]] && cp -p "${backup_dir}/queue" "$queue_unit"
+    for worker_unit in "${worker_units[@]}"; do cp -p "${backup_dir}/unit.${worker_unit}" "/etc/systemd/system/${worker_unit}"; done
     chown -R "${from}:${from_group}" "$root" 2>/dev/null || true
     chmod "$root_mode" "$root" 2>/dev/null || true
     site_isolate_acl_switch "$root" "$user" "$from" >/dev/null 2>&1 || true
@@ -176,14 +177,14 @@ site_isolate_handler() {
   fi
   if [[ -n "$queue_unit" ]]; then
     os_svc_daemon_reload || true
-    local worker_unit
-    for worker_unit in $(app_project_worker_units "$project"); do
+    for worker_unit in "${worker_units[@]}"; do
       os_svc_is_active "$worker_unit" && { os_svc_restart "$worker_unit" || warn "Restart ${worker_unit} manually"; }
     done
   fi
   # Only now: PHP-FPM workers and a Restart=always queue worker may still run
   # as the previous per-site user until the reloads above take effect.
-  if [[ "$from" != "$base" ]]; then
+  # An owner keeps running its other sites; only a per-site account goes.
+  if [[ "$from" != "$base" ]] && ! site_is_owner "$from"; then
     local waited=0
     while pgrep -u "$from" >/dev/null 2>&1 && (( waited < 20 )); do sleep 1; waited=$((waited + 1)); done
     site_user_remove_account "$from"

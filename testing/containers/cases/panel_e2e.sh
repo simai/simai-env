@@ -175,6 +175,7 @@ a=$(gate_with "$(req null self:describe '{}')" /root/rel.tgz)
 
 job_ok null "$(creq null site:redirect-add '{"domain":"new.test","from":"/old","to":"/","code":"301"}')" && ok "redirect-add job" || bad "redirect-add job"
 [[ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: new.test' http://127.0.0.1/old)" == 301 ]] && ok "redirect answers 301" || bad "redirect"
+[[ "$(gate "$(req null site:redirect-list '{"domain":"new.test"}')" | field 'd["data"]["redirects"]')" == "[{'from': '/old', 'to': '/', 'code': 301}]" ]] && ok "redirect-list reads the redirects" || bad "redirect-list: $(gate "$(req null site:redirect-list '{"domain":"new.test"}')" | head -c 300)"
 refused invalid_argument "$(req null site:redirect-add '{"domain":"new.test","from":"/x;return 200","to":"/"}')" "unsafe redirect path"
 
 # Owners through the panel.

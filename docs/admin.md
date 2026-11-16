@@ -89,8 +89,8 @@ See `docs/architecture/profiles.md`.
 - `site add --domain <domain> --host-mode wildcard`: create one site that serves both the main domain and all first-level subdomains (`*.domain`) on the same nginx vhost.
 - `ssl letsencrypt --domain <domain> --wildcard yes --dns-provider cloudflare --dns-credentials <file>`: request one Let's Encrypt cert for both the main domain and all first-level subdomains of a wildcard-host site.
 - In the menu, these are intentionally phrased in simpler language such as `Activity & optimization`, `Automatic optimization for this site`, `Site availability`, `Pause site`, `Resume site`, `Optimization plan`, `Database server status`, and `Configuration check`.
-- `site runtime-suspend --domain <domain> --confirm yes`: suspend a site runtime by disabling its PHP-FPM pool, parking nginx behind a managed `503`, and disabling cron/queue where applicable.
-- `site runtime-resume --domain <domain> --confirm yes`: restore a previously suspended site runtime.
+- `site suspend --domain <domain> --confirm yes` (older name `site runtime-suspend`): pause a site: nginx answers a `503` page with `Retry-After` (ACME validation still reachable), its cron, cron jobs, workers and PHP-FPM pool stop; data is untouched.
+- `site resume --domain <domain> --confirm yes` (older name `site runtime-resume`): start exactly what `site suspend` stopped and remove the `503` page.
 - `laravel status --domain <domain>`: show Laravel lifecycle state (`placeholder`, `app-ready`, `post-install`) and the next practical action.
 - `laravel app-ready --domain <domain>`: bootstrap a real Laravel application via Composer and prepare `.env` from SIMAI DB credentials.
 - `laravel finalize --domain <domain> --confirm yes [--migrate yes] [--ssl yes --email <email>]`: complete Laravel post-bootstrap baseline (APP_KEY, storage link, scheduler, baseline optimization, optional migrations and Let's Encrypt).

@@ -1,0 +1,17 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-suspend",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:suspend",
+    "args": {
+      "domain": "demo-php.test"
+    },
+    "target": "demo-php.test",
+    "description": "Pause a site: 503 page with Retry-After, cron and workers stopped, data untouched",
+    "effects": "write",
+    "lock": "site",
+    "applied": false
+  }
+}

@@ -30,7 +30,7 @@ SSH_PORT="${SIMAI_STAND_SSH:-12222}"
 FIXTURES="${ROOT_DIR}/testing/fixtures/panel"
 KEY_DIR="${HOME}/.simai-stand"
 # Bump when the shape of a recorded answer changes (docs/architecture/panel-gate.md).
-FIXTURE_SET=33
+FIXTURE_SET=34
 
 in_stand() { docker exec "$NAME" "$@"; }
 running() { [[ "$(docker container inspect -f '{{.State.Running}}' "$NAME" 2>/dev/null)" == true ]]; }
@@ -148,8 +148,13 @@ FW
     "plan.site-deploy-git|null|site:deploy|{\"domain\":\"demo-static.test\",\"git\":\"https://github.com/example/site\",\"ref\":\"v1.0.0\"}"
     "refused.owner-admin-only|\"demo\"|owner:create|{\"name\":\"other\"}"
     "plan.site-set-php|null|site:set-php|{\"domain\":\"demo-php.test\",\"php\":\"${PHP}\"}"
+    "plan.site-suspend|null|site:suspend|{\"domain\":\"demo-php.test\"}"
+    "refused.not-suspended|null|site:resume|{\"domain\":\"demo-php.test\"}"
     "plan.owner-create|null|owner:create|{\"name\":\"staff\"}"
     "plan.owner-block|null|owner:block|{\"name\":\"demo\"}"
+    "plan.site-transfer|null|site:transfer|{\"domain\":\"demo-php.test\",\"owner\":\"demo\"}"
+    "refused.site-transfer.same-owner|null|site:transfer|{\"domain\":\"demo-owned.test\",\"owner\":\"demo\"}"
+    "refused.owner-admin-only.site-transfer|\"demo\"|site:transfer|{\"domain\":\"demo-owned.test\",\"owner\":\"demo\"}"
     "plan.site-add-laravel|null|site:add|{\"domain\":\"app.test\",\"profile\":\"laravel\"}"
     "logs-nginx.demo-static.test|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\"}"
     "logs-nginx.match|null|logs:nginx|{\"domain\":\"demo-static.test\",\"lines\":\"5\",\"match\":\"GET\"}"
@@ -207,6 +212,9 @@ FW
     "site-names.demo-owned.test|\"demo\"|site:names|{\"domain\":\"demo-owned.test\"}"
     "plan.site-name-add|\"demo\"|site:name-add|{\"domain\":\"demo-owned.test\",\"name\":\"www.demo-owned.test\",\"mode\":\"redirect\"}"
     "refused.owner-scope.site-names|\"demo\"|site:names|{\"domain\":\"demo-php.test\"}"
+    "site-redirects.demo-redirect.test|null|site:redirect-list|{\"domain\":\"demo-redirect.test\"}"
+    "site-redirects.demo-owned.test|\"demo\"|site:redirect-list|{\"domain\":\"demo-owned.test\"}"
+    "refused.owner-scope.site-redirects|\"demo\"|site:redirect-list|{\"domain\":\"demo-php.test\"}"
     "panel-address|null|panel:address|{}"
     "plan.panel-port|null|panel:port|{\"port\":\"8600\"}"
     "plan.panel-ip-access|null|panel:ip-access|{\"enabled\":\"no\"}"
@@ -242,6 +250,12 @@ FW
     "plan.file-remove|\"demo\"|file:remove|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\"}"
     "plan.file-extract|\"demo\"|file:extract|{\"domain\":\"demo-owned.test\",\"path\":\"public/site.zip\",\"to\":\"public\"}"
     "plan.file-archive|\"demo\"|file:archive|{\"domain\":\"demo-owned.test\",\"path\":\"public\",\"to\":\"public.zip\"}"
+    "file-trash-list.demo-owned.test|\"demo\"|file:trash-list|{\"domain\":\"demo-owned.test\"}"
+    "plan.file-copy|\"demo\"|file:copy|{\"domain\":\"demo-owned.test\",\"path\":\"public\",\"to\":\"public-copy\"}"
+    "plan.file-trash-empty|\"demo\"|file:trash-empty|{\"domain\":\"demo-owned.test\"}"
+    "refused.invalid-argument.file-trash-restore|\"demo\"|file:trash-restore|{\"domain\":\"demo-owned.test\",\"id\":\"../x\"}"
+    "refused.invalid-argument.file-remove-permanent|\"demo\"|file:remove|{\"domain\":\"demo-owned.test\",\"path\":\"public/hello.txt\",\"permanent\":\"yes\"}"
+    "refused.invalid-argument.file-copy|\"demo\"|file:copy|{\"domain\":\"demo-owned.test\",\"path\":\"../etc/passwd\",\"to\":\"public/p\"}"
     "site-nginx-custom-show.demo-php.test|null|site:nginx-custom-show|{\"domain\":\"demo-php.test\"}"
     "plan.site-nginx-custom|null|site:nginx-custom|{\"domain\":\"demo-php.test\",\"content\":\"client_max_body_size 64m;\\n\"}"
     "refused.owner-admin-only.site-nginx-custom-show|\"demo\"|site:nginx-custom-show|{\"domain\":\"demo-owned.test\"}"
@@ -396,6 +410,11 @@ BX
     in_stand /root/simai-env/simai-admin.sh site check-fix --domain "$B" --id "$fx" --confirm yes >/dev/null 2>&1 || true
   done
   bx_status bitrix-status.done
+  # 1.57.0: one site's caches: the plan lists them, the job clears them; a
+  # redirect site has none of its own.
+  bx_req plan.site-cache-clear site:cache-clear "{\"domain\":\"${B}\"}"
+  names_job job-site-cache-clear site:cache-clear "{\"domain\":\"${B}\"}"
+  bx_req refused.profile-unsupported site:cache-clear '{"domain":"demo-redirect.test"}'
   in_stand /root/simai-env/simai-admin.sh site remove --domain "$B" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true
   # WordPress sites: the steps of a new install (a job; its one-time admin
   # password is pinned below), the steps of a restore on a second site, the

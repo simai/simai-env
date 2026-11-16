@@ -42,7 +42,11 @@ file_show() {
     python3 -I -c '
 import json, sys
 d = json.loads(sys.argv[1])
-if "entries" in d:
+if d.get("schema") == "simai-file-trash/1" and "entries" in d:
+    for e in d["entries"]:
+        print("{}  {:<5} {:>12} {}".format(e["id"], e["type"], e["size"], e["path"] or "(unknown path)"))
+    print("{} entries, {} bytes; kept {} days".format(d["count"], d["total_bytes"], d["retention_days"]))
+elif "entries" in d:
     for e in d["entries"]:
         print("{:<5} {:>12} {}{}".format(e["type"], e["size"], e["name"], " -> " + str(e.get("target")) if e["type"] == "link" else ""))
     if d["truncated"]:
@@ -102,7 +106,58 @@ file_extract_handler() {
 
 file_mkdir_handler() { file_prepare "$@" && require_args "path" && file_show mkdir "${PARSED_ARGS[path]}"; }
 file_rename_handler() { file_prepare "$@" && require_args "path to" && file_show rename "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}"; }
-file_remove_handler() { file_prepare "$@" && require_args "path" && file_show remove "${PARSED_ARGS[path]}"; }
+
+# Into the site's trash (<root>/.simai-trash) unless --permanent yes.
+file_remove_handler() {
+  file_prepare "$@" && require_args "path" || return 1
+  local permanent="${PARSED_ARGS[permanent]:-no}"
+  [[ "$permanent" =~ ^(yes|no)$ ]] || { error "--permanent must be yes or no"; return 1; }
+  if [[ "$permanent" == yes ]]; then
+    file_show remove "${PARSED_ARGS[path]}"
+  else
+    file_show trash "${PARSED_ARGS[path]}"
+  fi
+}
+
+file_copy_handler() { file_prepare "$@" && require_args "path to" && file_show copy "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}"; }
+
+FILE_TRASH_ID_RE='^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}$'
+
+file_trash_id_arg() {
+  [[ -z "${1:-}" || "$1" =~ $FILE_TRASH_ID_RE ]] || { error "--id must be a trash id such as 20261116T120000Z-1a2b3c"; return 1; }
+}
+
+file_trash_list_handler() { file_prepare "$@" && file_show trash-list ""; }
+
+file_trash_restore_handler() {
+  file_prepare "$@" && require_args "id" && file_trash_id_arg "${PARSED_ARGS[id]}" || return 1
+  file_show trash-restore "" "${PARSED_ARGS[id]}" "${PARSED_ARGS[to]:-}"
+}
+
+file_trash_empty_handler() {
+  file_prepare "$@" && file_trash_id_arg "${PARSED_ARGS[id]:-}" || return 1
+  file_show trash-empty "" "${PARSED_ARGS[id]:-}"
+}
+
+# Plan checks (admin/lib/execution.sh): what the copy or restore would refuse
+# (missing source or entry, a target that exists, a bad path), seen before
+# confirming. They change nothing.
+file_copy_plan_check() {
+  local domain path to
+  domain=$(command_arg domain "$@"); path=$(command_arg path "$@"); to=$(command_arg to "$@")
+  [[ -n "$path" && -n "$to" ]] || return 0
+  file_site "$domain" || return 1
+  file_helper copy-check "$path" "$to" >/dev/null
+}
+
+file_trash_restore_plan_check() {
+  local domain id to
+  domain=$(command_arg domain "$@"); id=$(command_arg id "$@"); to=$(command_arg to "$@")
+  [[ -n "$id" ]] || return 0
+  file_trash_id_arg "$id" || return 1
+  file_site "$domain" || return 1
+  file_helper trash-restore-check "" "$id" "$to" >/dev/null
+}
 
 register_cmd "file" "list" "List a directory of a site (as the site user, inside the site directory)" "file_list_handler" "domain" "path=" "tier:advanced effects:read"
 register_cmd "file" "stat" "Show one file or directory of a site" "file_stat_handler" "domain" "path=" "tier:advanced effects:read"
@@ -114,4 +169,8 @@ register_cmd "file" "archive" "Pack a file or directory of a site into a new .ta
 register_cmd "file" "extract" "Unpack an archive of a site into a directory (files and directories only)" "file_extract_handler" "domain path to" "overwrite=" "tier:advanced"
 register_cmd "file" "mkdir" "Create a directory in a site" "file_mkdir_handler" "domain path" "" "tier:advanced"
 register_cmd "file" "rename" "Rename or move a file or directory within a site" "file_rename_handler" "domain path to" "" "tier:advanced"
-register_cmd "file" "remove" "Remove a file, a link or a directory with its contents from a site" "file_remove_handler" "domain path" "" "tier:advanced"
+register_cmd "file" "remove" "Move a file, a link or a directory of a site into its trash (--permanent yes deletes for good)" "file_remove_handler" "domain path" "permanent=" "tier:advanced"
+register_cmd "file" "copy" "Copy a file or directory within a site (links copied as links)" "file_copy_handler" "domain path to" "" "tier:advanced"
+register_cmd "file" "trash-list" "List the site's trash (entries are kept 30 days)" "file_trash_list_handler" "domain" "" "tier:advanced effects:read"
+register_cmd "file" "trash-restore" "Put a trash entry back where it was or at --to" "file_trash_restore_handler" "domain id" "to=" "tier:advanced"
+register_cmd "file" "trash-empty" "Delete one trash entry (--id) or the whole trash of a site for good" "file_trash_empty_handler" "domain" "id=" "tier:advanced effects:delete"

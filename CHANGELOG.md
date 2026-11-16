@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+## 1.57.0 - 2026-11-16
+
+- `site remove` that keeps the database or its user moves the site's
+  `db.env` to `/etc/simai-env/kept-db/<domain>-<time>.env` (root only) and
+  says where, instead of leaving it in the removed site's folder.
+- `site redirect-list --output json` (`simai-site-redirects/1`: path
+  redirects `{from, to, code}` and the whole-domain redirect); gateway
+  `site:redirect-list` (read, owner-scoped).
+- `file remove` moves into the site's trash (`<site>/.simai-trash/`, owned
+  by the site user, outside `public/` and `releases/`) instead of deleting;
+  `--permanent yes` still deletes for good. New `file trash-list`,
+  `file trash-restore --id [--to]` (refuses an existing target) and
+  `file trash-empty [--id]`; entries are kept 30 days, older ones go on the
+  next trash command. New `file copy --path --to` inside the site (links
+  copied as links, never followed; refuses an existing target). Gateway:
+  `file:copy`, `file:trash-list`, `file:trash-restore`, `file:trash-empty`;
+  `file:remove` now means "to the trash".
+- `site transfer --domain D --owner O` hands a site to another owner: files,
+  PHP-FPM pool, cron, workers and the owner's SSH/SFTP view move to O, the
+  previous owner loses access; `backup data` runs first and the site keeps
+  serving. Refuses an unknown or blocked owner, the current owner and the
+  panel's own site. Panel gateway: `site:transfer` (administrator only) with
+  the plan's list of what moves and named refusals.
+- `site isolate` rewrites and restores every worker unit of the project
+  (also app manifest workers without the main queue unit), and no longer
+  waits 20 seconds when the previous user is an owner that runs other sites.
+- `site suspend` / `site resume` pause and resume a site (the older
+  `runtime-suspend` / `runtime-resume` are the same commands): a `503`
+  HTML page with `Retry-After` (ACME challenge still served), the
+  scheduler, cron jobs, enabled workers and app service, and the site's own
+  PHP-FPM pool stopped; data untouched. Resume starts exactly what was
+  stopped. The page is an include of every site template
+  (`/etc/nginx/simai-suspend/<project>.conf`), so `set-php`, `ssl`,
+  `name-add`, `nginx-custom` and `apache` keep it; `set-php` and `cron
+  job-*` keep a paused site's runtime stopped; `site deploy` is refused
+  while paused; the pause survives a reboot and `self migrate` (which moves
+  pauses made by earlier releases to the include). Plans refuse an already
+  paused site, a site that is not paused and the panel's own site.
+- `site status`, `site describe` and `self describe` answer `suspended`;
+  server alerts no longer report a paused site as down.
+- Panel gateway: `site:suspend`, `site:resume` (refusals
+  `already_suspended`, `not_suspended`, `panel_site`).
+- `site cache-clear --domain D` (and `site:cache-clear` in the panel
+  gateway) clears one site's caches: its scripts in the OPcache (from inside
+  its own PHP-FPM pool, without touching other sites of the same PHP
+  version), its nginx fastcgi/proxy cache when it has one of its own, and
+  the framework cache of its profile (Laravel `optimize:clear`, WordPress
+  object cache and transients, Bitrix cache directories), as the site user.
+  The plan lists what will be cleared and what is skipped and why; alias,
+  redirect and proxy sites are refused.
+
 ## 1.56.4 - 2026-11-13
 
 - `site remove` no longer stops half way for a site with its own PHP

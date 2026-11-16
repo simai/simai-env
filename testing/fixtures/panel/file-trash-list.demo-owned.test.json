@@ -1,0 +1,16 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-file-trash-list.demo-owned.test",
+  "status": "ok",
+  "kind": "result",
+  "data": {
+    "schema": "simai-file-trash/1",
+    "dir": ".simai-trash",
+    "retention_days": 30,
+    "entries": [],
+    "count": 0,
+    "total_bytes": 0
+  },
+  "command_status": "success",
+  "operation_id": "fixture"
+}

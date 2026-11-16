@@ -7,6 +7,7 @@
     "schema": "simai-site-status/1",
     "domain": "demo-bitrix.test",
     "profile": "bitrix",
+    "suspended": false,
     "route": "restore",
     "step": "finalize",
     "next": "bitrix:finalize",

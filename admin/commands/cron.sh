@@ -120,7 +120,8 @@ cron_jobs_apply() {
   local domain="$1"
   cron_jobs_site "$domain" || return 1
   install -D -m 0755 -o root -g root "${SIMAI_ENV_ROOT}/lib/cron_job_run.sh" /usr/local/lib/simai-env/cron-job-run || return 1
-  python3 -I "$CRON_JOBS_PY" render "$domain" "$CRON_SITE_USER" "$CRON_SITE_DIR" "$CRON_SITE_SLUG"
+  python3 -I "$CRON_JOBS_PY" render "$domain" "$CRON_SITE_USER" "$CRON_SITE_DIR" "$CRON_SITE_SLUG" || return 1
+  site_suspend_cron_jobs_sync "$domain" "$CRON_SITE_SLUG"
 }
 
 cron_list_handler() {

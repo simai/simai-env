@@ -143,7 +143,7 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
         if (cert.get("last_renew") or {}).get("ok") is False:
             add("cert_renew_failed", domain, "warning", f"the last certificate renewal of {domain} failed", domain)
         answers = s.get("answers") or {}
-        if answers.get("checked_at"):
+        if answers.get("checked_at") and not s.get("suspended"):  # a paused site answers 503 on purpose
             code = answers.get("http")
             if code is None or code >= 500:
                 what = "does not answer" if code is None else f"answers HTTP {code}"

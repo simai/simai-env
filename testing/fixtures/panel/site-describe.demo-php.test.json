@@ -37,6 +37,8 @@
     },
     "last_offsite": null,
     "adopted": null,
+    "suspended": false,
+    "suspended_at": null,
     "answers": {
       "http": 200,
       "path": "/",
@@ -56,9 +58,9 @@
       },
       "items": [
         {
-          "path": "/var/backups/simai/demo-php.test/20261110-173343",
-          "created_at": "2026-11-10T17:33:43",
-          "size_bytes": 4380,
+          "path": "/var/backups/simai/demo-php.test/20261116-130724",
+          "created_at": "2026-11-16T13:07:24",
+          "size_bytes": 4382,
           "parts": [
             "config",
             "db",

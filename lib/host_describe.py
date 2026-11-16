@@ -288,6 +288,10 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "last_offsite": last_offsite(domain),
         "adopted": kv_file(STATE / "sites" / domain / "app.env").get("ADOPTED_AT"),
     }
+    # site suspend: nginx answers 503, cron and workers are stopped.
+    runtime = kv_file(STATE / "sites" / domain / "runtime.env")
+    info["suspended"] = runtime.get("SITE_RUNTIME_STATE") == "suspended"
+    info["suspended_at"] = runtime.get("SITE_RUNTIME_SUSPENDED_AT") if info["suspended"] else None
     known = (status if status is not None else site_status()).get(domain) or {}
     info["answers"] = {k: known.get(k) for k in ("http", "path", "checked_at")} if known.get("checked_at") else None
     size = known.get("disk") if isinstance(known.get("disk"), dict) else {}

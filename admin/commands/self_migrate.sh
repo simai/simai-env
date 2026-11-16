@@ -312,6 +312,7 @@ self_migrate_handler() {
   fi
   self_migrate_nginx_hardening
   self_migrate_php_fpm_host
+  self_migrate_suspended_sites
   self_migrate_confirmed_schedules || return 1
   if [[ ${#SELF_MIGRATE_CHANGES[@]} -eq 0 ]]; then
     info "Host is up to date; nothing to migrate"

@@ -127,23 +127,26 @@ site_status_handler() {
     site_status_minimal "$domain" "$profile" || rc=$?
   fi
   (( rc == 0 )) || return "$rc"
+  local suspended=no
+  site_is_suspended "$domain" && suspended=yes
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" != json ]]; then
     ui_header "SIMAI ENV · Site status"
-    print_kv_table "Domain|${domain}" "Profile|${profile}" "Route|${SS_ROUTE}" "Step|${SS_STEP}" \
+    print_kv_table "Domain|${domain}" "Profile|${profile}" "Paused|${suspended}" "Route|${SS_ROUTE}" "Step|${SS_STEP}" \
       "Next|${SS_NEXT:-none}" "Open|${SS_RESTORE_URL:-${SS_INSTALLER_URL:-none}}" \
       "Pending|$(IFS=,; echo "${SS_PENDING[*]:-none}")"
     return 0
   fi
   python3 -c '
 import json, sys
-domain, profile, route, step, nxt, restore_url, installer_url, n = sys.argv[1:9]
-pending = sys.argv[9:9 + int(n)]
-detail = dict(kv.split("=", 1) for kv in sys.argv[9 + int(n):])
-print(json.dumps({"schema": "simai-site-status/1", "domain": domain, "profile": profile, "route": route,
+domain, profile, suspended, route, step, nxt, restore_url, installer_url, n = sys.argv[1:10]
+pending = sys.argv[10:10 + int(n)]
+detail = dict(kv.split("=", 1) for kv in sys.argv[10 + int(n):])
+print(json.dumps({"schema": "simai-site-status/1", "domain": domain, "profile": profile,
+                  "suspended": suspended == "yes", "route": route,
                   "step": step, "next": nxt or None, "restore_url": restore_url or None,
                   "installer_url": installer_url or None, "pending": [p for p in pending if p],
                   "detail": {k: (v or None) for k, v in detail.items()}}, indent=2))' \
-    "$domain" "$profile" "$SS_ROUTE" "$SS_STEP" "$SS_NEXT" "$SS_RESTORE_URL" "$SS_INSTALLER_URL" \
+    "$domain" "$profile" "$suspended" "$SS_ROUTE" "$SS_STEP" "$SS_NEXT" "$SS_RESTORE_URL" "$SS_INSTALLER_URL" \
     "${#SS_PENDING[@]}" "${SS_PENDING[@]}" "${SS_DETAIL[@]}"
 }
 

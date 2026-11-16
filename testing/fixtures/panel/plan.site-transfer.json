@@ -1,0 +1,34 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-plan.site-transfer",
+  "status": "ok",
+  "kind": "plan",
+  "data": {
+    "command": "site:transfer",
+    "args": {
+      "domain": "demo-php.test",
+      "owner": "demo"
+    },
+    "target": "demo-php.test",
+    "description": "Transfer a site to another owner: files, PHP pool, cron, workers and SSH/SFTP access (backup first)",
+    "effects": "write",
+    "lock": "site",
+    "applied": false,
+    "transfer": {
+      "schema": "simai-site-transfer-plan/1",
+      "domain": "demo-php.test",
+      "from": "site-demo-php-test",
+      "from_owner": null,
+      "to_owner": "demo",
+      "backup": "backup data (database and files) first",
+      "moves": [
+        "demo-php.test",
+        "demo",
+        "files: /home/simai/www/demo-php.test becomes demo:demo, closed to others",
+        "PHP-FPM pool /etc/php/8.3/fpm/pool.d/demo-php-test.conf: runs as demo",
+        "SSH/SFTP: /home/demo/sites/demo-php.test appears",
+        "database demo_php_test: unchanged; its credentials (site .env) are readable only by demo"
+      ]
+    }
+  }
+}

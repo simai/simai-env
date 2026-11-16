@@ -32,6 +32,25 @@ site_redirect_list_handler() {
     [[ "$(site_redirect_env_get "$domain" PATH)" == drop ]] && suffix="/"
     rows+=("whole domain|$(site_redirect_env_get "$domain" CODE) -> $(site_redirect_env_get "$domain" TARGET)${suffix}")
   }
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    DOMAIN="$domain" FILE="$file" TARGET="$(site_redirect_env_get "$domain" TARGET)" \
+      WCODE="$(site_redirect_env_get "$domain" CODE)" WPATH="$(site_redirect_env_get "$domain" PATH)" python3 -I -c '
+import json, os
+rows = []
+try:
+    for line in open(os.environ["FILE"], encoding="utf-8"):
+        parts = line.split()
+        if len(parts) == 3:
+            rows.append({"from": parts[1], "to": parts[2], "code": int(parts[0])})
+except OSError:
+    pass
+whole = None
+if os.environ["TARGET"]:
+    whole = {"to": os.environ["TARGET"], "code": int(os.environ["WCODE"] or 301),
+             "path": "drop" if os.environ["WPATH"] == "drop" else "keep"}
+print(json.dumps({"schema": "simai-site-redirects/1", "domain": os.environ["DOMAIN"], "redirects": rows, "whole_domain": whole}, indent=2))'
+    return 0
+  fi
   [[ ${#rows[@]} -gt 0 ]] || rows=("Redirects|none")
   ui_result_table "${rows[@]}"
 }

@@ -239,140 +239,8 @@ site_runtime_status_handler() {
     "Scheduler policy|${cron_state}" \
     "Worker policy|${queue_state}"
   ui_next_steps
-  ui_kv "Suspend" "simai-admin.sh site runtime-suspend --domain ${domain} --confirm yes"
-  ui_kv "Resume" "simai-admin.sh site runtime-resume --domain ${domain} --confirm yes"
-}
-
-site_runtime_suspend_handler() {
-  parse_kv_args "$@"
-  local domain
-  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
-  [[ -z "$domain" ]] && return 0
-  local confirm="${PARSED_ARGS[confirm]:-no}"
-  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to suspend site runtime"
-    return 1
-  fi
-
-  if ! read_site_metadata "$domain"; then
-    error "Failed to read site metadata for ${domain}"
-    return 1
-  fi
-
-  local profile="${SITE_META[profile]:-unknown}"
-  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
-  local slug="${SITE_META[slug]:-$project}"
-  local php="${SITE_META[php]:-none}"
-  local socket_project="${SITE_META[php_socket_project]:-$project}"
-  local state
-  state=$(site_runtime_state "$domain")
-  if [[ "$state" == "suspended" ]]; then
-    warn "Site runtime is already suspended."
-    return 0
-  fi
-
-  local cron_policy="unchanged" queue_policy="unchanged" pool_status="n/a"
-  if [[ "$php" != "none" ]]; then
-    pool_status=$(site_runtime_disable_pool "$php" "$socket_project")
-  fi
-  if load_profile "$profile"; then
-    if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" ]]; then
-      cron_policy=$(site_runtime_disable_cron "$slug")
-    fi
-    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" ]]; then
-      local queue_unit="laravel-queue-${project}.service"
-      if os_svc_has_unit "$queue_unit"; then
-        os_svc_disable_now "$queue_unit" || true
-        queue_policy="disabled"
-      else
-        queue_policy="missing"
-      fi
-    fi
-  fi
-  if ! site_runtime_nginx_suspend "$domain"; then
-    if [[ "$php" != "none" && "$pool_status" == "disabled" ]]; then
-      site_runtime_enable_pool "$php" "$socket_project" >/dev/null 2>&1 || true
-    fi
-    if [[ "$cron_policy" == "disabled" ]]; then
-      site_runtime_enable_cron "$slug" >/dev/null 2>&1 || true
-    fi
-    if [[ "$queue_policy" == "disabled" ]]; then
-      local queue_unit="laravel-queue-${project}.service"
-      if os_svc_has_unit "$queue_unit"; then
-        os_svc_enable_now "$queue_unit" || os_svc_restart "$queue_unit" || true
-      fi
-    fi
-    return 1
-  fi
-  write_site_runtime_state "$domain" \
-    "SITE_RUNTIME_STATE|suspended" \
-    "SITE_RUNTIME_CRON|${cron_policy}" \
-    "SITE_RUNTIME_QUEUE|${queue_policy}"
-
-  ui_header "SIMAI ENV · Pause site"
-  ui_result_table \
-    "Domain|${domain}" \
-    "Availability|suspended" \
-    "PHP pool|${pool_status}" \
-    "Cron|${cron_policy}" \
-    "Queue|${queue_policy}"
-}
-
-site_runtime_resume_handler() {
-  parse_kv_args "$@"
-  local domain
-  domain=$(site_pick_existing_domain "${PARSED_ARGS[domain]:-}") || return $?
-  [[ -z "$domain" ]] && return 0
-  local confirm="${PARSED_ARGS[confirm]:-no}"
-  if [[ "${SIMAI_ADMIN_MENU:-0}" != "1" && "$confirm" != "yes" ]]; then
-    error "Use --confirm yes to resume site runtime"
-    return 1
-  fi
-
-  if ! read_site_metadata "$domain"; then
-    error "Failed to read site metadata for ${domain}"
-    return 1
-  fi
-
-  local profile="${SITE_META[profile]:-unknown}"
-  local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
-  local slug="${SITE_META[slug]:-$project}"
-  local php="${SITE_META[php]:-none}"
-  local socket_project="${SITE_META[php_socket_project]:-$project}"
-  local cron_policy queue_policy
-  cron_policy=$(site_runtime_read_var "$domain" "SITE_RUNTIME_CRON" 2>/dev/null || true)
-  queue_policy=$(site_runtime_read_var "$domain" "SITE_RUNTIME_QUEUE" 2>/dev/null || true)
-  local pool_status="n/a"
-  if [[ "$php" != "none" ]]; then
-    pool_status=$(site_runtime_enable_pool "$php" "$socket_project")
-  fi
-  if load_profile "$profile"; then
-    if [[ "${PROFILE_SUPPORTS_CRON:-no}" == "yes" && "$cron_policy" == "disabled" ]]; then
-      cron_policy=$(site_runtime_enable_cron "$slug")
-    fi
-    if [[ "${PROFILE_SUPPORTS_QUEUE:-no}" == "yes" && "$queue_policy" == "disabled" ]]; then
-      local queue_unit="laravel-queue-${project}.service"
-      if os_svc_has_unit "$queue_unit"; then
-        os_svc_enable_now "$queue_unit" || os_svc_restart "$queue_unit" || true
-        queue_policy="enabled"
-      fi
-    fi
-  fi
-  if ! site_runtime_nginx_resume "$domain"; then
-    return 1
-  fi
-  write_site_runtime_state "$domain" \
-    "SITE_RUNTIME_STATE|active" \
-    "SITE_RUNTIME_CRON|${cron_policy:-unchanged}" \
-    "SITE_RUNTIME_QUEUE|${queue_policy:-unchanged}"
-
-  ui_header "SIMAI ENV · Resume site"
-  ui_result_table \
-    "Domain|${domain}" \
-    "Availability|active" \
-    "PHP pool|${pool_status}" \
-    "Cron|${cron_policy:-unchanged}" \
-    "Queue|${queue_policy:-unchanged}"
+  ui_kv "Suspend" "simai-admin.sh site suspend --domain ${domain} --confirm yes"
+  ui_kv "Resume" "simai-admin.sh site resume --domain ${domain} --confirm yes"
 }
 
 site_issue_default_ssl_after_create() {
@@ -1822,6 +1690,21 @@ site_remove_handler() {
   if [[ $drop_db -eq 1 && $drop_user -eq 1 && $db_drop_succeeded -eq 1 && $db_user_drop_succeeded -eq 1 ]]; then
     remove_db_env=yes
   fi
+  # A kept database or user keeps its credentials, but not in the folder of a
+  # site that no longer exists: a later site add of the same domain must
+  # start clean. They move to a root-only folder; the path is printed.
+  local site_db_env kept_dir kept_file
+  site_db_env="$(site_sites_config_dir)/${domain}/db.env"
+  if [[ "$remove_db_env" == no && -f "$site_db_env" ]]; then
+    kept_dir="${SIMAI_KEPT_DB_DIR:-/etc/simai-env/kept-db}"
+    kept_file="${kept_dir}/${domain}-$(date -u +%Y%m%dT%H%M%SZ).env"
+    if install -d -m 0700 "$kept_dir" && mv -f -- "$site_db_env" "$kept_file" && chmod 0600 "$kept_file"; then
+      info "Database credentials of the kept database resources moved to ${kept_file}"
+      remove_db_env=yes
+    else
+      warn "Could not move ${site_db_env} out of the site folder"
+    fi
+  fi
   if ! site_remove_metadata_cleanup "$(site_sites_config_dir)/${domain}" "$remove_db_env"; then
     warn "Site metadata cleanup was incomplete"
     removal_failed=1
@@ -2075,6 +1958,8 @@ site_set_php_handler() {
       info "Queue unit not found for ${queue_project}; skipping queue update"
     fi
   fi
+  # A paused site stays paused: the new pool, cron file and worker stop again.
+  site_suspend_reassert "$domain"
 
   echo "===== PHP switch summary ====="
   echo "Domain      : ${domain}"
@@ -2364,5 +2249,3 @@ register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handle
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" "" "effects:read"
 register_cmd "site" "info" "Show site details" "site_info_handler" "" "domain=" "effects:read"
 register_cmd "site" "runtime-status" "Show site runtime state" "site_runtime_status_handler" "" "domain=" "effects:read"
-register_cmd "site" "runtime-suspend" "Suspend site runtime" "site_runtime_suspend_handler" "domain" "confirm=" "menu:confirm"
-register_cmd "site" "runtime-resume" "Resume site runtime" "site_runtime_resume_handler" "domain" "confirm=" "menu:confirm"

@@ -365,6 +365,11 @@ site_deploy_handler() {
   require_args "domain" || return 1
   validate_domain "$domain" "allow" || return 1
   require_site_exists "$domain" || return 1
+  # A paused site answers 503 to the health check and must not start workers.
+  if site_is_suspended "$domain"; then
+    error "${domain} is paused; resume it first: simai-admin.sh site resume --domain ${domain} --confirm yes"
+    return 1
+  fi
   read_site_metadata "$domain" || return 1
   local root="${SITE_META[root]}" php="${SITE_META[php]}" profile="${SITE_META[profile]}"
   local project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"

@@ -1,0 +1,9 @@
+{
+  "schema": "simai-panel-answer/1",
+  "request_id": "fixture-refused.profile-unsupported",
+  "status": "refused",
+  "reason": "profile_unsupported",
+  "data": {
+    "detail": "A redirect site has no caches of its own; clear the caches of the site that serves it"
+  }
+}
