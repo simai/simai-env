@@ -56,6 +56,7 @@ restore_archive_top() {
 site_restore_kinds() {
   local files="$1" dump="$2"
   case "$files" in
+    *.sql.zip) error "--files is the site's files; ${files##*/} is a dump (--dump)"; return 1 ;;
     *.tar.gz|*.tgz|*.tar|*.zip) ;;
     *) error "--files must be a .tar.gz, .tgz, .tar or .zip archive"; return 1 ;;
   esac
@@ -63,8 +64,9 @@ site_restore_kinds() {
   case "$dump" in
     "") ;;
     *.sql.gz) SR_DUMP_GZ=yes ;;
+    *.sql.zip) SR_DUMP_GZ=zip ;;
     *.sql) ;;
-    *) error "--dump must be a .sql or .sql.gz file"; return 1 ;;
+    *) error "--dump must be a .sql, .sql.gz or .sql.zip file"; return 1 ;;
   esac
 }
 

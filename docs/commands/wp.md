@@ -33,7 +33,7 @@ a step tracker (the panel's):
 | `next` | the command for the step: `wp:install`, `file:upload`, `wp:restore-ready`, `wp:finalize`, or null |
 | `url` | admin URL once installed; installer URL when core files wait for the web installer |
 | `pending` | profile rules `wp finalize` will fix |
-| `files`, `dumps` | site archives (`.tar.gz`, `.tgz`, `.tar`, core packages excluded) and dumps (`.sql`, `.sql.gz`) found at the top of the site directory or the web root, relative to the site directory |
+| `files`, `dumps` | site archives (`.tar.gz`, `.tgz`, `.tar`, `.zip`, core packages excluded) and dumps (`.sql`, `.sql.gz`, `.sql.zip`) found at the top of the site directory or the web root, relative to the site directory |
 | `db_state`, `web_state`, `core`, `config`, `wp_cli` | the probes above |
 
 ## Install
@@ -76,10 +76,10 @@ WordPress tables, the site has no database or uses PostgreSQL.
 simai-admin.sh wp restore-ready --domain <domain> --files <archive> --dump <dump> [--overwrite yes] [--confirm yes]
 ```
 
-Brings a copy of a WordPress site in: `--files` is a `.tar.gz`, `.tgz` or
-`.tar` of the site's files (its docroot, or a folder holding it; an archive
-with only `wp-content` gets fresh core files), `--dump` a `.sql` or
-`.sql.gz` MySQL dump. Both are paths inside the site directory (relative to
+Brings a copy of a WordPress site in: `--files` is a `.tar.gz`, `.tgz`,
+`.tar` or `.zip` of the site's files (its docroot, or a folder holding it; an
+archive with only `wp-content` gets fresh core files), `--dump` a `.sql`,
+`.sql.gz` or `.sql.zip` MySQL dump (a zip with exactly one `.sql` inside). Both are paths inside the site directory (relative to
 it, or absolute below it), regular files, no `.`/`..` parts and no symlink on
 the way: upload them with the file manager first. Without `--confirm yes`
 the plan.

@@ -70,8 +70,19 @@ else
   grep -q 'overwrite yes' /tmp/gr-again && ok 'existing files need --overwrite' || bad "refusal: $(tail -3 /tmp/gr-again)"
 fi
 before=$(ls /var/backups/simai/$D 2>/dev/null | wc -l)
-cli site restore-ready --domain $D --files public/copy2.tar.gz --overwrite yes --confirm yes >/tmp/gr-over 2>&1 && ok 'restore with --overwrite' || { bad 'overwrite'; tail -10 /tmp/gr-over; }
+# The dump zipped (.sql.zip, one .sql inside).
+printf 'CREATE TABLE notes (id INT PRIMARY KEY, body VARCHAR(50));\nINSERT INTO notes VALUES (1, "from-the-zip");\n' >/tmp/gr-dump.sql
+python3 -c 'import zipfile; z=zipfile.ZipFile("/tmp/gr-dump.sql.zip","w"); z.write("/tmp/gr-dump.sql","backup/site.sql"); z.writestr("__MACOSX/._site.sql","x"); z.close()'
+cp /tmp/gr-dump.sql.zip $R/dump2.sql.zip && chown $owner $R/dump2.sql.zip
+cli site restore-ready --domain $D --files public/copy2.tar.gz --dump dump2.sql.zip --overwrite yes --confirm yes >/tmp/gr-over 2>&1 && ok 'restore with --overwrite' || { bad 'overwrite'; tail -10 /tmp/gr-over; }
 (( $(ls /var/backups/simai/$D 2>/dev/null | wc -l) > before )) && ok 'a backup is taken before overwriting' || bad 'no backup before overwrite'
+[[ "$(mysql -Nse "SELECT body FROM \`$db\`.notes WHERE id=1")" == from-the-zip ]] && ok 'a .sql.zip dump replaces the database' || bad 'zip dump not imported'
+python3 -c 'import zipfile; z=zipfile.ZipFile("/tmp/gr-two.sql.zip","w"); z.writestr("a.sql","SELECT 1;"); z.writestr("b.sql","SELECT 1;"); z.close()'
+cp /tmp/gr-two.sql.zip $R/two.sql.zip && chown $owner $R/two.sql.zip
+tar -C "$src" -czf $R/public/copy3.tar.gz mysite && chown $owner $R/public/copy3.tar.gz
+cli site restore-ready --domain $D --files public/copy3.tar.gz --dump two.sql.zip --overwrite yes --confirm yes >/dev/null 2>&1 \
+  && bad 'a zip with two .sql files accepted' || ok 'a zip with two .sql files is refused'
+cli site restore-ready --domain $D --files two.sql.zip >/dev/null 2>&1 && bad 'a .sql.zip taken as the files' || ok 'a .sql.zip is not a files archive'
 
 # A .zip that carries the web root folder itself goes to the site root.
 cli site add --domain $D2 --profile generic --php 8.3 --create-db no --confirm yes >/dev/null 2>&1 || bad 'site add zip'

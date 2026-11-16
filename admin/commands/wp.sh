@@ -124,14 +124,15 @@ wp_restore_candidates() {
   shopt -s nullglob
   for dir in "$WP_ROOT" "$WP_DOC_ROOT"; do
     if [[ "$kind" == files ]]; then
-      set -- "$dir"/*.tar.gz "$dir"/*.tgz "$dir"/*.tar
+      set -- "$dir"/*.tar.gz "$dir"/*.tgz "$dir"/*.tar "$dir"/*.zip
     else
-      set -- "$dir"/*.sql "$dir"/*.sql.gz
+      set -- "$dir"/*.sql "$dir"/*.sql.gz "$dir"/*.sql.zip
     fi
     for path in "$@"; do
       [[ -f "$path" && ! -L "$path" ]] || continue
       name=$(basename "$path")
-      [[ "$kind" == files && ( "$name" == latest*.tar.gz || "$name" == wordpress-*.tar.gz ) ]] && continue
+      [[ "$kind" == files && ( "$name" == *.sql.zip || "$name" == latest*.tar.gz || "$name" == wordpress-*.tar.gz \
+        || "$name" == latest*.zip || "$name" == wordpress-*.zip ) ]] && continue
       printf '%s\n' "${path#"${WP_ROOT%/}"/}"
     done
   done

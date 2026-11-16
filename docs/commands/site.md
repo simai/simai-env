@@ -618,7 +618,8 @@ simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.
 - `--files`: a `.tar.gz`, `.tgz`, `.tar` or `.zip` archive inside the site
   directory (uploaded with `file upload` or over SFTP), relative to the site
   directory or absolute inside it; links and `..` are refused.
-- `--dump` (optional): a `.sql` or `.sql.gz` file inside the site directory,
+- `--dump` (optional): a `.sql`, `.sql.gz` or `.sql.zip` (exactly one `.sql`
+  inside) file in the site directory,
   imported into the site's MySQL database with the site's own credentials.
   The site needs a database (`site db-create`).
 - Everything runs as the site user. A single folder wrapping the archive is

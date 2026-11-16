@@ -432,13 +432,15 @@ wp_site_file() {
 wp_restore_kinds() {
   local files="$1" dump="$2"
   case "$files" in
+    *.sql.zip) error "--files is the site's files; ${files##*/} is a dump (--dump)"; return 1 ;;
     *.tar.gz|*.tgz|*.tar|*.zip) ;;
     *) error "--files must be a .tar.gz, .tgz, .tar or .zip archive"; return 1 ;;
   esac
   case "$dump" in
     *.sql.gz) WP_RESTORE_DUMP_GZ=yes ;;
+    *.sql.zip) WP_RESTORE_DUMP_GZ=zip ;;
     *.sql) WP_RESTORE_DUMP_GZ=no ;;
-    *) error "--dump must be a .sql or .sql.gz file"; return 1 ;;
+    *) error "--dump must be a .sql, .sql.gz or .sql.zip file"; return 1 ;;
   esac
 }
 
@@ -516,7 +518,22 @@ wp_restore_import_dump() {
   } >"$cnf"
   umask "$saved"
   chown "$SIMAI_USER" "$cnf" && chmod 0400 "$cnf" || { rm -rf "$d"; return 1; }
-  if [[ "$gz" == yes ]]; then
+  if [[ "$gz" == zip ]]; then
+    # One .sql inside the zip (folders and __MACOSX entries aside), streamed.
+    # shellcheck disable=SC2024 # root opens the file or the log; only the reader runs as the site user
+    python3 -I -c '
+import shutil, sys, zipfile
+with zipfile.ZipFile(sys.argv[1]) as z:
+    sql = [i for i in z.infolist() if not i.is_dir() and i.filename.lower().endswith(".sql")
+           and not i.filename.startswith("__MACOSX/")]
+    if len(sql) != 1:
+        sys.exit("the zip must hold exactly one .sql file, found %d" % len(sql))
+    with z.open(sql[0]) as src:
+        shutil.copyfileobj(src, sys.stdout.buffer, 1 << 20)
+' "$dump" 2>>"$LOG_FILE" | sudo -u "$SIMAI_USER" -H mysql --defaults-extra-file="$cnf" --default-character-set=utf8mb4 \
+      --binary-mode "$name" >>"$LOG_FILE" 2>&1 || rc=$?
+    (( PIPESTATUS[0] == 0 )) || rc=1
+  elif [[ "$gz" == yes ]]; then
     # shellcheck disable=SC2024 # root opens the file or the log; only the reader runs as the site user
     gzip -dc -- "$dump" | sudo -u "$SIMAI_USER" -H mysql --defaults-extra-file="$cnf" --default-character-set=utf8mb4 \
       --binary-mode "$name" >>"$LOG_FILE" 2>&1 || rc=$?

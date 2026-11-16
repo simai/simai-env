@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.57.3 - 2026-11-16
+
+- Zipped dumps: `site restore-ready` and `wp restore-ready` take
+  `--dump x.sql.zip` (exactly one `.sql` inside; `__MACOSX` entries
+  ignored), streamed into the site's database as the site user. A
+  `.sql.zip` given as `--files` is refused with a pointer to `--dump`.
+- `wp status` lists uploaded `.zip` site archives and `.sql.zip` dumps.
+
 ## 1.57.2 - 2026-11-16
 
 - `site restore-ready` and `wp restore-ready` failed on servers where
