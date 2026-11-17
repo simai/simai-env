@@ -400,6 +400,16 @@ ssl_select_domain() {
   echo "$domain"
 }
 
+# The folder nginx serves /.well-known/acme-challenge/ from (its alias), so a
+# site in the release layout (public dir current/public) still answers the
+# challenge from a folder outside the releases. Falls back to the doc root.
+ssl_acme_webroot() {
+  local domain="$1" fallback="$2" alias
+  alias=$(sed -n 's#^[[:space:]]*alias[[:space:]]\{1,\}\(/[^;]*\)/\.well-known/acme-challenge/\{0,1\};.*#\1#p' \
+    "/etc/nginx/sites-available/${domain}.conf" 2>/dev/null | head -n1)
+  printf '%s\n' "${alias:-$fallback}"
+}
+
 ssl_site_context() {
   local domain="$1"
   if ! read_site_metadata "$domain"; then
@@ -628,6 +638,7 @@ ssl_issue_handler() {
   local webroot=""
   local pd="${SITE_SSL_PUBLIC_DIR}"
   webroot=$(site_compute_doc_root "$SITE_SSL_ROOT" "$pd") || return 1
+  webroot=$(ssl_acme_webroot "$domain" "$webroot")
   if ! validate_path "$webroot"; then
     return 1
   fi
@@ -891,6 +902,7 @@ ssl_renew_handler() {
   local pd="${SITE_SSL_PUBLIC_DIR}"
   local webroot=""
   webroot=$(site_compute_doc_root "$SITE_SSL_ROOT" "$pd") || return 1
+  webroot=$(ssl_acme_webroot "$domain" "$webroot")
   if ! validate_path "$webroot"; then
     return 1
   fi

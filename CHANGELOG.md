@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.57.4 - 2026-11-17
+
+- `ssl letsencrypt` and `ssl renew` take the ACME webroot from the site's
+  nginx `/.well-known/acme-challenge/` alias. A site deployed into the
+  release layout (public dir `current/public`, such as the Larena Panel)
+  failed the HTTP challenge with 404: certbot wrote into `current/public`
+  while nginx answered from `<root>/public`.
+
 ## 1.57.3 - 2026-11-16
 
 - Zipped dumps: `site restore-ready` and `wp restore-ready` take
