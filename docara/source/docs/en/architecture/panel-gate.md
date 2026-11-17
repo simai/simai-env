@@ -703,6 +703,17 @@ action, job). Everything else is refused.
   (`new`, `restore`, `repo` with inputs and steps). Fixture set 32 adds
   `site-status.<site>` for the demo sites and
   `site-status.demo-bitrix.test.<step>` along the Bitrix restore.
+- 1.58.0: `site:db-browser {domain, minutes?}` (action; owners on their
+  own sites; `minutes` 5 to 480, default 60) opens Adminer on the site's
+  HTTPS address, signed in to the site's database only. The address is in
+  the job result `browser_url` (with `expires_at`, `engine`, `database`),
+  handed out once by `job:status` (ONCE_RESULT) and never in the job log;
+  open it in a new tab. Plans refuse a site without its own database, PHP or
+  HTTPS, an alias and a paused site (`plan_failed`).
+  `site:db-browser-close {domain}` (action) and `site:db-browser-status
+  {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
+  `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
+  the site and its Let's Encrypt certificate in one job.
 - 1.57.1: `site:restore-ready {domain, files, dump?, overwrite?}` (action):
   a `generic` site from a files archive (`.tar.gz`, `.tgz`, `.tar`, `.zip`)
   and an optional MySQL dump inside the site directory; refusals of the
