@@ -158,14 +158,18 @@ def main():
     except OSError:
         enabled = None  # no allowlist: every bundled profile is enabled
     installed, pgsql = php_versions(), Path("/usr/lib/postgresql").is_dir()
-    profiles = []
+    profiles, disabled = [], []
     for path in sorted(PROFILES.glob("*.profile.sh")):
         pid = path.name[:-len(".profile.sh")]
+        meta = read_profile(path)
         if enabled is None or pid in enabled:
-            profiles.append(describe(pid, read_profile(path), installed, pgsql))
+            profiles.append(describe(pid, meta, installed, pgsql))
+        else:
+            # Bundled but switched off: the panel offers profile:enable (1.57.5).
+            disabled.append({"id": pid, "title": meta.get("TITLE") or pid})
     if mode == "json":
-        print(json.dumps({"schema": "simai-site-profiles/1", "php_installed": installed, "profiles": profiles},
-                         ensure_ascii=False))
+        print(json.dumps({"schema": "simai-site-profiles/1", "php_installed": installed, "profiles": profiles,
+                          "disabled": disabled}, ensure_ascii=False))
         return
     for p in profiles:
         own = ", ".join(a["name"] for a in p["args"] if a["name"] not in ("domain", "owner", "backup"))
@@ -173,6 +177,8 @@ def main():
         for r in p["routes"]:
             print(f"{'':<10}   {r['id']}{'' if r['available'] else ' (planned)'}: "
                   + " -> ".join(s["command"] for s in r["steps"]))
+    if disabled:
+        print("disabled: " + ", ".join(d["id"] for d in disabled) + "  (profile enable --id ID)")
 
 
 if __name__ == "__main__":

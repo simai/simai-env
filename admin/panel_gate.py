@@ -296,6 +296,10 @@ ALLOW = {
     "service:restart": ({"name": SERVICE}, {"name"}, "action"),
     "service:reload": ({"name": SERVICE}, {"name"}, "action"),
     "self:profiles": ({}, set(), "read"),
+    # 1.57.5: the wizard switches a bundled site profile on or off (admin only;
+    # disabling refuses core profiles and profiles that sites still use).
+    "profile:enable": ({"id": PROFILE}, {"id"}, "action"),
+    "profile:disable": ({"id": PROFILE}, {"id"}, "action"),
     # 1.34.0: a site's own cron jobs, run as the site user.
     "cron:list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "cron:job-add": ({"domain": DOMAIN, "schedule": CRON_SCHEDULE, "command": CRON_COMMAND},
@@ -358,7 +362,7 @@ ALLOW = {
     "job:list": ({}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
-ADMIN_ONLY = {"owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "site:transfer",
+ADMIN_ONLY = {"profile:enable", "profile:disable", "owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "site:transfer",
               "self:metrics",
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
               "service:list", "service:log", "service:restart", "service:reload", "firewall:status",

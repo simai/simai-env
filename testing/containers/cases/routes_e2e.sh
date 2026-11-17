@@ -133,5 +133,24 @@ cli owner create --name rtown --pubkey-file /root/rt-own.pub --confirm yes >/dev
 a=$(gate "$(req '"rtown"' site:status "{\"domain\":\"$S\"}")")
 [[ "$(j "d['status']+':'+d.get('reason','')" <<<"$a")" == refused:owner_scope ]] && ok "an owner is refused another's site" || bad "owner scope: $a"
 
+# 6. The wizard switches a profile off and on (admin only).
+creq() { printf '{"schema":"simai-panel-request/1","request_id":"r3","actor":{"user":"admin@x","owner":null},"command":"%s","args":%s,"confirm":true}' "$1" "$2"; }
+wait_job() { local s _; for _ in {1..60}; do s=$(gate "$(req null job:status "{\"job_id\":\"$1\"}")" | j "d['data']['state']"); [[ "$s" != running ]] && { echo "$s"; return; }; sleep 1; done; echo timeout; }
+a=$(gate "$(req '"rtown"' profile:disable '{"id":"proxy"}')")
+[[ "$(j "d['status']+':'+d.get('reason','')" <<<"$a")" == refused:not_allowed ]] && ok 'an owner cannot switch profiles' || bad "owner profile: ${a:0:200}"
+a=$(gate "$(req null profile:disable '{"id":"proxy"}')")
+[[ "$(j "d['status']+'/'+d.get('kind','')" <<<"$a")" == ok/plan ]] && grep -qx proxy /etc/simai-env/profiles.enabled && ok 'profile:disable answers a plan first' || bad "disable plan: ${a:0:300}"
+a=$(gate "$(creq profile:disable '{"id":"proxy"}')")
+[[ "$(wait_job "$(j "d.get('job_id','')" <<<"$a")")" == succeeded ]] && ! grep -qx proxy /etc/simai-env/profiles.enabled && ok 'profile:disable switches the profile off' || bad "disable: ${a:0:300}"
+a=$(gate "$(req null self:profiles '{}')")
+[[ "$(j "[x['id'] for x in d['data']['disabled']]" <<<"$a")" == *proxy* && "$(j "[x['id'] for x in d['data']['profiles'] if x['id']=='proxy']" <<<"$a")" == "[]" ]] \
+  && ok 'self:profiles lists the disabled profile apart' || bad "disabled list: ${a:0:300}"
+a=$(gate "$(creq profile:disable '{"id":"generic"}')")
+[[ "$(wait_job "$(j "d.get('job_id','')" <<<"$a")")" != succeeded ]] && grep -qx generic /etc/simai-env/profiles.enabled && ok 'a core profile is not switched off' || bad "core disable: ${a:0:300}"
+a=$(gate "$(creq profile:enable '{"id":"proxy"}')")
+[[ "$(wait_job "$(j "d.get('job_id','')" <<<"$a")")" == succeeded ]] && grep -qx proxy /etc/simai-env/profiles.enabled && ok 'profile:enable switches it back on' || bad "enable: ${a:0:300}"
+a=$(gate "$(req null profile:enable '{"id":"../x"}')")
+[[ "$(j "d['status']+':'+d.get('reason','')" <<<"$a")" == refused:invalid_argument ]] && ok 'an unknown profile id is refused' || bad "bad id: ${a:0:200}"
+
 for d in "$S" "$L" "$B"; do cli site remove --domain "$d" --remove-files yes --drop-db yes --confirm yes >/dev/null 2>&1 || true; done
 echo "failures=$fails"; exit "$fails"

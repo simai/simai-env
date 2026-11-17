@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.57.5 - 2026-11-17
+
+- Panel gateway: `profile:enable` and `profile:disable` (admin only, plan
+  first) so the site wizard can switch a bundled profile on, such as
+  1C-Bitrix or WordPress on a fresh server. `self profiles` answers
+  `disabled [{id, title}]` with the switched-off profiles.
+
 ## 1.57.4 - 2026-11-17
 
 - `ssl letsencrypt` and `ssl renew` take the ACME webroot from the site's
