@@ -604,6 +604,48 @@ A failed item makes the command fail; skipped items do not. Alias, redirect
 and proxy sites are refused (`profile_unsupported`): they have no caches of
 their own.
 
+## db-browser / db-browser-close / db-browser-status
+
+A temporary database browser for one site (1.58.0): Adminer, signed in to
+the site's own database, on the site's own HTTPS address.
+
+```bash
+sudo /root/simai-env/simai-admin.sh site db-browser --domain example.com                 # plan
+sudo /root/simai-env/simai-admin.sh site db-browser --domain example.com --minutes 60 --confirm yes
+sudo /root/simai-env/simai-admin.sh site db-browser-status --domain example.com --output json
+sudo /root/simai-env/simai-admin.sh site db-browser-close --domain example.com --confirm yes
+```
+
+- The address is `https://<domain>/.simai-db/<token>/` with a new random
+  token on every opening; the previous address stops working. It opens
+  only over HTTPS, so the site needs a certificate first.
+- Adminer (version and SHA-256 pinned, downloaded once from its GitHub
+  release into `/usr/local/share/simai-env/adminer/`; `SIMAI_ADMINER_FILE`
+  points to a local copy on offline servers) runs in the site's own PHP-FPM
+  pool as the site's user. A wrapper fixes the driver, server, user and
+  database from `db.env`: other servers, users, databases or drivers in the
+  address are ignored, and the password is never shown or put in the
+  session.
+- `--minutes` 5 to 480, default 60. At the deadline a timer runs
+  `db-browser-close`; after a reboot the five-minute status refresh does it;
+  and the wrapper itself answers 410 past the deadline.
+- The location is not logged (`access_log off`) and answers with
+  `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Robots-Tag:
+  noindex`. Any other path under `/.simai-db/` is 404.
+- Refused: a site without its own database, without PHP, sharing another
+  site's pool (an alias), without HTTPS, paused, or whose PHP lacks the
+  database driver. `site remove` closes it.
+- Files: `/etc/nginx/simai-tools/<project>.conf` (included by every PHP site
+  template; older configs get the include on first use),
+  `/etc/simai-env/db-browser/<project>.php` (root, group of the site user,
+  0640), `/etc/simai-env/db-browser/<project>.env` (root, 0600).
+
+`db-browser-status --output json`: `simai-db-browser/1` with `domain`,
+`open`, `expires_at` (never the address). Panel gateway:
+`site:db-browser {domain, minutes?}` (action; the address is in the job
+result `browser_url`, handed out once by `job:status`, never in the job
+log), `site:db-browser-close {domain}`, `site:db-browser-status {domain}`.
+
 ## restore-ready
 
 Restore a plain PHP site (`generic` profile) from a copy (1.57.1). Bitrix

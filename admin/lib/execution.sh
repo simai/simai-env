@@ -84,6 +84,7 @@ command_plan_check() {
     site:restore-ready) site_restore_plan_check "$@" || return 1 ;;
     site:suspend|site:runtime-suspend) site_suspend_plan_check suspend "$@" || return 1 ;;
     site:resume|site:runtime-resume) site_suspend_plan_check resume "$@" || return 1 ;;
+    site:db-browser) db_browser_plan_check "$@" || return 1 ;;
     file:copy) file_copy_plan_check "$@" || return 1 ;;
     file:trash-restore) file_trash_restore_plan_check "$@" || return 1 ;;
   esac

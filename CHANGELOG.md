@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.58.0 - 2026-11-17
+
+- `site db-browser`: a temporary database browser for one site. Adminer
+  (pinned version and checksum) opens on the site's own HTTPS address under
+  a random path, runs in the site's PHP-FPM pool as the site's user and is
+  signed in to the site's database only; the password is never shown. It
+  closes by itself after `--minutes` (default 60), on `db-browser-close`
+  and with `site remove`. `db-browser-status` says whether it is open.
+  Panel gateway: `site:db-browser` (the address handed out once),
+  `site:db-browser-close`, `site:db-browser-status`.
+- Panel gateway: `site:add` takes `ssl`, `ssl-email` and `ssl-redirect`,
+  so a site and its certificate are one job.
+- PHP site templates include `/etc/nginx/simai-tools/<project>.conf`.
+
 ## 1.57.5 - 2026-11-17
 
 - Panel gateway: `profile:enable` and `profile:disable` (admin only, plan

@@ -1763,6 +1763,10 @@ remove_nginx_site() {
   os_svc_reload nginx || true
   fi
   [[ -z "$custom" ]] || rm -f -- "$custom"  # the site's own directives go with it
+  # A database browser of the site closes with it.
+  if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F db_browser_teardown >/dev/null; then
+    db_browser_teardown "$project"
+  fi
   if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F apache_site_remove >/dev/null; then
     apache_site_remove "$project"
   fi

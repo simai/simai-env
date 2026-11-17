@@ -64,6 +64,7 @@ PUBKEY = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+DBB_MINUTES = re.compile(r"^(?:[5-9]|[1-9][0-9]|[1-3][0-9]{2}|4[0-7][0-9]|480)$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 SECURITY_FIX = re.compile(r"^(antivirus|auto_updates|fail2ban|ssh_password)$")
 GEO_MODE = re.compile(r"^(off|deny|allow)$")
@@ -177,7 +178,7 @@ ALLOW = {
     "site:add": ({"domain": DOMAIN, "profile": PROFILE, "php": PHP, "owner": OWNER, "create-db": YES_NO,
                   "db-engine": ENGINE, "redirect-to": ORIGIN, "redirect-code": CODE, "redirect-path": KEEP_DROP,
                   "backup": YES_NO, "upstream-port": PORT, "upstream-path": UPSTREAM_PATH, "websockets": YES_NO,
-                  "bitrix-files": BITRIX_FILES},
+                  "bitrix-files": BITRIX_FILES, "ssl": YES_NO, "ssl-email": EMAIL, "ssl-redirect": YES_NO},
                  {"domain", "profile"}, "action"),
     "site:remove": ({"domain": DOMAIN, "remove-files": YES_NO, "drop-db": YES_NO, "drop-db-user": YES_NO},
                     {"domain"}, "action"),
@@ -217,6 +218,11 @@ ALLOW = {
                           {"domain", "from", "to"}, "action"),
     "site:redirect-remove": ({"domain": DOMAIN, "from": URL_PATH}, {"domain", "from"}, "action"),
     "site:redirect-list": ({"domain": DOMAIN}, {"domain"}, "read"),
+    # 1.58.0: a temporary database browser (Adminer) on the site's HTTPS
+    # address; the address is in the job result only (ONCE_RESULT).
+    "site:db-browser": ({"domain": DOMAIN, "minutes": DBB_MINUTES}, {"domain"}, "action"),
+    "site:db-browser-close": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "site:db-browser-status": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:db-create": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-drop": ({"domain": DOMAIN}, {"domain"}, "action"),
     "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
@@ -387,7 +393,7 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
 NO_CANCEL = {"self:update"}
 # Job result values shown once: the first job:status of a finished job
 # returns them and removes them from the result file; job:list never does.
-ONCE_RESULT = {"admin_password"}
+ONCE_RESULT = {"admin_password", "browser_url"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file",

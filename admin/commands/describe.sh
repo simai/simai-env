@@ -45,6 +45,8 @@ self_status_refresh_handler() {
   if [[ -n "$(python3 -I "${SIMAI_ENV_ROOT}/lib/timed_change.py" expired 2>/dev/null)" || -s /etc/simai-env/firewall/blocks.json ]]; then
     SIMAI_ADMIN_MENU=0 "${SIMAI_ENV_ROOT}/simai-admin.sh" change expire --confirm yes >/dev/null 2>&1 || true
   fi
+  # Database browsers past their deadline (their timer lost to a reboot).
+  if declare -F db_browser_expire_all >/dev/null; then db_browser_expire_all; fi
 }
 
 self_profiles_handler() {
