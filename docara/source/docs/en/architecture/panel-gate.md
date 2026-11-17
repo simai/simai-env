@@ -405,6 +405,11 @@ Host services and site profiles (1.33.0):
   no|optional|required, cron, queue, alias, args [{name, required, values |
   pattern, default, description}]}]`. Only the profiles `site:add` accepts
   through the gateway (no `alias`). Build the site wizard from it. Since
+  1.57.5 the answer also carries `disabled [{id, title}]`: bundled profiles
+  that are switched off. An administrator switches one with
+  `profile:enable {id}` / `profile:disable {id}` (actions: a plan first,
+  then a job; admin only). `profile:disable` refuses a core profile and a
+  profile that sites still use; the job fails with the reason. Since
   1.56.0 each profile also carries `routes [{id: new|restore|repo, title,
   available, inputs [{name, required, kind, values?}], steps [{id, title,
   command, args | url_from}]}]` (docs/commands/self.md): every step is a
