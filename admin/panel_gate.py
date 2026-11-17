@@ -223,6 +223,9 @@ ALLOW = {
     "site:db-browser": ({"domain": DOMAIN, "minutes": DBB_MINUTES}, {"domain"}, "action"),
     "site:db-browser-close": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-browser-status": ({"domain": DOMAIN}, {"domain"}, "read"),
+    # 1.59.0: a site's database connection details; the password is in the
+    # job result only (ONCE_RESULT db_password).
+    "site:db-credentials": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-create": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-drop": ({"domain": DOMAIN}, {"domain"}, "action"),
     "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
@@ -393,7 +396,7 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
 NO_CANCEL = {"self:update"}
 # Job result values shown once: the first job:status of a finished job
 # returns them and removes them from the result file; job:list never does.
-ONCE_RESULT = {"admin_password", "browser_url"}
+ONCE_RESULT = {"admin_password", "browser_url", "db_password"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file",

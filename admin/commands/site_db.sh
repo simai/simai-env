@@ -287,6 +287,72 @@ site_db_rotate_reload_app() {
   site_db_run_as "$user" "$app" "$php_bin" artisan queue:restart >>"$LOG_FILE" 2>&1 || true
 }
 
+# The PHP files that hold a Bitrix or WordPress site's database password,
+# as "kind|path" (lib/db_config_password.py kinds); dbconn.php only when it
+# sets $DBPassword.
+site_db_rotate_config_files() {
+  local domain="$1" root doc_root f public_dir="public"
+  ROTATE_CONFIG_FILES=()
+  root="${SITE_META[root]:-}"
+  # An empty public_dir means the site root itself.
+  [[ -z "${SITE_META[public_dir]+x}" ]] || public_dir="${SITE_META[public_dir]}"
+  doc_root=$(site_compute_doc_root "$root" "$public_dir") || return 1
+  case "${SITE_META[profile]:-}" in
+    wordpress)
+      for f in "${doc_root}/wp-config.php" "$(dirname "$doc_root")/wp-config.php"; do
+        [[ -f "$f" && ! -L "$f" ]] && { ROTATE_CONFIG_FILES+=("wp|${f}"); break; }
+      done
+      ;;
+    bitrix)
+      f="${doc_root}/bitrix/.settings.php"
+      [[ -f "$f" && ! -L "$f" ]] && ROTATE_CONFIG_FILES+=("bitrix-settings|${f}")
+      f="${doc_root}/bitrix/php_interface/dbconn.php"
+      [[ -f "$f" && ! -L "$f" ]] && grep -q 'DBPassword' "$f" && ROTATE_CONFIG_FILES+=("bitrix-dbconn|${f}")
+      ;;
+  esac
+  if (( ${#ROTATE_CONFIG_FILES[@]} == 0 )); then
+    error "${domain} has no ${SITE_META[profile]} configuration with a database password yet; nothing to rotate"
+    return 1
+  fi
+}
+
+# Runs lib/db_config_password.py as the file's owner; passwords on stdin.
+site_db_rotate_config_run() {
+  local mode="$1" kind="$2" file="$3" old="$4" new="$5" owner
+  owner=$(stat -c %U "$file") || return 2
+  (cd / && printf '%s\n%s\n' "$old" "$new" | sudo -n -u "$owner" python3 -I -c "$(cat "${SIMAI_ENV_ROOT}/lib/db_config_password.py")" \
+    "$mode" "$kind" "$file")
+}
+
+site_db_rotate_config_check() {
+  local old="$1" item rc
+  for item in "${ROTATE_CONFIG_FILES[@]}"; do
+    rc=0
+    site_db_rotate_config_run check "${item%%|*}" "${item#*|}" "$old" "Check0000check" || rc=$?
+    case "$rc" in
+      0) ;;
+      4) error "${item#*|} uses another database password than the site's db.env; rotation blocked"; return 1 ;;
+      3) error "${item#*|} has no database password setting; rotation blocked"; return 1 ;;
+      *) error "Cannot read ${item#*|}; rotation blocked"; return 1 ;;
+    esac
+  done
+}
+
+# Rewrites every file; on a failure the files already rewritten go back.
+site_db_rotate_config_apply() {
+  local old="$1" new="$2" item done_items=()
+  for item in "${ROTATE_CONFIG_FILES[@]}"; do
+    if ! site_db_rotate_config_run apply "${item%%|*}" "${item#*|}" "$old" "$new"; then
+      local back
+      for back in "${done_items[@]}"; do
+        site_db_rotate_config_run apply "${back%%|*}" "${back#*|}" "$new" "$old" || true
+      done
+      return 1
+    fi
+    done_items+=("$item")
+  done
+}
+
 site_db_rotate_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -319,28 +385,29 @@ site_db_rotate_handler() {
     error "Profile ${SITE_META[profile]:-} does not use DB; rotation blocked."
     return 1
   fi
-  case "${SITE_META[profile]:-}" in
-    bitrix|wordpress)
-      # These profiles keep DB credentials in PHP config files that db-rotate
-      # does not rewrite; rotating would take the site down immediately.
-      error "db-rotate does not update ${SITE_META[profile]} configuration files; rotation blocked."
-      echo "Change the password in MySQL and in the site's DB config together during a maintenance window."
-      return 1
-      ;;
-  esac
-
-  local db_name="" db_user="" db_charset="utf8mb4" db_coll="utf8mb4_unicode_ci"
+  local db_name="" db_user="" db_pass="" db_charset="utf8mb4" db_coll="utf8mb4_unicode_ci"
   if read_env=$(read_site_db_env "$domain"); then
     while IFS= read -r entry; do
       local k="${entry%%|*}" v="${entry#*|}"
       case "$k" in
         DB_NAME) db_name="$v" ;;
         DB_USER) db_user="$v" ;;
+        DB_PASS) db_pass="$v" ;;
         DB_CHARSET) db_charset="$v" ;;
         DB_COLLATION) db_coll="$v" ;;
       esac
     done <<<"$read_env"
   fi
+  # Bitrix and WordPress keep the password in PHP files: they are checked
+  # before anything changes and rewritten right after the database (1.59.0).
+  local config_profile=no
+  case "${SITE_META[profile]:-}" in
+    bitrix|wordpress)
+      config_profile=yes
+      site_db_rotate_config_files "$domain" || return 1
+      site_db_rotate_config_check "$db_pass" || return 1
+      ;;
+  esac
   if [[ -z "$db_name" || -z "$db_user" ]]; then
     error "db.env not found or incomplete for ${domain}; cannot rotate."
     return 1
@@ -349,6 +416,10 @@ site_db_rotate_handler() {
   if ! db_validate_db_user "$db_user"; then return 1; fi
 
   echo "Plan to rotate password for ${db_user}@localhost on ${db_name}"
+  if [[ "$config_profile" == yes ]]; then
+    local f
+    for f in "${ROTATE_CONFIG_FILES[@]}"; do echo "- update the password in ${f#*|}"; done
+  fi
   if [[ "$dry_run" == "yes" ]]; then
     echo "Dry-run only; no changes made."
     return 0
@@ -372,11 +443,24 @@ site_db_rotate_handler() {
   if ! site_db_apply_rotate "$domain" "$db_name" "$db_user" "$new_pass" "$db_charset" "$db_coll"; then
     return 1
   fi
+  if [[ "$config_profile" == yes ]]; then
+    if ! site_db_rotate_config_apply "$db_pass" "$new_pass"; then
+      # The site must keep working: the old password goes back.
+      site_db_apply_rotate "$domain" "$db_name" "$db_user" "$db_pass" "$db_charset" "$db_coll" \
+        || error "Could not restore the old password of ${db_user}; set it in the site configuration now"
+      error "The site configuration could not be updated; the old password was restored"
+      return 1
+    fi
+  fi
   echo "Password rotated for ${db_user}"
   echo "DB_NAME=${db_name}"
   echo "DB_USER=${db_user}"
   echo "DB_HOST=localhost"
   echo "DB_PASS=updated (hidden)"
+  if [[ "$config_profile" == yes ]]; then
+    for f in "${ROTATE_CONFIG_FILES[@]}"; do echo "Updated: ${f#*|}"; done
+    return 0
+  fi
   read_site_metadata "$domain" || return 1
   local project_root="${SITE_META[root]:-}"
   if [[ -z "$project_root" || ! -d "$project_root" ]]; then
@@ -404,6 +488,63 @@ site_db_rotate_handler() {
   fi
 }
 
+# Refusals the plan can name: a Bitrix or WordPress configuration that does
+# not hold the db.env password (command_plan_check).
+site_db_rotate_plan_check() {
+  local domain entry pass=""
+  domain=$(command_arg domain "$@")
+  [[ -n "$domain" ]] || return 0
+  validate_domain "$domain" allow || return 1
+  require_site_exists "$domain" || return 1
+  read_site_metadata "$domain" || return 1
+  case "${SITE_META[profile]:-}" in bitrix|wordpress) ;; *) return 0 ;; esac
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == DB_PASS ]] && pass="${entry#*|}"
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  [[ -n "$pass" ]] || { error "${domain} has no database of its own"; return 1; }
+  site_db_rotate_config_files "$domain" || return 1
+  site_db_rotate_config_check "$pass"
+}
+
+# Connection details of a site's database (1.59.0). Through the panel the
+# password is in the job result only, handed out once; the job log and the
+# audit log never carry it.
+site_db_credentials_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}" entry engine name="" user="" pass="" host="" port=""
+  require_args "domain" || return 1
+  validate_domain "$domain" allow || return 1
+  require_site_exists "$domain" || return 1
+  while IFS= read -r entry; do
+    case "${entry%%|*}" in
+      DB_NAME) name="${entry#*|}" ;;
+      DB_USER) user="${entry#*|}" ;;
+      DB_PASS) pass="${entry#*|}" ;;
+      DB_HOST) host="${entry#*|}" ;;
+      DB_PORT) port="${entry#*|}" ;;
+    esac
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  if [[ -z "$name" || -z "$user" || -z "$pass" ]]; then
+    error "${domain} has no database of its own (site db-create --domain ${domain} creates one)"
+    return 1
+  fi
+  engine=$(site_db_engine "$domain")
+  [[ -n "$host" ]] || host=localhost
+  [[ -n "$port" ]] || port=$(db_engine_default_port "$engine")
+  info "Database credentials of ${domain} handed out (${SUDO_USER:-${USER:-root}}${SIMAI_JOB_RESULT:+, panel job})"
+  if [[ -n "${SIMAI_JOB_RESULT:-}" ]]; then
+    python3 -I -c 'import json, sys
+keys = ("engine", "host", "port", "database", "user", "db_password")
+print(json.dumps(dict(zip(keys, sys.stdin.read().split("\n")[:6]))))' <<<"$(printf '%s\n%s\n%s\n%s\n%s\n%s' "$engine" "$host" "$port" "$name" "$user" "$pass")" >"$SIMAI_JOB_RESULT"
+    ui_result_table "Domain|${domain}" "Database|${name} (${engine})" "User|${user}" "Password|(handed to the panel once)"
+    return 0
+  fi
+  ui_header "SIMAI ENV · Database credentials"
+  ui_result_table "Domain|${domain}" "Engine|${engine}" "Host|${host}" "Port|${port}" "Database|${name}" "User|${user}" "Password|${pass}"
+  echo "Keep the password secret. Change it with: simai-admin.sh site db-rotate --domain ${domain} --confirm yes"
+}
+
+register_cmd "site" "db-credentials" "Show the connection details of a site's database, password included" "site_db_credentials_handler" "domain" "" "menu:confirm"
 register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced effects:read"
 register_cmd "site" "db-create" "Create DB + user for a site" "site_db_create_handler" "" "domain= dry_run= confirm=" "tier:advanced"
 register_cmd "site" "db-drop" "Drop DB + user for a site" "site_db_drop_handler" "" "domain= dry_run= confirm= remove_files=" "tier:advanced"

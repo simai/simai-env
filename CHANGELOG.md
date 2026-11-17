@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.59.0 - 2026-11-18
+
+- `site db-credentials`: the connection details of a site's database,
+  password included, for another application or a desktop client. Panel
+  gateway `site:db-credentials`: the password is in the job result, handed
+  out once, never in the job or admin log.
+- `site db-rotate` works on Bitrix and WordPress sites: the new password is
+  written into `bitrix/.settings.php` and `dbconn.php` or `wp-config.php`
+  (only the value equal to the old password, as the file's owner). A
+  configuration with another password is refused in the plan; a failed
+  write restores the old password.
+
 ## 1.58.0 - 2026-11-17
 
 - `site db-browser`: a temporary database browser for one site. Adminer

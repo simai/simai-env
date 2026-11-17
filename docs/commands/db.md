@@ -50,8 +50,28 @@ Notes:
 
 ## db-rotate
 `simai-admin.sh site db-rotate --domain <domain> [--dry_run yes] [--confirm yes]`
-- Rotates the DB user password, updates db.env, and prints the new password once.
-- In menu mode, it can also update the project `.env` immediately after rotation.
+- Rotates the DB user password and updates db.env; the new password is not
+  printed (`site db-credentials` shows it).
+- Laravel and other `.env` sites: the project `.env` is updated (in menu mode
+  it asks first), then the config cache is rebuilt and workers restart.
+- Bitrix and WordPress (1.59.0): the password is also replaced in
+  `bitrix/.settings.php` and `bitrix/php_interface/dbconn.php`
+  (`$DBPassword`), or in `wp-config.php` (`DB_PASSWORD`; the web root or its
+  parent). Only a value equal to the old db.env password is replaced, as
+  the file's owner; other `password` keys (a cache server) stay. A file that
+  holds another password is refused already in the plan, and nothing
+  changes. If a file cannot be written, the old password is restored.
+
+## db-credentials
+`simai-admin.sh site db-credentials --domain <domain> --confirm yes`
+- Shows the connection details of the site's database (1.59.0): engine,
+  host, port, database, user and password, for another application or a
+  desktop client (over an SSH tunnel). Without `--confirm yes` it prints a
+  plan.
+- Panel gateway: `site:db-credentials {domain}` (action; owners on their own
+  sites). The job result carries `engine`, `host`, `port`, `database`,
+  `user` and `db_password`; `job:status` hands `db_password` out once, and
+  neither the job log nor the admin log contains it.
 
 ## db-export
 `simai-admin.sh site db-export --domain <domain> [--target .env] [--confirm yes]`

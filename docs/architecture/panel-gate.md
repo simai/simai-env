@@ -709,6 +709,15 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.59.0: `site:db-credentials {domain}` (action; owners on their own
+  sites): the job result carries `engine`, `host`, `port`, `database`,
+  `user` and `db_password`, handed out once (ONCE_RESULT), never in the job
+  log. `site:db-rotate` works on Bitrix and WordPress sites too: it rewrites
+  the password in their PHP configuration; a configuration holding another
+  password is refused in the plan (`plan_failed`). A database list for the
+  panel is `db:list` (`simai-databases/1`: `databases [{name, engine, site,
+  size_bytes, users}]`, owners see their sites'); a site without a database
+  gets one with `site:db-create {domain}`.
 - 1.57.1: `site:restore-ready {domain, files, dump?, overwrite?}` (action):
   a `generic` site from a files archive (`.tar.gz`, `.tgz`, `.tar`, `.zip`)
   and an optional MySQL dump inside the site directory; refusals of the
