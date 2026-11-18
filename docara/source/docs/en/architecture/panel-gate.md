@@ -444,7 +444,8 @@ Host services and site profiles (1.33.0):
   `warning`, …: that level and above) and `format: json` with `entries [{at,
   level, unit, message, raw}]` from journald, `at` with the zone),
   `service:restart {name}` and `service:reload {name}`
-  (actions), administrator only. `name` is one of `nginx`, `php<ver>-fpm`,
+  (actions), administrator only; `service:stop` and `service:start` since
+  1.62.0 (see the version list). `name` is one of `nginx`, `php<ver>-fpm`,
   `mysql`, `mariadb`, `postgresql`, `redis-server`, `cron`, and must exist on
   the host. nginx and PHP-FPM test their configuration first; a failed test
   fails the job and the service keeps running. A failed restart ends the job
@@ -766,6 +767,14 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.62.0: `service:stop {name}` and `service:start {name}` (actions,
+  administrator only). `service:list` rows have `critical` and `can_stop`;
+  a stop of nginx, PHP-FPM or a database server is refused `critical`
+  before a job starts. The plan of a stop has `service {service, active,
+  critical, server, sites [{domain, uses}], until}`: `uses` is
+  `scheduler` (cron), `cache_store`, `cache_driver`, `session_driver`,
+  `queue_connection` or `worker` (Redis); `server: true` for cron (the
+  server's own checks pause).
 - 1.61.0: `file:preview {domain, path, max-bytes?}` (read); the trash
   keeps 7 days and empties itself hourly; a `site:db-browser` plan is
   refused with its reason: `no_database`, `no_php`, `no_https`, `alias`
