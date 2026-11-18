@@ -507,6 +507,33 @@ panel_setup_link_handler() {
   panel_print_setup_link "$domain" "$token"
 }
 
+panel_reset_password_handler() {
+  parse_kv_args "$@"
+  local email="${PARSED_ARGS[email]:-}" domain user root php_bin rc=0
+  domain=$(panel_state_get PANEL_DOMAIN); user=$(panel_state_get PANEL_USER)
+  [[ -n "$domain" && -n "$user" ]] || { error "The panel is not installed (panel install)"; return 1; }
+  if [[ -n "$email" && ! "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
+    error "Invalid --email"; return 1
+  fi
+  root="$(panel_site_root "$domain")/current"
+  [[ -f "${root}/artisan" ]] || { error "The panel build has no artisan in ${root}"; return 1; }
+  # The new password is typed twice, hidden, straight into the terminal: it
+  # never goes through arguments, the environment or the log.
+  if ! { : </dev/tty; } 2>/dev/null; then
+    error "Run it in an interactive terminal (ssh -t): the new password is asked there"; return 1
+  fi
+  read_site_metadata "$domain"
+  php_bin=$(resolve_php_bin "${SITE_META[php]}")
+  local -a cmd=("$php_bin" artisan larena:panel-reset-password)
+  [[ -z "$email" ]] || cmd+=("$email")
+  (cd "$root" && sudo -u "$user" -H "${cmd[@]}") </dev/tty >/dev/tty 2>/dev/tty || rc=$?
+  if (( rc != 0 )); then
+    error "The password was not reset (the account is unknown or blocked, the password was refused, or input was cancelled)"
+    return "$rc"
+  fi
+  ui_result_table "Panel|${domain}" "Password|reset from the console; the person's sessions are closed"
+}
+
 panel_remove_site() {
   local domain="$1"
   local -a remove=(site remove --domain "$1" --remove-files yes --confirm yes)
@@ -548,6 +575,7 @@ panel_status_handler() {
 
 register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "" "domain= port= version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"
 register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "version= git= ref= archive= sha256=" "tier:advanced lock:none"
+register_cmd "panel" "reset-password" "Reset a panel password from the server console (asks the new password in the terminal)" "panel_reset_password_handler" "" "email=" "tier:advanced"
 register_cmd "panel" "remove" "Remove the panel site and its gateway access (other sites are not touched)" "panel_remove_handler" "" "" "tier:advanced lock:none"
 register_cmd "panel" "status" "Show the installed panel" "panel_status_handler" "" "" "effects:read"
 register_cmd "panel" "setup-link" "Replace the panel's one-time first sign-in link" "panel_setup_link_handler" "" "" "tier:advanced"

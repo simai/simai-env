@@ -83,6 +83,12 @@ if (($argv[1] ?? '') === 'key:generate') {
     $body = is_file($env) ? preg_replace('/^APP_KEY=.*$/m', '', file_get_contents($env)) : '';
     file_put_contents($env, rtrim($body) . "\nAPP_KEY=base64:" . base64_encode(random_bytes(32)) . "\n");
 }
+// The console password reset: hidden input from the terminal, never an argument.
+if (($argv[1] ?? '') === 'larena:panel-reset-password') {
+    $pass = trim((string) fgets(STDIN));
+    file_put_contents('/tmp/panel-reset-seen', trim(shell_exec('id -un')) . ' ' . ($argv[2] ?? '-') . ' ' . (stream_isatty(STDIN) ? 'tty' : 'pipe') . "\n");
+    exit($pass === 'good-pass-123' ? 0 : 2);
+}
 exit(0);
 PHP
   chmod +x "$dir/artisan"
@@ -121,6 +127,15 @@ cli panel status 2>&1 | grep 'build' >/dev/null && ok "status shows the build" |
 grep -q "^${user2} ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate \"\"" /etc/sudoers.d/simai-panel && ok "gateway rule follows the build's account" || bad "sudoers: $(cat /etc/sudoers.d/simai-panel)"
 grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' $env && ok "the build gets a setup token in .env" || bad "token for build"
 [[ "$(printf '{"schema":"simai-panel-request/1","request_id":"p2","actor":{"user":"a","owner":null},"command":"self:describe","args":{}}' | sudo -n -u "$user2" sudo -n /usr/local/sbin/simai-panel-gate | field 'd["status"]')" == ok ]] && ok "the build calls the gateway" || bad "build gateway call"
+# Password reset from the console (1.63.3): run as the panel account, in a terminal only.
+rm -f /tmp/panel-reset-seen
+setsid -w ./simai-admin.sh panel reset-password --email admin@panel.test --confirm yes </dev/null >/tmp/prp0 2>&1 && bad "reset without a terminal accepted" || ok "reset needs a terminal"
+cli panel reset-password --email 'x;id' --confirm yes >/tmp/prp1 2>&1 && bad "bad email accepted" || ok "reset refuses a malformed email"
+printf 'good-pass-123\n' | script -qec "./simai-admin.sh panel reset-password --email admin@panel.test --confirm yes" /dev/null >/tmp/prp2 2>&1 && grep -q 'reset from the console' /tmp/prp2 \
+  && [[ "$(cat /tmp/panel-reset-seen 2>/dev/null)" == "$user2 admin@panel.test tty" ]] && ok "reset runs artisan as the panel account in a terminal" || { bad "reset: $(cat /tmp/panel-reset-seen 2>&1) $(tail -3 /tmp/prp2)"; }
+grep -rqs 'good-pass-123' /var/log/simai-admin.log /var/log/simai-audit.log && bad "password in a log" || ok "the password stays out of the logs"
+printf 'short\n' | script -qec "./simai-admin.sh panel reset-password --email admin@panel.test --confirm yes" /dev/null >/tmp/prp3 2>&1
+grep -q 'not reset' /tmp/prp3 && ok "a refused reset is reported" || bad "refused reset: $(tail -3 /tmp/prp3)"
 # Uploads up to 1 GB: PHP and nginx limits of the panel site.
 grep -qE 'upload_max_filesize.*1024M' /etc/php/*/fpm/pool.d/${project}.conf && grep -qE 'post_max_size.*1100M' /etc/php/*/fpm/pool.d/${project}.conf \
   && ok "the panel's PHP takes 1 GB uploads" || bad "panel php limits: $(grep -hE 'upload_max|post_max' /etc/php/*/fpm/pool.d/${project}.conf)"

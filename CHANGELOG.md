@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.63.3 - 2026-11-18
+
+- `panel reset-password [--email <address>]`: resets a panel password from
+  the server console. It runs the panel's own artisan command as the panel
+  account; the new password is typed in the terminal, hidden, and never
+  reaches arguments or logs.
+
 ## 1.63.2 - 2026-11-18
 
 - Static sites send `Access-Control-Allow-Origin: *` on the SIMAI Framework
