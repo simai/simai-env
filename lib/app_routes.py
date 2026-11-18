@@ -105,6 +105,13 @@ def static_release_routes(docroot: str) -> str:
         "        add_header Cache-Control $simai_static_cache_control always;\n"
         "        try_files $uri =404;\n"
         "    }\n"
+        '    location ~ "^/_docara/vendor/simai-framework/runtime/[0-9a-f]{40}/distr/core/contracts/icon-names\\.v[0-9]+\\.json$" {\n'
+        f"        root {docroot};\n"
+        '        add_header Access-Control-Allow-Origin "*" always;\n'
+        '        add_header X-Content-Type-Options "nosniff" always;\n'
+        "        add_header Cache-Control $simai_static_cache_control always;\n"
+        "        try_files $uri =404;\n"
+        "    }\n"
         "    location / {\n"
         f"        root {docroot};\n"
         "        try_files $uri $uri/ $uri.html /200.html =404;\n"

@@ -28,12 +28,14 @@ mk_artifact() {  # $1 label, $2 extra
   echo "pages.test" >"$dir/CNAME"; : >"$dir/.nojekyll"
   mkdir -p "$dir/_docara/vendor"; echo 'a{}' >"$dir/_docara/shell.0123456789abcdef.css"; echo 'b{}' >"$dir/_docara/plain.css"; echo font >"$dir/_docara/icons.0123456789abcdef.woff2"
   echo "MIT" >"$dir/_docara/vendor/LICENSE"
+  mkdir -p "$dir/$(dirname "$ICONS")"; echo '{"icons":[]}' >"$dir$ICONS"; echo '{}' >"$dir$(dirname "$ICONS")/other.json"
   printf '{"schema": "simai-app/1", "profile": "static", "health": {"path": "/ok/"}}\n' >"$dir/.simai/app.json"
   [[ "${2:-}" == escape ]] && ln -s ../../../../etc/passwd "$dir/leak.txt"
   tar -C "$dir" -czf "/root/art-$1.tgz" .
   sha256sum "/root/art-$1.tgz" | cut -d' ' -f1
 }
 
+ICONS=/_docara/vendor/simai-framework/runtime/24d64b7f6eb7a782d648dbb5b44f7eb763ec815b/distr/core/contracts/icon-names.v1.json
 cli site add --domain $D --profile static --confirm yes >/tmp/s-add 2>&1 && ok "site add static" || { bad "site add"; tail -10 /tmp/s-add; }
 s1=$(mk_artifact v1)
 cli site deploy --domain $D --archive /root/art-v1.tgz --sha256 "$s1" >/tmp/s-plan 2>&1
@@ -68,6 +70,10 @@ hdr $font -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin: \*$' && ok
 hdr $font | grep -qi '^X-Content-Type-Options: nosniff' && hdr $font | grep -qi '^Cache-Control: public, max-age=31536000, immutable$' && ok "fonts keep nosniff and caching" || bad "font headers: $(hdr $font)"
 [[ "$(code /_docara/missing.woff2)" == 404 ]] && ok "missing font is 404" || bad "missing font: $(code /_docara/missing.woff2)"
 hdr /style.css | grep -qi '^Access-Control-Allow-Origin' && bad "CORS header beyond fonts" || ok "other files stay same-origin"
+hdr $ICONS -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin: \*$' && hdr $ICONS | grep -qi '^X-Content-Type-Options: nosniff' \
+  && hdr $ICONS | grep -qi '^Cache-Control: public, max-age=600$' && ok "Framework icon names list loads from sandboxed frames" || bad "icons cors: $(hdr $ICONS -H 'Origin: null')"
+hdr "$(dirname $ICONS)/other.json" -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin' && bad "CORS on other JSON" || ok "other JSON stays same-origin"
+[[ "$(code "${ICONS/v1.json/v9.json}")" == 404 ]] && ok "missing icon names list is 404" || bad "missing icons: $(code "${ICONS/v1.json/v9.json}")"
 # Sites rendered before 1.24.0 get the font location from self migrate.
 sed -i '/# Fonts load in CORS mode/,/^    }$/d' $cfg && nginx -s reload && sleep 1
 cli self migrate --confirm yes >/tmp/s-mig2 2>&1
@@ -75,6 +81,13 @@ grep -q "$D: fonts allowed to any origin" /tmp/s-mig2 && grep -c 'woff2?|ttf|otf
 for _ in {1..20}; do hdr $font | grep -qi '^Access-Control-Allow-Origin' && break; sleep 0.5; done
 hdr $font | grep -qi '^Access-Control-Allow-Origin: \*$' && ok "migrated site allows fonts" || bad "after font migrate: $(hdr $font)"
 cli self migrate --confirm yes 2>&1 | grep -q "fonts allowed" && bad "font migration not idempotent" || ok "font migration is idempotent"
+# Sites rendered before 1.63.2 get the icon names location from self migrate.
+sed -i '/# The SIMAI Framework icon names list/,/^    }$/d' $cfg && nginx -s reload && sleep 1
+cli self migrate --confirm yes >/tmp/s-mig3 2>&1
+grep -q "$D: icon names list allowed to any origin" /tmp/s-mig3 && grep -c 'contracts/icon-names' $cfg | grep -qx 1 && ok "migrate adds the icon names location once" || { bad "icons migration"; tail -5 /tmp/s-mig3; }
+for _ in {1..20}; do hdr $ICONS -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin' && break; sleep 0.5; done
+hdr $ICONS -H 'Origin: null' | grep -qi '^Access-Control-Allow-Origin: \*$' && ok "migrated site allows the icon names list" || bad "after icons migrate: $(hdr $ICONS)"
+cli self migrate --confirm yes 2>&1 | grep -q "icon names list allowed" && bad "icons migration not idempotent" || ok "icons migration is idempotent"
 [[ "$(code /.simai/app.json)" =~ ^40[34]$ ]] && ok "manifest in the artifact is not served" || bad "manifest served"
 
 s2=$(mk_artifact v2 broken)

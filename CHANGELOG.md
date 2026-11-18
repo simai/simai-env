@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.63.2 - 2026-11-18
+
+- Static sites send `Access-Control-Allow-Origin: *` on the SIMAI Framework
+  icon names list
+  (`/_docara/vendor/simai-framework/runtime/<40-hex>/distr/core/contracts/icon-names.v<N>.json`),
+  so Docara example frames (origin `null`) load it, as fonts already do;
+  other JSON stays same-origin. `self migrate` adds the location to existing
+  static sites (backup, `nginx -t`, restored on failure).
+
 ## 1.63.1 - 2026-11-18
 
 - `owner create --sites a.test,b.test`: the account and its existing sites

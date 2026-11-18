@@ -230,6 +230,32 @@ self_migrate_static_font_cors() {
   return 0
 }
 
+# Static sites rendered before 1.63.2 refused the SIMAI Framework icon names
+# list to sandboxed example frames.
+self_migrate_static_icon_names_cors() {
+  local cfg domain backup
+  for cfg in /etc/nginx/sites-available/*.conf; do
+    [[ -f "$cfg" ]] || continue
+    grep -q '^# simai-nginx-template: static$' "$cfg" || continue
+    grep -q '^    location / {$' "$cfg" || continue
+    grep -q 'contracts/icon-names' "$cfg" && continue
+    domain=$(basename "$cfg" .conf)
+    backup="${cfg}.bak.$(date +%Y%m%d%H%M%S)"
+    cp -p "$cfg" "$backup" || continue
+    ICON_BLOCK="$(sed -n '/# The SIMAI Framework icon names list/,/^    }$/p' "$NGINX_TEMPLATE_STATIC")" awk '
+      $0 == "    location / {" && !done { print ENVIRON["ICON_BLOCK"]; print ""; done = 1 }
+      { print }' "$backup" >"$cfg"
+    if grep -q 'contracts/icon-names' "$cfg" && nginx -t >>"$LOG_FILE" 2>&1; then
+      SELF_MIGRATE_CHANGES+=("${domain}: icon names list allowed to any origin")
+      SELF_MIGRATE_RELOAD_NGINX=1
+    else
+      cp -p "$backup" "$cfg"
+      warn "Could not add the icon names location to ${cfg}; previous configuration restored"
+    fi
+  done
+  return 0
+}
+
 # Node sites with a static root rendered by 1.18.0-1.18.1: routes without
 # charset; render them again from the current release.
 self_migrate_app_routes_charset() {
@@ -305,6 +331,7 @@ self_migrate_handler() {
   SELF_MIGRATE_RELOAD_NGINX=0
   self_migrate_static_charset
   self_migrate_static_font_cors
+  self_migrate_static_icon_names_cors
   self_migrate_app_routes_charset
   self_migrate_bitrix_dot_default
   if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
