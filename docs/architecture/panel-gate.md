@@ -762,6 +762,13 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.62.2: files with passwords (`.env`, `wp-config.php`, `.settings.php`,
+  `dbconn.php`, keys…; the list is in `docs/commands/file.md`) are
+  `secret: true` in `file:list`, `file:stat` and `file:trash-list`.
+  `file:archive` and `file:extract` take `without-secrets: yes|no`: such
+  files are not packed, and are neither created nor overwritten on
+  extraction; the job result has `secret_skipped [path]` (at most 30) and
+  `secret_skipped_total`. Packing such a file itself fails (`secret`).
 - 1.62.0: `service:stop {name}` and `service:start {name}` (actions,
   administrator only). `service:list` rows have `critical` and `can_stop`;
   a stop of nginx, PHP-FPM or a database server is refused `critical`

@@ -50,6 +50,18 @@ file_prepare() {
 file_show() {
   local json
   json=$(file_helper "$@") || return 1
+  # A panel job hands on what archive/extract left out (job:status result;
+  # the gateway reads 4 KiB of it, so at most 30 paths and the total).
+  if [[ -n "${SIMAI_JOB_RESULT:-}" && "$json" == *'"secret_skipped"'* ]]; then
+    python3 -I -c '
+import json, sys
+d = json.loads(sys.argv[1])
+skipped = d.get("secret_skipped") or []
+keep = {k: d[k] for k in ("path", "type", "packed", "files", "dirs", "skipped") if k in d}
+paths = [p[:100] for p in skipped[:30]]
+open(sys.argv[2], "w").write(json.dumps({**keep, "secret_skipped": paths, "secret_skipped_total": len(skipped)}))' \
+      "$json" "$SIMAI_JOB_RESULT" 2>/dev/null || true
+  fi
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
     printf '%s\n' "$json"
   else
@@ -128,13 +140,20 @@ file_upload_handler() {
   file_show put "${PARSED_ARGS[path]}" "$expect" <"$src"
 }
 
-file_archive_handler() { file_prepare "$@" && require_args "path to" && file_show archive "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}"; }
+file_archive_handler() {
+  file_prepare "$@" && require_args "path to" || return 1
+  local ws="${PARSED_ARGS[without-secrets]:-no}"
+  [[ "$ws" =~ ^(yes|no)$ ]] || { error "--without-secrets must be yes or no"; return 1; }
+  file_show archive "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}" "$ws"
+}
 
 file_extract_handler() {
   file_prepare "$@" && require_args "path to" || return 1
   local overwrite="${PARSED_ARGS[overwrite]:-no}"
   [[ "$overwrite" =~ ^(yes|no)$ ]] || { error "--overwrite must be yes or no"; return 1; }
-  file_show extract "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}" "$overwrite"
+  local ws="${PARSED_ARGS[without-secrets]:-no}"
+  [[ "$ws" =~ ^(yes|no)$ ]] || { error "--without-secrets must be yes or no"; return 1; }
+  file_show extract "${PARSED_ARGS[path]}" "${PARSED_ARGS[to]}" "$overwrite" "$ws"
 }
 
 file_mkdir_handler() { file_prepare "$@" && require_args "path" && file_show mkdir "${PARSED_ARGS[path]}"; }
@@ -199,8 +218,8 @@ register_cmd "file" "preview" "Show an image or the start of a text file of a si
 register_cmd "file" "cat" "Write the raw bytes of a site file to stdout" "file_cat_handler" "domain path" "" "tier:advanced effects:read"
 register_cmd "file" "write" "Replace or create a text file of a site from --content-file" "file_write_handler" "domain path content-file" "expect-sha256=" "tier:advanced"
 register_cmd "file" "upload" "Put an uploaded file into a site (up to 1 GiB, checked against --sha256)" "file_upload_handler" "domain path source sha256" "expect-sha256=" "tier:advanced"
-register_cmd "file" "archive" "Pack a file or directory of a site into a new .tar.gz, .tgz, .tar or .zip" "file_archive_handler" "domain path to" "" "tier:advanced"
-register_cmd "file" "extract" "Unpack an archive of a site into a directory (files and directories only)" "file_extract_handler" "domain path to" "overwrite=" "tier:advanced"
+register_cmd "file" "archive" "Pack a file or directory of a site into a new .tar.gz, .tgz, .tar or .zip" "file_archive_handler" "domain path to" "without-secrets=" "tier:advanced"
+register_cmd "file" "extract" "Unpack an archive of a site into a directory (files and directories only)" "file_extract_handler" "domain path to" "overwrite= without-secrets=" "tier:advanced"
 register_cmd "file" "mkdir" "Create a directory in a site" "file_mkdir_handler" "domain path" "" "tier:advanced"
 register_cmd "file" "rename" "Rename or move a file or directory within a site" "file_rename_handler" "domain path to" "" "tier:advanced"
 register_cmd "file" "remove" "Move a file, a link or a directory of a site into its trash (--permanent yes deletes for good)" "file_remove_handler" "domain path" "permanent=" "tier:advanced"

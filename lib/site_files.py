@@ -106,9 +106,32 @@ def kind(mode):
     return "other"
 
 
+# Files that hold passwords and keys (1.62.2). The panel needs a separate
+# right to see them; `secret` marks them in listings, and archive/extract
+# with without-secrets leave them out. The trash holds deleted files under
+# other names, so it is left out as a whole.
+SECRET_NAMES = {"wp-config.php", ".settings.php", ".settings_extra.php", "dbconn.php", "auth.json",
+                ".htpasswd", ".my.cnf", ".pgpass", ".netrc", "id_rsa", "id_ecdsa", "id_ed25519"}
+SECRET_NOT = {".env.example", ".env.sample", ".env.dist", ".env.template"}
+
+
+def is_secret(name):
+    if name in SECRET_NOT:
+        return False
+    return name in SECRET_NAMES or name == ".env" or name.startswith(".env.") \
+        or name.endswith((".pem", ".key", ".p12", ".pfx"))
+
+
+def secret_path(names):
+    """True for a secret file or anything inside the trash."""
+    return bool(names) and (is_secret(names[-1]) or TRASH_DIR in names)
+
+
 def entry(name, st, dir_fd):
     e = {"name": name, "type": kind(st.st_mode), "size": st.st_size, "mtime": int(st.st_mtime),
          "mode": oct(stat.S_IMODE(st.st_mode))[2:]}
+    if e["type"] != "dir" and is_secret(name):
+        e["secret"] = True
     if e["type"] == "link":
         try:
             e["target"] = os.readlink(name, dir_fd=dir_fd)
@@ -406,9 +429,13 @@ def walk_tree(dir_fd, prefix):
                 os.close(sub)
 
 
-def op_archive(root_fd, names, dest):
+def op_archive(root_fd, names, dest, without_secrets="no"):
     if not names or not dest:
         raise Fail("bad_path", "name what to pack and the archive to create")
+    skip = without_secrets == "yes"
+    if skip and secret_path(names):
+        raise Fail("secret", f"{names[-1]} holds passwords; it is not packed without the right to see it")
+    skipped = []
     fmt = archive_format(dest[-1])
     if dest[:len(names)] == names:
         raise Fail("bad_path", "the archive cannot be inside what it packs")
@@ -428,6 +455,10 @@ def op_archive(root_fd, names, dest):
             yield names[-1], top, src_parent, names[-1]
             if top_fd is not None:
                 for rel, st, fd, n in walk_tree(top_fd, names[-1]):
+                    if skip and secret_path(rel.split("/")):
+                        if is_secret(n) and len(skipped) < 1000:
+                            skipped.append("/".join(names[:-1] + [rel]))
+                        continue
                     yield rel, st, fd, n
         tmp = f".{dest[-1][:200]}.simai-{os.getpid()}"
         out_fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644,
@@ -457,7 +488,10 @@ def op_archive(root_fd, names, dest):
     finally:
         os.close(src_parent)
         os.close(dst_parent)
-    return {"schema": "simai-file-stat/1", "path": "/".join(dest), "type": "file", "packed": count}
+    result = {"schema": "simai-file-stat/1", "path": "/".join(dest), "type": "file", "packed": count}
+    if skip:
+        result["secret_skipped"] = skipped
+    return result
 
 
 def open_member(fd, name):
@@ -553,13 +587,25 @@ def ensure_dirs(root_fd, names):
     return fd
 
 
-def op_extract(root_fd, names, dest, overwrite):
+def op_extract(root_fd, names, dest, overwrite, without_secrets="no"):
+    skip = without_secrets == "yes"
+    secret_skipped = []
     fmt = archive_format(names[-1] if names else "")
     src = os.fdopen(open_file(root_fd, names), "rb")
     dest_fd = ensure_dirs(root_fd, dest)
     files = dirs = skipped = 0
     try:
         entries = list(members(src, fmt))
+        if skip:
+            # Neither created nor overwritten: the entry is left out (1.62.2).
+            kept = []
+            for e in entries:
+                if e[0] and secret_path(e[0]):
+                    if e[1] == "file" and len(secret_skipped) < 1000:
+                        secret_skipped.append("/".join(dest + e[0]))
+                    continue
+                kept.append(e)
+            entries = kept
         if overwrite != "yes":
             clash = []
             for mnames, kind, _, _ in entries:
@@ -603,8 +649,11 @@ def op_extract(root_fd, names, dest, overwrite):
     finally:
         os.close(dest_fd)
         src.close()
-    return {"schema": "simai-file-stat/1", "path": "/".join(dest), "type": "dir", "files": files, "dirs": dirs,
-            "skipped": skipped}
+    result = {"schema": "simai-file-stat/1", "path": "/".join(dest), "type": "dir", "files": files, "dirs": dirs,
+              "skipped": skipped}
+    if skip:
+        result["secret_skipped"] = secret_skipped
+    return result
 
 
 # The trash: <root>/.simai-trash/<id>/{item, meta.json}. It sits in the site
@@ -702,7 +751,10 @@ def trash_entry(trash_fd, tid):
     path = meta.get("path") if isinstance(meta.get("path"), str) else None
     size = meta.get("size") if isinstance(meta.get("size"), int) else st.st_size
     return {"id": tid, "path": path, "name": path.rsplit("/", 1)[-1] if path else None, "type": kind(st.st_mode),
-            "size": size, "deleted_at": when, "expires_at": when + TRASH_DAYS * 86400}
+            "size": size, "deleted_at": when, "expires_at": when + TRASH_DAYS * 86400,
+            # A deleted .env restored under another name could be read: the
+            # panel treats the entry like the file (1.62.2).
+            "secret": bool(path) and is_secret(path.rsplit("/", 1)[-1])}
 
 
 def op_trash(root_fd, names):
@@ -1066,9 +1118,9 @@ def main(argv):
     elif op == "put":
         result = op_write(root_fd, names, argv[3], MAX_UPLOAD)
     elif op == "archive":
-        result = op_archive(root_fd, names, parts(argv[3]))
+        result = op_archive(root_fd, names, parts(argv[3]), argv[4] if len(argv) > 4 else "no")
     elif op == "extract":
-        result = op_extract(root_fd, names, parts(argv[3]), argv[4])
+        result = op_extract(root_fd, names, parts(argv[3]), argv[4], argv[5] if len(argv) > 5 else "no")
     elif op == "rename":
         result = op_rename(root_fd, names, parts(argv[3]))
     elif op == "gather":

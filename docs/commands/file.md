@@ -13,12 +13,21 @@ outside. Links are listed and can be removed, but are never followed.
 Errors read `error: <code>: <message>`: `bad_path`, `not_found`,
 `not_a_directory`, `not_a_file`, `permission_denied`, `exists`, `changed`,
 `too_large`, `not_text`, `bad_archive`, and for the trash `bad_id`,
-`no_trash`, `cross_device`.
+`no_trash`, `cross_device`, `secret`.
+
+Files with passwords (1.62.2): `.env` and `.env.*` (not `.env.example`,
+`.env.sample`, `.env.dist`, `.env.template`), `wp-config.php`,
+`.settings.php`, `.settings_extra.php`, `dbconn.php`, `auth.json`,
+`.htpasswd`, `.my.cnf`, `.pgpass`, `.netrc`, `id_rsa`, `id_ecdsa`,
+`id_ed25519` and `*.pem`, `*.key`, `*.p12`, `*.pfx`. Listings, `stat` and
+the trash mark them `secret: true`; the panel shows and changes them only
+to people with that right. `archive` and `extract` take `--without-secrets
+yes` for the others.
 
 ## list
 `--path P` (default: the site directory). `--output json` answers
 `simai-files/1`: `path, entries [{name, type: dir|file|link|other, size,
-mtime, mode, target (links)}], truncated` (at most 5000 entries; directories
+mtime, mode, target (links), secret (1.62.2)}], truncated` (at most 5000 entries; directories
 first).
 
 ## stat
@@ -63,7 +72,9 @@ sha256 from `read` fails `changed` if someone changed the file meanwhile;
 `--path P --to Q --confirm yes`. Packs the file or directory `P` into the new
 archive `Q`: `.zip`, `.tar.gz`, `.tgz` or `.tar` by its name. Links are
 stored as links and never followed; sockets and devices are left out. `Q`
-cannot be inside `P`.
+cannot be inside `P`. With `--without-secrets yes` files with passwords and
+the trash are left out and listed in `secret_skipped`; packing such a file
+itself is refused (`secret`).
 
 ## extract
 `--path P --to D [--overwrite yes|no] --confirm yes`. Unpacks `P` (`.zip`,
@@ -72,7 +83,10 @@ files and directories are unpacked; links, hard links and devices are
 skipped and counted. An entry with an absolute name or `..` refuses the whole
 archive (`bad_archive`), as does one with more than 100000 entries or 8 GiB.
 Without `--overwrite yes` nothing is written if any file already exists.
-The answer counts `files`, `dirs` and `skipped`.
+The answer counts `files`, `dirs` and `skipped`. With `--without-secrets
+yes` entries that are files with passwords are neither created nor
+overwritten (an existing `.env` stays as it was) and are listed in
+`secret_skipped`; they do not count as a clash for `--overwrite no`.
 
 ## mkdir
 `--path P --confirm yes`. The parent must exist.

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.2 - 2026-11-18
+
+- Files with passwords (`.env`, `wp-config.php`, Bitrix `.settings.php`
+  and `dbconn.php`, keys) are marked `secret` in file listings and the
+  trash. `file archive` and `file extract` take `--without-secrets yes`:
+  such files are not packed, and unpacking neither creates nor overwrites
+  them; the answer names what was left out. The panel passes it for
+  people without the right to see these files (owner decision).
+
 ## 1.62.1 - 2026-11-18
 
 - Larena Panel 0.4.7: a job page that says plainly whether an action is

@@ -2,7 +2,9 @@
 # Files for the panel (1.61.0): file preview (an image whole, the start of a
 # text file, binaries refused, the 5 MiB cap), the trash keeps 7 days and an
 # expired entry goes with the hourly status refresh, without anyone opening
-# the trash; a database browser plan names its refusal (no_https).
+# the trash; a database browser plan names its refusal (no_https). Files
+# with passwords (1.62.2): marked secret in the list; archive and extract
+# with without-secrets leave them out and name them.
 set -uo pipefail
 rm -rf /root/simai-env-fp
 cp -r /src /root/simai-env-fp
@@ -55,6 +57,41 @@ r=$(gate "$(req site:db-browser "{\"domain\":\"$D\"}")")
   && ok 'db browser refusal: no_https' || bad "reason: $(head -c 300 <<<"$r")"
 r=$(gate "$(req site:db-browser "{\"domain\":\"$D\"}" ',"confirm":true')")
 [[ "$(j "d['status']+'/'+d['reason']" <<<"$r")" == refused/no_https ]] && ok 'confirmed: refused before a job starts' || bad "confirm: $(head -c 300 <<<"$r")"
+
+# Files with passwords.
+wait_job() {
+  local a st
+  for _ in $(seq 1 120); do
+    a=$(gate "$(req job:status "{\"job_id\":\"$1\"}")")
+    st=$(j "d['data']['state']" <<<"$a" 2>/dev/null)
+    [[ "$st" == running || -z "$st" ]] || break; sleep 1
+  done
+  printf '%s' "$a"
+}
+mkdir -p $root/sec/sub
+printf 'DB_PASSWORD=old\n' >$root/sec/.env; printf 'x\n' >$root/sec/.env.example; printf 'a\n' >$root/sec/a.txt
+printf '<?php\n' >$root/sec/sub/wp-config.php
+chown -R $own $root/sec
+l=$(gate "$(req file:list "{\"domain\":\"$D\",\"path\":\"sec\"}")")
+[[ "$(j "sorted(e['name'] for e in d['data']['entries'] if e.get('secret'))" <<<"$l")" == "['.env']" ]] && ok 'list marks .env secret, not .env.example' || bad "secret mark: $(head -c 400 <<<"$l")"
+job=$(gate "$(req file:archive "{\"domain\":\"$D\",\"path\":\"sec\",\"to\":\"sec.tar.gz\",\"without-secrets\":\"yes\"}" ',"confirm":true')" | j "d.get('job_id','')")
+a=$(wait_job "$job")
+[[ "$(j "sorted(d['data']['result']['secret_skipped'])" <<<"$a")" == "['sec/.env', 'sec/sub/wp-config.php']" ]] && ok 'archive without secrets names what it left out' || bad "archive: $(head -c 500 <<<"$a")"
+[[ "$(tar tzf $root/sec.tar.gz | sort | tr '\n' ' ')" == "sec/ sec/.env.example sec/a.txt sec/sub/ " ]] && ok 'the archive holds no secret file' || bad "contents: $(tar tzf $root/sec.tar.gz | tr '\n' ' ')"
+r=$(gate "$(req file:archive "{\"domain\":\"$D\",\"path\":\"sec/.env\",\"to\":\"env.zip\",\"without-secrets\":\"yes\"}" ',"confirm":true')" | j "d.get('job_id','')")
+a=$(wait_job "$r"); [[ "$(j "d['data']['state']" <<<"$a")" == failed && ! -e $root/env.zip ]] && ok 'packing .env itself is refused' || bad "env pack: $(head -c 300 <<<"$a")"
+cli file archive --domain $D --path sec --to full.tar.gz --confirm yes >/dev/null 2>&1
+printf 'DB_PASSWORD=new\n' >$root/sec/.env.new; tar czf $root/evil.tar.gz -C $root --transform 's/.env.new/.env/' sec/.env.new; chown $own $root/evil.tar.gz $root/full.tar.gz
+job=$(gate "$(req file:extract "{\"domain\":\"$D\",\"path\":\"evil.tar.gz\",\"to\":\".\",\"overwrite\":\"yes\",\"without-secrets\":\"yes\"}" ',"confirm":true')" | j "d.get('job_id','')")
+a=$(wait_job "$job")
+[[ "$(cat $root/sec/.env)" == DB_PASSWORD=old && "$(j "d['data']['result']['secret_skipped']" <<<"$a")" == "['sec/.env']" ]] && ok 'extract without secrets does not overwrite .env' || bad "extract: $(head -c 500 <<<"$a")"
+cli file remove --domain $D --path sec/.env --confirm yes >/dev/null 2>&1
+[[ "$(cli file trash-list --domain $D --output json 2>/dev/null | j "[e['secret'] for e in (d['data'] if 'data' in d else d)['entries'] if e['name'] == '.env']")" == "[True]" ]] \
+  && ok 'trash marks a deleted .env secret' || bad 'trash secret mark'
+rm -rf $root/sec
+job=$(gate "$(req file:extract "{\"domain\":\"$D\",\"path\":\"full.tar.gz\",\"to\":\".\",\"without-secrets\":\"yes\"}" ',"confirm":true')" | j "d.get('job_id','')")
+a=$(wait_job "$job")
+[[ -f $root/sec/a.txt && ! -e $root/sec/.env && ! -e $root/sec/sub/wp-config.php ]] && ok 'extract without secrets does not create them' || bad "create: $(ls -A $root/sec 2>&1)"
 
 cli site remove --domain $D --remove-files yes --drop-db yes --drop-db-user yes --confirm yes >/dev/null 2>&1
 echo "failures=$fails"; exit "$fails"
