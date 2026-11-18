@@ -27,6 +27,20 @@ file_helper() {
   (cd / && runuser -u "$FILE_USER" -- python3 -I "$FILE_HELPER" "$1" "$FILE_ROOT" "${@:2}")
 }
 
+# Entries past the trash's retention go without anyone opening the trash:
+# self status-refresh calls this at most once an hour (each site's trash is
+# pruned as the site user, as every trash operation is).
+file_trash_prune_all() {
+  local stamp=/var/lib/simai-env/trash-prune.stamp domain
+  [[ ! -f "$stamp" || -n "$(find "$stamp" -mmin +59 2>/dev/null)" ]] || return 0
+  install -d -m 0755 /var/lib/simai-env 2>/dev/null && touch "$stamp" 2>/dev/null || return 0
+  while IFS= read -r domain; do
+    [[ -n "$domain" ]] || continue
+    ( file_site "$domain" >/dev/null 2>&1 && [[ -d "${FILE_ROOT}/.simai-trash" && ! -L "${FILE_ROOT}/.simai-trash" ]] \
+        && file_helper trash-list "" >/dev/null 2>&1 ) || true
+  done < <(list_sites 2>/dev/null || true)
+}
+
 file_prepare() {
   parse_kv_args "$@"
   require_args "domain" || return 1
@@ -65,6 +79,25 @@ file_stat_handler() { file_prepare "$@" && file_show stat "${PARSED_ARGS[path]:-
 
 file_read_handler() {
   file_prepare "$@" && require_args "path" && file_show read "${PARSED_ARGS[path]}"
+}
+
+# An image or the start of a text file, to look at in the panel (1.61.0).
+file_preview_handler() {
+  file_prepare "$@" && require_args "path" || return 1
+  local max="${PARSED_ARGS[max-bytes]:-1048576}"
+  [[ "$max" =~ ^[1-9][0-9]{0,6}$ ]] && (( max <= 5242880 )) || { error "--max-bytes must be 1-5242880"; return 1; }
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    file_helper preview "${PARSED_ARGS[path]}" "$max"
+    return
+  fi
+  # A person sees what it is, not the bytes (they can be 5 MiB of base64).
+  file_helper preview "${PARSED_ARGS[path]}" "$max" | python3 -I -c '
+import json, sys
+d = json.load(sys.stdin)
+print("{}  {} {}  {} of {} bytes{}  sha256 {}".format(d["path"], d["kind"], d["mime"], d["bytes"], d["size"],
+      " (truncated)" if d["truncated"] else "", d["sha256"]))
+if d["kind"] == "text":
+    print(d["content"][:4000])'
 }
 
 # Raw bytes of one file to stdout (the gateway streams them as a download).
@@ -162,6 +195,7 @@ file_trash_restore_plan_check() {
 register_cmd "file" "list" "List a directory of a site (as the site user, inside the site directory)" "file_list_handler" "domain" "path=" "tier:advanced effects:read"
 register_cmd "file" "stat" "Show one file or directory of a site" "file_stat_handler" "domain" "path=" "tier:advanced effects:read"
 register_cmd "file" "read" "Show a text file of a site (UTF-8, up to 1 MiB)" "file_read_handler" "domain path" "" "tier:advanced effects:read"
+register_cmd "file" "preview" "Show an image or the start of a text file of a site (up to 5 MiB)" "file_preview_handler" "domain path" "max-bytes=" "tier:advanced effects:read"
 register_cmd "file" "cat" "Write the raw bytes of a site file to stdout" "file_cat_handler" "domain path" "" "tier:advanced effects:read"
 register_cmd "file" "write" "Replace or create a text file of a site from --content-file" "file_write_handler" "domain path content-file" "expect-sha256=" "tier:advanced"
 register_cmd "file" "upload" "Put an uploaded file into a site (up to 1 GiB, checked against --sha256)" "file_upload_handler" "domain path source sha256" "expect-sha256=" "tier:advanced"
@@ -171,6 +205,6 @@ register_cmd "file" "mkdir" "Create a directory in a site" "file_mkdir_handler" 
 register_cmd "file" "rename" "Rename or move a file or directory within a site" "file_rename_handler" "domain path to" "" "tier:advanced"
 register_cmd "file" "remove" "Move a file, a link or a directory of a site into its trash (--permanent yes deletes for good)" "file_remove_handler" "domain path" "permanent=" "tier:advanced"
 register_cmd "file" "copy" "Copy a file or directory within a site (links copied as links)" "file_copy_handler" "domain path to" "" "tier:advanced"
-register_cmd "file" "trash-list" "List the site's trash (entries are kept 30 days)" "file_trash_list_handler" "domain" "" "tier:advanced effects:read"
+register_cmd "file" "trash-list" "List the site's trash (entries are kept 7 days)" "file_trash_list_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "file" "trash-restore" "Put a trash entry back where it was or at --to" "file_trash_restore_handler" "domain id" "to=" "tier:advanced"
 register_cmd "file" "trash-empty" "Delete one trash entry (--id) or the whole trash of a site for good" "file_trash_empty_handler" "domain" "id=" "tier:advanced effects:delete"

@@ -25,6 +25,19 @@ first).
 One entry, `simai-file-stat/1`: `path, name, type, size, mtime, mode,
 target`.
 
+## preview
+Show an image or the start of a text file without downloading it (1.61.0).
+
+Usage: `simai-admin.sh file preview --domain <domain> --path <path> [--max-bytes 1048576] [--output json]`
+
+`simai-file-preview/1`: `path`, `size`, `mtime`, `kind` (`image` or
+`text`), `mime`, `encoding` (`base64` for an image, `utf-8` for text),
+`truncated`, `bytes` and `sha256` of what is returned, and `content`.
+An image (PNG, JPEG, GIF, WebP, BMP, ICO) comes whole or is refused
+`too_large` past `--max-bytes`; a text file comes cut at that size on a
+whole character. Other binaries are refused `not_previewable`.
+`--max-bytes` is 1–5242880 (5 MiB), 1 MiB by default.
+
 ## read
 A UTF-8 text file up to 1 MiB, `simai-file/1`: `path, size, mtime, sha256,
 content`. A larger or binary file is refused (`too_large`, `not_text`);
@@ -99,10 +112,11 @@ id is the UTC deletion time plus six hex characters, e.g.
 site) cannot be moved and is refused `cross_device`; remove it with
 `--permanent yes`.
 
-Retention: entries are kept 30 days. Every trash command (`remove`,
-`trash-list`, `trash-restore`, `trash-empty`) first deletes the entries older
-than that, so there is no cron job; a trash nobody touches keeps its old
-entries until the next trash command. The age comes from the id.
+Retention: entries are kept 7 days (30 before 1.61.0). Every trash command
+(`remove`, `trash-list`, `trash-restore`, `trash-empty`) first deletes the
+entries older than that, and `self status-refresh` prunes every site's trash
+at most once an hour, so an untouched trash empties itself too. The age
+comes from the id.
 
 ### trash-list
 `--domain D`. `--output json` answers `simai-file-trash/1`: `dir,

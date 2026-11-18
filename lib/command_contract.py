@@ -7,7 +7,7 @@ import fcntl
 from pathlib import Path
 
 
-PLAN_DATA = {"site:add", "bitrix:restore-ready", "site:transfer", "site:cache-clear"}
+PLAN_DATA = {"site:add", "bitrix:restore-ready", "site:transfer", "site:cache-clear", "site:db-browser"}
 
 
 def result(args):
@@ -29,7 +29,7 @@ def result(args):
         "verification": "not_run" if status == "planned" else "handler_exit_only",
     }
     # Only these audited handlers return structured, secret-free native data.
-    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "file:trash-list", "site:nginx-custom-show", "backup:storage-list", "backup:storage-copies", "security:status", "security:files", "security:quarantine-list", "security:geo-status", "security:geo-lookup", "mcp:status", "panel:address", "site:names", "site:redirect-list", "site:check-state", "bitrix:status", "site:status", "bitrix:restore-ready", "wp:status", "wp:install", "site:cache-clear", "site:db-browser-status"} or key == "site:doctor" and status in {"success", "failed"}) and output:
+    if (status == "success" and key in {"self:describe", "site:describe", "self:commands", "self:ai-catalog", "logs:nginx", "self:metrics", "php:extensions", "site:php-ini-list", "db:list", "access:list", "self:alerts", "self:metrics-history", "self:update-plan", "self:profiles", "service:list", "service:log", "cron:list", "cron:job-runs", "firewall:status", "change:status", "ssl:dns-status", "php:list", "software:list", "file:list", "file:stat", "file:read", "file:preview", "file:trash-list", "site:nginx-custom-show", "backup:storage-list", "backup:storage-copies", "security:status", "security:files", "security:quarantine-list", "security:geo-status", "security:geo-lookup", "mcp:status", "panel:address", "site:names", "site:redirect-list", "site:check-state", "bitrix:status", "site:status", "bitrix:restore-ready", "wp:status", "wp:install", "site:cache-clear", "site:db-browser-status"} or key == "site:doctor" and status in {"success", "failed"}) and output:
         try:
             value["data"] = json.loads(Path(output).read_text())
             if key == "site:doctor":

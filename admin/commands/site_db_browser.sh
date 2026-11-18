@@ -108,34 +108,40 @@ db_browser_context() {
   return 0
 }
 
+# A refusal the plan names (the panel gateway answers it as the reason).
+db_browser_refuse() {
+  error "$2"
+  site_plan_data_write "$(python3 -I -c 'import json,sys; print(json.dumps({"refusal": sys.argv[1], "detail": sys.argv[2]}))' "$1" "$2")"
+}
+
 db_browser_check() {
   local domain="$1" ext
   if [[ -z "$DBB_NAME" || -z "$DBB_USER" || -z "$DBB_PASS" ]]; then
-    error "${domain} has no database of its own (site db-create --domain ${domain} creates one)"
+    db_browser_refuse no_database "${domain} has no database of its own (site db-create --domain ${domain} creates one)"
     return 1
   fi
-  [[ "$DBB_ENGINE" == mysql || "$DBB_ENGINE" == pgsql ]] || { error "Database engine ${DBB_ENGINE} is not supported"; return 1; }
+  [[ "$DBB_ENGINE" == mysql || "$DBB_ENGINE" == pgsql ]] || { db_browser_refuse engine_unsupported "Database engine ${DBB_ENGINE} is not supported"; return 1; }
   if [[ "$DBB_PHP" == none || -z "$DBB_PHP" ]]; then
-    error "${domain} has no PHP; the database browser runs in the site's PHP pool"
+    db_browser_refuse no_php "${domain} has no PHP; the database browser runs in the site's PHP pool"
     return 1
   fi
   if [[ "$DBB_SOCKET_PROJECT" != "$DBB_PROJECT" ]]; then
-    error "${domain} shares the PHP pool of another site; open the browser on that site"
+    db_browser_refuse alias "${domain} shares the PHP pool of another site; open the browser on that site"
     return 1
   fi
   if ! site_ssl_meta_is_enabled "${SITE_META[ssl]:-none}"; then
-    error "${domain} has no HTTPS certificate; the browser opens only over HTTPS (ssl letsencrypt --domain ${domain})"
+    db_browser_refuse no_https "${domain} has no HTTPS certificate; the browser opens only over HTTPS (ssl letsencrypt --domain ${domain})"
     return 1
   fi
   if declare -F site_is_suspended >/dev/null && site_is_suspended "$domain"; then
-    error "${domain} is paused (site resume --domain ${domain})"
+    db_browser_refuse suspended "${domain} is paused (site resume --domain ${domain})"
     return 1
   fi
   [[ -S "/run/php/php${DBB_PHP}-fpm-${DBB_PROJECT}.sock" || -f "/etc/php/${DBB_PHP}/fpm/pool.d/${DBB_PROJECT}.conf" ]] \
-    || { error "The PHP pool of ${domain} is missing (site doctor --domain ${domain})"; return 1; }
+    || { db_browser_refuse no_php "The PHP pool of ${domain} is missing (site doctor --domain ${domain})"; return 1; }
   if [[ "$DBB_ENGINE" == pgsql ]]; then ext='^(pgsql|pdo_pgsql)$'; else ext='^(mysqli|pdo_mysql)$'; fi
   if command -v "php${DBB_PHP}" >/dev/null 2>&1 && ! "php${DBB_PHP}" -m 2>/dev/null | grep -Eq "$ext"; then
-    error "PHP ${DBB_PHP} has no ${DBB_ENGINE} driver (package php${DBB_PHP}-${DBB_ENGINE})"
+    db_browser_refuse no_driver "PHP ${DBB_PHP} has no ${DBB_ENGINE} driver (package php${DBB_PHP}-${DBB_ENGINE})"
     return 1
   fi
   return 0

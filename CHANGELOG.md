@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.61.0 - 2026-11-18
+
+- `file preview` (gateway `file:preview`): an image whole (base64) or the
+  start of a text file, up to 5 MiB, with its type, size and sha256, so
+  the panel shows a file without downloading it all.
+- The site trash keeps 7 days instead of 30 (owner decision) and empties
+  itself: `self status-refresh` prunes every site's trash hourly.
+- A `site:db-browser` plan is refused with its reason (`no_https`,
+  `no_database`, `no_php`, `alias`, `suspended`, `no_driver`) instead of a
+  bare `plan_failed`.
+
 ## 1.60.0 - 2026-11-18
 
 - Panel jobs explain themselves. `job:status` and `job:list` carry

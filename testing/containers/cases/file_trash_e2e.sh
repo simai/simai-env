@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2164  # container test script: loose cd checks are fine here
 # Site trash and copy (1.57.0): file remove moves into <root>/.simai-trash as
-# the site user, trash-list/restore/empty, 30-day retention, --permanent yes;
+# the site user, trash-list/restore/empty, 7-day retention, --permanent yes;
 # file copy inside the site (links copied, never followed); the panel gateway
 # (plans, a confirmed job, refusals).
 set -uo pipefail
@@ -30,8 +30,8 @@ tid=$(fj trash-list | js 'd["entries"][0]["id"]' 2>/dev/null)
 [[ "$(stat -c '%U %a' "$root/.simai-trash")" == "$user 700" ]] && ok "the trash belongs to the site user, mode 700" || bad "trash owner: $(stat -c '%U %a' "$root/.simai-trash")"
 [[ "$(stat -c %U "$root/.simai-trash/$tid/item")" == "$user" && -L "$root/.simai-trash/$tid/item/esc" && -d /etc ]] && ok "links go to the trash as links" || bad "trash link"
 l=$(fj trash-list)
-[[ "$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); e=d["entries"]; print(len(e)==1 and e[0]["id"]==sys.argv[2] and e[0]["path"]=="public/docs" and e[0]["type"]=="dir" and e[0]["expires_at"]-e[0]["deleted_at"]==30*86400 and d["schema"]=="simai-file-trash/1")' "$l" "$tid")" == True ]] \
-  && ok "trash-list shows the original path, type and 30-day expiry" || bad "trash-list: $l"
+[[ "$(python3 -c 'import json,sys; d=json.loads(sys.argv[1]); e=d["entries"]; print(len(e)==1 and e[0]["id"]==sys.argv[2] and e[0]["path"]=="public/docs" and e[0]["type"]=="dir" and e[0]["expires_at"]-e[0]["deleted_at"]==7*86400 and d["schema"]=="simai-file-trash/1")' "$l" "$tid")" == True ]] \
+  && ok "trash-list shows the original path, type and 7-day expiry" || bad "trash-list: $l"
 cli file remove --domain trash.test --path .simai-trash --confirm yes >/tmp/o 2>&1 && bad "trashed the trash" || ok "the trash cannot be moved into itself"
 
 # Restore: where it was, refused over an existing path, elsewhere with parents.
@@ -58,7 +58,7 @@ cli file trash-empty --domain trash.test --id "$first" --confirm yes >/dev/null 
   && ok "trash-empty --id deletes one entry" || bad "empty one: $(fj trash-list)"
 old=20200101T000000Z-abcdef
 runuser -u "$user" -- mkdir -p "$root/.simai-trash/$old/item"
-[[ "$(fj trash-list | js 'd["count"]')" == 1 && ! -e "$root/.simai-trash/$old" ]] && ok "entries older than 30 days are dropped" || bad "retention: $(ls "$root/.simai-trash")"
+[[ "$(fj trash-list | js 'd["count"]')" == 1 && ! -e "$root/.simai-trash/$old" ]] && ok "entries older than 7 days are dropped" || bad "retention: $(ls "$root/.simai-trash")"
 cli file trash-empty --domain trash.test --confirm yes >/dev/null 2>&1 && [[ "$(fj trash-list | js 'd["count"]')" == 0 ]] && ok "trash-empty deletes the whole trash" || bad "empty all"
 echo x >"$root/public/gone.txt"; chown "$user:" "$root/public/gone.txt"
 cli file remove --domain trash.test --path public/gone.txt --permanent yes --confirm yes >/dev/null 2>&1 \

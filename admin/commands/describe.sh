@@ -47,6 +47,8 @@ self_status_refresh_handler() {
   fi
   # Database browsers past their deadline (their timer lost to a reboot).
   if declare -F db_browser_expire_all >/dev/null; then db_browser_expire_all; fi
+  # Trash entries past their 7 days (hourly at most).
+  if declare -F file_trash_prune_all >/dev/null; then file_trash_prune_all; fi
 }
 
 self_profiles_handler() {

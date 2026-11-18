@@ -183,6 +183,52 @@ def op_read(root_fd, names):
             "sha256": hashlib.sha256(data).hexdigest(), "content": text}
 
 
+MAX_PREVIEW = 5 << 20
+IMAGES = [(b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"), (b"GIF87a", "image/gif"),
+          (b"GIF89a", "image/gif"), (b"BM", "image/bmp"), (b"\x00\x00\x01\x00", "image/x-icon")]
+TEXT_TYPES = {".svg": "image/svg+xml", ".json": "application/json", ".html": "text/html", ".htm": "text/html",
+              ".css": "text/css", ".js": "text/javascript", ".xml": "application/xml", ".md": "text/markdown",
+              ".csv": "text/csv", ".php": "text/x-php"}
+
+
+def op_preview(root_fd, names, limit):
+    """A file to look at without downloading it all: an image (whole, up to
+    the limit) or the start of a UTF-8 text file, with what it is."""
+    import base64
+    limit = min(int(limit), MAX_PREVIEW)
+    fd = open_file(root_fd, names)
+    st = os.fstat(fd)
+    with os.fdopen(fd, "rb") as f:
+        data = f.read(limit + 1)
+    truncated = len(data) > limit
+    data = data[:limit]
+    mime = next((m for sig, m in IMAGES if data.startswith(sig)), None)
+    if mime is None and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        mime = "image/webp"
+    base = {"schema": "simai-file-preview/1", "path": "/".join(names), "size": st.st_size, "mtime": int(st.st_mtime)}
+    if mime:
+        if truncated:
+            raise Fail("too_large", f"the image is larger than {limit} bytes; download it instead")
+        return {**base, "kind": "image", "mime": mime, "encoding": "base64", "truncated": False,
+                "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                "content": base64.b64encode(data).decode("ascii")}
+    if b"\x00" in data:
+        raise Fail("not_previewable", "the file is binary and not an image; download it instead")
+    text = data.decode("utf-8", "ignore") if truncated else None
+    if text is None:
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            raise Fail("not_previewable", "the file is not UTF-8 text; download it instead")
+    elif len(text.encode("utf-8")) < len(data) - 3:  # more than a character cut at the end
+        raise Fail("not_previewable", "the file is not UTF-8 text; download it instead")
+    shown = text.encode("utf-8")
+    ext = os.path.splitext(names[-1])[1].lower() if names else ""
+    return {**base, "kind": "text", "mime": TEXT_TYPES.get(ext, "text/plain"), "encoding": "utf-8",
+            "truncated": truncated, "bytes": len(shown), "sha256": hashlib.sha256(shown).hexdigest(),
+            "content": text}
+
+
 def op_cat(root_fd, names):
     fd = open_file(root_fd, names)
     out = sys.stdout.buffer
@@ -567,7 +613,7 @@ def op_extract(root_fd, names, dest, overwrite):
 # the site user and counts toward the site. The id carries the deletion time
 # (UTC), which is what retention goes by.
 TRASH_DIR = ".simai-trash"
-TRASH_DAYS = 30
+TRASH_DAYS = 7  # owner decision 2026-11-18 (1.61.0; 30 before)
 TRASH_ID = re.compile(r"^([0-9]{8}T[0-9]{6}Z)-[0-9a-f]{6}$")
 
 
@@ -1029,6 +1075,8 @@ def main(argv):
         result = op_gather(root_fd, names, parts(argv[3]))
     elif op in ("copy", "copy-check"):
         result = op_copy(root_fd, names, parts(argv[3]), op == "copy-check")
+    elif op == "preview":
+        result = op_preview(root_fd, names, argv[3])
     elif op == "trash":
         result = op_trash(root_fd, names)
     elif op == "trash-list":

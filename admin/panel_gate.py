@@ -102,6 +102,7 @@ PHP_EXT = re.compile(r"^[a-z0-9_]{2,32}$")
 SOFTWARE = re.compile(r"^(node|redis|postgresql|apache|certbot|fail2ban|memcached|imagemagick|jpegoptim|optipng|ffmpeg|supervisor)$")
 MAJOR = re.compile(r"^[0-9]{2}$")
 # A path inside a site directory: no "..", no control characters.
+PREVIEW_BYTES = re.compile(r"^(?:[1-9][0-9]{0,6})$")  # the command caps it at 5 MiB
 FILE_PATH = re.compile(r"^(?!.*(?:^|/)\.\.(?:/|$))[^\x00-\x1f\x7f]{0,1024}$")
 CONTENT = re.compile(r"^[^\x00]*$")
 EXPECT = re.compile(r"^(?:[0-9a-f]{64}|new|any)$")
@@ -269,6 +270,7 @@ ALLOW = {
     "file:list": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
     "file:stat": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain"}, "read"),
     "file:read": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "read"),
+    "file:preview": ({"domain": DOMAIN, "path": FILE_PATH, "max-bytes": PREVIEW_BYTES}, {"domain", "path"}, "read"),
     "file:download": ({"domain": DOMAIN, "path": FILE_PATH}, {"domain", "path"}, "download"),
     "file:write": ({"domain": DOMAIN, "path": FILE_PATH, "content": CONTENT, "expect-sha256": EXPECT},
                    {"domain", "path", "content"}, "action"),
@@ -419,8 +421,10 @@ URL_ARGS = {"url"}  # shown without the query string (a signature) instead of "(
 RESOURCE_CHECKED = {"site:add", "bitrix:restore-ready"}
 PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_invalid",
                  "owner_missing", "owner_blocked", "same_owner", "panel_site",  # these four: site:transfer
-                 "profile_unsupported"}  # site:cache-clear of an alias, redirect or proxy site
-PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear"}  # plans that name their refusal
+                 "profile_unsupported",  # site:cache-clear of an alias, redirect or proxy site
+                 "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
+                 "engine_unsupported"}
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"

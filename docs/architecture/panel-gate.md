@@ -489,7 +489,10 @@ site directory; links are never followed (`docs/commands/file.md`):
 
 - Reads: `file:list {domain, path}` (`simai-files/1`), `file:stat {domain,
   path}` (`simai-file-stat/1`), `file:read {domain, path}` (`simai-file/1`
-  with `sha256` and `content`, UTF-8 up to 1 MiB).
+  with `sha256` and `content`, UTF-8 up to 1 MiB), `file:preview {domain,
+  path, max-bytes?}` (1.61.0, `simai-file-preview/1`: an image whole as
+  base64 or the start of a text file, `kind`, `mime`, `truncated`, `bytes`,
+  `sha256`; up to 5 MiB).
 - Actions:
   `file:write {domain, path, content, expect-sha256: <sha256>|new|any}` (the content travels in the request, so up to about 60 KB here; a
   job record keeps only its size, `"(N bytes)"`), `file:mkdir {domain,
@@ -758,6 +761,12 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.61.0: `file:preview {domain, path, max-bytes?}` (read); the trash
+  keeps 7 days and empties itself hourly; a `site:db-browser` plan is
+  refused with its reason: `no_database`, `no_php`, `no_https`, `alias`
+  (shares another site's PHP pool), `suspended`, `no_driver`,
+  `engine_unsupported` (with `data.detail` and `data.checks`), before a job
+  starts as well.
 - 1.60.0: request `lang` and `actor.kind`; plans in words (`title`,
   `display`, `effects_words`, `consequence`, `checks {blockers, notes}`);
   job details (`started_at`, `finished_at`, `title`, `object`, `steps`,
@@ -881,7 +890,8 @@ action, job). Everything else is refused.
   `YYYYMMDDTHHMMSSZ-` plus six hex characters, otherwise `invalid_argument`.
   The plans of `file:copy` and `file:trash-restore` fail (`plan_failed`)
   when the source or entry is missing or the target exists. Entries older
-  than 30 days are deleted by the next trash command of that site
+  than 7 days (30 before 1.61.0) are deleted by the next trash command of that site, and hourly by
+  `self status-refresh`
   (`docs/commands/file.md`).
 - 1.57.0: `site:transfer {domain, owner}` (action, administrator only like
   `owner:*`): the site moves to another owner (files, PHP-FPM pool, cron,
