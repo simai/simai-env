@@ -6,7 +6,8 @@ nothing else reaches `systemctl`.
 
 ## list
 Show each service with its state, whether it starts at boot, since when it
-runs and whether it can reload.
+runs, whether it can reload, whether it is `critical` and whether it
+`can_stop` (1.62.0).
 
 Usage: `simai-admin.sh service list [--output json]` (`simai-services/1`)
 
@@ -24,6 +25,28 @@ Behavior:
   `restart`.
 - If the service is not running afterwards, the command fails and prints the
   last 30 lines of its journal.
+
+## stop / start
+Stop a service the sites can do without for a while, or start a stopped one
+(1.62.0).
+
+Usage: `simai-admin.sh service stop --name <service> --confirm yes`,
+`simai-admin.sh service start --name <service> --confirm yes`
+
+Behavior:
+- nginx, PHP-FPM and the database servers are critical: sites stop
+  answering without them, so `stop` refuses them (use `restart`). Only Redis
+  and cron can be stopped.
+- The plan of `stop` (without `--confirm yes`) names the sites that lose
+  something: for cron, the sites with a scheduler or cron jobs (and the
+  server's own checks and alerts pause); for Redis, the sites whose `.env`
+  picks Redis for `CACHE_STORE`, `CACHE_DRIVER`, `SESSION_DRIVER` or
+  `QUEUE_CONNECTION`, and their Redis queue workers. Only these keys are
+  read.
+- `stop` does not disable the service: it starts again on `start` or on
+  reboot.
+- `start` tests the configuration first, like `restart`; if the service is
+  not running afterwards, the command fails with its last journal lines.
 
 ## log
 Show the last journal lines of a service.

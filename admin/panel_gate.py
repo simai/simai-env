@@ -316,6 +316,8 @@ ALLOW = {
     "service:log": ({"name": SERVICE, "lines": LOG_LINES, "format": LOG_FORMAT, "priority": PRIORITY}, {"name"}, "read"),
     "service:restart": ({"name": SERVICE}, {"name"}, "action"),
     "service:reload": ({"name": SERVICE}, {"name"}, "action"),
+    "service:stop": ({"name": SERVICE}, {"name"}, "action"),
+    "service:start": ({"name": SERVICE}, {"name"}, "action"),
     "self:profiles": ({}, set(), "read"),
     # 1.57.5: the wizard switches a bundled site profile on or off (admin only;
     # disabling refuses core profiles and profiles that sites still use).
@@ -386,7 +388,8 @@ HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
 ADMIN_ONLY = {"profile:enable", "profile:disable", "owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "site:transfer",
               "self:metrics",
               "self:alerts-channel", "self:alerts-test", "self:metrics-history", "self:update-plan", "self:update",
-              "service:list", "service:log", "service:restart", "service:reload", "firewall:status",
+              "service:list", "service:log", "service:restart", "service:reload", "service:stop", "service:start",
+              "firewall:status",
               "firewall:rule-add", "firewall:rule-remove", "firewall:block", "firewall:unblock", "panel:access",
               "panel:address", "panel:port", "panel:ip-access", "panel:domain",
               "change:confirm", "change:status", "ssl:dns-credentials",
@@ -423,8 +426,9 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "owner_missing", "owner_blocked", "same_owner", "panel_site",  # these four: site:transfer
                  "profile_unsupported",  # site:cache-clear of an alias, redirect or proxy site
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
-                 "engine_unsupported"}
-PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser"}  # plans that name their refusal
+                 "engine_unsupported",
+                 "critical"}  # service:stop of nginx, PHP-FPM or a database server
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -723,6 +727,9 @@ def plan(command, args, attachment=None, lang="en"):
     if command == "site:cache-clear" and isinstance(result.get("data"), dict):
         # What would be cleared and what is skipped, with the reason.
         answer["clear"] = result["data"].get("items")
+    if command == "service:stop" and isinstance(result.get("data"), dict):
+        # Which sites lose what while it is stopped (scheduler, cache, sessions, queue, workers).
+        answer["service"] = result["data"]
     if command == "self:update":
         # Versions, release notes, what restarts and which sites are checked.
         answer["update"] = (run("self:update-plan", {"target": args["target"]}) or {}).get("data")

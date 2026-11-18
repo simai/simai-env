@@ -88,6 +88,8 @@
     "self:firewall-ensure": "Проверка межсетевого экрана",
     "service:restart": "Перезапуск {name}",
     "service:reload": "Перечитывание настроек {name}",
+    "service:stop": "Остановка {name}",
+    "service:start": "Запуск {name}",
     "profile:enable": "Включение профиля {id}",
     "profile:disable": "Выключение профиля {id}",
     "firewall:rule-add": "Правило межсетевого экрана для порта {port}",

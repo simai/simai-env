@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.62.0 - 2026-11-18
+
+- `service stop` and `service start` (gateway `service:stop`,
+  `service:start`). Only Redis and cron can be stopped; nginx, PHP-FPM and
+  the database servers are critical and refused (`critical`), they only
+  restart. The plan of a stop names the sites that lose their scheduler,
+  Redis cache, sessions, queue or workers. `service list` shows
+  `critical` and `can_stop`.
+
 ## 1.61.0 - 2026-11-18
 
 - `file preview` (gateway `file:preview`): an image whole (base64) or the
