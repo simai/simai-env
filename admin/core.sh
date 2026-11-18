@@ -485,6 +485,12 @@ run_command() {
     software:install|software:remove|software:update|software:refresh|php:install|php:remove|php:update|php:extension|site:apache|db:pgsql-install)
       apt_cache_warm ;;
   esac
+  # The panel's own certificate changed: its APP_URL and cookie follow.
+  if [[ "$rc" == 0 ]] && declare -F panel_scheme_sync >/dev/null; then
+    case "$key" in
+      ssl:letsencrypt|ssl:install|ssl:remove) panel_scheme_sync "$(command_arg domain "${command_args[@]}")" || true ;;
+    esac
+  fi
   if [[ -n "${SIMAI_EXECUTION_RECEIPT:-}" ]]; then
     python3 "${SIMAI_ENV_ROOT}/lib/command_contract.py" record "$SIMAI_EXECUTION_RECEIPT" "$key" "$rc" "$corr_id"
   fi

@@ -111,6 +111,31 @@ panel_address_app_url() {
   return 0
 }
 
+# The panel's own site got or lost its certificate (ssl letsencrypt, install
+# or remove, through any caller): APP_URL and the session cookie follow, so
+# a login over http does not loop on a secure-only cookie and links point
+# to https after the certificate (1.59.1).
+panel_scheme_sync() {
+  local domain="$1" panel scheme secure root app project user php_bin
+  panel=$(panel_state_get PANEL_DOMAIN 2>/dev/null || true)
+  [[ -n "$panel" && "$domain" == "$panel" && "$domain" != "${SIMAI_PANEL_INTERNAL_DOMAIN:-}" ]] || return 0
+  [[ "$(panel_state_get SOURCE 2>/dev/null || true)" == build ]] || return 0
+  read_site_metadata "$domain" >/dev/null 2>&1 || return 0
+  if site_ssl_meta_is_enabled "${SITE_META[ssl]:-none}"; then scheme=https secure=true; else scheme=http secure=false; fi
+  panel_env_set "$domain" APP_URL "${scheme}://${domain}" && panel_env_set "$domain" SESSION_SECURE_COOKIE "$secure" \
+    || { warn "Could not set APP_URL of the panel; set it to ${scheme}://${domain}"; return 0; }
+  root=$(panel_site_root "$domain"); app="$root"
+  [[ -f "${root}/current/artisan" ]] && app="${root}/current"
+  project=$(site_project_for_domain "$domain") || return 0
+  user=$(site_user_for_project "$project") || return 0
+  php_bin=$(resolve_php_bin "${SITE_META[php]:-}")
+  [[ -n "$php_bin" && -f "${app}/artisan" ]] || return 0
+  (cd / && sudo -n -u "$user" -H "$php_bin" "${app}/artisan" optimize:clear) >>"${LOG_FILE:-/var/log/simai-admin.log}" 2>&1 \
+    || warn "optimize:clear of the panel failed; run it as ${user}"
+  info "Panel address: ${scheme}://${domain} (secure session cookie: ${secure})"
+  return 0
+}
+
 panel_address_require() {
   [[ -n "$(panel_state_get PANEL_DOMAIN)" ]] || { error "The panel is not installed (panel install)"; return 1; }
 }

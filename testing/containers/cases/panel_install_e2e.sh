@@ -108,6 +108,15 @@ project=$(sed -n 's/^# simai-project: *//p' /etc/nginx/sites-available/$P.conf)
 user2=$(cat "/etc/simai-env/site-users/$project")
 [[ "$(stat -c '%U %a' $env)" == "$user2 640" ]] && ok ".env belongs to the panel account only" || bad ".env: $(stat -c '%U %a' $env)"
 [[ -L /home/simai/www/$P/current ]] && ok "the build has releases to roll back to" || bad "no release layout"
+# The panel's certificate: APP_URL and the session cookie follow it (1.59.1).
+grep -q '^SESSION_SECURE_COOKIE=false' $env && ok "no secure-only cookie before a certificate" || bad "cookie before ssl: $(grep '^SESSION_SECURE_COOKIE' $env)"
+pc=$(mktemp -d)
+openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=$P" -addext "subjectAltName=DNS:$P" -keyout $pc/key.pem -out $pc/cert.pem >/dev/null 2>&1
+cli ssl install --domain $P --cert $pc/cert.pem --key $pc/key.pem --confirm yes >/tmp/pssl 2>&1 || { bad "panel ssl install"; tail -5 /tmp/pssl; }
+grep -q "^APP_URL=https://$P\$" $env && grep -q '^SESSION_SECURE_COOKIE=true' $env && ok "after ssl: APP_URL https, secure cookie" || bad "after ssl: $(grep -E '^(APP_URL|SESSION_SECURE_COOKIE)=' $env)"
+[[ "$(stat -c '%U %a' $env)" == "$user2 640" ]] && ok ".env keeps its owner after ssl" || bad ".env after ssl: $(stat -c '%U %a' $env)"
+cli ssl remove --domain $P --confirm yes >/tmp/pssl2 2>&1 || { bad "panel ssl remove"; tail -5 /tmp/pssl2; }
+grep -q "^APP_URL=http://$P\$" $env && grep -q '^SESSION_SECURE_COOKIE=false' $env && ok "after ssl remove: back to http" || bad "after remove: $(grep -E '^(APP_URL|SESSION_SECURE_COOKIE)=' $env)"
 cli panel status 2>&1 | grep 'build' >/dev/null && ok "status shows the build" || bad "status build"
 grep -q "^${user2} ALL=(root) NOPASSWD: /usr/local/sbin/simai-panel-gate \"\"" /etc/sudoers.d/simai-panel && ok "gateway rule follows the build's account" || bad "sudoers: $(cat /etc/sudoers.d/simai-panel)"
 grep -q '^SIMAI_PANEL_SETUP_TOKEN=[a-f0-9]\{64\}$' $env && ok "the build gets a setup token in .env" || bad "token for build"

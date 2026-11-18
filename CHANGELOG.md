@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.59.1 - 2026-11-18
+
+- The Larena Panel follows its own certificate: after `ssl letsencrypt` or
+  `ssl install` on the panel's domain its `APP_URL` becomes `https://` and
+  `SESSION_SECURE_COOKIE=true`; after `ssl remove`, or before any
+  certificate, `http://` and `false`; then `optimize:clear`. A login over
+  http no longer loops on a secure-only cookie.
+
 ## 1.59.0 - 2026-11-18
 
 - `site db-credentials`: the connection details of a site's database,

@@ -255,7 +255,7 @@ panel_adopt_build() {
   panel_admin "${adopt[@]}" >>"$LOG_FILE" 2>&1 || { error "Installing the panel build failed; see ${LOG_FILE}"; return 1; }
   # The panel shows server data: error pages must never carry debug output.
   panel_env_set "$domain" APP_ENV production && panel_env_set "$domain" APP_DEBUG false \
-    && panel_env_set "$domain" APP_URL "http://${domain}"
+    && panel_env_set "$domain" APP_URL "http://${domain}" && panel_env_set "$domain" SESSION_SECURE_COOKIE false
 }
 
 # A failed first install leaves nothing behind: the domain and directory were
@@ -425,7 +425,7 @@ panel_install_run() {
     progress_step "Requesting a Let's Encrypt certificate"
     if panel_admin ssl letsencrypt --domain "$domain" --email "$email" --redirect yes --confirm yes >>"$LOG_FILE" 2>&1; then
       panel_state_set SSL letsencrypt || return 1
-      [[ "$source" == build ]] && panel_env_set "$domain" APP_URL "https://${domain}"
+      # APP_URL and SESSION_SECURE_COOKIE follow (panel_scheme_sync, after the command).
     else
       warn "Certificate request failed (DNS must point to this server); retry: simai-admin.sh ssl letsencrypt --domain ${domain} --email ${email} --confirm yes"
     fi
