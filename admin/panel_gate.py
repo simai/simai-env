@@ -42,6 +42,7 @@ YES_NO = re.compile(r"^(yes|no)$")
 ALERT_LEVELS = re.compile(r"^(urgent|all)$")  # what the alert channel sends (1.63.0)
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 OWNER = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+DOMAIN_LIST = re.compile(r"^(?=.{1,4000}$)[A-Za-z0-9.-]{3,253}(,[A-Za-z0-9.-]{3,253}){0,49}$")  # owner:create sites; each checked by the command
 EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}$")
 LINES = re.compile(r"^(?:[1-9][0-9]{0,2}|1000)$")
 LOG_LINES = re.compile(r"^(?:[1-9][0-9]{0,3}|10000)$")  # a log download takes up to 10000
@@ -243,7 +244,7 @@ ALLOW = {
     "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
     "cron:remove": ({"domain": DOMAIN}, {"domain"}, "action"),
     "ssl:remove": ({"domain": DOMAIN, "delete-cert": YES_NO}, {"domain"}, "action"),
-    "owner:create": ({"name": OWNER, "pubkey": PUBKEY}, {"name"}, "action"),
+    "owner:create": ({"name": OWNER, "pubkey": PUBKEY, "sites": DOMAIN_LIST}, {"name"}, "action"),
     "owner:add-key": ({"name": OWNER, "pubkey": PUBKEY}, {"name", "pubkey"}, "action"),
     "owner:remove": ({"name": OWNER}, {"name"}, "action"),
     "owner:block": ({"name": OWNER}, {"name"}, "action"),
@@ -431,8 +432,9 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "profile_unsupported",  # site:cache-clear of an alias, redirect or proxy site
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
                  "engine_unsupported",
-                 "critical"}  # service:stop of nginx, PHP-FPM or a database server
-PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop"}  # plans that name their refusal
+                 "critical",  # service:stop
+                 "site_missing", "too_many", "site_unsupported"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop", "owner:create"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -731,6 +733,9 @@ def plan(command, args, attachment=None, lang="en"):
     if command == "site:cache-clear" and isinstance(result.get("data"), dict):
         # What would be cleared and what is skipped, with the reason.
         answer["clear"] = result["data"].get("items")
+    if command == "owner:create" and isinstance(result.get("data"), dict):
+        # The account and the sites that move to it.
+        answer["owner"] = result["data"]
     if command == "service:stop" and isinstance(result.get("data"), dict):
         # Which sites lose what while it is stopped (scheduler, cache, sessions, queue, workers).
         answer["service"] = result["data"]

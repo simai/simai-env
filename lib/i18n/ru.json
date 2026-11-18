@@ -53,7 +53,7 @@
     "cron:job-remove": "Удаление задания по расписанию",
     "cron:job-enable": "Включение задания по расписанию",
     "cron:job-disable": "Выключение задания по расписанию",
-    "owner:create": "Новый владелец {name}",
+    "owner:create": "Новый аккаунт на сервере {name}",
     "owner:add-key": "Ключ для владельца {name}",
     "owner:remove": "Удаление владельца {name}",
     "owner:block": "Блокировка владельца {name}",
@@ -164,6 +164,7 @@
     "overwrite": "Заменить существующее",
     "without-secrets": "Без файлов с паролями",
     "levels": "Что присылать",
+    "sites": "Сайты",
     "remove-files": "Удалить файлы",
     "drop-db": "Удалить базу",
     "drop-db-user": "Удалить пользователя базы",
@@ -234,6 +235,8 @@
     "leaves": "Останется сделанным: {steps}"
   },
   "steps": {
+    "Creating owner ${name}": "Создаётся аккаунт ${name}",
+    "Moving ${domain} to ${name}": "Сайт ${domain} переходит к аккаунту ${name}",
     "Adding ${name} to ${domain} (${mode})": "Добавляется имя ${name} к ${domain}",
     "Alias/target checks": "Проверка связанного сайта",
     "Application checks": "Проверка приложения",

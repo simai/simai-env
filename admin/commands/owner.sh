@@ -71,11 +71,47 @@ owner_add_key_file() {
   info "Keys added for ${owner}: ${added}"
 }
 
+# The plan of owner create (1.63.1): which sites move to the account.
+owner_create_plan_check() {
+  local name sites
+  name=$(command_arg name "$@")
+  sites=$(command_arg sites "$@")
+  [[ -n "$name" ]] || return 0
+  owner_validate_name "$name" || return 1
+  if [[ -f "$(owner_blocks_dir)/${name}" ]]; then
+    error "Owner ${name} is blocked; unblock it first"
+    site_plan_data_write '{"refusal": "owner_blocked"}'
+    return 1
+  fi
+  if [[ -n "$sites" ]] && ! owner_sites_check "$name" "$sites" >/dev/null; then
+    site_plan_data_write "$(python3 -I -c 'import json,sys; print(json.dumps({"refusal": sys.argv[1]}))' "${OWNER_SITES_REFUSAL:-site_unsupported}")"
+    return 1
+  fi
+  site_plan_data_write "$(NAME="$name" NEW="$(site_is_owner "$name" && echo no || echo yes)" python3 -I -c '
+import json, os, sys
+sites = []
+for line in sys.stdin.read().splitlines():
+    domain, _, frm = line.partition("\t")
+    if domain:
+        sites.append({"domain": domain, "from": frm})
+print(json.dumps({"schema": "simai-owner-create-plan/1", "owner": os.environ["NAME"], "new": os.environ["NEW"] == "yes",
+                  "sites": sites, "per_site": "backup data first; files, PHP-FPM pool, cron, workers and ~/sites move; the site keeps serving; a previous owner loses SSH/SFTP to it",
+                  "on_failure": "the failing site stays where it was; sites moved before it stay with the account; repeating continues"}))' <<<"${OWNER_SITES_ROWS:-}")"
+  return 0
+}
+
 owner_create_handler() {
   parse_kv_args "$@"
-  local name="${PARSED_ARGS[name]:-}" key_file="${PARSED_ARGS[pubkey-file]:-}"
+  local name="${PARSED_ARGS[name]:-}" key_file="${PARSED_ARGS[pubkey-file]:-}" sites="${PARSED_ARGS[sites]:-}"
   require_args "name" || return 1
   owner_validate_name "$name" || return 1
+  local rows=""
+  if [[ -n "$sites" ]]; then
+    # Every site is checked before anything changes.
+    owner_sites_check "$name" "$sites" >/dev/null || { error "Nothing was created: a site cannot move to ${name}"; return 1; }
+    rows="$OWNER_SITES_ROWS"
+    progress_step "Creating owner ${name}"
+  fi
   if id -u "$name" >/dev/null 2>&1 && ! site_is_owner "$name"; then
     error "System user ${name} already exists and is not a simai owner"
     return 1
@@ -104,6 +140,21 @@ owner_create_handler() {
     "Home|/home/${name} (sites linked in ~/sites)" \
     "SSH keys|${SIMAI_OWNER_KEYS_DIR}/${name}" \
     "Password login|disabled"
+  if [[ -n "$rows" ]]; then
+    local domain from moved=() rc=0
+    while IFS=$'\t' read -r domain from; do
+      [[ -n "$domain" ]] || continue
+      progress_step "Moving ${domain} to ${name}"
+      if ! ( site_transfer_handler --domain "$domain" --owner "$name" --confirm yes ); then
+        error "Moving ${domain} failed; it stays with ${from}. Moved before it: ${moved[*]:-none}. Repeat owner create to continue."
+        rc=1
+        break
+      fi
+      moved+=("$domain")
+    done <<<"$rows"
+    (( rc == 0 )) || return 1
+    ui_kv "Sites moved" "${moved[*]:-none}"
+  fi
   ui_next_steps
   ui_kv "Add a site" "simai-admin.sh site add --domain <domain> --owner ${name}"
   ui_kv "Move a site" "simai-admin.sh site transfer --domain <domain> --owner ${name}"
@@ -189,7 +240,7 @@ owner_unblock_handler() {
   ui_result_table "Owner|${name}" "Access|restored"
 }
 
-register_cmd "owner" "create" "Create an owner account that can run several sites" "owner_create_handler" "name" "pubkey-file=" "tier:advanced"
+register_cmd "owner" "create" "Create an owner account that can run several sites, optionally moving existing sites to it" "owner_create_handler" "name" "pubkey-file= sites=" "tier:advanced"
 register_cmd "owner" "add-key" "Allow an SSH public key to log in as an owner" "owner_add_key_handler" "name pubkey-file" "" "tier:advanced"
 register_cmd "owner" "list" "List owners, their SSH keys and projects" "owner_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "owner" "remove" "Remove an owner that has no sites" "owner_remove_handler" "name" "confirm=" "tier:advanced"

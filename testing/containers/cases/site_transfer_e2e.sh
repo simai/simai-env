@@ -115,4 +115,26 @@ done
 [[ "$(cat /etc/simai-env/site-users/tr-test)" == delta && -L "/home/delta/sites/$D" && ! -e "/home/bravo/sites/$D" ]] \
   && ok "job moved the site to delta" || bad "job result: $(cat /etc/simai-env/site-users/tr-test)"
 [[ "$(http "$D" /p.php)" == "delta:moved" ]] && ok "site answers as delta" || bad "after job: $(http "$D" /p.php)"
+
+# owner create with sites (1.63.1): one job, every site checked first.
+E=tr2.test
+cli site add --domain "$E" --profile generic --php 8.3 --confirm yes >/tmp/t-e 2>&1 || { bad "site add $E"; tail -5 /tmp/t-e; }
+oreq() { printf '{"schema":"simai-panel-request/1","request_id":"r3","lang":"ru","actor":{"user":"admin@x","owner":null},"command":"owner:create","args":%s%s}' "$1" "${2:-}"; }
+a=$(gate "$(oreq "{\"name\":\"echo\",\"sites\":\"$E,nosuch.test\"}")")
+[[ "$(j "d['status']+':'+d['reason']" <<<"$a")" == refused:site_missing ]] && ! id echo >/dev/null 2>&1 && ok "owner create refuses a missing site, creates nothing" || bad "site_missing: ${a:0:300}"
+a=$(gate "$(oreq "{\"name\":\"echo\",\"sites\":\"$E,$D\"}")")
+[[ "$(j "(d['data']['title'], d['data']['owner']['new'], [s['domain'] for s in d['data']['owner']['sites']])" <<<"$a")" == "('Новый аккаунт на сервере echo', True, ['$E', '$D'])" ]] \
+  && ok "owner create plan lists the sites that move" || bad "owner plan: ${a:0:600}"
+a=$(gate "$(oreq "{\"name\":\"echo\",\"sites\":\"$E,$D\"}" ',"confirm":true')")
+jid=$(j "d.get('job_id','')" <<<"$a"); st=""
+for _ in $(seq 1 240); do
+  st=$(gate "$(printf '{"schema":"simai-panel-request/1","request_id":"r2","lang":"ru","actor":{"user":"admin@x","owner":null},"command":"job:status","args":{"job_id":"%s"}}' "$jid")" | j "d['data']['state']" 2>/dev/null)
+  [[ "$st" == running || -z "$st" ]] || break; sleep 1
+done
+[[ "$st" == succeeded ]] && ok "owner create with sites: one job" || bad "owner job: $st"
+[[ "$(cat /etc/simai-env/site-users/tr-test)" == echo && "$(cat /etc/simai-env/site-users/tr2-test)" == echo && -L "/home/echo/sites/$E" && -L "/home/echo/sites/$D" && ! -e "/home/delta/sites/$D" ]] \
+  && ok "both sites belong to echo" || bad "after owner create: $(cat /etc/simai-env/site-users/tr-test /etc/simai-env/site-users/tr2-test 2>&1)"
+[[ "$(http "$D" /p.php)" == "echo:moved" ]] && ok "site answers as echo" || bad "after owner job: $(http "$D" /p.php)"
+cli owner create --name echo --sites "$E,$D" --confirm yes >/tmp/t-again 2>&1 && ok "repeating is harmless (sites already moved)" || { bad "repeat"; tail -5 /tmp/t-again; }
+
 echo "failures=$fails"; exit $fails

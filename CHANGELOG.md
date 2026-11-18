@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.63.1 - 2026-11-18
+
+- `owner create --sites a.test,b.test`: the account and its existing sites
+  in one run (and one panel job). Every site is checked first; a site that
+  cannot move stops it before anything is created. The panel calls it
+  "Новый аккаунт на сервере".
+- The `site:transfer` plan says the site keeps serving during the move.
+
 ## 1.63.0 - 2026-11-18
 
 - Alerts speak Russian for the panel: each has a `level` (`urgent` or

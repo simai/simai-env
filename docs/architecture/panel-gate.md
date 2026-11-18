@@ -767,6 +767,14 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.63.1: `owner:create {name, pubkey?, sites?}`: `sites` is a comma list
+  (at most 50) of existing sites that move to the account in the same job.
+  The plan has `owner {schema: simai-owner-create-plan/1, owner, new,
+  sites [{domain, from}], per_site, on_failure}`; a plan or a confirmed
+  request is refused `site_missing`, `alias`, `panel_site`,
+  `owner_blocked`, `too_many` or `site_unsupported` before anything
+  changes. Its title is "Новый аккаунт на сервере {name}". The
+  `site:transfer` plan has `downtime` (none: PHP-FPM reloads gracefully).
 - 1.63.0: alerts carry `level` (`urgent`, `warning`), a Russian `title`
   and `line`; `self:alerts-channel` takes `levels: urgent|all` (default
   `urgent`: only urgent alerts and their resolution are sent) and

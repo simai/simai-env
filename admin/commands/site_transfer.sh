@@ -30,7 +30,8 @@ site_transfer_check() {
     error "${domain} is the panel's own site; it cannot be transferred to an owner."
     return 1
   fi
-  if ! site_is_owner "$owner"; then
+  # owner create --sites checks its sites before the owner exists (1.63.1).
+  if [[ "${TRANSFER_NEW_OWNER:-}" != "$owner" ]] && ! site_is_owner "$owner"; then
     TRANSFER_REFUSAL="owner_missing"
     error "Owner ${owner} does not exist. Create it first: simai-admin.sh owner create --name ${owner}"
     return 1
@@ -89,7 +90,7 @@ site_transfer_moves() {
 
 site_transfer_plan_data() {
   local domain="$1" owner="$2"
-  site_plan_data_write "$(python3 -c 'import json,sys; d,f,fo,t=sys.argv[1:5]; print(json.dumps({"schema":"simai-site-transfer-plan/1","domain":d,"from":f,"from_owner":fo or None,"to_owner":t,"backup":"backup data (database and files) first","moves":sys.argv[5:]}))' \
+  site_plan_data_write "$(python3 -c 'import json,sys; d,f,fo,t=sys.argv[1:5]; print(json.dumps({"schema":"simai-site-transfer-plan/1","domain":d,"from":f,"from_owner":fo or None,"to_owner":t,"backup":"backup data (database and files) first","downtime":"none: PHP-FPM reloads gracefully, workers restart","moves":sys.argv[5:]}))' \
     "$domain" "$TRANSFER_FROM" "$TRANSFER_FROM_OWNER" "$owner" "$@")"
 }
 
@@ -105,6 +106,34 @@ site_transfer_plan_check() {
   local -a moves=()
   mapfile -t moves < <(site_transfer_moves "$domain" "$owner")
   site_transfer_plan_data "$domain" "$owner" "${moves[@]}"
+  return 0
+}
+
+# owner create --sites: the sites in a list, checked; sets OWNER_SITES_ROWS
+# (domain<TAB>from per site still to move; one already with the owner is
+# skipped). Sets OWNER_SITES_REFUSAL and returns 1 when any site cannot move.
+# shellcheck disable=SC2034 # OWNER_SITES_REFUSAL is read by owner create's plan check
+owner_sites_check() {
+  local name="$1" list="$2" domain
+  OWNER_SITES_REFUSAL="" OWNER_SITES_ROWS=""
+  local -A seen=()
+  IFS=',' read -r -a _owner_sites <<<"$list"
+  (( ${#_owner_sites[@]} <= 50 )) || { OWNER_SITES_REFUSAL="too_many"; error "At most 50 sites at once"; return 1; }
+  for domain in "${_owner_sites[@]}"; do
+    domain="${domain// /}"
+    [[ -n "$domain" && -z "${seen[$domain]:-}" ]] || continue
+    seen[$domain]=1
+    if ! require_site_exists "$domain" 2>/dev/null; then
+      OWNER_SITES_REFUSAL="site_missing"; error "Site ${domain} does not exist"; return 1
+    fi
+    if ! TRANSFER_NEW_OWNER="$name" site_transfer_check "$domain" "$name"; then
+      [[ "$TRANSFER_REFUSAL" == same_owner ]] && continue
+      OWNER_SITES_REFUSAL="${TRANSFER_REFUSAL:-site_unsupported}"
+      [[ "${SITE_META[profile]:-}" != alias ]] || OWNER_SITES_REFUSAL="alias"
+      return 1
+    fi
+    OWNER_SITES_ROWS+="${domain}"$'\t'"$(site_transfer_from_text)"$'\n'
+  done
   return 0
 }
 

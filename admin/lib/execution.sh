@@ -88,6 +88,7 @@ command_plan_check() {
     site:db-rotate) site_db_rotate_plan_check "$@" || return 1 ;;
     file:copy) file_copy_plan_check "$@" || return 1 ;;
     service:stop) service_stop_plan_check "$@" || return 1 ;;
+    owner:create) owner_create_plan_check "$@" || return 1 ;;
     file:trash-restore) file_trash_restore_plan_check "$@" || return 1 ;;
   esac
   return 0
