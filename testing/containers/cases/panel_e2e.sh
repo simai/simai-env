@@ -348,6 +348,8 @@ a=$(gate "$(req null self:alerts '{}')")
 sid=$(field '[x["id"] for x in d["data"]["alerts"] if x["kind"] == "site_down" and x["domain"] == "acme.test"][0]' <<<"$a")
 [[ -n "$sid" && "$(field '[x["message"] for x in d["data"]["alerts"] if x["kind"] == "site_down"][0]' <<<"$a")" == "acme.test answers HTTP 503" ]] && ok "a site answering 503 twice opens an alert" || bad "site_down: ${a:0:400}"
 [[ "$(field '[x["state"] for x in d["data"]["alerts"] if x["kind"] == "backup_failed"]' <<<"$a")" == "['resolved']" ]] && ok "a cleared problem is resolved" || bad "backup_failed not resolved"
+[[ "$(field '[(x["level"], x["title"]) for x in d["data"]["alerts"] if x["kind"] == "site_down"][0]' <<<"$a")" == "('urgent', 'Сайт acme.test отвечает с ошибкой 503')" ]] && ok "an alert has its level and a Russian title" || bad "alert words: ${a:0:500}"
+[[ "$(field '[(x["level"], x["state"], bool(x["resolved_at"])) for x in d["data"]["alerts"] if x["kind"] == "backup_failed"][0]' <<<"$a")" == "('warning', 'resolved', True)" ]] && ok "a resolved alert keeps its id with resolved_at" || bad "resolved record"
 [[ "$(gate "$(req '"acme"' self:alerts-ack "{\"id\":\"${sid}\"}")" | field 'd["kind"]')" == plan ]] && ok "alert ack plan" || bad "ack plan"
 job_ok '"acme"' "$(creq '"acme"' self:alerts-ack "{\"id\":\"${sid}\"}")" && ok "owner acknowledges an alert of their site" || bad "ack job"
 [[ "$(gate "$(req null self:alerts '{}')" | field '[(x["state"], x["acked_by"]) for x in d["data"]["alerts"] if x["id"] == "'"$sid"'"]')" == "[('acked', 'admin@x')]" ]] && ok "the alert is acknowledged by the panel user" || bad "acked state"
@@ -375,6 +377,9 @@ grep -q '"event": "test"' /root/hook.log 2>/dev/null && ok "the webhook received
 a=$(gate "$(req null self:alerts '{}')")
 [[ "$(field 'd["data"]["channel"]["kind"] + " " + d["data"]["channel"]["target_hint"]' <<<"$a")" == "webhook http://127.0.0.1:18999/…" ]] && ok "the channel shows without its path" || bad "channel: $(field 'd["data"]["channel"]' <<<"$a")"
 grep -q secret-path <<<"$a" && bad "the webhook path leaked" || ok "the webhook path is not shown"
+[[ "$(field 'd["data"]["channel"]["levels"]' <<<"$a")" == urgent ]] && ok "the channel sends urgent alerts by default" || bad "levels default"
+job_ok null "$(creq null self:alerts-channel '{"kind":"webhook","levels":"all"}')" && [[ "$(gate "$(req null self:alerts '{}')" | field 'd["data"]["channel"]["kind"] + " " + d["data"]["channel"]["levels"]')" == "webhook all" ]] \
+  && ok "levels change without the target again" || bad "levels all"
 kill $hookpid 2>/dev/null
 tok="123456789:AAFakeFakeFakeFakeFakeFakeFakeFake12"
 a=$(gate "$(creq null self:alerts-channel "{\"kind\":\"telegram\",\"target\":\"-1001234567\",\"token\":\"${tok}\"}")"); j=$(field 'd["job_id"]' <<<"$a")

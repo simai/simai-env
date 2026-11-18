@@ -74,12 +74,15 @@ self_alerts_ack_handler() {
 self_alerts_channel_handler() {
   parse_kv_args "$@"
   local kind="${PARSED_ARGS[kind]:-}" target="${PARSED_ARGS[target]:-}" token_file="${PARSED_ARGS[token-file]:-}"
+  local levels="${PARSED_ARGS[levels]:-}"
   require_args "kind" || return 1
+  [[ -z "$levels" || "$levels" =~ ^(urgent|all)$ ]] || { error "--levels must be urgent or all"; return 1; }
   case "$kind" in
     off) python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" channel off - ;;
     webhook|telegram)
-      require_args "target" || return 1
-      python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" channel "$kind" "$target" ${token_file:+"$token_file"} ;;
+      # Without --target only the levels of the current channel change.
+      [[ -n "$target" || -n "$levels" ]] || { require_args "target" || return 1; }
+      python3 -I "${SIMAI_ENV_ROOT}/lib/server_watch.py" channel "$kind" "${target:--}" "${token_file:--}" "$levels" ;;
     *) error "--kind must be webhook, telegram or off"; return 1 ;;
   esac
 }
@@ -159,7 +162,7 @@ register_cmd "self" "metrics" "Show current CPU load, memory, swap and disk use"
 register_cmd "self" "status-refresh" "Check whether sites answer, measure their disk use, update alerts and the load history" "self_status_refresh_handler" "" "" "tier:advanced lock:none"
 register_cmd "self" "alerts" "List server alerts: disk, certificates, sites, backups, the panel" "self_alerts_handler" "" "" "tier:advanced effects:read"
 register_cmd "self" "alerts-ack" "Acknowledge an open alert" "self_alerts_ack_handler" "id" "by=" "tier:advanced lock:none"
-register_cmd "self" "alerts-channel" "Send alerts to a webhook or a Telegram chat, or nowhere" "self_alerts_channel_handler" "kind" "target= token-file=" "tier:advanced lock:none"
+register_cmd "self" "alerts-channel" "Send alerts to a webhook or a Telegram chat, or nowhere" "self_alerts_channel_handler" "kind" "target= token-file= levels=" "tier:advanced lock:none"
 register_cmd "self" "alerts-test" "Send a test message to the alert channel" "self_alerts_test_handler" "" "" "tier:advanced lock:none"
 register_cmd "self" "metrics-history" "Show the load history: 1-minute points for an hour, 5-minute for 6 hours or a day, hourly for a week or month" "self_metrics_history_handler" "" "period=" "tier:advanced effects:read"
 register_cmd "self" "profiles" "List enabled site profiles with the site add arguments, values and defaults of each" "self_profiles_handler" "" "" "tier:advanced effects:read"

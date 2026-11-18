@@ -39,6 +39,7 @@ ENV = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 
 DOMAIN = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)+$")
 YES_NO = re.compile(r"^(yes|no)$")
+ALERT_LEVELS = re.compile(r"^(urgent|all)$")  # what the alert channel sends (1.63.0)
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 OWNER = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}$")
@@ -307,7 +308,8 @@ ALLOW = {
     # Stage 4 (1.31.0): server alerts that work while the panel is down, load history.
     "self:alerts": ({}, set(), "read"),
     "self:alerts-ack": ({"id": ALERT_ID}, {"id"}, "action"),
-    "self:alerts-channel": ({"kind": CHANNEL_KIND, "target": CHANNEL_TARGET, "token": TG_TOKEN}, {"kind"}, "action"),
+    "self:alerts-channel": ({"kind": CHANNEL_KIND, "target": CHANNEL_TARGET, "token": TG_TOKEN,
+                             "levels": ALERT_LEVELS}, {"kind"}, "action"),
     "self:alerts-test": ({}, set(), "action"),
     "self:metrics-history": ({"period": PERIOD}, set(), "read"),
     # 1.32.0: safe update of simai-env or the panel build, with a plan first.

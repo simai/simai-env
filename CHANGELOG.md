@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.63.0 - 2026-11-18
+
+- Alerts speak Russian for the panel: each has a `level` (`urgent` or
+  `warning`), a `title` and a line of detail; Telegram messages are in
+  Russian too. A cleared alert stays the same record, marked resolved.
+- `self alerts-channel --levels urgent|all`: by default only urgent alerts
+  (and their resolution) go to Telegram or the webhook (owner decision);
+  the levels can change without entering the target again.
+
 ## 1.62.2 - 2026-11-18
 
 - Files with passwords (`.env`, `wp-config.php`, Bitrix `.settings.php`

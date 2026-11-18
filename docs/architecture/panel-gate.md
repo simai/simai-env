@@ -380,9 +380,12 @@ minutes, also while the panel is closed or down (see `self alerts` in
 docs/commands/self.md):
 
 - `self:alerts` answers `simai-alerts/1`: `alerts [{id, kind, severity,
-  domain, target, message, state: open|acked|resolved, first_seen,
-  last_seen, acked_at, acked_by, resolved_at}]`, `checked_at` and `channel
-  {kind, target_hint, last_sent_at, last_error}`. Kinds: `disk_full`,
+  level: urgent|warning, title, line, domain, target, message, state:
+  open|acked|resolved, first_seen, last_seen, acked_at, acked_by,
+  resolved_at}]`, `checked_at` and `channel {kind, target_hint, levels,
+  last_sent_at, last_error}`. `title` and `line` are Russian (1.63.0). A
+  cleared alert stays the same record (same `id`) with `state: resolved`
+  and `resolved_at` for 7 days. Kinds: `disk_full`,
   `cert_expiring`, `cert_renew_failed`, `site_down`, `panel_down`,
   `backup_missing`, `backup_failed`, `backup_check_failed`,
   `backup_offsite_failed`, `security_risk`. An owner gets
@@ -390,7 +393,9 @@ docs/commands/self.md):
 - `self:alerts-ack {id}` (action): the alert stays until its condition
   clears, marked as acknowledged by the panel user (`acked_by`). An owner
   may acknowledge only their sites' alerts (`owner_scope`, `unknown_alert`).
-- `self:alerts-channel {kind: webhook|telegram|off, target, token}` and
+- `self:alerts-channel {kind: webhook|telegram|off, target, token, levels:
+  urgent|all}` (`levels` since 1.63.0, default `urgent`; with the current
+  `kind` and no `target` only the levels change) and
   `self:alerts-test`, administrator only. `token` (the Telegram bot token)
   is passed as a file, shown as `(stored)` in plans and job records, and its
   file is removed when the job ends.
@@ -762,6 +767,11 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.63.0: alerts carry `level` (`urgent`, `warning`), a Russian `title`
+  and `line`; `self:alerts-channel` takes `levels: urgent|all` (default
+  `urgent`: only urgent alerts and their resolution are sent) and
+  `channel.levels` is in `self:alerts`. Urgent security findings come as
+  `security_risk` alerts (`critical` severity: `urgent`, `high`: `warning`).
 - 1.62.2: files with passwords (`.env`, `wp-config.php`, `.settings.php`,
   `dbconn.php`, keys…; the list is in `docs/commands/file.md`) are
   `secret: true` in `file:list`, `file:stat` and `file:trash-list`.

@@ -123,23 +123,23 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
     """What is wrong right now, as alert candidates."""
     found, t = [], now()
 
-    def add(kind, target, severity, message, domain=None):
+    def add(kind, target, severity, message, domain=None, **facts):
         found.append({"id": alert_id(kind, target), "kind": kind, "target": target, "domain": domain,
-                      "severity": severity, "message": message})
+                      "severity": severity, "message": message, "facts": facts})
 
     for d in metrics.get("disk", []):
         if d["total_bytes"]:
             pct = round(d["used_bytes"] * 100 / d["total_bytes"])
             if pct >= DISK_WARN:
                 add("disk_full", d["mount"], "critical" if pct >= DISK_CRIT else "warning",
-                    f"disk {d['mount']} is {pct}% full")
+                    f"disk {d['mount']} is {pct}% full", None, mount=d["mount"], pct=pct)
     panel = panel_domain()
     for s in sites:
         domain = s["domain"]
         cert = s.get("certificate") or {}
         if cert.get("valid") and isinstance(cert.get("days_left"), int) and cert["days_left"] < CERT_DAYS:
             add("cert_expiring", domain, "critical" if cert["days_left"] < CERT_CRIT_DAYS else "warning",
-                f"certificate of {domain} expires in {cert['days_left']} days", domain)
+                f"certificate of {domain} expires in {cert['days_left']} days", domain, days=cert["days_left"])
         if (cert.get("last_renew") or {}).get("ok") is False:
             add("cert_renew_failed", domain, "warning", f"the last certificate renewal of {domain} failed", domain)
         answers = s.get("answers") or {}
@@ -148,7 +148,8 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
             if code is None or code >= 500:
                 what = "does not answer" if code is None else f"answers HTTP {code}"
                 kind = "panel_down" if domain == panel else "site_down"
-                add(kind, domain, "critical", f"{'the panel ' if kind == 'panel_down' else ''}{domain} {what}", domain)
+                add(kind, domain, "critical", f"{'the panel ' if kind == 'panel_down' else ''}{domain} {what}", domain,
+                    http=code)
         if s.get("backup_schedule"):
             last = parse(s.get("last_backup"))
             if last is None:
@@ -160,13 +161,15 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
             else:
                 since = last
             if t - since > timedelta(hours=BACKUP_HOURS):
-                add("backup_missing", domain, "warning", f"no backup of {domain} in {BACKUP_HOURS} hours", domain)
+                add("backup_missing", domain, "warning", f"no backup of {domain} in {BACKUP_HOURS} hours", domain,
+                    hours=BACKUP_HOURS)
         run = load_json(BACKUP_RUNS / f"{domain}.json", {})
         if run.get("ok") is False:
             add("backup_failed", domain, "warning", f"the last backup of {domain} failed", domain)
         if (s.get("last_offsite") or {}).get("ok") is False:
             add("backup_offsite_failed", domain, "warning",
-                f"the last backup of {domain} was not uploaded to storage {s['last_offsite'].get('storage')}", domain)
+                f"the last backup of {domain} was not uploaded to storage {s['last_offsite'].get('storage')}", domain,
+                storage=s["last_offsite"].get("storage"))
         if (s.get("last_verify") or {}).get("ok") is False:
             add("backup_check_failed", domain, "warning", f"the last check of a backup of {domain} failed", domain)
     # Serious problems found by the security center (security status).
@@ -175,7 +178,8 @@ def conditions(metrics: dict, sites: list[dict]) -> list[dict]:
                 and c.get("check") not in ("certificate", "backup_offsite"):
             add("security_risk", str(c.get("id")), "critical" if c["severity"] == "critical" else "warning",
                 f"security: {c.get('title')}" + (f" ({c['domain']})" if c.get("domain") else "")
-                + f": {c.get('detail')}", c.get("domain"))
+                + f": {c.get('detail')}", c.get("domain"), check=c.get("check"), title=c.get("title"),
+                detail=c.get("detail"))
     return found
 
 
@@ -372,9 +376,55 @@ def history(period: str) -> dict:
             "points": points}
 
 
+# For the panel (1.63.0): the level (urgent for critical, warning otherwise)
+# and a Russian title with a line of detail where one helps. English stays
+# in `message`.
+def level(alert: dict) -> str:
+    return "urgent" if alert.get("severity") == "critical" else "warning"
+
+
+def words(alert: dict) -> tuple[str, str | None]:
+    f, d = alert.get("facts") or {}, alert.get("domain") or alert.get("target") or ""
+    kind = alert.get("kind")
+    if kind == "disk_full":
+        return f"Диск {f.get('mount', alert.get('target'))} заполнен на {f.get('pct', '?')}%", \
+            "Освободите место: старые копии, журналы, корзина сайтов"
+    if kind == "cert_expiring":
+        return f"Сертификат {d} истекает через {f.get('days', '?')} дн.", "Продлите сертификат сайта"
+    if kind == "cert_renew_failed":
+        return f"Не удалось продлить сертификат {d}", "Проверьте, что домен указывает на этот сервер"
+    if kind in ("site_down", "panel_down"):
+        who = "Панель" if kind == "panel_down" else "Сайт"
+        code = f.get("http")
+        return (f"{who} {d} не отвечает" if code is None else f"{who} {d} отвечает с ошибкой {code}"), None
+    if kind == "backup_missing":
+        return f"Нет копии {d} больше {f.get('hours', BACKUP_HOURS)} ч", None
+    if kind == "backup_failed":
+        return f"Последняя копия {d} не удалась", None
+    if kind == "backup_offsite_failed":
+        return f"Копия {d} не выгрузилась в хранилище {f.get('storage') or ''}".rstrip(), None
+    if kind == "backup_check_failed":
+        return f"Проверка копии {d} не прошла", None
+    if kind == "security_risk":
+        title = str(f.get("title") or "найдена проблема")
+        return f"Безопасность: {title}" + (f" ({alert['domain']})" if alert.get("domain") else ""), \
+            (str(f["detail"])[:500] if f.get("detail") else None)
+    if kind == "test":
+        return "Проверка канала уведомлений", None
+    return str(alert.get("message") or kind), None
+
+
+def shown(alert: dict) -> dict:
+    title, line = words(alert)
+    return {**{k: v for k, v in alert.items() if k != "facts"}, "level": level(alert), "title": title, "line": line}
+
+
 def channel() -> dict:
     data = load_json(CHANNEL, {})
-    return data if data.get("kind") in ("webhook", "telegram") else {"kind": "off"}
+    if data.get("kind") not in ("webhook", "telegram"):
+        return {"kind": "off", "levels": "urgent"}
+    data["levels"] = data.get("levels") if data.get("levels") in ("urgent", "all") else "urgent"
+    return data
 
 
 def target_hint(ch: dict) -> str | None:
@@ -409,9 +459,15 @@ def send(text: str, payload: dict) -> str | None:
 def notify(state: dict, alert: dict, event: str) -> None:
     host = socket.gethostname()
     mark = {"opened": "⚠", "resolved": "✓", "test": "•"}[event]
-    text = f"{mark} {host}: {alert['message']}" + (" (resolved)" if event == "resolved" else "")
-    error = send(text, {"schema": "simai-alert-event/1", "host": host, "event": event, "alert": alert})
-    if channel()["kind"] != "off":
+    ch = channel()
+    # levels=urgent (the default, owner decision): only urgent alerts go out,
+    # and their resolution; the panel shows all of them.
+    if event != "test" and ch["levels"] == "urgent" and level(alert) != "urgent":
+        return
+    title, line = words(alert)
+    text = f"{mark} {host}: {title}" + (f"\n{line}" if line else "") + (" — снова в порядке" if event == "resolved" else "")
+    error = send(text, {"schema": "simai-alert-event/1", "host": host, "event": event, "alert": shown(alert)})
+    if ch["kind"] != "off":
         state["channel"] = {"last_sent_at": stamp(), "last_error": error}
 
 
@@ -440,7 +496,7 @@ def run() -> int:
                 continue
         a = state["alerts"].get(cid)
         if a and a["state"] in ("open", "acked"):
-            a.update(last_seen=t, message=c["message"], severity=c["severity"])
+            a.update(last_seen=t, message=c["message"], severity=c["severity"], facts=c["facts"])
             continue
         state["alerts"][cid] = {**c, "state": "open", "first_seen": t, "last_seen": t,
                                 "acked_at": None, "acked_by": None, "resolved_at": None}
@@ -477,8 +533,8 @@ def alerts_answer() -> dict:
     rows = sorted(state["alerts"].values(), key=lambda a: (ORDER.get(a["state"], 3), a["first_seen"]))
     ch = channel()
     info = state.get("channel") or {}
-    return {"schema": "simai-alerts/1", "checked_at": state.get("checked_at"), "alerts": rows,
-            "channel": {"kind": ch["kind"], "target_hint": target_hint(ch),
+    return {"schema": "simai-alerts/1", "checked_at": state.get("checked_at"), "alerts": [shown(a) for a in rows],
+            "channel": {"kind": ch["kind"], "target_hint": target_hint(ch), "levels": ch["levels"],
                         "last_sent_at": info.get("last_sent_at"), "last_error": info.get("last_error")}}
 
 
@@ -495,7 +551,14 @@ def ack(aid: str, by: str) -> int:
     return 0
 
 
-def set_channel(kind: str, target: str, token_file: str | None) -> int:
+def set_channel(kind: str, target: str, token_file: str | None, levels: str | None = None) -> int:
+    current = channel()
+    if levels is not None and levels not in ("urgent", "all"):
+        print("--levels must be urgent or all", file=sys.stderr)
+        return 1
+    levels = levels or current["levels"]
+    if kind == current["kind"] and target in ("", "-", None):
+        target = current.get("target", "")  # only the levels change
     if kind == "off":
         CHANNEL.unlink(missing_ok=True)
         TG_TOKEN.unlink(missing_ok=True)
@@ -517,8 +580,8 @@ def set_channel(kind: str, target: str, token_file: str | None) -> int:
         write_private(TG_TOKEN, token + "\n", 0o600)
     else:
         TG_TOKEN.unlink(missing_ok=True)
-    write_private(CHANNEL, json.dumps({"kind": kind, "target": target}) + "\n", 0o600)
-    print(f"Alert channel: {kind} ({target_hint({'kind': kind, 'target': target})})")
+    write_private(CHANNEL, json.dumps({"kind": kind, "target": target, "levels": levels}) + "\n", 0o600)
+    print(f"Alert channel: {kind} ({target_hint({'kind': kind, 'target': target})}), levels: {levels}")
     return 0
 
 
@@ -548,7 +611,7 @@ def main() -> int:
             print(json.dumps(data, ensure_ascii=False))
         else:
             for a in data["alerts"]:
-                print(f"{a['id']}  {a['state']:<8} {a['severity']:<8} {a['message']}  (since {a['first_seen']})")
+                print(f"{a['id']}  {a['state']:<8} {a['level']:<8} {a['message']}  (since {a['first_seen']})")
             print(f"Channel: {data['channel']['kind']}" + (f", last error: {data['channel']['last_error']}"
                                                           if data["channel"]["last_error"] else ""))
         return 0
@@ -563,8 +626,9 @@ def main() -> int:
                 cpu = "-" if p.get("cpu_percent") is None else f"{p['cpu_percent']}%"
                 print(f"{p['at']}  load {p['load1']:<6} cpu {cpu:<6} memory {p['memory_used_bytes'] / (1 << 30):.1f} GiB")
         return 0
-    if args[:1] == ["channel"] and len(args) in (3, 4):
-        return set_channel(args[1], args[2], args[3] if len(args) == 4 else None)
+    if args[:1] == ["channel"] and len(args) in (3, 4, 5):
+        token_file = args[3] if len(args) >= 4 and args[3] not in ("", "-") else None
+        return set_channel(args[1], args[2], token_file, args[4] if len(args) == 5 and args[4] else None)
     if args == ["test"]:
         return test()
     print(__doc__.split("Usage:")[1].strip(), file=sys.stderr)
