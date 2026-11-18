@@ -41,6 +41,13 @@ logs_letsencrypt_handler() {
   logs_tail_file "$LETSENCRYPT_LOG" "$lines"
 }
 
+# Access log lines whose status matches a list like 4xx,5xx or 404.
+logs_status_filter() {
+  local rx
+  rx=$(printf '%s' "$1" | sed -e 's/x/[0-9]/g' -e 's/,/|/g')
+  grep -E -- "\" (${rx}) " || true
+}
+
 logs_nginx_handler() {
   parse_kv_args "$@"
   local domain="${PARSED_ARGS[domain]:-}"
@@ -84,19 +91,30 @@ logs_nginx_handler() {
     return 1
   fi
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
-    [[ "$lines" =~ ^[0-9]+$ ]] && (( lines >= 1 && lines <= 1000 )) || { error "--lines must be 1-1000"; return 1; }
-    # With --match: the last matching lines (fixed string) among the last
-    # LOGS_MATCH_SCAN lines of the file.
-    if [[ -n "$match" ]]; then
-      tail -n "${LOGS_MATCH_SCAN:-20000}" "$file" | { grep -F -- "$match" || true; } | tail -n "$lines"
+    local format="${PARSED_ARGS[format]:-text}" status="${PARSED_ARGS[status]:-}"
+    [[ "$lines" =~ ^[0-9]+$ ]] && (( lines >= 1 && lines <= 10000 )) || { error "--lines must be 1-10000"; return 1; }
+    [[ "$format" == text || "$format" == json ]] || { error "--format must be text or json"; return 1; }
+    [[ -z "$status" || "$status" =~ ^([1-5]xx|[1-5][0-9]{2})(,([1-5]xx|[1-5][0-9]{2}))*$ ]] || { error "--status must be a list like 4xx,5xx or 404"; return 1; }
+    [[ -z "$status" || "$kind" == access ]] || { error "--status filters the access log only"; return 1; }
+    # With --match (a fixed string) or --status (4xx, 5xx, 404): the last
+    # matching lines among the last LOGS_MATCH_SCAN lines of the file.
+    local scan="${LOGS_MATCH_SCAN:-20000}"
+    if [[ -n "$match" || -n "$status" ]]; then
+      tail -n "$scan" "$file" | { if [[ -n "$match" ]]; then grep -F -- "$match" || true; else cat; fi; } \
+        | { if [[ -n "$status" ]]; then logs_status_filter "$status"; else cat; fi; } | tail -n "$lines"
     else
       tail -n "$lines" "$file"
-    fi | python3 -c '
-import json, sys
-rows = [l.rstrip("\n") for l in sys.stdin.buffer.read().decode("utf-8", "replace").splitlines()]
-json.dump({"schema": "simai-log-tail/1", "domain": sys.argv[1], "kind": sys.argv[2], "file": sys.argv[3],
-           "lines": rows, **({"match": sys.argv[4]} if sys.argv[4] else {})}, sys.stdout, ensure_ascii=False)
-print()' "$domain" "$kind" "$file" "$match"
+    fi | FORMAT="$format" KIND="nginx-${kind}" ENTRIES="${SIMAI_ENV_ROOT}/lib/log_entries.py" python3 -I -c '
+import json, os, subprocess, sys
+data = sys.stdin.buffer.read()
+rows = [l.rstrip("\n") for l in data.decode("utf-8", "replace").splitlines()]
+answer = {"schema": "simai-log-tail/1", "domain": sys.argv[1], "kind": sys.argv[2], "file": sys.argv[3], "lines": rows,
+          **({"match": sys.argv[4]} if sys.argv[4] else {}), **({"status": sys.argv[5]} if sys.argv[5] else {})}
+if os.environ["FORMAT"] == "json":
+    out = subprocess.run([sys.executable, "-I", os.environ["ENTRIES"], os.environ["KIND"]], input=data, capture_output=True)
+    answer["entries"] = json.loads(out.stdout or b"[]")
+json.dump(answer, sys.stdout, ensure_ascii=False)
+print()' "$domain" "$kind" "$file" "$match" "$status"
     return 0
   fi
   if [[ -n "$match" ]]; then
@@ -109,5 +127,5 @@ print()' "$domain" "$kind" "$file" "$match"
 register_cmd "logs" "admin" "Tail simai-admin log" "logs_admin_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
 register_cmd "logs" "env" "Tail installer log" "logs_env_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
 register_cmd "logs" "audit" "Tail audit log" "logs_audit_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"
-register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=\${LOGS_DEFAULT_LINES} match=" "effects:read"
+register_cmd "logs" "nginx" "Tail nginx access/error for a domain" "logs_nginx_handler" "" "domain= kind= lines=\${LOGS_DEFAULT_LINES} match= format= status=" "effects:read"
 register_cmd "logs" "letsencrypt" "Tail Let's Encrypt log" "logs_letsencrypt_handler" "" "lines=\${LOGS_DEFAULT_LINES}" "effects:read"

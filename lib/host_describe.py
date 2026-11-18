@@ -334,6 +334,41 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
     return info
 
 
+def host_timezone() -> dict:
+    """The server's zone: its name (from /etc/localtime) and current offset."""
+    name = None
+    try:
+        link = os.readlink("/etc/localtime")
+        name = link.split("zoneinfo/", 1)[1] if "zoneinfo/" in link else None
+    except OSError:
+        pass
+    if not name and Path("/etc/timezone").is_file():
+        name = Path("/etc/timezone").read_text().strip() or None
+    now = datetime.now().astimezone()
+    return {"name": name or now.tzname(), "offset": now.strftime("%z")[:3] + ":" + now.strftime("%z")[3:]}
+
+
+def version_key(value: str) -> tuple:
+    return tuple(int(p) if p.isdigit() else 0 for p in re.split(r"[.-]", value or ""))
+
+
+def describe_panel(root: str):
+    """The installed Larena Panel and the build this simai-env pins (secret-free keys only)."""
+    state = kv_file(Path(os.environ.get("SIMAI_PANEL_STATE", "/etc/simai-env/panel.env")),
+                    {"PANEL_DOMAIN", "VERSION", "SOURCE", "INSTALLED_AT"})
+    domain = state.get("PANEL_DOMAIN")
+    if not domain:
+        return None
+    pinned = kv_file(Path(root, "admin", "panel-release.env")).get("VERSION")
+    installed = state.get("VERSION") or None
+    source = state.get("SOURCE") or None
+    return {"domain": domain, "version": installed, "pinned": pinned, "source": source,
+            "installed_at": state.get("INSTALLED_AT") or None,
+            "update_available": bool(source == "build" and pinned and installed
+                                     and version_key(pinned) > version_key(installed)),
+            "update": "self:update target=panel (plan: self:update-plan target=panel)"}
+
+
 def describe_host(root: str) -> dict:
     os_release = kv_file(Path("/etc/os-release"))
     php_versions = sorted(p.parent.name for p in Path("/etc/php").glob("*/fpm")) if Path("/etc/php").is_dir() else []
@@ -359,6 +394,8 @@ def describe_host(root: str) -> dict:
         "schema": "simai-host/1",
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "simai_env": {"version": version, "root": root, "cli": f"{root}/simai-admin.sh"},
+        "timezone": host_timezone(),
+        "panel": describe_panel(root),
         "os": {"id": os_release.get("ID", "").strip('"'), "version": os_release.get("VERSION_ID", "").strip('"')},
         "services": services,
         "php_versions": php_versions,

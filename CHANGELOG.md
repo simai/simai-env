@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.60.0 - 2026-11-18
+
+- Panel jobs explain themselves. `job:status` and `job:list` carry
+  `started_at`/`finished_at`, a `title` ("Копия сайта demo.test"), the
+  `object` (`site`, `owner`, `php`, …), `actor.kind`, `steps` with names
+  and states from the command's progress lines, `progress` ("2 of 5"), an
+  `outcome` in one phrase (for a failure, the command's last error) and
+  `cancel` (can it stop now, what stays done).
+- `job:list` takes `before`, `limit`, `state` and `since` and answers
+  `counts {running, failed_since}`: one small request for an indicator of
+  running and failed jobs in the panel header.
+- Requests may carry `lang: ru`: plan labels and values, titles, step names,
+  states and outcomes in Russian (`lib/i18n/ru.json`). Plans carry `title`,
+  `display`, `effects_words`, `consequence` and `checks {blockers, notes}`:
+  what would stop the action and what is worth knowing, from the plan
+  check's own errors and warnings; a failed or refused plan has them too.
+- `logs nginx` and `service log`: `--format json` adds entries with the
+  time and its zone, level, status, method, path and client address;
+  `--status 4xx,5xx` (access log) and `--priority err` (journal) filter on
+  the server; up to 10000 lines for a download.
+- `self describe` has the server's `timezone` and a `panel` block: domain,
+  installed and pinned version, whether an update is available.
+
 ## 1.59.2 - 2026-11-18
 
 - Package installs and upgrades never stop on a configuration file

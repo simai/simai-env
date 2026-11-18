@@ -15,6 +15,11 @@ SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 # DPKG_FORCE since 1.19.5 (it replaces the built-in defaults, so they are
 # listed too); ucf (php.ini) reads UCF_FORCE_CONFFOLD.
 export DEBIAN_FRONTEND=noninteractive DPKG_FORCE="${DPKG_FORCE:-security-mac,downgrade,confdef,confold}" UCF_FORCE_CONFFOLD=1
+# A panel job's step file: the job's own command takes SIMAI_JOB_STEPS and
+# hands it to its worker only (SIMAI_JOB_STEPS_ACTIVE), so the commands that
+# command runs do not mix their steps in (command_dispatch).
+SIMAI_JOB_STEPS_FILE="${SIMAI_JOB_STEPS_ACTIVE:-}"
+unset SIMAI_JOB_STEPS_ACTIVE
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
 source "${SIMAI_ENV_ROOT}/lib/ui.sh"
@@ -149,6 +154,11 @@ log() {
   mkdir -p "$(dirname "$LOG_FILE")"
   echo "${ts} [${level}] ${msg}" >>"$LOG_FILE"
   echo "${ts} [${level}] ${msg}" >&2
+  # A plan check's errors and warnings go to the JSON plan as what would
+  # stop the action and what is worth knowing (panel gateway, 1.60.0).
+  if [[ -n "${SIMAI_PLAN_CHECKS_FILE:-}" && ( "$level" == ERROR || "$level" == WARN ) ]]; then
+    printf '%s\t%s\n' "$level" "${msg//[$'\t\n\r']/ }" >>"$SIMAI_PLAN_CHECKS_FILE" 2>/dev/null || true
+  fi
 }
 
 info() { log "INFO" "$@"; }
@@ -444,17 +454,23 @@ run_command() {
     local plan_data plan_rc=0
     plan_data=$(mktemp)
     chmod 0600 "$plan_data"
+    local plan_checks
+    plan_checks=$(mktemp)
+    chmod 0600 "$plan_checks"
+    SIMAI_PLAN_CHECKS_FILE="$plan_checks"
     SIMAI_PLAN_DATA="$plan_data" command_plan_check "$key" "${command_args[@]}" || plan_rc=$?
+    SIMAI_PLAN_CHECKS_FILE=""
+    export SIMAI_PLAN_CHECKS="$plan_checks"
     if (( plan_rc != 0 )); then
       [[ "$output" != json ]] || command_result failed 1 "$key" "$target" "$corr_id" "$effect" "$plan_data"
-      rm -f "$plan_data"
+      rm -f "$plan_data" "$plan_checks"; unset SIMAI_PLAN_CHECKS
       return 1
     fi
     if [[ "$output" == json ]]; then
       command_result planned 0 "$key" "$target" "$corr_id" "$effect" "$plan_data"
-      rm -f "$plan_data"
+      rm -f "$plan_data" "$plan_checks"; unset SIMAI_PLAN_CHECKS
     else
-      rm -f "$plan_data"
+      rm -f "$plan_data" "$plan_checks"; unset SIMAI_PLAN_CHECKS
       command_preview "$key" "$target" "${command_args[@]}"
     fi
     return 0
@@ -465,6 +481,11 @@ run_command() {
   args_redacted=$(redact_args "${command_args[@]}")
   audit_log "start" "$caller" "$section" "$name" "$args_redacted" "" "$corr_id" || return 1
   info "Running command ${section} ${name} (corr_id=${corr_id})"
+  if [[ -n "${SIMAI_JOB_STEPS:-}" ]]; then
+    SIMAI_JOB_STEPS_FILE="$SIMAI_JOB_STEPS"
+    export SIMAI_JOB_STEPS_ACTIVE="$SIMAI_JOB_STEPS"
+    unset SIMAI_JOB_STEPS
+  fi
   local captured=''
   if [[ "$output" == json ]]; then
     captured=$(mktemp)
@@ -556,10 +577,19 @@ progress_step() {
   local msg="$*"
   if [[ -z "${PROGRESS_TOTAL:-}" ]]; then
     info "[?/?] ${msg}"
+    progress_record 0 0 "$msg"
     return
   fi
   PROGRESS_CURRENT=$((PROGRESS_CURRENT+1))
   info "[${PROGRESS_CURRENT}/${PROGRESS_TOTAL}] ${msg}"
+  progress_record "$PROGRESS_CURRENT" "$PROGRESS_TOTAL" "$msg"
+}
+
+# A panel job's steps (job:status steps/progress): the top command's only;
+# commands it runs do not see the file (SIMAI_JOB_STEPS is taken at start).
+progress_record() {
+  [[ -n "${SIMAI_JOB_STEPS_FILE:-}" ]] || return 0
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${3//[$'\t\n\r']/ }" >>"$SIMAI_JOB_STEPS_FILE" 2>/dev/null || true
 }
 
 progress_done() {

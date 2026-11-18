@@ -43,8 +43,17 @@ REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,64}$")
 OWNER = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,63}$")
 LINES = re.compile(r"^(?:[1-9][0-9]{0,2}|1000)$")
+LOG_LINES = re.compile(r"^(?:[1-9][0-9]{0,3}|10000)$")  # a log download takes up to 10000
+LOG_FORMAT = re.compile(r"^(text|json)$")
+LOG_STATUS = re.compile(r"^(?:[1-5]xx|[1-5][0-9]{2})(?:,(?:[1-5]xx|[1-5][0-9]{2})){0,9}$")
+PRIORITY = re.compile(r"^(emerg|alert|crit|err|warning|notice|info|debug)$")
 JOB_ID = re.compile(r"^[a-f0-9]{24}$")
 CURSOR = re.compile(r"^[0-9]{1,7}$")
+JOB_LIMIT = re.compile(r"^(?:[1-9][0-9]?|100)$")
+JOB_STATES = re.compile(r"^(?:running|succeeded|failed|cancelled|busy)(?:,(?:running|succeeded|failed|cancelled|busy)){0,4}$")
+ISO_TIME = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
+LANGS = {"ru", "en"}
+ACTOR_KINDS = {"person", "schedule", "server"}
 KIND = re.compile(r"^(access|error)$")
 PHP = re.compile(r"^[5-9]\.[0-9]$")
 PROFILE = re.compile(r"^(static|generic|laravel|wordpress|node|redirect|proxy|bitrix)$")
@@ -162,7 +171,8 @@ ALLOW = {
     "self:commands": ({}, set(), "read"),
     "site:describe": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:doctor": ({"domain": DOMAIN, "strict": YES_NO, "include-target": YES_NO}, {"domain"}, "read"),
-    "logs:nginx": ({"domain": DOMAIN, "kind": KIND, "lines": LINES, "match": MATCH}, {"domain"}, "read"),
+    "logs:nginx": ({"domain": DOMAIN, "kind": KIND, "lines": LOG_LINES, "match": MATCH, "format": LOG_FORMAT,
+                    "status": LOG_STATUS}, {"domain"}, "read"),
     "ssl:letsencrypt": ({"domain": DOMAIN, "email": EMAIL, "redirect": YES_NO, "hsts": YES_NO, "staging": YES_NO,
                          "challenge": CHALLENGE, "wildcard": YES_NO}, {"domain", "email"}, "action"),
     "ssl:dns-credentials": ({"provider": DNS_PROVIDER, "token": CF_TOKEN, "remove": YES_NO}, {"provider"}, "action"),
@@ -301,7 +311,7 @@ ALLOW = {
     "self:update": ({"target": UPDATE_TARGET}, {"target"}, "action"),
     # 1.33.0: host services, site profiles for the wizard.
     "service:list": ({}, set(), "read"),
-    "service:log": ({"name": SERVICE, "lines": LINES}, {"name"}, "read"),
+    "service:log": ({"name": SERVICE, "lines": LOG_LINES, "format": LOG_FORMAT, "priority": PRIORITY}, {"name"}, "read"),
     "service:restart": ({"name": SERVICE}, {"name"}, "action"),
     "service:reload": ({"name": SERVICE}, {"name"}, "action"),
     "self:profiles": ({}, set(), "read"),
@@ -368,7 +378,7 @@ ALLOW = {
     "job:status": ({"job_id": JOB_ID}, {"job_id"}, "job"),
     "job:log": ({"job_id": JOB_ID, "after": CURSOR}, {"job_id"}, "job"),
     "job:cancel": ({"job_id": JOB_ID}, {"job_id"}, "job"),
-    "job:list": ({}, set(), "job"),
+    "job:list": ({"before": JOB_ID, "limit": JOB_LIMIT, "state": JOB_STATES, "since": ISO_TIME}, set(), "job"),
 }
 HOST_COMMANDS = {"self:describe"}  # owners get a filtered view
 ADMIN_ONLY = {"profile:enable", "profile:disable", "owner:create", "owner:add-key", "owner:remove", "owner:block", "owner:unblock", "site:transfer",
@@ -459,6 +469,10 @@ def parse(raw):
     by = actor.get("impersonated_by")
     if by is not None and not text(by, 254):
         raise Refused("bad_actor")
+    if actor.get("kind", "person") not in ACTOR_KINDS:
+        raise Refused("bad_actor")  # who started it: a person, a schedule or the server itself
+    if req.get("lang", "en") not in LANGS:
+        raise Refused("bad_request")
     command = req.get("command")
     if command not in ALLOW:
         raise Refused("not_allowed")
@@ -554,6 +568,92 @@ def shown_args(args):
             for k, v in args.items()}
 
 
+# Words for people (1.60.0): a request may carry "lang": "ru" (or "en", the
+# default); titles, plan labels and step names then come from lib/i18n.
+I18N_DIR = Path(__file__).resolve().parent.parent / "lib" / "i18n"
+_WORDS, _STEPS = {}, {}
+
+
+def words_for(lang):
+    if lang not in _WORDS:
+        try:
+            _WORDS[lang] = json.loads((I18N_DIR / f"{lang}.json").read_text()) if lang != "en" else {}
+        except (OSError, ValueError):
+            _WORDS[lang] = {}
+    return _WORDS[lang]
+
+
+def fill(template, values):
+    out = re.sub(r"\{([a-z_-]+)\}", lambda m: str(values.get(m.group(1)) or ""), template)
+    return re.sub(r"\s{2,}", " ", out).strip().rstrip(":").strip()
+
+
+def job_title(command, args, lang):
+    args = args or {}
+    w = words_for(lang)
+    template = w.get("commands", {}).get(command)
+    if template:
+        values = w.get("values", {})
+        return fill(template, {k: values.get(k, {}).get(v) or v for k, v in args.items()})
+    subject = next((args[k] for k in ("domain", "name", "login", "php", "target", "id") if args.get(k)), "")
+    return (command.replace(":", " ").replace("-", " ").capitalize() + " " + subject).strip()
+
+
+def job_object(command, args):
+    args, section = args or {}, command.split(":", 1)[0]
+    if args.get("domain") and command != "panel:domain":
+        return {"kind": "site", "id": args["domain"]}
+    kind, key = {"owner": ("owner", "name"), "access": ("access", "login"), "php": ("php", "php"),
+                 "service": ("service", "name"), "software": ("software", "name"),
+                 "profile": ("profile", "id"), "panel": ("panel", "domain")}.get(section, ("server", None))
+    if section == "backup" and args.get("name"):
+        kind, key = "storage", "name"
+    if command == "self:update":
+        return {"kind": "panel" if args.get("target") == "panel" else "server", "id": args.get("target")}
+    return {"kind": kind, "id": args.get(key) if key else None}
+
+
+def step_title(message, lang):
+    table = words_for(lang).get("steps")
+    if not table:
+        return message
+    if lang not in _STEPS:
+        rows = []
+        for source, local in table.items():
+            parts = re.split(r"(\$\{[^}]+\})", source)
+            rx = "".join(f"(?P<{re.sub(r'[^A-Za-z0-9_]', '', p[2:-1].split(':-')[0])}>.+?)" if p.startswith("${")
+                         else re.escape(p) for p in parts)
+            try:
+                rows.append((re.compile(rx), local))
+            except re.error:
+                continue
+        _STEPS[lang] = rows
+    for rx, local in _STEPS[lang]:
+        m = rx.fullmatch(message)
+        if m:
+            return re.sub(r"\$\{([A-Za-z0-9_]+)[^}]*\}", lambda g: m.groupdict().get(g.group(1)) or "", local)
+    return message
+
+
+def plan_words(command, args, effects, lang):
+    """Labels and values of a plan for people, and what it does to data."""
+    w = words_for(lang)
+    labels, values = w.get("args", {}), w.get("values", {})
+    display = [{"key": k, "label": labels.get(k, k), "value": v,
+                "words": values.get(k, {}).get(v) or values.get("*", {}).get(v) or v}
+               for k, v in args.items()]
+    return {"display": display, "title": job_title(command, args, lang),
+            "effects_words": w.get("effects", {}).get(effects or "", effects),
+            "consequence": w.get("consequences", {}).get(command)}
+
+
+def plan_checks(result):
+    found = (result or {}).get("plan_checks") if isinstance(result, dict) else None
+    if not isinstance(found, dict):
+        return {"blockers": [], "notes": []}
+    return {"blockers": list(found.get("blockers") or []), "notes": list(found.get("notes") or [])}
+
+
 def plan_run(command, args, files=None):
     """The command's JSON plan. A URL goes in a file, as it does for a job."""
     tmp = None
@@ -580,29 +680,34 @@ def plan_refusal(command, result):
         return
     data = result.get("data")
     if isinstance(data, dict) and data.get("refusal") in PLAN_REFUSALS:
-        raise Refused(data["refusal"], {k: data[k] for k in ("resources", "archive", "detail") if k in data})
+        raise Refused(data["refusal"], {**{k: data[k] for k in ("resources", "archive", "detail") if k in data},
+                                        "checks": plan_checks(result)})
 
 
-def plan(command, args, attachment=None):
+def plan(command, args, attachment=None, lang="en"):
     # Without --confirm only a command that requires confirmation is safe to
     # call; for the others the plan is a preview from the registry.
     if command not in CONDITIONAL and registry_entry(command).get("confirmation") != "required":
         entry = registry_entry(command)
         if not entry:
             return None
-        return {"command": command, "args": shown_args(args), "target": args.get("domain") or "host",
+        shown = shown_args(args)
+        return {"command": command, "args": shown, "target": args.get("domain") or "host",
                 "description": entry.get("description"), "effects": entry.get("effects"),
-                "lock": entry.get("lock"), "applied": False, "preview": True}
+                "lock": entry.get("lock"), "applied": False, "preview": True,
+                "checks": {"blockers": [], "notes": []}, **plan_words(command, shown, entry.get("effects"), lang)}
     files = {"attachment": {ATTACHMENT[command]: "/dev/null", "sha256": attachment["sha256"]}} if attachment else None
     result = plan_run(command, args, files)
     plan_refusal(command, result)
     if result is None or result.get("status") != "planned":
-        return None
+        # What stopped it, in the plan check's words (no secret is logged).
+        return {"failed": True, "checks": plan_checks(result)}
     entry = registry_entry(command)
     shown = shown_args(args)
     answer = {"command": command, "args": shown, "target": result.get("target"),
               "description": entry.get("description"), "effects": result.get("effects"),
-              "lock": entry.get("lock"), "applied": False}
+              "lock": entry.get("lock"), "applied": False, "checks": plan_checks(result),
+              **plan_words(command, shown, result.get("effects"), lang)}
     if command in RESOURCE_CHECKED and isinstance(result.get("data"), dict):
         # Free disk, memory against the profile, warnings; what a restore found.
         answer["resources"] = result["data"].get("resources")
@@ -696,8 +801,12 @@ def start_job(req, command, args, stream):
     quoted = " ".join("'" + a.replace("'", "'\\''") + "'" for a in argv_for(command, args, files) + ["--confirm", "yes"])
     # The arguments were validated against strict patterns; quoting keeps them literal.
     # A command may leave a small result for the job (a timed change's id).
-    script.write_text(f"#!/bin/bash\nexport SIMAI_JOB_RESULT={d}/result.json\n"
-                      f"{quoted} </dev/null >{d}/log 2>&1\necho $? >{d}/exit_code\n{cleanup}")
+    # Its steps go to steps.tsv (admin/core.sh progress_step), its times to
+    # started_at and finished_at.
+    script.write_text(f"#!/bin/bash\nexport SIMAI_JOB_RESULT={d}/result.json SIMAI_JOB_STEPS={d}/steps.tsv\n"
+                      f"date -u +%Y-%m-%dT%H:%M:%SZ >{d}/started_at\n"
+                      f"{quoted} </dev/null >{d}/log 2>&1\nrc=$?\n"
+                      f"date -u +%Y-%m-%dT%H:%M:%SZ >{d}/finished_at\necho $rc >{d}/exit_code\n{cleanup}")
     script.chmod(0o700)
     proc = subprocess.run(["systemd-run", f"--unit={unit_name(job_id)}", "--collect", "--quiet",
                            "--property=Type=exec", *(f"--setenv={k}={v}" for k, v in ENV.items()),
@@ -745,7 +854,79 @@ def take_once(d):
     return data if isinstance(data, dict) else None
 
 
-def job_state(job_id, reveal=False):
+def job_time(d, name):
+    try:
+        value = (d / name).read_text()[:32].strip()
+    except OSError:
+        return None
+    return value if ISO_TIME.match(value) else None
+
+
+def job_steps(d, state, lang):
+    """Steps from the top command's progress lines; the last one is running,
+    failed or done with the job, the rest of the announced total waits."""
+    try:
+        rows = (d / "steps.tsv").read_text(errors="replace").splitlines()[:200]
+    except OSError:
+        rows = []
+    steps, total = [], 0
+    for row in rows:
+        parts = row.split("\t", 3)
+        if len(parts) != 4 or not parts[0].isdigit() or not parts[1].isdigit():
+            continue
+        if steps:
+            steps[-1].update(state="done", finished_at=parts[2])
+        total = int(parts[1]) if int(parts[1]) else total
+        steps.append({"id": len(steps) + 1, "title": step_title(parts[3][:300], lang), "state": "running",
+                      "started_at": parts[2] if ISO_TIME.match(parts[2]) else None})
+    if steps and state != "running":
+        steps[-1]["state"] = "done" if state == "succeeded" else "failed"
+        steps[-1]["finished_at"] = job_time(d, "finished_at")
+    waiting = max(0, total - len(steps)) if state == "running" else 0
+    if state != "running":
+        total = len(steps)  # a command may announce more steps than it needed
+    steps += [{"id": len(steps) + i + 1, "title": None, "state": "waiting"} for i in range(waiting)]
+    current = next((s for s in steps if s["state"] in ("running", "failed")), None)
+    progress = {"current": current["id"] if current else len([s for s in steps if s["state"] == "done"]),
+                "total": max(total, len(steps)), "title": current["title"] if current else None} if steps else None
+    return steps, progress
+
+
+def job_outcome(d, state, code, lang):
+    w = words_for(lang).get("outcomes", {})
+    if state == "running":
+        return None
+    if state == "failed":
+        key = "not_started" if code == 125 else "lost" if code is None else "failed"
+        reason = None
+        try:
+            for line in reversed((d / "log").read_text(errors="replace").splitlines()[-400:]):
+                m = re.match(r"^\S+ \[ERROR\] (.+)$", line)
+                if m:
+                    reason = m.group(1).strip()[:300]
+                    break
+        except OSError:
+            pass
+        head = w.get(key) or {"not_started": "Not started", "lost": "Stopped without a result"}.get(key, "Failed")
+        return {"code": key, "words": f"{head}: {reason}" if reason else head, "reason": reason}
+    words = w.get(state) or {"succeeded": "Done", "busy": "Busy with another action on this object; try again later",
+                             "cancelled": "Cancelled"}.get(state, state)
+    return {"code": state, "words": words, "reason": None}
+
+
+def job_cancel(meta, state, steps, lang):
+    w = words_for(lang).get("cancel", {})
+    if state != "running":
+        return {"cancellable": False, "leaves": None}
+    if meta.get("command") in NO_CANCEL:
+        return {"cancellable": False, "leaves": w.get("not_cancellable", "This action cannot be stopped")}
+    done = [s["title"] for s in steps if s["state"] == "done" and s["title"]]
+    if not done:
+        return {"cancellable": True, "leaves": w.get("nothing_done", "Nothing is done yet")}
+    return {"cancellable": True, "leaves": fill(w.get("leaves", "Stays done: {steps}"), {"steps": "; ".join(done)})}
+
+
+def job_state(job_id, reveal=False, lang="en"):
     d = job_dir(job_id)
     meta = read_job(job_id) or {}
     def exit_code():
@@ -781,10 +962,45 @@ def job_state(job_id, reveal=False):
     if isinstance(result, dict) and ONCE_RESULT & set(result):
         result = take_once(d) if reveal and state != "running" else \
             {k: v for k, v in result.items() if k not in ONCE_RESULT}
+    actor = dict(meta.get("actor") or {})
+    actor.setdefault("kind", "person")
+    steps, progress = job_steps(d, state, lang)
     return {"job_id": job_id, "state": state, "exit_code": code, "command": meta.get("command"),
             "args": meta.get("args"), "created_at": meta.get("created_at"),
-            "request_id": meta.get("request_id"), "actor": meta.get("actor"),
+            "started_at": job_time(d, "started_at"), "finished_at": job_time(d, "finished_at"),
+            "title": job_title(meta.get("command") or "", meta.get("args"), lang),
+            "object": job_object(meta.get("command") or "", meta.get("args")),
+            "state_words": words_for(lang).get("states", {}).get(state, state),
+            "request_id": meta.get("request_id"), "actor": actor,
+            "steps": steps, "progress": progress, "outcome": job_outcome(d, state, code, lang),
+            "cancel": job_cancel(meta, state, steps, lang),
             "result": result if isinstance(result, dict) else None}
+
+
+def job_list(args, owner, lang):
+    """Newest first. before=<job_id> continues a list ("More"), state and
+    since filter it, counts tell a header indicator what runs and what failed
+    (since <since>) without fetching every job."""
+    found = []
+    for d in JOBS.glob("*"):
+        if JOB_ID.match(d.name):
+            meta = read_job(d.name)
+            if meta is not None and (owner is None or (meta.get("actor") or {}).get("owner") == owner):
+                found.append((meta.get("created_at") or "", d.name))
+    found.sort(reverse=True)
+    since, wanted = args.get("since"), set((args.get("state") or "").split(",")) - {""}
+    limit = int(args.get("limit", "100"))
+    states = [job_state(name, lang=lang) for _, name in found]
+    counts = {"running": sum(1 for st in states if st["state"] == "running"),
+              "failed_since": sum(1 for st in states if st["state"] == "failed" and since
+                                  and (st["finished_at"] or st["created_at"] or "") >= since)}
+    if args.get("before"):
+        mark = next((i for i, st in enumerate(states) if st["job_id"] == args["before"]), None)
+        states = states[mark + 1:] if mark is not None else []
+    picked = [st for st in states if (not wanted or st["state"] in wanted)
+              and (not since or st["state"] == "running" or (st["finished_at"] or st["created_at"] or "") >= since)]
+    jobs, more = picked[:limit], len(picked) > limit
+    return {"jobs": jobs, "counts": counts, "more": more, "next_before": jobs[-1]["job_id"] if more else None}
 
 
 def job_visible(job_id, owner):
@@ -792,16 +1008,14 @@ def job_visible(job_id, owner):
     return meta is not None and (owner is None or (meta.get("actor") or {}).get("owner") == owner)
 
 
-def job_answer(command, args, owner):
+def job_answer(command, args, owner, lang="en"):
     if command == "job:list":
-        jobs = [job_state(d.name) for d in sorted(JOBS.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
-                if JOB_ID.match(d.name) and job_visible(d.name, owner)][:100]
-        return {"jobs": jobs}
+        return job_list(args, owner, lang)
     job_id = args["job_id"]
     if not job_visible(job_id, owner):
         raise Refused("unknown_job")
     if command == "job:status":
-        return job_state(job_id, reveal=True)
+        return job_state(job_id, reveal=True, lang=lang)
     if command == "job:log":
         after = int(args.get("after", "0"))
         try:
@@ -1093,13 +1307,15 @@ def handle(raw, stream, started, reads_only=False):
         if kind == "download":
             return download(args, answer, entry, started)
         if kind == "job":
-            answer.update(status="ok", kind="result", data=job_answer(command, args, owner))
+            answer.update(status="ok", kind="result", data=job_answer(command, args, owner, req.get("lang", "en")))
             raise Done
         if kind == "action":
             if not req.get("confirm", False):
-                data = plan(command, args, req.get("attachment"))
+                data = plan(command, args, req.get("attachment"), req.get("lang", "en"))
                 if data is None:
                     answer.update(status="failed", reason="plan_failed")
+                elif data.get("failed"):
+                    answer.update(status="failed", reason="plan_failed", data={"checks": data["checks"]})
                 else:
                     if check:
                         data["check"] = check  # title and one line: what the button does

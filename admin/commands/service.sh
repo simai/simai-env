@@ -94,19 +94,32 @@ service_log_handler() {
   parse_kv_args "$@"
   require_args "name" || return 1
   local name="${PARSED_ARGS[name]}" lines="${PARSED_ARGS[lines]:-100}"
+  local format="${PARSED_ARGS[format]:-text}" priority="${PARSED_ARGS[priority]:-}"
   service_require_name "$name" || return 1
-  [[ "$lines" =~ ^[1-9][0-9]{0,3}$ ]] && (( lines <= 1000 )) || { error "--lines must be 1-1000"; return 1; }
+  [[ "$lines" =~ ^[1-9][0-9]{0,4}$ ]] && (( lines <= 10000 )) || { error "--lines must be 1-10000"; return 1; }
+  [[ "$format" == text || "$format" == json ]] || { error "--format must be text or json"; return 1; }
+  [[ -z "$priority" || "$priority" =~ ^(emerg|alert|crit|err|warning|notice|info|debug)$ ]] || { error "--priority must be emerg, alert, crit, err, warning, notice, info or debug"; return 1; }
+  local -a filter=()
+  [[ -z "$priority" ]] || filter=(-p "$priority")
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" != json ]]; then
-    service_journal_tail "$name" "$lines"
+    journalctl -u "$name" -n "$lines" "${filter[@]}" --no-pager -o short-iso 2>/dev/null || true
     return 0
   fi
-  service_journal_tail "$name" "$lines" | NAME="$name" python3 -I -c '
+  # JSON: journald's own entries, so time (with the zone) and priority are exact.
+  journalctl -u "$name" -n "$lines" "${filter[@]}" --no-pager -o json 2>/dev/null \
+    | "${SIMAI_ENV_ROOT}/lib/log_entries.py" journal \
+    | NAME="$name" FORMAT="$format" PRIORITY="$priority" python3 -I -c '
 import json, os, sys
-print(json.dumps({"schema": "simai-service-log/1", "name": os.environ["NAME"],
-                  "lines": [l.rstrip("\n")[:2000] for l in sys.stdin]}, ensure_ascii=False))'
+entries = json.load(sys.stdin)
+answer = {"schema": "simai-service-log/1", "name": os.environ["NAME"], "lines": [e["raw"][:2000] for e in entries]}
+if os.environ["PRIORITY"]:
+    answer["priority"] = os.environ["PRIORITY"]
+if os.environ["FORMAT"] == "json":
+    answer["entries"] = entries
+print(json.dumps(answer, ensure_ascii=False))'
 }
 
 register_cmd "service" "list" "List host services (nginx, PHP-FPM, databases, Redis, cron) and their state" "service_list_handler" "" "" "tier:advanced effects:read"
 register_cmd "service" "restart" "Restart a host service after its configuration test" "service_restart_handler" "name" "" "tier:advanced"
 register_cmd "service" "reload" "Reload a host service's configuration after its test" "service_reload_handler" "name" "" "tier:advanced"
-register_cmd "service" "log" "Show the last journal lines of a host service" "service_log_handler" "name" "lines=" "tier:advanced effects:read"
+register_cmd "service" "log" "Show the last journal lines of a host service" "service_log_handler" "name" "lines= format= priority=" "tier:advanced effects:read"

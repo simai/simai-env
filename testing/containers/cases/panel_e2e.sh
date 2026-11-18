@@ -97,7 +97,7 @@ a=$(gate "$(req null self:describe '{}')")
 curl -s -o /dev/null -H 'Host: open.test' http://127.0.0.1/panel-probe
 a=$(gate "$(req null logs:nginx '{"domain":"open.test","lines":"20"}')")
 [[ "$(field 'any("panel-probe" in l for l in d["data"]["lines"])' <<<"$a")" == True ]] && ok "access log tail" || bad "logs: ${a:0:300}"
-refused invalid_argument "$(req null logs:nginx '{"domain":"open.test","lines":"5000"}')" "too many log lines"
+refused invalid_argument "$(req null logs:nginx '{"domain":"open.test","lines":"10001"}')" "too many log lines"
 
 # Actions: a plan without confirm, a job with it.
 a=$(gate "$(req null backup:data '{"domain":"open.test","db":"no"}')")

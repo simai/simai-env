@@ -28,5 +28,7 @@ Behavior:
 ## log
 Show the last journal lines of a service.
 
-Usage: `simai-admin.sh service log --name <service> [--lines 100] [--output json]`
-(`simai-service-log/1`, at most 1000 lines)
+Usage: `simai-admin.sh service log --name <service> [--lines 100] [--priority err] [--format json] [--output json]`
+(`simai-service-log/1`, at most 10000 lines). `--priority` keeps that level
+and above (`emerg` … `debug`); `--format json` adds `entries` with `at` (ISO
+8601 with the zone), `level`, `unit`, `message` and `raw` (1.60.0)

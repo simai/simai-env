@@ -50,6 +50,19 @@ def result(args):
                 value["data"] = data
         except (ValueError, OSError):
             pass
+    # What a plan check found, in its own words: errors stop the action,
+    # warnings are worth knowing (admin/core.sh log() in plan mode).
+    checks = os.environ.get("SIMAI_PLAN_CHECKS")
+    if checks and status in {"planned", "failed"}:
+        found = {"blockers": [], "notes": []}
+        try:
+            for row in Path(checks).read_text(errors="replace").splitlines()[:50]:
+                level, _, words = row.partition("\t")
+                if words.strip():
+                    found["blockers" if level == "ERROR" else "notes"].append(words.strip()[:500])
+        except OSError:
+            pass
+        value["plan_checks"] = found
     json.dump(value, sys.stdout, ensure_ascii=False, indent=2)
     print()
     return value["exit_code"]
