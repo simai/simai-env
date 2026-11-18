@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.62.1 - 2026-11-18
+
+- Larena Panel 0.4.7: a job page that says plainly whether an action is
+  done, failed or still running, with "Repeat" for a failed one; the
+  background jobs badge on every page; "Updates" in the panel settings
+  (versions of simai-env and the panel, check and update). Its checksum
+  is pinned here.
+
 ## 1.62.0 - 2026-11-18
 
 - `service stop` and `service start` (gateway `service:stop`,
