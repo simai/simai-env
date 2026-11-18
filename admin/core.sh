@@ -8,6 +8,13 @@ ADMIN_USER=${ADMIN_USER:-simai}
 SIMAI_RC_MENU_RELOAD=88
 SIMAI_RC_CANCELLED=89
 SIMAI_ENV_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# Package installs and upgrades never stop on a question: a panel job or cron
+# has no one to answer it, and dpkg then leaves the package half configured
+# (php update on a changed php-fpm.conf). A changed configuration file is
+# kept, a new default goes next to it as *.dpkg-dist (1.59.2). dpkg reads
+# DPKG_FORCE since 1.19.5 (it replaces the built-in defaults, so they are
+# listed too); ucf (php.ini) reads UCF_FORCE_CONFFOLD.
+export DEBIAN_FRONTEND=noninteractive DPKG_FORCE="${DPKG_FORCE:-security-mac,downgrade,confdef,confold}" UCF_FORCE_CONFFOLD=1
 source "${SIMAI_ENV_ROOT}/lib/platform.sh"
 source "${SIMAI_ENV_ROOT}/lib/os_adapter.sh"
 source "${SIMAI_ENV_ROOT}/lib/ui.sh"

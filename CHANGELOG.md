@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.59.2 - 2026-11-18
+
+- Package installs and upgrades never stop on a configuration file
+  question. `php update` from a panel job left `php8.3-fpm` half configured
+  ("end of file on stdin at conffile prompt") because `php-fpm.conf` had
+  been changed. Every command now runs with `DEBIAN_FRONTEND=noninteractive`,
+  `DPKG_FORCE=security-mac,downgrade,confdef,confold` and
+  `UCF_FORCE_CONFFOLD=1`: a changed file is kept, the new default goes next
+  to it as `*.dpkg-dist`. A server where this happened recovers with
+  `dpkg --configure -a --force-confdef --force-confold`.
+
 ## 1.59.1 - 2026-11-18
 
 - The Larena Panel follows its own certificate: after `ssl letsencrypt` or
