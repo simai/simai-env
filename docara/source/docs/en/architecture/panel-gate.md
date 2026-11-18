@@ -119,6 +119,14 @@ address and the one-time first sign-in link (see below).
   The panel build accepts that link for the first administrator and then
   removes the line from `.env`. `panel setup-link` replaces the token (the
   old link stops working).
+- **Password reset from the console** (1.63.3): `panel reset-password
+  [--email <address>]` runs the build's `artisan larena:panel-reset-password
+  [<email>]` as the panel account, with the panel's PHP, in `current`. It
+  needs an interactive terminal (`ssh -t`): the new password is typed there
+  twice, hidden, and never goes through arguments, the environment or the
+  log. A non-zero exit (unknown or blocked account, refused password,
+  cancelled input) is reported as "not reset". The panel shows this command
+  on "Forgot password?" when mail is off.
 - `panel update` moves to the version pinned by the current simai-env release
   (`self update` does not update the panel by itself). It does nothing at that
   version and never steps back without `--version`; `--archive/--sha256` and
