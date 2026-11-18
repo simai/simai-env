@@ -21,6 +21,15 @@ Creates user and group `acme` (member of `simai-owners`), home `/home/acme`
 (`0750`) with links to the owner's sites in `~/sites/`. Password login is
 disabled. `www-data` joins group `acme` so nginx can serve the files.
 
+`--sites a.test,b.test` (1.63.1, at most 50) moves existing sites to the
+account in the same run, each as `site transfer` does it (backup first;
+files, PHP-FPM pool, cron, workers, `~/sites`; the site keeps serving; a
+previous owner loses SSH/SFTP to it). Every site is checked before anything
+changes: a missing site, an alias, the panel's own site or a blocked owner
+stops the command and nothing is created. If a move fails, that site stays
+where it was and the sites moved before it stay with the account; running
+the same command again continues (sites already with the owner are skipped).
+
 SSH keys are read only from `/etc/ssh/simai-owner-keys/<owner>` (root-owned,
 see `/etc/ssh/sshd_config.d/91-simai-owners.conf`). PHP runs as the owner, so
 a key written by a compromised site into `~/.ssh/authorized_keys` is ignored.
