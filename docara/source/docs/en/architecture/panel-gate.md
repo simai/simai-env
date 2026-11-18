@@ -60,6 +60,13 @@ address and the one-time first sign-in link (see below).
   If no certificate comes, nothing
   is left of the domain. The certificate renews with the others
   (`ssl renew-due`). `panel domain --remove yes` takes it away again.
+- **The panel's certificate and its session** (1.59.1). Whenever the
+  panel's domain gets a certificate (`ssl letsencrypt`, `ssl install`, also
+  from `panel install --email`) its `.env` gets `APP_URL=https://D` and
+  `SESSION_SECURE_COOKIE=true`; without one (a new install, `ssl remove`)
+  `http://D` and `false`; then `optimize:clear` runs as the panel's user.
+  So a login over plain http works until the certificate comes instead of
+  looping on a secure-only cookie.
 - **Moving the port.** `panel port --port N` (100-65535, not SSH, web, mail
   or database ports, not in use) is a timed change: unless
   `change confirm --id <id>` comes within `--window` seconds (300 by default), the previous
