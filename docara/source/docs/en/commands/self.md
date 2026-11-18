@@ -485,6 +485,7 @@ sudo /root/simai-env/simai-admin.sh self alerts
 sudo /root/simai-env/simai-admin.sh self alerts-ack --id 9147a2749fff --confirm yes
 sudo /root/simai-env/simai-admin.sh self alerts-channel --kind webhook --target https://hooks.example.com/simai --confirm yes
 sudo /root/simai-env/simai-admin.sh self alerts-channel --kind telegram --target -1001234567 --token-file /root/bot.token --confirm yes
+sudo /root/simai-env/simai-admin.sh self alerts-channel --kind telegram --levels all --confirm yes
 sudo /root/simai-env/simai-admin.sh self alerts-test --confirm yes
 sudo /root/simai-env/simai-admin.sh self metrics-history --period week
 ```
@@ -495,9 +496,14 @@ days left or its last renewal failed, a site or the panel does not answer or
 answers 5xx in two checks in a row, a site with a schedule has no backup in
 48 hours, or the last backup or backup check failed. The same problem keeps
 the same id; an alert is `open`, `acked` or `resolved` (when the condition
-clears; resolved alerts are kept 7 days). New and resolved alerts go to the
-channel: a webhook gets a JSON `simai-alert-event/1` POST, Telegram a short
-text. The webhook URL is shown only as scheme and host; the Telegram bot token
+clears; resolved alerts are kept 7 days). Each alert has a `level`:
+`urgent` (critical) or `warning`, and a Russian `title` with a `line` of
+detail where one helps (1.63.0); `message` stays in English. New and
+resolved alerts go to the channel: a webhook gets a JSON
+`simai-alert-event/1` POST, Telegram a short Russian text. `--levels urgent`
+(the default) sends only urgent alerts and their resolution, `--levels all`
+every alert; without `--target` only the levels of the current channel
+change. The webhook URL is shown only as scheme and host; the Telegram bot token
 stays in `/etc/simai-env/alerts-telegram.token` (root, 0600) and is never
 printed. `--kind off` removes the channel and the token.
 
