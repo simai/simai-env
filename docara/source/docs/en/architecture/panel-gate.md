@@ -173,6 +173,12 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
   not own, and any host-level command.
 - `confirm: false` on a state-changing command returns the plan only, as the
   CLI does without `--confirm yes`.
+- `lang` (1.60.0, optional): `ru` or `en` (the default). With `ru`, plan
+  labels and values, job titles, step names, states and outcomes come in
+  Russian from `lib/i18n/ru.json`; codes stay as they are. Any other value is
+  refused `bad_request`.
+- `actor.kind` (1.60.0, optional): `person` (the default), `schedule` or
+  `server`, for the History page; anything else is refused `bad_actor`.
 
 An action that carries a file sends it after the request line: the request
 is one line ending in `\n` with
@@ -269,7 +275,12 @@ with `created_at`, `size_bytes`, `parts` (`db`, `files`, `config`),
 `checksums` and `encrypted`. `logs:nginx {domain, kind: access|error,
 lines: 1-1000, match}` answers `simai-log-tail/1` with the last lines; with
 `match` (a fixed string, printable ASCII, up to 200 characters) the last
-matching lines among the last 20000 lines of the file.
+matching lines among the last 20000 lines of the file. Since 1.60.0
+`lines` goes up to 10000 (a log download), `status` (`4xx,5xx`, `404`;
+access log only) keeps the matching lines among the last 20000, and
+`format: json` adds `entries [{at, level, status?, method?, path?, ip?,
+message?, raw}]`: `at` is ISO 8601 with the zone (the access log's own; the
+error log's local time with the server's zone).
 
 Stage 9 reads:
 
@@ -297,10 +308,38 @@ human output and exit code are in `/var/lib/simai-env/panel-jobs/<job_id>/`
 
 | Command | Answer |
 | --- | --- |
-| `job:status` `{job_id}` | `state`: `running`, `succeeded`, `failed`, `busy` (target locked), `cancelled`; exit code, command, arguments, actor; `result` when the command left one (values such as `wp:install`'s `admin_password` only in the first answer after the job ended) |
+| `job:status` `{job_id}` | `state`: `running`, `succeeded`, `failed`, `busy` (target locked), `cancelled`; exit code, command, arguments, actor; `result` when the command left one (values such as `wp:install`'s `admin_password` only in the first answer after the job ended); since 1.60.0 the job details below |
 | `job:log` `{job_id, after}` | up to 1000 output lines after the cursor and `next`, for a live view |
 | `job:cancel` `{job_id}` | stops the unit; refused `not_running` for a finished job |
-| `job:list` | the last 100 jobs |
+| `job:list` `{before?, limit?, state?, since?}` | newest first, `limit` 1–100 (100 by default); `before=<job_id>` continues after that job ("More"); `state` a comma list (`running,failed`); `since` an ISO time `…Z`: jobs finished after it and every running one. Answer: `jobs`, `more`, `next_before`, and `counts {running, failed_since}` over all visible jobs, so a header indicator polls one small request |
+
+### Job details (1.60.0)
+
+Every `job:status` and `job:list` entry also has:
+
+| Field | Meaning |
+| --- | --- |
+| `started_at`, `finished_at` | ISO 8601 in UTC (`2026-11-18T10:00:00Z`); `finished_at` is `null` while it runs |
+| `title` | one phrase: `Копия сайта demo.test` (`lang: ru`), `Backup data demo.test` otherwise |
+| `object` | `{kind, id}`: `site`, `owner`, `access`, `php`, `service`, `software`, `profile`, `panel`, `storage` or `server` |
+| `actor.kind` | `person`, `schedule` or `server` (`person` when the panel did not say) |
+| `state_words` | the state for people: `Выполняется`, `Готово`, `Ошибка`, `Отменено`, `Занято` |
+| `steps` | `[{id, title, state, started_at?, finished_at?}]`, `state` `waiting`, `running`, `done` or `failed`; from the command's own progress lines (`[2/5] …`), the commands it runs are not mixed in; announced steps not reached yet are `waiting` with `title: null` |
+| `progress` | `{current, total, title}`: "2 of 5: Создаётся база"; `null` for a command without steps |
+| `outcome` | `{code, words, reason}` once it ended: `succeeded`, `failed`, `busy`, `cancelled`, `not_started` or `lost` (stopped without an exit code); for `failed`, `reason` is the command's last error line and `words` is `Ошибка: <reason>` |
+| `cancel` | `{cancellable, leaves}`: whether `job:cancel` can stop it now and what stays done (the finished steps), or why it cannot (`self:update` is never stopped) |
+
+### Plans in words (1.60.0)
+
+A plan also carries `title`, `display` (`[{key, label, value, words}]`:
+`create-db` → `Создать базу` / `да`, `locale` `en_US` → `английский`),
+`effects_words` (`изменит настройки или файлы`, `удалит данные`),
+`consequence` for commands that delete or replace data, and
+`checks {blockers, notes}`: the plan check's errors (what would stop the
+action: the domain points to another server, not enough disk, the site
+exists) and warnings (worth knowing). A plan that fails answers
+`failed`/`plan_failed` with `data.checks`; a refused plan (`not_enough_disk`
+and the other plan refusals) has `data.checks` too.
 
 An owner sees and controls only jobs started as that owner.
 
@@ -401,7 +440,10 @@ Host services and site profiles (1.33.0):
 
 - `service:list` (`simai-services/1`: `services [{name, active, enabled,
   since, can_reload}]`), `service:log {name, lines}` (`simai-service-log/1`:
-  `{name, lines}`), `service:restart {name}` and `service:reload {name}`
+  `{name, lines}`; since 1.60.0 `lines` up to 10000, `priority` (`err`,
+  `warning`, …: that level and above) and `format: json` with `entries [{at,
+  level, unit, message, raw}]` from journald, `at` with the zone),
+  `service:restart {name}` and `service:reload {name}`
   (actions), administrator only. `name` is one of `nginx`, `php<ver>-fpm`,
   `mysql`, `mariadb`, `postgresql`, `redis-server`, `cron`, and must exist on
   the host. nginx and PHP-FPM test their configuration first; a failed test
@@ -721,6 +763,15 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.60.0: request `lang` and `actor.kind`; plans in words (`title`,
+  `display`, `effects_words`, `consequence`, `checks {blockers, notes}`);
+  job details (`started_at`, `finished_at`, `title`, `object`, `steps`,
+  `progress`, `outcome`, `cancel`, `state_words`); `job:list {before, limit,
+  state, since}` with `counts`; `logs:nginx` and `service:log` entries;
+  `self:describe` has `timezone {name, offset}` and `panel {domain, version,
+  pinned, source, installed_at, update_available}` (`null` without a
+  panel): the panel updates with `self:update-plan` / `self:update`
+  `target=panel`.
 - 1.59.0: `site:db-credentials {domain}` (action; owners on their own
   sites): the job result carries `engine`, `host`, `port`, `database`,
   `user` and `db_password`, handed out once (ONCE_RESULT), never in the job

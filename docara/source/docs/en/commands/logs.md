@@ -54,6 +54,13 @@ Options:
 - `--domain <domain>` (required outside menu)
 - `--kind access|error` (default `access`)
 - `--lines <n>`
+- `--match <text>` (JSON output): the last lines containing it
+- `--status 4xx,5xx` (JSON output, access log, 1.60.0): the last lines with
+  these statuses (`4xx`, `5xx`, or a code such as `404`)
+- `--format json` (JSON output, 1.60.0): adds `entries` with `at` (ISO 8601
+  with the zone), `level`, `status`, `method`, `path`, `ip`, `message`, `raw`
+
+With `--output json` `--lines` goes up to 10000.
 
 Typical use:
 ```bash
