@@ -13,6 +13,7 @@ Templates define rendered configuration artifacts:
 - `templates/healthcheck.php`: local-only healthcheck for non-alias/non-static profiles, copied to `<docroot>/healthcheck.php` when `PROFILE_HEALTHCHECK_MODE=php`.
 - `nginx-static.conf` includes an nginx-served `/healthcheck` (local-only) matching `PROFILE_HEALTHCHECK_MODE=nginx`.
 - `nginx-static.conf` sends `Access-Control-Allow-Origin: *` on fonts (`woff`, `woff2`, `ttf`, `otf`, `eot`) only, so pages in sandboxed frames (origin `null`) can load them, as on GitHub Pages; `self migrate` adds that location to sites rendered before 1.24.0.
+- `nginx-static.conf` also sends it on the SIMAI Framework icon names list, `/_docara/vendor/simai-framework/runtime/<40-hex commit>/distr/core/contracts/icon-names.v<N>.json` (with nosniff and the usual caching); other JSON stays same-origin. `self migrate` adds that location to sites rendered before 1.63.2.
 - `systemd/laravel-queue.service`: queue worker unit template with placeholders `{{PROJECT_NAME}}`, `{{PROJECT_ROOT}}`, `{{PHP_BIN}}`, `{{USER}}`.
 
 Rendering rules:
