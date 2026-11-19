@@ -678,6 +678,12 @@ simai-admin.sh site restore-ready --domain shop.example.com --files public/copy.
 
 Without `--confirm yes` it prints the plan. Panel gateway:
 `site:restore-ready {domain, files, dump?, overwrite?}`.
+The plan names its refusal for the panel (`file_missing`,
+`files_present`, `database_not_empty`, `no_database` and others; see
+`docs/architecture/panel-gate.md`, 1.63.4) and what the check found: the
+target folders, the database and its tables, existing files and whether a
+backup is taken. `site status` shows route `restore` once an archive is
+uploaded into the site.
 
 ## status
 Where a site stands on its creation route (1.56.0), one answer for every

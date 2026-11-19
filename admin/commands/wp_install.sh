@@ -396,37 +396,47 @@ print(json.dumps({"schema": "simai-wp-install/1", "domain": domain, "url": url, 
 # A file inside the site directory given relative to it (or absolute
 # below it): no "..", no symlink anywhere on the way, a regular file.
 # Prints the absolute path.
-wp_site_file() {
+# Resolves a file inside the site directory: SITE_FILE_PATH on success,
+# SITE_FILE_REFUSAL (path_invalid, root_missing, file_missing, symlink,
+# not_file) and the error on refusal.
+# shellcheck disable=SC2034 # SITE_FILE_REFUSAL is read by the callers
+site_file_resolve() {
   local root="$1" path="$2" what="$3" rel real_root real
+  SITE_FILE_PATH="" SITE_FILE_REFUSAL=""
   if [[ -z "$path" || "$path" =~ [[:cntrl:]] ]]; then
-    error "--${what} is empty or has control characters"
+    SITE_FILE_REFUSAL=path_invalid; error "--${what} is empty or has control characters"
     return 1
   fi
   if [[ "/${path}/" == *"/../"* || "/${path}/" == *"/./"* ]]; then
-    error "--${what} must not contain '.' or '..' parts"
+    SITE_FILE_REFUSAL=path_invalid; error "--${what} must not contain '.' or '..' parts"
     return 1
   fi
-  real_root=$(realpath -e -- "$root" 2>/dev/null) || { error "Site directory ${root} is missing"; return 1; }
+  real_root=$(realpath -e -- "$root" 2>/dev/null) || { SITE_FILE_REFUSAL=root_missing; error "Site directory ${root} is missing"; return 1; }
   if [[ "$path" == /* ]]; then
     case "$path" in
       "${root%/}"/*) rel="${path#"${root%/}"/}" ;;
       "${real_root}"/*) rel="${path#"${real_root}"/}" ;;
-      *) error "--${what} must be inside ${root}"; return 1 ;;
+      *) SITE_FILE_REFUSAL=path_invalid; error "--${what} must be inside ${root}"; return 1 ;;
     esac
   else
     rel="$path"
   fi
   rel="${rel#./}"
-  real=$(realpath -e -- "${real_root}/${rel}" 2>/dev/null) || { error "--${what}: ${rel} not found in ${root}"; return 1; }
+  real=$(realpath -e -- "${real_root}/${rel}" 2>/dev/null) || { SITE_FILE_REFUSAL=file_missing; error "--${what}: ${rel} not found in ${root}"; return 1; }
   if [[ "$real" != "${real_root}/${rel%/}" ]]; then
-    error "--${what}: ${rel} goes through a symlink; refused"
+    SITE_FILE_REFUSAL=symlink; error "--${what}: ${rel} goes through a symlink; refused"
     return 1
   fi
   if [[ ! -f "$real" || -L "$real" ]]; then
-    error "--${what}: ${rel} is not a regular file"
+    SITE_FILE_REFUSAL=not_file; error "--${what}: ${rel} is not a regular file"
     return 1
   fi
-  printf '%s\n' "$real"
+  SITE_FILE_PATH="$real"
+}
+
+wp_site_file() {
+  site_file_resolve "$@" || return 1
+  printf '%s\n' "$SITE_FILE_PATH"
 }
 
 wp_restore_kinds() {

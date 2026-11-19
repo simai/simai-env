@@ -5,7 +5,8 @@
 # (not empty without --overwrite, wrong profile, path outside the site), a
 # .zip archive that carries public/ itself, --overwrite with a backup first,
 # a .zip with a '..' entry refused, the generic restore route in
-# self profiles and the gateway plan.
+# self profiles and the gateway plan; site status restore route, named
+# refusals and the facts of the plan (1.63.4).
 set -uo pipefail
 rm -rf /root/simai-env-gr
 cp -r /src /root/simai-env-gr
@@ -88,7 +89,13 @@ cli site restore-ready --domain $D --files two.sql.zip >/dev/null 2>&1 && bad 'a
 cli site add --domain $D2 --profile generic --php 8.3 --create-db no --confirm yes >/dev/null 2>&1 || bad 'site add zip'
 z=$(mktemp -d); mkdir -p "$z/public" "$z/app"; echo '<?php echo "ZIP-RESTORED";' >"$z/public/index.php"; echo 'x' >"$z/app/lib.txt"
 (cd "$z" && python3 -c 'import zipfile; z=zipfile.ZipFile("site.zip","w"); z.write("public/index.php"); z.write("app/lib.txt"); z.close()')
+st() { cli site status --domain $D2 --output json 2>/dev/null | j "(d['data']['route'], d['data']['step'], d['data']['next'])"; }
+[[ "$(st)" == "('none', 'prepare', 'file:upload')" ]] && ok 'site status: an empty PHP site waits for an upload' || bad "status empty: $(st)"
+echo 'SELECT 1;' >$R2/only.sql
+[[ "$(st)" == "('restore', 'upload', 'file:upload')" ]] && ok 'site status: a dump alone still waits for the archive' || bad "status dump: $(st)"
+rm -f $R2/only.sql
 cp "$z/site.zip" $R2/site.zip && chown "$(stat -c %U:%G $R2)" $R2/site.zip
+[[ "$(st)" == "('restore', 'restore', 'site:restore-ready')" ]] && ok 'site status: an uploaded archive leads to site:restore-ready' || bad "status archive: $(st)"
 cli site restore-ready --domain $D2 --files site.zip --confirm yes >/tmp/gr-zip 2>&1 && ok 'restore from .zip' || { bad 'zip restore'; tail -10 /tmp/gr-zip; }
 [[ "$(http $D2 /)" == ZIP-RESTORED && -f $R2/app/lib.txt && "$(stat -c %a $R2)" != 700 ]] && ok 'an archive with public/ lands in the site root' || bad "zip layout: $(http $D2 / | head -c 100); $(ls $R2)"
 cli site restore-ready --domain $D2 --files site.zip --dump x.sql --confirm yes >/dev/null 2>&1 && bad 'dump without a database accepted' || ok 'a dump needs the site database'
@@ -111,6 +118,18 @@ req() { printf '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"us
 cp "$z/site.zip" $R2/site2.zip && chown "$(stat -c %U:%G $R2)" $R2/site2.zip
 [[ "$(gate "$(req "{\"domain\":\"$D2\",\"files\":\"site2.zip\",\"overwrite\":\"yes\"}")" | j "d['status']+'/'+d.get('kind','')")" == ok/plan ]] && ok 'gateway plan' || bad 'gateway plan'
 [[ "$(gate "$(req "{\"domain\":\"$D2\",\"files\":\"../x.zip\"}")" | j "d['status']+'/'+d.get('reason','')")" == refused/invalid_argument ]] && ok 'gateway refuses ..' || bad 'gateway ..'
+p=$(gate "$(req "{\"domain\":\"$D2\",\"files\":\"site2.zip\",\"overwrite\":\"yes\"}")")
+[[ "$(j "(d['data']['restore']['files'], d['data']['restore']['files_present'], d['data']['restore']['backup'], d['data']['restore']['database']['exists'], d['data']['restore']['root'] == '$R2')" <<<"$p")" == "('site2.zip', True, True, False, True)" ]] \
+  && ok 'the plan names what the check found' || bad "plan facts: $(head -c 600 <<<"$p")"
+reason() { gate "$(req "$1")" | j "d['status']+'/'+d.get('reason','')+'/'+str(bool((d.get('data') or {}).get('restore')))"; }
+[[ "$(reason "{\"domain\":\"$D2\",\"files\":\"missing.zip\"}")" == refused/file_missing/True ]] && ok 'refusal file_missing with the facts' || bad "missing: $(reason "{\"domain\":\"$D2\",\"files\":\"missing.zip\"}")"
+[[ "$(reason "{\"domain\":\"$D2\",\"files\":\"site2.zip\"}")" == refused/files_present/True ]] && ok 'refusal files_present' || bad "present: $(reason "{\"domain\":\"$D2\",\"files\":\"site2.zip\"}")"
+echo 'SELECT 1;' >$R2/d.sql; chown "$(stat -c %U:%G $R2)" $R2/d.sql
+[[ "$(reason "{\"domain\":\"$D2\",\"files\":\"site2.zip\",\"dump\":\"d.sql\",\"overwrite\":\"yes\"}")" == refused/no_database/True ]] && ok 'refusal no_database' || bad "no db"
+[[ "$(reason "{\"domain\":\"$D2\",\"files\":\"d.sql\"}")" == refused/files_is_dump/True ]] && ok 'refusal files_is_dump' || bad "files is dump"
+[[ "$(reason "{\"domain\":\"grwp.test\",\"files\":\"x.zip\"}")" == refused/profile_wordpress/True ]] && ok 'refusal profile_wordpress' || bad "wp profile"
+r=$(python3 -c "import sys; sys.path.insert(0, 'admin'); import panel_gate as g; print(g.step_title(\"Moving the archive and the dump to the site's trash\", 'ru'))")
+[[ "$r" == "Архив и дамп — в корзину сайта" ]] && ok 'the trash step reads in Russian' || bad "step: $r"
 
 cleanup
 echo "failures=$fails"; exit "$fails"

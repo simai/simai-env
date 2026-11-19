@@ -433,8 +433,13 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
                  "engine_unsupported",
                  "critical",  # service:stop
-                 "site_missing", "too_many", "site_unsupported"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
-PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop", "owner:create"}  # plans that name their refusal
+                 "site_missing", "too_many", "site_unsupported",
+                 # site:restore-ready (1.63.4), with site_missing, profile_unsupported, no_database, engine_unsupported
+                 "profile_bitrix", "profile_wordpress", "releases", "root_missing", "path_invalid", "file_missing",
+                 "symlink", "not_file", "files_is_dump", "archive_kind", "dump_kind", "database_unreadable",
+                 "database_not_empty", "files_present"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop", "owner:create",
+                                   "site:restore-ready"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -638,10 +643,12 @@ def step_title(message, lang):
             rx = "".join(f"(?P<{re.sub(r'[^A-Za-z0-9_]', '', p[2:-1].split(':-')[0])}>.+?)" if p.startswith("${")
                          else re.escape(p) for p in parts)
             try:
-                rows.append((re.compile(rx), local))
+                rows.append((re.compile(rx), local, len(parts) // 2))
             except re.error:
                 continue
-        _STEPS[lang] = rows
+        # A literal title wins over a pattern with variables that also fits it.
+        rows.sort(key=lambda row: row[2])
+        _STEPS[lang] = [row[:2] for row in rows]
     for rx, local in _STEPS[lang]:
         m = rx.fullmatch(message)
         if m:
@@ -694,7 +701,7 @@ def plan_refusal(command, result):
         return
     data = result.get("data")
     if isinstance(data, dict) and data.get("refusal") in PLAN_REFUSALS:
-        raise Refused(data["refusal"], {**{k: data[k] for k in ("resources", "archive", "detail") if k in data},
+        raise Refused(data["refusal"], {**{k: data[k] for k in ("resources", "archive", "restore", "detail") if k in data},
                                         "checks": plan_checks(result)})
 
 
@@ -736,6 +743,9 @@ def plan(command, args, attachment=None, lang="en"):
     if command == "owner:create" and isinstance(result.get("data"), dict):
         # The account and the sites that move to it.
         answer["owner"] = result["data"]
+    if command == "site:restore-ready" and isinstance(result.get("data"), dict):
+        # What the check found: target folders, database and its tables, files, backup.
+        answer["restore"] = result["data"].get("restore")
     if command == "service:stop" and isinstance(result.get("data"), dict):
         # Which sites lose what while it is stopped (scheduler, cache, sessions, queue, workers).
         answer["service"] = result["data"]

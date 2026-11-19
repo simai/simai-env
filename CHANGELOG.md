@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.63.4 - 2026-11-19
+
+- `site restore-ready` for the panel: the plan names its refusal with a code
+  (`file_missing`, `files_present`, `database_not_empty`, `no_database`,
+  `profile_wordpress` and others) and carries what the check found (target
+  folders, database and its tables, existing files, backup).
+- `site status` of a PHP site shows route `restore` once an archive (step
+  `restore`, next `site:restore-ready`) or only a dump (step `upload`) is in
+  the site.
+- Panel step titles: the step that moves the archive and the dump to the
+  trash no longer reads as a site transfer in Russian.
+
 ## 1.63.3 - 2026-11-18
 
 - `panel reset-password [--email <address>]`: resets a panel password from

@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 PLAN_DATA = {"site:add", "bitrix:restore-ready", "site:transfer", "site:cache-clear", "site:db-browser",
-             "service:stop", "owner:create"}
+             "service:stop", "owner:create", "site:restore-ready"}
 
 
 def result(args):

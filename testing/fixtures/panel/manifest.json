@@ -626,8 +626,8 @@
       "status": "refused"
     },
     "refused.plan-failed.site-restore-ready.json": {
-      "sha256": "a80218a822ac430a83dbe3a9160ea4303699c063fd546a6e80e78b8e34980b33",
-      "status": "failed"
+      "sha256": "89b3cb391c045f17e3da34e91f69c7b155af52d8a1673437fbd8b07cb9dd6cf0",
+      "status": "refused"
     },
     "refused.profile-disabled.json": {
       "sha256": "24d5662fa64085de4653ed9f61d1a45f74a778c96bc2937b3606237162276e13",

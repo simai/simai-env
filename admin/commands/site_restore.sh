@@ -56,9 +56,9 @@ restore_archive_top() {
 site_restore_kinds() {
   local files="$1" dump="$2"
   case "$files" in
-    *.sql.zip) error "--files is the site's files; ${files##*/} is a dump (--dump)"; return 1 ;;
+    *.sql|*.sql.gz|*.sql.zip) SR_REFUSAL=files_is_dump; error "--files is the site's files; ${files##*/} is a dump (--dump)"; return 1 ;;
     *.tar.gz|*.tgz|*.tar|*.zip) ;;
-    *) error "--files must be a .tar.gz, .tgz, .tar or .zip archive"; return 1 ;;
+    *) SR_REFUSAL=archive_kind; error "--files must be a .tar.gz, .tgz, .tar or .zip archive"; return 1 ;;
   esac
   SR_DUMP_GZ=no
   case "$dump" in
@@ -66,80 +66,126 @@ site_restore_kinds() {
     *.sql.gz) SR_DUMP_GZ=yes ;;
     *.sql.zip) SR_DUMP_GZ=zip ;;
     *.sql) ;;
-    *) error "--dump must be a .sql, .sql.gz or .sql.zip file"; return 1 ;;
+    *) SR_REFUSAL=dump_kind; error "--dump must be a .sql, .sql.gz or .sql.zip file"; return 1 ;;
   esac
 }
 
-# Sets SR_* for a generic site; refuses what the restore cannot do.
+# The site's MySQL database, if any: SR_DB_EXISTS, SR_DB_NAME, SR_DB_ENGINE,
+# SR_TABLES (-1 when root cannot read it).
+site_restore_db_facts() {
+  local domain="$1" entry
+  SR_DB_EXISTS=no SR_DB_NAME="" SR_DB_ENGINE="" SR_TABLES=0
+  read_site_db_env "$domain" >/dev/null 2>&1 || return 0
+  SR_DB_EXISTS=yes
+  SR_DB_ENGINE=$(site_db_engine "$domain")
+  [[ "$SR_DB_ENGINE" == mysql ]] || return 0
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == DB_NAME ]] && SR_DB_NAME="${entry#*|}"
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  if db_validate_db_name "$SR_DB_NAME" >/dev/null 2>&1; then
+    SR_TABLES=$(wp_db_table_count "$SR_DB_NAME")
+  else
+    SR_TABLES=-1
+  fi
+}
+
+# Sets SR_* for a generic site; refuses what the restore cannot do, with the
+# reason's code in SR_REFUSAL and what was found for the plan.
 site_restore_precheck() {
   local domain="$1" files="$2" dump="$3" overwrite="$4" f
-  validate_domain "$domain" "allow" || return 1
-  require_site_exists "$domain" || return 1
-  read_site_metadata "$domain" || { error "Failed to read site metadata for ${domain}"; return 1; }
+  SR_REFUSAL="" SR_DOMAIN="$domain" SR_ROOT="" SR_DOC_ROOT="" SR_PUBLIC_DIR="" SR_FILES="" SR_DUMP=""
+  SR_DB_EXISTS=no SR_DB_NAME="" SR_DB_ENGINE="" SR_TABLES=0 SR_HAS_FILES=no SR_BACKUP=no SR_OVERWRITE="$overwrite"
+  validate_domain "$domain" "allow" || { SR_REFUSAL=site_missing; return 1; }
+  require_site_exists "$domain" || { SR_REFUSAL=site_missing; return 1; }
+  read_site_metadata "$domain" || { SR_REFUSAL=site_missing; error "Failed to read site metadata for ${domain}"; return 1; }
   local profile="${SITE_META[profile]:-}"
   case "$profile" in
     generic) ;;
-    bitrix) error "${domain} is a Bitrix site: use bitrix restore-ready"; return 1 ;;
-    wordpress) error "${domain} is a WordPress site: use wp restore-ready"; return 1 ;;
-    *) error "site restore-ready is for PHP sites (generic profile); ${domain} is ${profile:-unknown}"; return 1 ;;
+    bitrix) SR_REFUSAL=profile_bitrix; error "${domain} is a Bitrix site: use bitrix restore-ready"; return 1 ;;
+    wordpress) SR_REFUSAL=profile_wordpress; error "${domain} is a WordPress site: use wp restore-ready"; return 1 ;;
+    *) SR_REFUSAL=profile_unsupported; error "site restore-ready is for PHP sites (generic profile); ${domain} is ${profile:-unknown}"; return 1 ;;
   esac
-  SR_DOMAIN="$domain"
   SR_ROOT="${SITE_META[root]:-}"
-  validate_path "$SR_ROOT" || return 1
+  validate_path "$SR_ROOT" || { SR_REFUSAL=root_missing; return 1; }
+  [[ -d "$SR_ROOT" ]] || { SR_REFUSAL=root_missing; error "Site directory ${SR_ROOT} is missing"; return 1; }
   if deploy_layout_active "$SR_ROOT"; then
-    error "${domain} is deployed in releases; restore it with site deploy --archive"
+    SR_REFUSAL=releases; error "${domain} is deployed in releases; restore it with site deploy --archive"
     return 1
   fi
   SR_PUBLIC_DIR="${SITE_META[public_dir]-public}"
-  SR_DOC_ROOT=$(site_compute_doc_root "$SR_ROOT" "$SR_PUBLIC_DIR") || return 1
-  SR_FILES=$(wp_site_file "$SR_ROOT" "$files" files) || return 1
-  SR_DUMP=""
-  [[ -z "$dump" ]] || SR_DUMP=$(wp_site_file "$SR_ROOT" "$dump" dump) || return 1
-  site_restore_kinds "$SR_FILES" "$SR_DUMP" || return 1
-  SR_DB_NAME="" SR_TABLES=0
-  if [[ -n "$SR_DUMP" ]]; then
-    if ! read_site_db_env "$domain" >/dev/null 2>&1; then
-      error "${domain} has no database for the dump: simai-admin.sh site db-create --domain ${domain} --confirm yes"
-      return 1
-    fi
-    if [[ "$(site_db_engine "$domain")" != mysql ]]; then
-      error "The dump can be imported into MySQL only; ${domain} uses $(site_db_engine "$domain")"
-      return 1
-    fi
-    local entry
-    while IFS= read -r entry; do
-      [[ "${entry%%|*}" == DB_NAME ]] && SR_DB_NAME="${entry#*|}"
-    done < <(read_site_db_env "$domain" 2>/dev/null || true)
-    db_validate_db_name "$SR_DB_NAME" >/dev/null 2>&1 || { error "The site database name is not valid"; return 1; }
-    SR_TABLES=$(wp_db_table_count "$SR_DB_NAME")
-    [[ "$SR_TABLES" != -1 ]] || { error "Cannot read the database ${SR_DB_NAME} as root"; return 1; }
-  fi
+  SR_DOC_ROOT=$(site_compute_doc_root "$SR_ROOT" "$SR_PUBLIC_DIR") || { SR_REFUSAL=root_missing; return 1; }
+  site_restore_db_facts "$domain"
   # Files of the site's own besides the placeholder, the archive and the dump.
-  SR_HAS_FILES=no
+  local files_real="" dump_real=""
+  files_real=$(realpath -e -- "${SR_ROOT}/${files#"${SR_ROOT%/}"/}" 2>/dev/null || true)
+  [[ -z "$dump" ]] || dump_real=$(realpath -e -- "${SR_ROOT}/${dump#"${SR_ROOT%/}"/}" 2>/dev/null || true)
   while IFS= read -r f; do
-    [[ "$f" == "$SR_FILES" || "$f" == "$SR_DUMP" ]] && continue
+    [[ "$f" == "$files_real" || ( -n "$dump_real" && "$f" == "$dump_real" ) ]] && continue
     [[ "$f" == "${SR_DOC_ROOT}/healthcheck.php" ]] && continue
     grep -qE "SIMAI placeholder|Placeholder: site is configured" "$f" 2>/dev/null && continue
     SR_HAS_FILES=yes; break
   done < <(find "$SR_DOC_ROOT" -mindepth 1 -maxdepth 2 -type f 2>/dev/null | head -n 50)
+  site_file_resolve "$SR_ROOT" "$files" files || { SR_REFUSAL="$SITE_FILE_REFUSAL"; return 1; }
+  SR_FILES="$SITE_FILE_PATH"
+  if [[ -n "$dump" ]]; then
+    site_file_resolve "$SR_ROOT" "$dump" dump || { SR_REFUSAL="$SITE_FILE_REFUSAL"; return 1; }
+    SR_DUMP="$SITE_FILE_PATH"
+  fi
+  site_restore_kinds "$SR_FILES" "$SR_DUMP" || return 1
+  if [[ -n "$SR_DUMP" ]]; then
+    if [[ "$SR_DB_EXISTS" != yes ]]; then
+      SR_REFUSAL=no_database; error "${domain} has no database for the dump: simai-admin.sh site db-create --domain ${domain} --confirm yes"
+      return 1
+    fi
+    if [[ "$SR_DB_ENGINE" != mysql ]]; then
+      SR_REFUSAL=engine_unsupported; error "The dump can be imported into MySQL only; ${domain} uses ${SR_DB_ENGINE}"
+      return 1
+    fi
+    if [[ "$SR_TABLES" == -1 ]]; then
+      SR_REFUSAL=database_unreadable; error "Cannot read the site database as root"
+      return 1
+    fi
+  fi
   if [[ "$overwrite" != yes ]]; then
-    if (( SR_TABLES > 0 )); then
-      error "The database ${SR_DB_NAME} is not empty (${SR_TABLES} tables); rerun with --overwrite yes (a backup is taken first)"
+    if [[ -n "$SR_DUMP" ]] && (( SR_TABLES > 0 )); then
+      SR_REFUSAL=database_not_empty; error "The database ${SR_DB_NAME} is not empty (${SR_TABLES} tables); rerun with --overwrite yes (a backup is taken first)"
       return 1
     fi
     if [[ "$SR_HAS_FILES" == yes ]]; then
-      error "${SR_DOC_ROOT} already has files; rerun with --overwrite yes (a backup is taken first)"
+      SR_REFUSAL=files_present; error "${SR_DOC_ROOT} already has files; rerun with --overwrite yes (a backup is taken first)"
       return 1
     fi
+  fi
+  if [[ "$overwrite" == yes ]] && { { [[ -n "$SR_DUMP" ]] && (( SR_TABLES > 0 )); } || [[ "$SR_HAS_FILES" == yes ]]; }; then
+    SR_BACKUP=yes
   fi
   return 0
 }
 
+# What the check found, for the panel (simai-site-restore-plan/1).
+site_restore_plan_json() {
+  python3 -I -c '
+import json, sys
+(refusal, root, doc_root, public_dir, files, dump, db_exists, engine, name, tables, has_files, backup, overwrite) = sys.argv[1:14]
+def rel(p):
+    return p[len(root) + 1:] if root and p.startswith(root + "/") else (p or None)
+print(json.dumps({"refusal": refusal or None, "restore": {
+    "schema": "simai-site-restore-plan/1", "root": root or None, "doc_root": doc_root or None,
+    "public_dir": public_dir or None, "files": rel(files), "dump": rel(dump),
+    "database": {"exists": db_exists == "yes", "engine": engine or None, "name": name or None,
+                 "tables": int(tables) if tables.lstrip("-").isdigit() and int(tables) >= 0 and engine == "mysql" else None},
+    "files_present": has_files == "yes", "overwrite": overwrite == "yes", "backup": backup == "yes"}}))' \
+    "$SR_REFUSAL" "$SR_ROOT" "$SR_DOC_ROOT" "$SR_PUBLIC_DIR" "$SR_FILES" "$SR_DUMP" "$SR_DB_EXISTS" "$SR_DB_ENGINE" \
+    "$SR_DB_NAME" "$SR_TABLES" "$SR_HAS_FILES" "$SR_BACKUP" "$SR_OVERWRITE"
+}
+
 site_restore_plan_check() {
-  local overwrite
+  local overwrite rc=0
   overwrite=$(command_arg overwrite "$@")
   [[ "${overwrite,,}" == yes ]] && overwrite=yes || overwrite=no
-  site_restore_precheck "$(command_arg domain "$@")" "$(command_arg files "$@")" "$(command_arg dump "$@")" "$overwrite"
+  site_restore_precheck "$(command_arg domain "$@")" "$(command_arg files "$@")" "$(command_arg dump "$@")" "$overwrite" || rc=$?
+  site_plan_data_write "$(site_restore_plan_json)"
+  return "$rc"
 }
 
 # Where the archive goes: the site root when it carries the web root folder
@@ -175,7 +221,7 @@ site_restore_ready_handler() {
     if [[ -n "$SR_DUMP" ]]; then
       rows+=("Dump|${SR_DUMP} -> database ${SR_DB_NAME} (site credentials)")
       local db_now="${SR_TABLES} table(s)"
-      if [[ "$overwrite" == yes && "$SR_TABLES" -gt 0 ]]; then db_now+=", backed up, then replaced"; fi
+      if [[ "$SR_BACKUP" == yes && "$SR_TABLES" -gt 0 ]]; then db_now+=", backed up, then replaced"; fi
       rows+=("Database now|${db_now}")
     else
       rows+=("Dump|none")
@@ -192,13 +238,13 @@ site_restore_ready_handler() {
   ui_header "SIMAI ENV · PHP site restore"
   progress_init 4
   local backup_status="not needed" rc=0
-  if [[ "$overwrite" == yes ]] && { (( SR_TABLES > 0 )) || [[ "$SR_HAS_FILES" == yes ]]; }; then
+  if [[ "$SR_BACKUP" == yes ]]; then
     progress_step "Backing up the current site"
     local -a b=(backup data --domain "$SR_DOMAIN" --files yes --confirm yes)
-    [[ -n "$SR_DB_NAME" ]] && b+=(--db yes)
+    [[ -n "$SR_DUMP" && -n "$SR_DB_NAME" ]] && b+=(--db yes)
     run_command "${b[@]}" || { error "Backup failed; nothing restored"; return 1; }
     backup_status="taken (backup data)"
-    if (( SR_TABLES > 0 )); then
+    if [[ -n "$SR_DUMP" ]] && (( SR_TABLES > 0 )); then
       mysql_root_exec_stdin "DROP DATABASE \`${SR_DB_NAME}\`; CREATE DATABASE \`${SR_DB_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" \
         || { error "Cannot empty the database ${SR_DB_NAME}"; return 1; }
     fi

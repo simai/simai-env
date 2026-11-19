@@ -4,7 +4,7 @@
 # routes), in one answer shape for every profile (simai-site-status/1):
 #   route          new|restore|repo|installed|none
 #   step           the id of a route step (prepare, upload, validate,
-#                  run_restore, run_setup, deploy, configure, finalize) or done
+#                  restore, run_restore, run_setup, deploy, configure, finalize) or done
 #   next           the command of that step, open_url, or null
 #   restore_url / installer_url   the address an open_url step opens
 #   pending        what the next step will change (rule ids and the like)
@@ -98,8 +98,25 @@ site_status_minimal() {
   for f in index.html index.htm index.php; do
     [[ -n "$doc_root" && -f "${doc_root}/${f}" ]] && { index="${doc_root}/${f}"; break; }
   done
+  local -a archives=() dumps=()
+  if [[ "$profile" == generic && -n "$doc_root" ]]; then
+    # An archive or a dump uploaded for site restore-ready (1.63.4).
+    # shellcheck disable=SC2034 # read by wp_restore_candidates
+    local WP_ROOT="$root" WP_DOC_ROOT="$doc_root"
+    mapfile -t archives < <(wp_restore_candidates files)
+    mapfile -t dumps < <(wp_restore_candidates dumps)
+  fi
   if [[ -n "$index" ]] && ! grep -q "SIMAI placeholder" "$index" 2>/dev/null; then
     SS_ROUTE="installed" SS_STEP="done"
+  elif (( ${#archives[@]} > 0 || ${#dumps[@]} > 0 )); then
+    SS_ROUTE="restore"
+    if (( ${#archives[@]} > 0 )); then
+      SS_STEP="restore" SS_NEXT="site:restore-ready"
+    else
+      SS_STEP="upload" SS_NEXT="file:upload"
+    fi
+    SS_DETAIL=("index=$([[ -n "$index" ]] && basename "$index" || echo missing)" "archive=${archives[0]:-}" "dump=${dumps[0]:-}")
+    return 0
   else
     SS_ROUTE="none" SS_STEP="prepare"
     case "$profile" in
