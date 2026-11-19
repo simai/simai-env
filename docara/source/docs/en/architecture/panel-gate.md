@@ -780,6 +780,20 @@ action, job). Everything else is refused.
   {domain}` (read, `simai-db-browser/1`: `domain`, `open`, `expires_at`).
   `site:add` takes `ssl: yes|no`, `ssl-email` and `ssl-redirect: yes|no`:
   the site and its Let's Encrypt certificate in one job.
+- 1.63.4: `site:restore-ready` names its refusal in the plan (`refused`
+  with `reason` and `data.restore`): `site_missing`, `profile_bitrix`,
+  `profile_wordpress`, `profile_unsupported`, `releases`, `root_missing`,
+  `path_invalid`, `file_missing`, `symlink`, `not_file`, `files_is_dump`,
+  `archive_kind`, `dump_kind`, `no_database`, `engine_unsupported`,
+  `database_unreadable`, `database_not_empty`, `files_present`. Plans and
+  refusals carry `restore` (`simai-site-restore-plan/1`: `root`, `doc_root`,
+  `public_dir`, `files`, `dump`, `database {exists, engine, name, tables}`,
+  `files_present`, `overwrite`, `backup`). `site:status` of a PHP site
+  reports route `restore` once an archive or dump is in the site directory
+  (or its web root): step `upload` (next `file:upload`) with a dump only,
+  step `restore` (next `site:restore-ready`) with an archive; `detail` names
+  `archive` and `dump`. A step title with no variables wins over a pattern
+  that also fits it (the trash step no longer reads as a transfer).
 - 1.63.1: `owner:create {name, pubkey?, sites?}`: `sites` is a comma list
   (at most 50) of existing sites that move to the account in the same job.
   The plan has `owner {schema: simai-owner-create-plan/1, owner, new,
