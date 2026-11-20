@@ -112,6 +112,17 @@ trash, not deleted; `--permanent yes` deletes it for good (the panel gateway
 never passes it). The site directory itself cannot be removed, nor the trash
 itself. The answer carries `trash_id`.
 
+## Overwrites keep the previous version (1.64.0)
+`write`, `upload` and `extract --overwrite yes` never lose the file they
+replace: before the new content takes its name, the old file goes into the
+trash as an entry with `reason: overwritten` (a hard link, or a copy where a
+link is not allowed), under the same 7-day retention, and comes back with
+`trash-restore` (use `--to` while the new file is in place). `write` and
+`upload` answer `previous_trash_id` (null for a new file); `extract` answers
+`trashed` (count) and `trash_ids` (up to 1000; a panel job result keeps 30).
+If the old version cannot be kept, nothing is replaced and the command fails
+`trash_failed`.
+
 ## Trash (1.57.0)
 The trash is `<site directory>/.simai-trash/` (for example
 `/home/simai/www/example.com/.simai-trash/`), created on the first `remove`,
@@ -135,7 +146,8 @@ comes from the id.
 ### trash-list
 `--domain D`. `--output json` answers `simai-file-trash/1`: `dir,
 retention_days, entries [{id, path, name, type, size, deleted_at,
-expires_at}] (newest first), count, total_bytes`. Times are Unix seconds.
+expires_at, secret, reason}] (newest first), count, total_bytes`. Times are
+Unix seconds; `reason` is `removed` or `overwritten` (1.64.0).
 
 ### trash-restore
 `--domain D --id ID [--to P] --confirm yes`. Moves the entry back to where it
@@ -144,8 +156,11 @@ target exists (the plan already says so), `not_found` for an unknown id,
 `bad_id` for a malformed one.
 
 ### trash-empty
-`--domain D [--id ID] --confirm yes`. Deletes one entry, or the whole trash,
-for good.
+`--domain D [--id ID] [--dry-run yes] --confirm yes`. Deletes one entry, or
+the whole trash, for good, and answers `removed, count, items, bytes`. With
+`--dry-run yes` (1.64.0) nothing is deleted: the answer is `{dry_run: true,
+items, bytes, ids}`. The panel plan of `file:trash-empty` carries the same as
+`trash: {items, bytes, ids}`.
 
 ```bash
 sudo /root/simai-env/simai-admin.sh file list --domain example.com --path public

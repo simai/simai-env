@@ -1585,9 +1585,23 @@ site_remove_handler() {
       fi
     fi
     echo
+    echo "Last backup"
+    if [[ "$last_db" == yes || "$last_files" == yes ]]; then
+      echo "- before removal: database ${last_db}, files ${last_files}; kept ${BACKUP_HOLD_DAYS:-7} days (backup data-list, backup data-restore)"
+    else
+      echo "- not needed (no files or database are removed)"
+    fi
+    echo
     echo "Hint: to apply removal, run without --dry-run yes (CLI requires --confirm yes when destructive flags are set)"
   }
 
+  # What the last backup takes before anything goes (1.64.0); --last-backup no
+  # (console only) skips it for a site whose data is already lost.
+  local last_db=no last_files=no
+  if [[ "$is_alias" != "yes" && "${PARSED_ARGS[last-backup]:-yes}" != no ]]; then
+    [[ $drop_db -eq 1 ]] && last_db=yes
+    [[ $remove_files -eq 1 && -d "$root" ]] && last_files=yes
+  fi
   print_remove_plan
   if [[ $is_dry_run -eq 1 ]]; then
     return 0
@@ -1601,6 +1615,9 @@ site_remove_handler() {
     fi
   fi
 
+  if [[ "$last_db" == yes || "$last_files" == yes ]]; then
+    backup_data_last "$domain" site-remove "$last_db" "$last_files" || return 1
+  fi
   progress_init 5
   local removal_failed=0 db_drop_succeeded=0 db_user_drop_succeeded=0
   progress_step "Removing nginx configuration"
@@ -2244,7 +2261,7 @@ site_info_handler() {
 
 register_cmd "site" "add" "Create site scaffolding (nginx/php-fpm)" "site_add_handler" "domain" "project-name= path= php= profile= usage= host-mode= wildcard-domain= frame-policy= create-db= db= db-name= db-user= db-pass= db-export= path-style= target-domain= skip-db-required= ssl= ssl-email= ssl-redirect= ssl-hsts= ssl-staging= access-create= access-login= access-password= bitrix-files= backup= owner= db-engine= app-port= redirect-to= redirect-code= redirect-path= upstream-port= upstream-path= websockets=" "menu:internal-confirm"
 register_cmd "site" "frame-policy" "Control whether a site may be embedded in frames" "site_frame_policy_handler" "domain mode" "confirm=" "menu:hidden"
-register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= dry-run= confirm="
+register_cmd "site" "remove" "Remove site resources" "site_remove_handler" "" "domain= project-name= path= remove-files= drop-db= drop-db-user= db-name= db-user= last-backup= dry-run= confirm="
 register_cmd "site" "set-php" "Switch PHP version for site" "site_set_php_handler" "" "domain= php= keep-old-pool=" "menu:internal-confirm"
 register_cmd "site" "list" "List configured sites" "site_list_handler" "" "" "effects:read"
 register_cmd "site" "info" "Show site details" "site_info_handler" "" "domain=" "effects:read"

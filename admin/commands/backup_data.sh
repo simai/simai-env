@@ -121,11 +121,25 @@ backup_data_archive_files() {
   (( rc == 0 || rc == 1 ))
 }
 
+# The backup's keep_until (manifest.txt) as epoch seconds, or nothing.
+backup_data_keep_until() {
+  local value
+  value=$(sed -n 's/^keep_until=\([0-9T:Z-]*\)$/\1/p' "$1/manifest.txt" 2>/dev/null | head -n1)
+  [[ -n "$value" ]] && date -u -d "$value" +%s 2>/dev/null
+}
+
+# A backup still on hold (taken before a removal, 1.64.0) is neither pruned
+# nor counted toward --keep.
 backup_data_prune() {
   local domain_dir="$1" keep="$2"
-  local old
+  local old name until now
+  now=$(date +%s)
   find "$domain_dir" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*-[0-9]*' -printf '%f\n' 2>/dev/null \
-    | sort -r | awk -v keep="$keep" 'NR > keep' \
+    | while IFS= read -r name; do
+      until=$(backup_data_keep_until "${domain_dir}/${name}")
+      [[ -n "$until" ]] && (( until > now )) && continue
+      printf '%s\n' "$name"
+    done | sort -r | awk -v keep="$keep" 'NR > keep' \
     | while IFS= read -r old; do
       [[ "$old" =~ ^[0-9]{8}-[0-9]{6}$ ]] && rm -rf --one-file-system -- "${domain_dir:?}/${old}"
     done
@@ -280,6 +294,10 @@ backup_data_run() {
         "$(cat "${SIMAI_ENV_ROOT}/VERSION" 2>/dev/null || echo unknown)"
       printf 'db_engine=%s\n' "$([[ -n "$db_name" ]] && site_db_engine "$domain" || echo none)"
       printf 'encrypted=%s\n' "$([[ -n "$encrypt_to" ]] && echo age || echo no)"
+      if [[ -n "${BACKUP_DATA_REASON:-}" ]]; then
+        printf 'reason=%s\nkeep_until=%s\n' "$BACKUP_DATA_REASON" \
+          "$(date -u -d "+${BACKUP_DATA_HOLD_DAYS:-7} days" +%Y-%m-%dT%H:%M:%SZ)"
+      fi
     } >"${dir}/manifest.txt"
   fi
   if [[ -z "$failed" && -n "$encrypt_to" ]]; then
@@ -292,6 +310,7 @@ backup_data_run() {
     return 1
   fi
   chmod -R go-rwx "$dir"
+  BACKUP_DATA_DIR="$dir"
   [[ "${BACKUP_DATA_NO_PRUNE:-0}" == 1 ]] || backup_data_prune "$domain_dir" "$keep"
 
   local offsite_state="not configured"
@@ -322,6 +341,66 @@ backup_data_run() {
 
 # A check of a site's backup by name (the panel, the schedule) is remembered as
 # the site's last_verify; checks of a bare --path are not.
+# The last backup before a site's files or database go (site remove,
+# site db-drop; 1.64.0): kept BACKUP_HOLD_DAYS whatever --keep says, listed by
+# backup data-list (also once the site is gone) and restorable with
+# backup data-restore. Local only: an off-site failure must not block it.
+# Sets BACKUP_DATA_DIR; on failure the caller removes nothing.
+BACKUP_HOLD_DAYS=7
+backup_data_last() {
+  local domain="$1" reason="$2" db="$3" files="$4" rc=0
+  BACKUP_DATA_DIR=""
+  info "Taking the last backup of ${domain} (kept ${BACKUP_HOLD_DAYS} days)"
+  # A subshell: the backup parses its own arguments over the caller's.
+  BACKUP_DATA_DIR=$(
+    BACKUP_DATA_NO_PRUNE=1 BACKUP_DATA_REASON="$reason" BACKUP_DATA_HOLD_DAYS="$BACKUP_HOLD_DAYS" \
+      SIMAI_BACKUP_OFFSITE="" backup_data_handler --domain "$domain" --dest "$BACKUP_DATA_DEFAULT_DEST" \
+      --db "$db" --files "$files" --storage none >/dev/null || exit 1
+    printf '%s' "$BACKUP_DATA_DIR"
+  ) || rc=$?
+  if (( rc != 0 )) || [[ -z "$BACKUP_DATA_DIR" || ! -f "${BACKUP_DATA_DIR}/manifest.txt" ]]; then
+    error "backup_failed: the last backup of ${domain} failed; nothing was removed"
+    return 1
+  fi
+  echo "Last backup: ${BACKUP_DATA_DIR} (kept until $(sed -n 's/^keep_until=//p' "${BACKUP_DATA_DIR}/manifest.txt"))"
+}
+
+# Held backups past keep_until of sites that are gone (hourly at most, from
+# self status-refresh). Backups of existing sites follow --keep once their
+# hold ends.
+backup_data_hold_sweep() {
+  local stamp=/var/lib/simai-env/backup-hold.stamp base dir until now
+  [[ ! -f "$stamp" || -n "$(find "$stamp" -mmin +59 2>/dev/null)" ]] || return 0
+  install -d -m 0755 /var/lib/simai-env 2>/dev/null && touch "$stamp" 2>/dev/null || return 0
+  now=$(date +%s)
+  for base in "${BACKUP_DATA_DEFAULT_DEST%/}"/*/; do
+    base="${base%/}"
+    [[ -d "$base" && ! -L "$base" && "$(basename "$base")" =~ ^[a-z0-9.-]+$ ]] || continue
+    [[ -f "/etc/nginx/sites-available/$(basename "$base").conf" ]] && continue
+    for dir in "$base"/[0-9]*-[0-9]*; do
+      [[ -d "$dir" && "$(basename "$dir")" =~ ^[0-9]{8}-[0-9]{6}$ ]] || continue
+      until=$(backup_data_keep_until "$dir")
+      [[ -n "$until" ]] && (( until <= now )) && rm -rf --one-file-system -- "${dir:?}"
+    done
+  done
+  return 0
+}
+
+backup_data_list_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}"
+  [[ -z "$domain" ]] || validate_domain "$domain" "allow" || return 1
+  SIMAI_BACKUP_DEST="$BACKUP_DATA_DEFAULT_DEST" python3 -I "${SIMAI_ENV_ROOT}/lib/host_describe.py" "$SIMAI_ENV_ROOT" \
+    backups "$domain" | if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then cat; else python3 -I -c '
+import json, sys
+d = json.load(sys.stdin)
+for i in d["items"]:
+    hold = " hold until " + i["keep_until"] + " (" + (i["reason"] or "") + ")" if i["keep_until"] else ""
+    print("{:<30} {}  {:>12}  {}{}{}".format(i["domain"], i["backup"], i["size_bytes"], ",".join(i["parts"]), hold,
+                                          "" if i["site_exists"] else "  [site removed]"))
+print("{} backups in {}".format(d["count"], d["dest"]))'; fi
+}
+
 backup_data_verify_handler() {
   parse_kv_args "$@"
   local dir="${PARSED_ARGS[path]:-}" domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[backup]:-}"
@@ -503,6 +582,7 @@ backup_data_restore_handler() {
 }
 
 register_cmd "backup" "data" "Back up site database and files (with retention)" "backup_data_handler" "domain" "dest= keep= db= files= offsite= encrypt-to= storage=" "tier:advanced"
+register_cmd "backup" "data-list" "List data backups, also of removed sites (with their hold)" "backup_data_list_handler" "" "domain=" "tier:advanced effects:read"
 register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "" "path= domain= backup= restore-test=" "tier:advanced effects:read"
 register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest= verify=" "tier:advanced"
 register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= confirm=" "tier:advanced"

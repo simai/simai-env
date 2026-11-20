@@ -184,17 +184,56 @@ def backups(domain: str, project: str) -> dict:
         for d in sorted(base.iterdir(), reverse=True):
             if not (d.is_dir() and re.match(r"^\d{8}-\d{6}$", d.name)):
                 continue
-            files = [f for f in d.iterdir() if f.is_file()]
-            items.append({
+            items.append(backup_item(d))
+    return {"schedule": schedule, "items": items, "last_verify": last_verify(domain),
+            "last_offsite": last_offsite(domain)}
+
+
+def backup_hold(d: Path) -> dict:
+    """reason and keep_until of a backup taken before a removal (manifest.txt, 1.64.0)."""
+    out = {"reason": None, "keep_until": None}
+    try:
+        for line in (d / "manifest.txt").read_text(errors="replace").splitlines()[:50]:
+            key, _, value = line.partition("=")
+            if key == "reason" and re.fullmatch(r"[a-z-]{1,40}", value):
+                out["reason"] = value
+            elif key == "keep_until" and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", value):
+                out["keep_until"] = value
+    except OSError:
+        pass
+    return out
+
+
+def backup_item(d: Path) -> dict:
+    files = [f for f in d.iterdir() if f.is_file()]
+    return {
+                "backup": d.name,
                 "path": str(d),
                 "created_at": datetime.strptime(d.name, "%Y%m%d-%H%M%S").strftime("%Y-%m-%dT%H:%M:%S"),
                 "size_bytes": sum(f.stat().st_size for f in files),
                 "parts": sorted(n for n in ("db", "files", "config") if any(f.name.startswith(n + ".") for f in files)),
                 "checksums": (d / "SHA256SUMS").is_file(),
                 "encrypted": any(f.name.endswith(".age") for f in files),
-            })
-    return {"schedule": schedule, "items": items, "last_verify": last_verify(domain),
-            "last_offsite": last_offsite(domain)}
+                **backup_hold(d),
+    }
+
+
+def backup_list(domain: str | None) -> dict:
+    """Data backups in the default destination, also of sites removed since (backup data-list)."""
+    dest = Path(os.environ.get("SIMAI_BACKUP_DEST", "/var/backups/simai"))
+    items = []
+    try:
+        bases = sorted(b for b in dest.iterdir() if b.is_dir() and re.fullmatch(r"[a-z0-9.-]+", b.name))
+    except OSError:
+        bases = []
+    for base in bases:
+        if domain and base.name != domain:
+            continue
+        for d in sorted(base.iterdir(), reverse=True):
+            if d.is_dir() and re.match(r"^\d{8}-\d{6}$", d.name):
+                items.append({"domain": base.name, "site_exists": (NGINX / f"{base.name}.conf").is_file(),
+                              **backup_item(d)})
+    return {"schema": "simai-backup-list/1", "dest": str(dest), "items": items, "count": len(items)}
 
 
 def last_verify(domain: str) -> dict | None:
@@ -422,6 +461,8 @@ def main() -> int:
             return 1
         data = describe_site(sys.argv[3], True)
         data["schema"] = "simai-site/1"
+    elif mode == "backups" and (len(sys.argv) == 3 or (len(sys.argv) == 4 and re.fullmatch(r"[a-z0-9.-]*", sys.argv[3]))):
+        data = backup_list(sys.argv[3] if len(sys.argv) == 4 and sys.argv[3] else None)
     else:
         print("invalid arguments", file=sys.stderr)
         return 2

@@ -212,6 +212,7 @@
         "access:list",
         "access:remove",
         "backup:data",
+        "backup:data-list",
         "backup:data-restore",
         "backup:data-schedule",
         "backup:data-verify",

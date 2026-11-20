@@ -287,8 +287,11 @@ def check_expect(parent, name, expect):
     return stat.S_IMODE(st.st_mode)
 
 
-def save(parent, name, mode, src, limit):
-    """Write src to name atomically (a temporary file, then a rename); size and sha256."""
+def save(parent, name, mode, src, limit, before=None):
+    """Write src to name atomically (a temporary file, then a rename); size and sha256.
+
+    before(parent, name) runs after the content is written and before the
+    rename, when name exists: it keeps the previous version (the trash)."""
     tmp = f".{name[:200]}.simai-{os.getpid()}"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, mode, dir_fd=parent)
     digest, size = hashlib.sha256(), 0
@@ -306,6 +309,13 @@ def save(parent, name, mode, src, limit):
                 f.write(chunk)
             f.flush()
             os.fsync(f.fileno())
+        if before is not None:
+            try:
+                os.stat(name, dir_fd=parent, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                before(parent, name)
         os.rename(tmp, name, src_dir_fd=parent, dst_dir_fd=parent)
     except BaseException:
         try:
@@ -319,13 +329,18 @@ def save(parent, name, mode, src, limit):
 def op_write(root_fd, names, expect, limit=MAX_TEXT):
     if not names:
         raise Fail("not_a_file", "the site directory is not a file")
+    if names[0] == TRASH_DIR:
+        raise Fail("bad_path", "the trash cannot be written to")
     parent = walk(root_fd, names)
+    kept = []
     try:
         mode = check_expect(parent, names[-1], expect)
-        size, sha = save(parent, names[-1], mode, sys.stdin.buffer, limit)
+        size, sha = save(parent, names[-1], mode, sys.stdin.buffer, limit, keeper(root_fd, names[:-1], kept))
     finally:
         os.close(parent)
-    return {"schema": "simai-file-stat/1", "path": "/".join(names), "type": "file", "size": size, "sha256": sha}
+    # The version it replaced is in the trash (1.64.0), restorable like a removed file.
+    return {"schema": "simai-file-stat/1", "path": "/".join(names), "type": "file", "size": size, "sha256": sha,
+            "previous_trash_id": kept[0] if kept else None}
 
 
 def op_stat(root_fd, names):
@@ -592,8 +607,11 @@ def op_extract(root_fd, names, dest, overwrite, without_secrets="no"):
     secret_skipped = []
     fmt = archive_format(names[-1] if names else "")
     src = os.fdopen(open_file(root_fd, names), "rb")
+    if dest and dest[0] == TRASH_DIR:
+        raise Fail("bad_path", "cannot extract into the trash")
     dest_fd = ensure_dirs(root_fd, dest)
     files = dirs = skipped = 0
+    kept = []
     try:
         entries = list(members(src, fmt))
         if skip:
@@ -640,7 +658,7 @@ def op_extract(root_fd, names, dest, overwrite, without_secrets="no"):
                 except FileNotFoundError:
                     pass
                 with opener() as f:
-                    save(parent, mnames[-1], mode or 0o644, f, MAX_UNPACKED)
+                    save(parent, mnames[-1], mode or 0o644, f, MAX_UNPACKED, keeper(root_fd, dest + mnames[:-1], kept))
                 files += 1
             finally:
                 os.close(parent)
@@ -650,7 +668,7 @@ def op_extract(root_fd, names, dest, overwrite, without_secrets="no"):
         os.close(dest_fd)
         src.close()
     result = {"schema": "simai-file-stat/1", "path": "/".join(dest), "type": "dir", "files": files, "dirs": dirs,
-              "skipped": skipped}
+              "skipped": skipped, "trashed": len(kept), "trash_ids": kept[:1000]}
     if skip:
         result["secret_skipped"] = secret_skipped
     return result
@@ -754,7 +772,61 @@ def trash_entry(trash_fd, tid):
             "size": size, "deleted_at": when, "expires_at": when + TRASH_DAYS * 86400,
             # A deleted .env restored under another name could be read: the
             # panel treats the entry like the file (1.62.2).
-            "secret": bool(path) and is_secret(path.rsplit("/", 1)[-1])}
+            "secret": bool(path) and is_secret(path.rsplit("/", 1)[-1]),
+            # removed (file remove) or overwritten (write, upload, extract; 1.64.0)
+            "reason": meta.get("reason") if meta.get("reason") in ("removed", "overwritten") else "removed"}
+
+
+def trash_new_entry(trash_fd):
+    """A new entry directory: (id, descriptor)."""
+    for _ in range(20):
+        tid = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + secrets.token_hex(3)
+        try:
+            os.mkdir(tid, 0o700, dir_fd=trash_fd)
+        except FileExistsError:
+            continue
+        return tid, os.open(tid, DIR_FLAGS, dir_fd=trash_fd)
+    raise Fail("trash_failed", "no free trash id")
+
+
+def keeper(root_fd, dir_names, kept):
+    """A save() hook: the file about to be replaced goes to the trash first.
+
+    The trash gets a hard link to it (the new content is renamed over the
+    name, so the linked inode keeps the old bytes), or a copy where a link is
+    not allowed. If neither works, nothing is replaced."""
+    def keep(parent, name):
+        st = os.stat(name, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(st.st_mode):
+            return  # the caller refuses anything but a file
+        trash_fd = open_trash(root_fd, True)
+        try:
+            trash_prune(trash_fd)
+            tid, entry_fd = trash_new_entry(trash_fd)
+            try:
+                try:
+                    os.link(name, "item", src_dir_fd=parent, dst_dir_fd=entry_fd, follow_symlinks=False)
+                except OSError:
+                    try:
+                        src = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent)
+                        with os.fdopen(src, "rb") as f:
+                            save(entry_fd, "item", stat.S_IMODE(st.st_mode), f, MAX_UNPACKED)
+                    except (OSError, Fail) as e:
+                        os.close(entry_fd)
+                        entry_fd = None
+                        remove_any(trash_fd, tid)
+                        raise Fail("trash_failed", f"the current {name[:200]} cannot be kept in the trash "
+                                                   f"({getattr(e, 'strerror', None) or e}); nothing was replaced")
+                meta = {"path": "/".join(dir_names + [name]), "type": "file", "size": st.st_size,
+                        "deleted_at": trash_id_time(tid), "reason": "overwritten"}
+                save(entry_fd, "meta.json", 0o600, io.BytesIO(json.dumps(meta).encode()), 65536)
+            finally:
+                if entry_fd is not None:
+                    os.close(entry_fd)
+        finally:
+            os.close(trash_fd)
+        kept.append(tid)
+    return keep
 
 
 def op_trash(root_fd, names):
@@ -768,9 +840,7 @@ def op_trash(root_fd, names):
         trash_fd = open_trash(root_fd, True)
         try:
             trash_prune(trash_fd)
-            tid = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + "-" + secrets.token_hex(3)
-            os.mkdir(tid, 0o700, dir_fd=trash_fd)
-            entry_fd = os.open(tid, DIR_FLAGS, dir_fd=trash_fd)
+            tid, entry_fd = trash_new_entry(trash_fd)
             try:
                 try:
                     os.rename(names[-1], "item", src_dir_fd=parent, dst_dir_fd=entry_fd)
@@ -782,7 +852,7 @@ def op_trash(root_fd, names):
                     raise
                 size = tree_size(entry_fd, "item")
                 meta = {"path": "/".join(names), "type": kind(st.st_mode), "size": size,
-                        "deleted_at": trash_id_time(tid)}
+                        "deleted_at": trash_id_time(tid), "reason": "removed"}
                 save(entry_fd, "meta.json", 0o600, io.BytesIO(json.dumps(meta).encode()), 65536)
             finally:
                 os.close(entry_fd)
@@ -875,11 +945,19 @@ def op_trash_restore(root_fd, tid, to, check=False):
     return answer
 
 
-def op_trash_empty(root_fd, tid):
-    removed = []
+def op_trash_empty(root_fd, tid, check=False):
+    """Delete one entry or all of them; check=True only counts (the plan, 1.64.0)."""
+    if check:
+        rows = [r for r in op_trash_list(root_fd)["entries"] if not tid or r["id"] == tid]
+        if tid and not rows:
+            raise Fail("not_found", f"no trash entry {tid}")
+        return {"schema": "simai-file-trash/1", "dir": TRASH_DIR, "dry_run": True, "items": len(rows),
+                "bytes": sum(r["size"] for r in rows), "ids": [r["id"] for r in rows][:1000]}
+    removed, size = [], 0
     if tid:
         trash_fd = trash_open_entry(root_fd, tid)
         try:
+            size += trash_entry_size(trash_fd, tid)
             remove_any(trash_fd, tid)
             removed.append(tid)
         finally:
@@ -890,11 +968,20 @@ def op_trash_empty(root_fd, tid):
             try:
                 for name in os.listdir(trash_fd):
                     if trash_id_time(name) is not None:
+                        size += trash_entry_size(trash_fd, name)
                         remove_any(trash_fd, name)
                         removed.append(name)
             finally:
                 os.close(trash_fd)
-    return {"schema": "simai-file-trash/1", "dir": TRASH_DIR, "removed": sorted(removed), "count": len(removed)}
+    return {"schema": "simai-file-trash/1", "dir": TRASH_DIR, "removed": sorted(removed), "count": len(removed),
+            "items": len(removed), "bytes": size}
+
+
+def trash_entry_size(trash_fd, tid):
+    try:
+        return trash_entry(trash_fd, tid)["size"]
+    except OSError:
+        return 0
 
 
 def copy_into(src_parent, name, dst_parent, dst_name):
@@ -1135,8 +1222,8 @@ def main(argv):
         result = op_trash_list(root_fd)
     elif op in ("trash-restore", "trash-restore-check"):
         result = op_trash_restore(root_fd, argv[3], argv[4], op == "trash-restore-check")
-    elif op == "trash-empty":
-        result = op_trash_empty(root_fd, argv[3])
+    elif op in ("trash-empty", "trash-empty-check"):
+        result = op_trash_empty(root_fd, argv[3], op == "trash-empty-check")
     else:
         result = {"list": op_list, "stat": op_stat, "read": op_read, "mkdir": op_mkdir,
                   "remove": op_remove, "volumes": op_volumes}[op](root_fd, names)

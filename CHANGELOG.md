@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.64.0 - 2026-11-20
+
+Mistakes can be undone: a final delete is a separate, delayed step.
+
+- `site remove --remove-files yes` / `--drop-db yes` and `site db-drop` take
+  a last backup of the site first (files and/or database, kept 7 days
+  whatever `--keep` says). If it fails, nothing is removed and the error
+  starts with `backup_failed`. `--last-backup no` (console only) skips it.
+- `backup data-list [--domain D]`: data backups, also of removed sites, with
+  `reason` and `keep_until` of a last backup. Held backups of removed sites
+  go after their 7 days (`self status-refresh`, hourly).
+- `file write`, `file upload` and `file extract --overwrite yes` put the file
+  they replace into the site trash (reason `overwritten`, 7 days, restorable
+  with `trash-restore`); the answer carries `previous_trash_id` or `trashed`
+  and `trash_ids`. If the old version cannot be kept, nothing is replaced
+  (`trash_failed`).
+- `file trash-empty --dry-run yes` answers `{items, bytes, ids}`; the panel
+  plan of `file:trash-empty` carries the same as `trash`. Emptying reports
+  `items` and `bytes` too.
+
 ## 1.63.4 - 2026-11-19
 
 - `site restore-ready` for the panel: the plan names its refusal with a code

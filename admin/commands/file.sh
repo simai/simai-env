@@ -52,14 +52,19 @@ file_show() {
   json=$(file_helper "$@") || return 1
   # A panel job hands on what archive/extract left out (job:status result;
   # the gateway reads 4 KiB of it, so at most 30 paths and the total).
-  if [[ -n "${SIMAI_JOB_RESULT:-}" && "$json" == *'"secret_skipped"'* ]]; then
+  # Also what an overwrite put into the trash (1.64.0): the panel offers "undo".
+  if [[ -n "${SIMAI_JOB_RESULT:-}" && ( "$json" == *'"secret_skipped"'* || "$json" == *'"trash_ids": ["'* \
+        || "$json" == *'"previous_trash_id": "'* ) ]]; then
     python3 -I -c '
 import json, sys
 d = json.loads(sys.argv[1])
-skipped = d.get("secret_skipped") or []
-keep = {k: d[k] for k in ("path", "type", "packed", "files", "dirs", "skipped") if k in d}
-paths = [p[:100] for p in skipped[:30]]
-open(sys.argv[2], "w").write(json.dumps({**keep, "secret_skipped": paths, "secret_skipped_total": len(skipped)}))' \
+keep = {k: d[k] for k in ("path", "type", "packed", "files", "dirs", "skipped", "trashed", "previous_trash_id") if k in d}
+if "trash_ids" in d:
+    keep["trash_ids"] = d["trash_ids"][:30]
+if "secret_skipped" in d:
+    skipped = d.get("secret_skipped") or []
+    keep.update(secret_skipped=[p[:100] for p in skipped[:30]], secret_skipped_total=len(skipped))
+open(sys.argv[2], "w").write(json.dumps(keep))' \
       "$json" "$SIMAI_JOB_RESULT" 2>/dev/null || true
   fi
   if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
@@ -186,9 +191,16 @@ file_trash_restore_handler() {
   file_show trash-restore "" "${PARSED_ARGS[id]}" "${PARSED_ARGS[to]:-}"
 }
 
+# --dry-run yes counts what would go ({items, bytes}) and deletes nothing.
 file_trash_empty_handler() {
   file_prepare "$@" && file_trash_id_arg "${PARSED_ARGS[id]:-}" || return 1
-  file_show trash-empty "" "${PARSED_ARGS[id]:-}"
+  local dry="${PARSED_ARGS[dry-run]:-no}"
+  [[ "$dry" =~ ^(yes|no)$ ]] || { error "--dry-run must be yes or no"; return 1; }
+  if [[ "$dry" == yes ]]; then
+    file_show trash-empty-check "" "${PARSED_ARGS[id]:-}"
+  else
+    file_show trash-empty "" "${PARSED_ARGS[id]:-}"
+  fi
 }
 
 # Plan checks (admin/lib/execution.sh): what the copy or restore would refuse
@@ -200,6 +212,20 @@ file_copy_plan_check() {
   [[ -n "$path" && -n "$to" ]] || return 0
   file_site "$domain" || return 1
   file_helper copy-check "$path" "$to" >/dev/null
+}
+
+# The plan of emptying the trash carries what would be deleted for good:
+# {"trash": {"items", "bytes", "ids"}} (1.64.0).
+file_trash_empty_plan_check() {
+  local domain id out
+  domain=$(command_arg domain "$@"); id=$(command_arg id "$@")
+  file_trash_id_arg "$id" || return 1
+  file_site "$domain" || return 1
+  out=$(file_helper trash-empty-check "" "$id") || return 1
+  site_plan_data_write "$(printf '%s' "$out" | python3 -I -c '
+import json, sys
+d = json.load(sys.stdin)
+print(json.dumps({"trash": {k: d[k] for k in ("items", "bytes", "ids")}}))')"
 }
 
 file_trash_restore_plan_check() {
@@ -226,4 +252,4 @@ register_cmd "file" "remove" "Move a file, a link or a directory of a site into 
 register_cmd "file" "copy" "Copy a file or directory within a site (links copied as links)" "file_copy_handler" "domain path to" "" "tier:advanced"
 register_cmd "file" "trash-list" "List the site's trash (entries are kept 7 days)" "file_trash_list_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "file" "trash-restore" "Put a trash entry back where it was or at --to" "file_trash_restore_handler" "domain id" "to=" "tier:advanced"
-register_cmd "file" "trash-empty" "Delete one trash entry (--id) or the whole trash of a site for good" "file_trash_empty_handler" "domain" "id=" "tier:advanced effects:delete"
+register_cmd "file" "trash-empty" "Delete one trash entry (--id) or the whole trash of a site for good" "file_trash_empty_handler" "domain" "id= dry-run=" "tier:advanced effects:delete"

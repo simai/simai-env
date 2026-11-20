@@ -47,6 +47,10 @@ Notes:
 `simai-admin.sh site db-drop --domain <domain> [--dry_run yes] [--confirm yes] [--remove_files yes]`
 - Dry-run prints what would be dropped. Real execution requires confirmation.
 - Drops DB and user; removes db.env only when `--remove_files yes`.
+- First (1.64.0) a last backup of the database, kept 7 days (`reason=db-drop`,
+  see `backup data-list`); if it fails, nothing is dropped and the error
+  starts with `backup_failed`. `--last-backup no` (console only) skips it.
+  To restore: `site db-create`, then `backup data-restore --backup <timestamp> --files no`.
 
 ## db-rotate
 `simai-admin.sh site db-rotate --domain <domain> [--dry_run yes] [--confirm yes]`

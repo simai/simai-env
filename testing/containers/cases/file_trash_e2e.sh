@@ -107,8 +107,74 @@ a=$(gate "$(req null file:trash-restore "{\"domain\":\"trash.test\",\"id\":\"$gi
 a=$(gate "$(req null file:copy '{"domain":"trash.test","path":"public/one.txt","to":"public/three.txt"}' 1)"); s=$(wait_job "$(js 'd["job_id"]' <<<"$a")")
 [[ "$s" == succeeded ]] && cmp -s "$root/public/one.txt" "$root/public/three.txt" && ok "the file:copy job copies" || bad "gate copy job: $s"
 [[ "$(gate "$(req null file:trash-empty '{"domain":"trash.test"}')" | js 'd["kind"]')" == plan ]] && ok "file:trash-empty answers a plan" || bad "gate empty plan"
+p=$(gate "$(req null file:trash-empty '{"domain":"trash.test"}')")
+[[ "$(js 'set(d["data"]["trash"]) == {"items", "bytes", "ids"}' <<<"$p")" == True ]] && ok "the file:trash-empty plan names items and bytes" || bad "gate empty plan data: $p"
+echo gated-old >"$root/public/g.txt"; chown "$user:" "$root/public/g.txt"; echo gated-new >/tmp/g-new
+a=$(gate "$(req null file:write '{"domain":"trash.test","path":"public/g.txt","content":"gated-new\n","expect-sha256":"any"}' 1)")
+j=$(js 'd["job_id"]' <<<"$a"); s=$(wait_job "$j")
+r=$(gate "$(req null job:status "{\"job_id\":\"$j\"}")" | js 'd["data"].get("result") or {}')
+[[ "$s" == succeeded && "$r" == *previous_trash_id* ]] && ok "a file:write job hands on the previous version's trash id" || bad "gate write job: $s $r $a"
+
+# Overwrites keep the previous version in the trash (1.64.0).
+echo old-text >"$root/public/w.txt"; chown "$user:" "$root/public/w.txt"; echo new-text >/tmp/w-new
+w=$(fj write --path public/w.txt --content-file /tmp/w-new --expect-sha256 any --confirm yes)
+wid=$(js 'd["previous_trash_id"]' <<<"$w")
+[[ "$(cat "$root/public/w.txt")" == new-text && "$(cat "$root/.simai-trash/$wid/item" 2>/dev/null)" == old-text ]] \
+  && ok "write over a file keeps the previous version in the trash" || bad "write trash: $w"
+[[ "$(fj trash-list | js "[e['reason'] for e in d['entries'] if e['id'] == '$wid'][0]")" == overwritten ]] && ok "the entry is marked overwritten" || bad "overwritten reason"
+cli file trash-restore --domain trash.test --id "$wid" --to public/w-old.txt --confirm yes >/dev/null 2>&1
+[[ "$(cat "$root/public/w-old.txt" 2>/dev/null)" == old-text && "$(cat "$root/public/w.txt")" == new-text ]] && ok "the previous version restores like a removed file" || bad "restore previous"
+[[ "$(fj write --path public/fresh.txt --content-file /tmp/w-new --expect-sha256 new --confirm yes | js 'd["previous_trash_id"]')" == None ]] \
+  && ok "a new file puts nothing in the trash" || bad "new write trashed"
+sum=$(sha256sum /tmp/w-new | cut -d' ' -f1)
+u=$(fj upload --path public/w.txt --source /tmp/w-new --sha256 "$sum" --expect-sha256 any --confirm yes)
+[[ "$(js 'd["previous_trash_id"] is not None' <<<"$u")" == True ]] && ok "upload over a file keeps the previous version" || bad "upload trash: $u"
+mkdir -p /tmp/xa/public && echo from-archive >/tmp/xa/public/w.txt && echo extra >/tmp/xa/public/new.txt
+tar -C /tmp/xa -czf "$root/x.tgz" public && chown "$user:" "$root/x.tgz"
+before=$(cat "$root/public/w.txt")
+e=$(fj extract --path x.tgz --to . --overwrite yes --confirm yes)
+eid=$(js 'd["trash_ids"][0]' <<<"$e")
+[[ "$(js 'd["trashed"]' <<<"$e")" == 1 && "$(cat "$root/public/w.txt")" == from-archive && "$(cat "$root/.simai-trash/$eid/item")" == "$before" ]] \
+  && ok "extract with overwrite keeps each replaced file in the trash" || bad "extract trash: $e"
+
+# Emptying: a dry run counts and deletes nothing.
+n=$(fj trash-list | js 'd["count"]'); b=$(fj trash-list | js 'd["total_bytes"]')
+d=$(fj trash-empty --dry-run yes --confirm yes)
+[[ "$(js 'd["items"]' <<<"$d")" == "$n" && "$(js 'd["bytes"]' <<<"$d")" == "$b" && "$(js 'd["dry_run"]' <<<"$d")" == True && "$(fj trash-list | js 'd["count"]')" == "$n" ]] \
+  && ok "trash-empty --dry-run yes gives items and bytes and deletes nothing" || bad "dry run: $d (n=$n b=$b)"
+[[ "$(fj trash-empty --id "$eid" --dry-run yes --confirm yes | js 'd["items"]')" == 1 ]] && ok "a dry run of one entry counts one" || bad "dry run one"
+e2=$(fj trash-empty --confirm yes)
+[[ "$(js 'd["items"]' <<<"$e2")" == "$n" && "$(js 'd["bytes"]' <<<"$e2")" == "$b" && "$(fj trash-list | js 'd["count"]')" == 0 ]] && ok "emptying reports what went" || bad "empty: $e2"
 
 cli panel gate-disable --confirm yes >/dev/null 2>&1
-cli site remove --domain trash.test --remove-files yes --confirm yes >/dev/null 2>&1
+
+# The last backup before a removal (1.64.0): held 7 days, listed after the
+# site is gone, swept once its hold ends.
+echo keep-me >"$root/public/last.txt"; chown "$user:" "$root/public/last.txt"
+cli site remove --domain trash.test --remove-files yes --confirm yes >/tmp/o 2>&1
+lb=$(ls -d /var/backups/simai/trash.test/*/ 2>/dev/null | tail -1); lb="${lb%/}"
+[[ -n "$lb" && ! -e "$root" ]] && grep -q '^reason=site-remove$' "$lb/manifest.txt" && grep -q '^keep_until=' "$lb/manifest.txt" \
+  && tar -xzOf "$lb/files.tar.gz" 2>/dev/null | grep -q keep-me && ok "site remove with files takes a held last backup first" || bad "last backup: $(tail -3 /tmp/o) $lb"
+grep -q 'Last backup' /tmp/o && ok "the remove output names the last backup" || bad "remove output"
+l=$(cli backup data-list --domain trash.test --output json 2>/dev/null | js 'd["data"]')
+[[ "$(python3 -c 'import ast,sys; d=ast.literal_eval(sys.argv[1]); i=d["items"][0]; print(i["site_exists"] is False and i["reason"]=="site-remove" and bool(i["keep_until"]) and i["backup"] and "files" in i["parts"])' "$l")" == True ]] \
+  && ok "backup data-list shows it after the site is gone" || bad "data-list: $l"
+rm -f /var/lib/simai-env/backup-hold.stamp; cli self status-refresh --confirm yes >/dev/null 2>&1
+[[ -d "$lb" ]] && ok "a held backup stays before its hold ends" || bad "swept too early"
+sed -i 's/^keep_until=.*/keep_until=2020-01-01T00:00:00Z/' "$lb/manifest.txt"
+rm -f /var/lib/simai-env/backup-hold.stamp; cli self status-refresh --confirm yes >/dev/null 2>&1
+[[ ! -d "$lb" ]] && ok "a removed site's held backup goes after its hold" || bad "not swept"
+cli site add --domain gone.test --profile generic --php "$native" --create-db no --confirm yes >/dev/null 2>&1
+groot=$(cli site describe --domain gone.test --output json 2>/dev/null | js 'd["data"]["root"]')
+chmod 000 /var/backups/simai 2>/dev/null; chattr +i /var/backups/simai 2>/dev/null
+if lsattr -d /var/backups/simai 2>/dev/null | grep -q -- '-i-'; then
+  cli site remove --domain gone.test --remove-files yes --confirm yes >/tmp/o 2>&1
+  [[ -d "$groot" && -f /etc/nginx/sites-available/gone.test.conf ]] && grep -q backup_failed /tmp/o && ok "a failed last backup stops the removal (backup_failed)" || bad "failed backup removed: $(tail -2 /tmp/o)"
+  chattr -i /var/backups/simai
+else
+  ok "skip: immutable flag unavailable in this container"
+fi
+chmod 700 /var/backups/simai
+cli site remove --domain gone.test --remove-files yes --last-backup no --confirm yes >/dev/null 2>&1
 echo "failures=${fails}"
 exit $(( fails > 0 ))

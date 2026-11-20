@@ -90,6 +90,7 @@ command_plan_check() {
     service:stop) service_stop_plan_check "$@" || return 1 ;;
     owner:create) owner_create_plan_check "$@" || return 1 ;;
     file:trash-restore) file_trash_restore_plan_check "$@" || return 1 ;;
+    file:trash-empty) file_trash_empty_plan_check "$@" || return 1 ;;
   esac
   return 0
 }

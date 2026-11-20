@@ -100,6 +100,18 @@ The result of the last upload of each site is kept in
 `last_offsite {at, ok, storage, backup, error}` in `site describe` (and in
 its `backups`).
 
+## data-list
+`backup data-list [--domain D]` (1.64.0) lists the data backups in
+`/var/backups/simai`, also of sites removed since. `--output json` answers
+`simai-backup-list/1`: `dest, count, items [{domain, site_exists, backup,
+path, created_at, size_bytes, parts, checksums, encrypted, reason,
+keep_until}]`, newest first per site. `reason` and `keep_until` are set on
+a last backup taken by `site remove` (`site-remove`) or `site db-drop`
+(`db-drop`): it is held 7 days, not counted toward `--keep`, and a removed
+site's held backup goes after its hold (`self status-refresh`, hourly). The
+same two fields appear on the items of `site describe` `backups`. In the
+panel gateway it is admin-only.
+
 ## data-verify
 ```bash
 sudo /root/simai-env/simai-admin.sh backup data-verify --path /var/backups/simai/example.com/20260921-033000 --restore-test yes

@@ -375,6 +375,8 @@ ALLOW = {
     "self:firewall-ensure": ({}, set(), "action"),
     # Off-site storages for data backups (S3). Keys go in as files and are never kept.
     "backup:storage-list": ({}, set(), "read"),
+    # Data backups also of removed sites, with the hold of a last backup (1.64.0).
+    "backup:data-list": ({"domain": DOMAIN}, set(), "read"),
     "backup:storage-add": ({"name": STORAGE_NAME, "bucket": BUCKET, "endpoint": ORIGIN, "region": REGION,
                             "prefix": PREFIX, "keep": KEEP_DAYS, "default": YES_NO,
                             "access-key": S3_KEY, "secret-key": S3_KEY},
@@ -401,7 +403,7 @@ ADMIN_ONLY = {"profile:enable", "profile:disable", "owner:create", "owner:add-ke
               "php:list", "php:install", "php:remove", "php:extension", "php:update",
               "software:list", "software:refresh", "software:update", "software:install", "software:remove",
               "site:nginx-custom", "site:nginx-custom-show", "site:apache",
-              "backup:storage-list", "backup:storage-add", "backup:storage-test", "backup:storage-remove",
+              "backup:data-list", "backup:storage-list", "backup:storage-add", "backup:storage-test", "backup:storage-remove",
               "backup:storage-copies", "backup:storage-fetch",
               "security:status", "security:scan", "security:fix", "self:firewall-ensure",
               "security:files-scan", "security:files", "security:quarantine", "security:quarantine-list",
@@ -439,7 +441,7 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "symlink", "not_file", "files_is_dump", "archive_kind", "dump_kind", "database_unreadable",
                  "database_not_empty", "files_present"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
 PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop", "owner:create",
-                                   "site:restore-ready"}  # plans that name their refusal
+                                   "site:restore-ready", "file:trash-empty"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -746,6 +748,9 @@ def plan(command, args, attachment=None, lang="en"):
     if command == "site:restore-ready" and isinstance(result.get("data"), dict):
         # What the check found: target folders, database and its tables, files, backup.
         answer["restore"] = result["data"].get("restore")
+    if command == "file:trash-empty" and isinstance(result.get("data"), dict):
+        # What goes for good: {items, bytes, ids}.
+        answer["trash"] = result["data"].get("trash")
     if command == "service:stop" and isinstance(result.get("data"), dict):
         # Which sites lose what while it is stopped (scheduler, cache, sessions, queue, workers).
         answer["service"] = result["data"]

@@ -240,6 +240,12 @@ site_db_drop_handler() {
   echo "- Drop database: ${db_name}"
   echo "- Drop user    : ${db_user}@localhost"
   [[ "$remove_files" == "yes" ]] && echo "- Remove db.env file"
+  # The last backup of the database first (1.64.0); --last-backup no
+  # (console only) skips it.
+  local last_backup="${PARSED_ARGS[last-backup]:-yes}"
+  if [[ "$last_backup" != no ]]; then
+    echo "- First: last backup of the database, kept ${BACKUP_HOLD_DAYS:-7} days (backup data-list, backup data-restore)"
+  fi
   if [[ "$dry_run" == "yes" ]]; then
     echo "Dry-run only; no changes made."
     return 0
@@ -258,6 +264,9 @@ site_db_drop_handler() {
     }
   fi
 
+  if [[ "$last_backup" != no ]]; then
+    backup_data_last "$domain" db-drop yes no || return 1
+  fi
   if ! site_db_apply_drop "$domain" "$db_name" "$db_user" "$remove_files"; then
     return 1
   fi
@@ -547,5 +556,5 @@ print(json.dumps(dict(zip(keys, sys.stdin.read().split("\n")[:6]))))' <<<"$(prin
 register_cmd "site" "db-credentials" "Show the connection details of a site's database, password included" "site_db_credentials_handler" "domain" "" "menu:confirm"
 register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced effects:read"
 register_cmd "site" "db-create" "Create DB + user for a site" "site_db_create_handler" "" "domain= dry_run= confirm=" "tier:advanced"
-register_cmd "site" "db-drop" "Drop DB + user for a site" "site_db_drop_handler" "" "domain= dry_run= confirm= remove_files=" "tier:advanced"
+register_cmd "site" "db-drop" "Drop DB + user for a site" "site_db_drop_handler" "" "domain= dry_run= confirm= remove_files= last-backup=" "tier:advanced"
 register_cmd "site" "db-rotate" "Rotate DB user password for a site" "site_db_rotate_handler" "" "domain= dry_run= confirm=" "tier:advanced"
