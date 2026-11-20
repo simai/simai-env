@@ -314,8 +314,17 @@ Options:
 - `--drop-db-user` (`yes|no`, default user from project)
 - `--db-name`, `--db-user`
 - `--dry-run` (`yes|no`, default `no`; when `yes`, plan-only and no confirm needed)
+- `--last-backup` (`yes|no`, default `yes`; console only, the panel cannot skip it)
 
 Behavior:
+- Last backup (1.64.0): with `--remove-files yes` or `--drop-db yes` the site's
+  files and/or database are backed up first into
+  `/var/backups/simai/<domain>/<timestamp>/` with `reason=site-remove` and
+  `keep_until` (7 days) in `manifest.txt`. It is not pruned by `--keep`, is
+  listed by `backup data-list` after the site is gone, and goes after its 7
+  days. If it fails, nothing is removed and the error starts with
+  `backup_failed`. To restore: add the site again, then `backup data-restore
+  --backup <timestamp>`.
 - Dry-run mode (`--dry-run yes` or menu “Plan only”) prints what *would* be removed and exits without changes (no confirm needed).
 - Apply mode removes nginx vhost/symlink (with nginx -t before reload; restores if test fails).
 - PHP/cron/queue removal only when the profile requires PHP (alias/static skip automatically; cron removal is profile-gated).

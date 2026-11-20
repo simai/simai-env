@@ -794,6 +794,15 @@ action, job). Everything else is refused.
   step `restore` (next `site:restore-ready`) with an archive; `detail` names
   `archive` and `dump`. A step title with no variables wins over a pattern
   that also fits it (the trash step no longer reads as a transfer).
+- 1.64.0: `site:remove` (with `remove-files` or `drop-db`) and `site:db-drop`
+  take a last backup first, held 7 days; a failed backup stops the job and
+  its `reason` starts with `backup_failed`. `backup:data-list {domain?}`
+  (read, admin-only, `simai-backup-list/1`) lists backups also of removed
+  sites, with `reason` and `keep_until`. `file:write`, `file:upload` and
+  `file:extract` keep the replaced file in the trash (`reason:
+  overwritten`); the job result carries `previous_trash_id` or `trashed` and
+  `trash_ids` (30 at most); `trash_failed` means nothing was replaced. The
+  `file:trash-empty` plan carries `trash {items, bytes, ids}`.
 - 1.63.1: `owner:create {name, pubkey?, sites?}`: `sites` is a comma list
   (at most 50) of existing sites that move to the account in the same job.
   The plan has `owner {schema: simai-owner-create-plan/1, owner, new,
