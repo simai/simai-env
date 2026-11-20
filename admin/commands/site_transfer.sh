@@ -90,6 +90,7 @@ site_transfer_moves() {
 
 site_transfer_plan_data() {
   local domain="$1" owner="$2"
+  shift 2  # the rest are the moves
   site_plan_data_write "$(python3 -c 'import json,sys; d,f,fo,t=sys.argv[1:5]; print(json.dumps({"schema":"simai-site-transfer-plan/1","domain":d,"from":f,"from_owner":fo or None,"to_owner":t,"backup":"backup data (database and files) first","downtime":"none: PHP-FPM reloads gracefully, workers restart","moves":sys.argv[5:]}))' \
     "$domain" "$TRANSFER_FROM" "$TRANSFER_FROM_OWNER" "$owner" "$@")"
 }

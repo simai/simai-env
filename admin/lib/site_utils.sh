@@ -1767,6 +1767,10 @@ remove_nginx_site() {
   if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F db_browser_teardown >/dev/null; then
     db_browser_teardown "$project"
   fi
+  # So does its temporary link.
+  if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F preview_teardown >/dev/null; then
+    preview_teardown "$project"
+  fi
   if [[ "$project" =~ ^[a-z0-9-]+$ ]] && declare -F apache_site_remove >/dev/null; then
     apache_site_remove "$project"
   fi

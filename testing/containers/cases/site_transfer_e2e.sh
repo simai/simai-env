@@ -99,6 +99,8 @@ req() { printf '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"us
 a=$(gate "$(req null "{\"domain\":\"$D\",\"owner\":\"delta\"}")")
 [[ "$(j "d['kind']+'|'+d['data']['transfer']['from_owner']+'|'+d['data']['transfer']['to_owner']+'|'+str(len(d['data']['transfer']['moves'])>3)" <<<"$a")" == 'plan|bravo|delta|True' ]] \
   && ok "gateway plan lists what moves" || bad "gateway plan: ${a:0:600}"
+[[ "$(j "d['data']['transfer']['moves'][0].startswith('files: ')" <<<"$a")" == True ]] \
+  && ok "the moves start with the files, not the arguments" || bad "moves start: ${a:0:600}"
 a=$(gate "$(req null "{\"domain\":\"$D\",\"owner\":\"bravo\"}")")
 [[ "$(j "d['status']+':'+d['reason']" <<<"$a")" == refused:same_owner ]] && ok "gateway refuses same_owner" || bad "gateway same owner: ${a:0:300}"
 a=$(gate "$(req null "{\"domain\":\"$D\",\"owner\":\"gamma\"}" ',"confirm":true')")

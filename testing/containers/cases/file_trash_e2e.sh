@@ -159,6 +159,18 @@ grep -q 'Last backup' /tmp/o && ok "the remove output names the last backup" || 
 l=$(cli backup data-list --domain trash.test --output json 2>/dev/null | js 'd["data"]')
 [[ "$(python3 -c 'import ast,sys; d=ast.literal_eval(sys.argv[1]); i=d["items"][0]; print(i["site_exists"] is False and i["reason"]=="site-remove" and bool(i["keep_until"]) and i["backup"] and "files" in i["parts"])' "$l")" == True ]] \
   && ok "backup data-list shows it after the site is gone" || bad "data-list: $l"
+# «Вернуть сайт»: the same domain again, then its files live (1.65.0).
+cli site add --domain trash.test --profile generic --php "$native" --create-db no --confirm yes >/dev/null 2>&1
+echo mine >"$root/public/mine.txt"
+cli backup data-restore --domain trash.test --backup "$(basename "$lb")" --files-live yes --confirm yes >/tmp/o 2>&1 && bad "files went live over a site with files" \
+  || { grep -q root_not_empty /tmp/o && ok "files-live refuses a site with files (root_not_empty)" || bad "not empty: $(tail -2 /tmp/o)"; }
+rm -f "$root/public/mine.txt"
+cli backup data-restore --domain trash.test --backup "$(basename "$lb")" --files-live yes >/tmp/o 2>&1 && [[ ! -e "$root/public/last.txt" ]] \
+  && ok "the files-live plan passes on an empty site and changes nothing" || bad "live plan: $(tail -3 /tmp/o)"
+cli backup data-restore --domain trash.test --backup "$(basename "$lb")" --files-live yes --confirm yes >/tmp/o 2>&1
+[[ "$(cat "$root/public/last.txt" 2>/dev/null)" == keep-me && "$(stat -c %U "$root/public/last.txt")" == "$(stat -c %U "$root")" ]] \
+  && ok "the removed site's files come back live, owned by the site user" || bad "live restore: $(tail -3 /tmp/o)"
+cli site remove --domain trash.test --remove-files yes --last-backup no --confirm yes >/dev/null 2>&1
 rm -f /var/lib/simai-env/backup-hold.stamp; cli self status-refresh --confirm yes >/dev/null 2>&1
 [[ -d "$lb" ]] && ok "a held backup stays before its hold ends" || bad "swept too early"
 sed -i 's/^keep_until=.*/keep_until=2020-01-01T00:00:00Z/' "$lb/manifest.txt"

@@ -798,6 +798,14 @@ action, job). Everything else is refused.
   overwritten`); the job result carries `previous_trash_id` or `trashed` and
   `trash_ids` (30 at most); `trash_failed` means nothing was replaced. The
   `file:trash-empty` plan carries `trash {items, bytes, ids}`.
+- 1.65.0: `site:preview-link {domain, minutes 10-1440}` (action; plan
+  `preview {address, minutes, renew, mode}`; refusals `site_missing`,
+  `alias`, `suspended`, `no_address`, `no_nginx`, `no_port`; the job result
+  has `preview_url` once, plus `address`, `expires_at`, `mode`, `renewed`),
+  `site:preview-link-close {domain}`, `site:preview-link-status {domain}`
+  (read). `site:describe` has `preview_link`. `backup:data-restore` takes
+  `files-live: yes|no`; its plan refuses `root_not_empty`,
+  `no_files_archive`, `root_missing`, `releases`.
 - 1.63.1: `owner:create {name, pubkey?, sites?}`: `sites` is a comma list
   (at most 50) of existing sites that move to the account in the same job.
   The plan has `owner {schema: simai-owner-create-plan/1, owner, new,

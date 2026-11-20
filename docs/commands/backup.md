@@ -112,6 +112,15 @@ site's held backup goes after its hold (`self status-refresh`, hourly). The
 same two fields appear on the items of `site describe` `backups`. In the
 panel gateway it is admin-only.
 
+## data-restore --files-live (1.65.0)
+`--files-live yes` puts the files archive straight into the site directory,
+as the site user, instead of staging it next to it. Only into a site that
+holds nothing but what `site add` wrote (placeholder, health check, empty
+directories; the placeholder is removed first): otherwise refused
+`root_not_empty`; also `no_files_archive`, `root_missing`, `releases`. The
+plan already names the refusal. This brings a removed site back whole: add
+it again with the same domain, then restore its last backup.
+
 ## data-verify
 ```bash
 sudo /root/simai-env/simai-admin.sh backup data-verify --path /var/backups/simai/example.com/20260921-033000 --restore-test yes

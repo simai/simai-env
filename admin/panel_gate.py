@@ -75,6 +75,7 @@ PUBKEY = re.compile(r"^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh
 SHA256 = re.compile(r"^[a-f0-9]{64}$")
 BACKUP = re.compile(r"^[0-9]{8}-[0-9]{6}$")
 CLOCK = re.compile(r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+PREVIEW_MINUTES = re.compile(r"^(?:[1-9][0-9]|[1-9][0-9]{2}|1[0-3][0-9]{2}|14[0-3][0-9]|1440)$")  # 10-1440
 DBB_MINUTES = re.compile(r"^(?:[5-9]|[1-9][0-9]|[1-3][0-9]{2}|4[0-7][0-9]|480)$")
 KEEP_DAYS = re.compile(r"^(?:[1-9]|[1-8][0-9]|90)$")
 SECURITY_FIX = re.compile(r"^(antivirus|auto_updates|fail2ban|ssh_password)$")
@@ -234,6 +235,11 @@ ALLOW = {
     # 1.58.0: a temporary database browser (Adminer) on the site's HTTPS
     # address; the address is in the job result only (ONCE_RESULT).
     "site:db-browser": ({"domain": DOMAIN, "minutes": DBB_MINUTES}, {"domain"}, "action"),
+    # A temporary link before the domain points here (1.65.0): the link with
+    # its key is in the job result only (ONCE_RESULT preview_url).
+    "site:preview-link": ({"domain": DOMAIN, "minutes": PREVIEW_MINUTES}, {"domain"}, "action"),
+    "site:preview-link-close": ({"domain": DOMAIN}, {"domain"}, "action"),
+    "site:preview-link-status": ({"domain": DOMAIN}, {"domain"}, "read"),
     "site:db-browser-close": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-browser-status": ({"domain": DOMAIN}, {"domain"}, "read"),
     # 1.59.0: a site's database connection details; the password is in the
@@ -252,7 +258,7 @@ ALLOW = {
     # 1.57.0: hand a site to another owner (files, pool, cron, workers, SFTP view).
     "site:transfer": ({"domain": DOMAIN, "owner": OWNER}, {"domain", "owner"}, "action"),
     # Stage 9: backups, PHP, metrics, databases.
-    "backup:data-restore": ({"domain": DOMAIN, "backup": BACKUP, "db": YES_NO, "files": YES_NO},
+    "backup:data-restore": ({"domain": DOMAIN, "backup": BACKUP, "db": YES_NO, "files": YES_NO, "files-live": YES_NO},
                             {"domain", "backup"}, "action"),
     "backup:data-schedule": ({"domain": DOMAIN, "enabled": YES_NO, "time": CLOCK, "keep": KEEP_DAYS, "verify": YES_NO},
                              {"domain"}, "action"),
@@ -418,7 +424,7 @@ FORCED = {"backup:data-verify": {"restore-test": "yes"}, "site:php-ini-set": {"a
 NO_CANCEL = {"self:update"}
 # Job result values shown once: the first job:status of a finished job
 # returns them and removes them from the result file; job:list never does.
-ONCE_RESULT = {"admin_password", "browser_url", "db_password"}
+ONCE_RESULT = {"admin_password", "browser_url", "db_password", "preview_url"}
 CONDITIONAL = {"backup:data-verify"}  # a write (needs confirm) only with the forced arguments
 BLOCKS = "/etc/simai-env/owner-blocks"  # a blocked owner's requests are refused
 FILE_ARGS = {"pubkey": "pubkey-file", "token": "token-file", "content": "content-file",
@@ -434,13 +440,15 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "profile_unsupported",  # site:cache-clear of an alias, redirect or proxy site
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
                  "engine_unsupported",
+                 "no_address", "no_nginx", "no_port",  # site:preview-link (with site_missing, alias, suspended)
+                 "root_not_empty", "no_files_archive",  # backup:data-restore files-live (with root_missing, releases)
                  "critical",  # service:stop
                  "site_missing", "too_many", "site_unsupported",
                  # site:restore-ready (1.63.4), with site_missing, profile_unsupported, no_database, engine_unsupported
                  "profile_bitrix", "profile_wordpress", "releases", "root_missing", "path_invalid", "file_missing",
                  "symlink", "not_file", "files_is_dump", "archive_kind", "dump_kind", "database_unreadable",
                  "database_not_empty", "files_present"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
-PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "service:stop", "owner:create",
+PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "site:preview-link", "backup:data-restore", "service:stop", "owner:create",
                                    "site:restore-ready", "file:trash-empty"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
@@ -748,6 +756,9 @@ def plan(command, args, attachment=None, lang="en"):
     if command == "site:restore-ready" and isinstance(result.get("data"), dict):
         # What the check found: target folders, database and its tables, files, backup.
         answer["restore"] = result["data"].get("restore")
+    if command == "site:preview-link" and isinstance(result.get("data"), dict):
+        # The address (without the key), minutes, and whether it renews an open link.
+        answer["preview"] = result["data"].get("preview")
     if command == "file:trash-empty" and isinstance(result.get("data"), dict):
         # What goes for good: {items, bytes, ids}.
         answer["trash"] = result["data"].get("trash")

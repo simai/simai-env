@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.65.0 - 2026-11-20
+
+- `site preview-link --domain D [--minutes 10-1440]`: a temporary link to a
+  site before its domain points here, on a port of the server address
+  (`SIMAI_PREVIEW_PORTS`, 7700-7799). It opens only through the key link
+  (then a cookie), proxies to the site with its Host (HTTPS when the site
+  has a certificate), closes by itself, and a second call renews it.
+  `preview-link-close`, `preview-link-status`; `site describe` has
+  `preview_link {url, expires_at, mode}` without the key. The panel gets
+  the link once (`preview_url`). ufw, when active, opens the port only
+  while the link is open.
+- `backup data-restore --files-live yes`: the files go straight into a new,
+  empty site (after `site remove`, add the site again and restore); refused
+  `root_not_empty` when the site has files of its own.
+- `site transfer`: the plan's `moves` no longer start with the domain and
+  the owner.
+
 ## 1.64.0 - 2026-11-20
 
 Mistakes can be undone: a final delete is a separate, delayed step.

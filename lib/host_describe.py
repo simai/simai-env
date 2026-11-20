@@ -14,6 +14,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -262,6 +263,21 @@ def last_offsite(domain: str) -> dict | None:
             "backup": data.get("backup"), "error": data.get("error")}
 
 
+def preview_link(project: str) -> dict | None:
+    """An open temporary link (site preview-link, 1.65.0): address and deadline, never the key."""
+    state = kv_file(Path(os.environ.get("SIMAI_PREVIEW_DIR", "/etc/simai-env/preview")) / f"{project}.env")
+    try:
+        expires, port = int(state.get("EXPIRES", "")), int(state.get("PORT", ""))
+    except ValueError:
+        return None
+    ip = state.get("IP") or ""
+    if expires <= time.time() or not re.fullmatch(r"[0-9a-fA-F.:]+", ip):
+        return None
+    host = f"[{ip}]" if ":" in ip else ip
+    return {"url": f"http://{host}:{port}/", "expires_at": datetime.fromtimestamp(expires, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "mode": "ip_port"}
+
+
 def last_backup(domain: str, project: str) -> str | None:
     """Newest data backup of the site, from directory names only."""
     dests = {os.environ.get("SIMAI_BACKUP_DEST", "/var/backups/simai")}
@@ -331,6 +347,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
     runtime = kv_file(STATE / "sites" / domain / "runtime.env")
     info["suspended"] = runtime.get("SITE_RUNTIME_STATE") == "suspended"
     info["suspended_at"] = runtime.get("SITE_RUNTIME_SUSPENDED_AT") if info["suspended"] else None
+    info["preview_link"] = preview_link(project)
     known = (status if status is not None else site_status()).get(domain) or {}
     info["answers"] = {k: known.get(k) for k in ("http", "path", "checked_at")} if known.get("checked_at") else None
     size = known.get("disk") if isinstance(known.get("disk"), dict) else {}

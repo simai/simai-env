@@ -512,8 +512,47 @@ backup_data_schedule_handler() {
   ui_kv "Off-site copy" "set SIMAI_BACKUP_OFFSITE=user@host:/path in /etc/simai-env.conf"
 }
 
+# Files straight into a new, empty site (--files-live yes, 1.65.0): the site
+# directory may hold only what site add put there (the placeholder, the
+# health check, empty directories). Sets BR_REFUSAL (root_missing, releases,
+# root_not_empty, no_files_archive) on refusal.
+BR_REFUSAL=""
+backup_data_restore_live_check() {
+  local root="$1" dir="$2" f
+  BR_REFUSAL=""
+  [[ -f "${dir}/files.tar.gz" ]] || { BR_REFUSAL=no_files_archive; error "The backup has no plain files archive"; return 1; }
+  [[ -n "$root" && -d "$root" && ! -L "$root" ]] || { BR_REFUSAL=root_missing; error "Site directory ${root:-unknown} is missing"; return 1; }
+  if [[ -L "${root}/current" || -d "${root}/releases" ]]; then
+    BR_REFUSAL=releases; error "The site is deployed in releases; files cannot be put live here"; return 1
+  fi
+  while IFS= read -r f; do
+    [[ "$(basename "$f")" == healthcheck.php ]] && continue
+    grep -qE "SIMAI placeholder|Placeholder: site is configured" "$f" 2>/dev/null && continue
+    BR_REFUSAL=root_not_empty
+    error "root_not_empty: ${root} already has files (e.g. ${f#"${root}"/}); files go live only into an empty site"
+    return 1
+  done < <(find "$root" -mindepth 1 \( -type f -o -type l \) -not -path "${root}/.simai-trash/*" 2>/dev/null | head -n 20)
+  return 0
+}
+
+backup_data_restore_plan_check() {
+  local domain name dir live
+  domain=$(command_arg domain "$@"); name=$(command_arg backup "$@"); dir=$(command_arg path "$@"); live=$(command_arg files-live "$@")
+  [[ "${live,,}" == yes && -n "$domain" ]] || return 0
+  [[ "$(command_arg files "$@")" != no ]] || return 0
+  require_site_exists "$domain" >/dev/null 2>&1 || return 0
+  [[ -n "$dir" ]] || dir=$(backup_data_resolve "$domain" "$name" 2>/dev/null) || return 0
+  read_site_metadata "$domain" >/dev/null 2>&1 || return 0
+  if ! backup_data_restore_live_check "${SITE_META[root]:-}" "$dir"; then
+    site_plan_data_write "{\"refusal\": \"${BR_REFUSAL}\"}"
+    return 1
+  fi
+}
+
 backup_data_restore_handler() {
   parse_kv_args "$@"
+  local live="${PARSED_ARGS[files-live]:-no}"
+  [[ "${live,,}" == yes || "${live,,}" == no ]] || { error "--files-live must be yes or no"; return 1; }
   local domain="${PARSED_ARGS[domain]:-}" dir="${PARSED_ARGS[path]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
   local name="${PARSED_ARGS[backup]:-}" want_db="${PARSED_ARGS[db]:-yes}" want_files="${PARSED_ARGS[files]:-yes}"
   require_args "domain" || return 1
@@ -539,10 +578,17 @@ backup_data_restore_handler() {
     error "Nothing to restore: the backup has no plain database dump or files archive for the parts asked"
     return 1
   fi
+  if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
+    backup_data_restore_live_check "${SITE_META[root]:-}" "$dir" || return 1
+  fi
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
     [[ "$do_db" == yes ]] && echo "  - back up the current database ${db_name} as a new backup, then replace it with ${dir}/db.sql.gz"
-    [[ "$do_files" == yes ]] && echo "  - extract files into ${SITE_META[root]}.restore-<timestamp> for review; live files are not replaced"
+    if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
+      echo "  - put the files live into the empty site directory ${SITE_META[root]} (as the site user)"
+    elif [[ "$do_files" == yes ]]; then
+      echo "  - extract files into ${SITE_META[root]}.restore-<timestamp> for review; live files are not replaced"
+    fi
     echo "Rerun with --confirm yes to apply."
     return 0
   fi
@@ -570,7 +616,22 @@ backup_data_restore_handler() {
     fi
     echo "Database ${db_name} restored from $(basename "$dir")"
   fi
-  if [[ "$do_files" == yes ]]; then
+  if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
+    local root="${SITE_META[root]}" user project f
+    project="${SITE_META[project]:-$(project_slug_from_domain "$domain")}"
+    user=$(site_effective_user "$project")
+    # The placeholder site add wrote goes first; the archive brings the site's own.
+    while IFS= read -r f; do
+      grep -qE "SIMAI placeholder|Placeholder: site is configured" "$f" 2>/dev/null && rm -f -- "$f"
+    done < <(find "$root" -mindepth 1 -maxdepth 3 -type f 2>/dev/null)
+    info "Putting the files live into ${root} as ${user}"
+    # shellcheck disable=SC2024 # root opens the archive; only tar runs as the site user
+    if ! sudo -u "$user" -H tar --no-same-owner -xzf - -C "$root" <"${dir}/files.tar.gz" >>"$LOG_FILE" 2>&1; then
+      error "File extraction into ${root} failed; what was unpacked stays for review"
+      return 1
+    fi
+    echo "Files restored live into ${root}"
+  elif [[ "$do_files" == yes ]]; then
     local staging
     staging="${SITE_META[root]}.restore-$(date +%Y%m%d-%H%M%S)"
     install -d -m 0750 "$staging" || return 1
@@ -585,4 +646,4 @@ register_cmd "backup" "data" "Back up site database and files (with retention)" 
 register_cmd "backup" "data-list" "List data backups, also of removed sites (with their hold)" "backup_data_list_handler" "" "domain=" "tier:advanced effects:read"
 register_cmd "backup" "data-verify" "Verify a data backup (checksums, archives, optional restore test)" "backup_data_verify_handler" "" "path= domain= backup= restore-test=" "tier:advanced effects:read"
 register_cmd "backup" "data-schedule" "Enable or disable the daily data backup for a site" "backup_data_schedule_handler" "domain" "enabled= time= keep= dest= verify=" "tier:advanced"
-register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= confirm=" "tier:advanced"
+register_cmd "backup" "data-restore" "Restore a site database and stage its files from a data backup" "backup_data_restore_handler" "domain" "path= backup= db= files= files-live= confirm=" "tier:advanced"

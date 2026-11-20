@@ -85,6 +85,8 @@ command_plan_check() {
     site:suspend|site:runtime-suspend) site_suspend_plan_check suspend "$@" || return 1 ;;
     site:resume|site:runtime-resume) site_suspend_plan_check resume "$@" || return 1 ;;
     site:db-browser) db_browser_plan_check "$@" || return 1 ;;
+    site:preview-link) preview_plan_check "$@" || return 1 ;;
+    backup:data-restore) backup_data_restore_plan_check "$@" || return 1 ;;
     site:db-rotate) site_db_rotate_plan_check "$@" || return 1 ;;
     file:copy) file_copy_plan_check "$@" || return 1 ;;
     service:stop) service_stop_plan_check "$@" || return 1 ;;

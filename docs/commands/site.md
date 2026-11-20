@@ -297,6 +297,25 @@ in nginx metadata and survives SSL regeneration.
 dedicated application domain whose own authentication and authorization remain
 enabled.
 
+## preview-link
+`site preview-link --domain D [--minutes 10-1440] --confirm yes` (1.65.0)
+opens the site before its domain points here: `http://<server IP>:<port>/`
+on a port of `SIMAI_PREVIEW_PORTS` (default `7700-7799`; set
+`SIMAI_PREVIEW_IP` when the address found is not the public one). The link
+handed out is `http://<IP>:<port>/.simai-preview/<key>`: it sets a cookie
+and sends the visitor to `/`; without it every request is 403. Requests go
+to the site's own server block with its Host, over HTTPS when the site has
+a certificate; redirects to the domain come back to the link. Calling it
+again while open keeps the link and moves the deadline (`renewed`). It
+closes at the deadline (a timer; the status refresh after a reboot), with
+`preview-link-close`, and with `site remove`. When ufw is active the port is
+open only while the link is. Refusals: `site_missing`, `alias`,
+`suspended`, `no_address`, `no_nginx`, `no_port`. `--output json` answers
+`simai-preview-link/1 {domain, url, address, expires_at, mode: ip_port,
+renewed}`; in a panel job the link is in the result once (`preview_url`).
+`preview-link-status` and `site describe` (`preview_link`) show
+`{url, expires_at, mode}` without the key, or null.
+
 ## remove
 Remove site resources (profile-driven; no fixes on target data unless confirmed).
 
@@ -319,7 +338,8 @@ Behavior:
   listed by `backup data-list` after the site is gone, and goes after its 7
   days. If it fails, nothing is removed and the error starts with
   `backup_failed`. To restore: add the site again, then `backup data-restore
-  --backup <timestamp>`.
+  --backup <timestamp> --files-live yes` (1.65.0: the files go live into the
+  new, empty site).
 - Dry-run mode (`--dry-run yes` or menu “Plan only”) prints what *would* be removed and exits without changes (no confirm needed).
 - Apply mode removes nginx vhost/symlink (with nginx -t before reload; restores if test fails).
 - PHP/cron/queue removal only when the profile requires PHP (alias/static skip automatically; cron removal is profile-gated).

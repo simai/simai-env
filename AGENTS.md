@@ -58,6 +58,7 @@ JSON goes to stdout, logs to stderr. None of these outputs contain secrets.
 | New site for an owner | `owner create --name O --pubkey-file K`, then `site add --domain D --owner O` |
 | Move a site to its own user | `site isolate --domain D --confirm yes` |
 | PostgreSQL | `db pgsql-install --confirm yes`; `site add ... --db-engine pgsql` |
+| Open a site before DNS | `site preview-link --domain D --minutes 60 --confirm yes` (closes by itself) |
 | Health | `site doctor --domain D`, `self status` |
 | Security | `security status` (score, problems, one-click fixes), `security fix --check C --confirm yes` |
 | AI assistants (MCP) | `mcp enable --confirm yes`, `mcp key-add --pubkey-file K --owner O --confirm yes`, `mcp status`; `docs/commands/mcp.md` |
