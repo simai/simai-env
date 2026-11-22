@@ -157,8 +157,8 @@ lb=$(ls -d /var/backups/simai/trash.test/*/ 2>/dev/null | tail -1); lb="${lb%/}"
   && tar -xzOf "$lb/files.tar.gz" 2>/dev/null | grep -q keep-me && ok "site remove with files takes a held last backup first" || bad "last backup: $(tail -3 /tmp/o) $lb"
 grep -q 'Last backup' /tmp/o && ok "the remove output names the last backup" || bad "remove output"
 l=$(cli backup data-list --domain trash.test --output json 2>/dev/null | js 'd["data"]')
-[[ "$(python3 -c 'import ast,sys; d=ast.literal_eval(sys.argv[1]); i=d["items"][0]; print(i["site_exists"] is False and i["reason"]=="site-remove" and bool(i["keep_until"]) and i["backup"] and "files" in i["parts"])' "$l")" == True ]] \
-  && ok "backup data-list shows it after the site is gone" || bad "data-list: $l"
+[[ "$(python3 -c 'import ast,sys; d=ast.literal_eval(sys.argv[1]); i=d["items"][0]; print(i["site_exists"] is False and i["reason"]=="site-remove" and bool(i["keep_until"]) and i["backup"] and "files" in i["parts"] and i["profile"]=="generic" and i["has_database"] is False and i["db_engine"] is None)' "$l")" == True ]] \
+  && ok "backup data-list shows it after the site is gone, with its profile and no database" || bad "data-list: $l"
 # «Вернуть сайт»: the same domain again, then its files live (1.65.0).
 cli site add --domain trash.test --profile generic --php "$native" --create-db no --confirm yes >/dev/null 2>&1
 echo mine >"$root/public/mine.txt"

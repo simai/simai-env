@@ -313,6 +313,33 @@ self_migrate_php_fpm_host() {
   return 0
 }
 
+# Temporary links opened by 1.65.0 logged the link key in the request line:
+# log them masked from now on and mask the keys already in the log.
+self_migrate_preview_log() {
+  [[ -f "$SIMAI_PREVIEW_INCLUDE" ]] || return 0
+  [[ "$(cat "$SIMAI_PREVIEW_INCLUDE")" == "$(preview_include_text)" ]] && return 0
+  local backup conf
+  backup="${SIMAI_PREVIEW_INCLUDE}.bak.$(date +%Y%m%d%H%M%S)"
+  cp -p "$SIMAI_PREVIEW_INCLUDE" "$backup" || return 0
+  preview_include_ensure || return 0
+  for conf in "$SIMAI_PREVIEW_NGINX_DIR"/*.conf; do
+    [[ -f "$conf" ]] || continue
+    sed -i 's#^\(    access_log /var/log/nginx/simai-preview.access.log\);$#\1 simai_preview;#' "$conf"
+  done
+  if nginx -t >>"$LOG_FILE" 2>&1; then
+    SELF_MIGRATE_CHANGES+=("temporary links: the link key is no longer written to the access log")
+    SELF_MIGRATE_RELOAD_NGINX=1
+  else
+    cp -p "$backup" "$SIMAI_PREVIEW_INCLUDE"
+    for conf in "$SIMAI_PREVIEW_NGINX_DIR"/*.conf; do
+      [[ -f "$conf" ]] && sed -i 's#^\(    access_log /var/log/nginx/simai-preview.access.log\) simai_preview;$#\1;#' "$conf"
+    done
+    warn "Could not switch the temporary link log format; previous configuration restored"
+  fi
+  preview_log_scrub
+  return 0
+}
+
 self_migrate_handler() {
   parse_kv_args "$@"
   declare -ga SELF_MIGRATE_CHANGES=()
@@ -334,6 +361,7 @@ self_migrate_handler() {
   self_migrate_static_icon_names_cors
   self_migrate_app_routes_charset
   self_migrate_bitrix_dot_default
+  self_migrate_preview_log
   if [[ "$SELF_MIGRATE_RELOAD_NGINX" == 1 ]]; then
     os_svc_reload nginx >/dev/null 2>&1 || warn "nginx reload failed after the static site migrations"
   fi

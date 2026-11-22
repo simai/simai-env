@@ -119,7 +119,7 @@ server {
     listen ${port};
     listen [::]:${port};
     server_name _;
-    access_log /var/log/nginx/simai-preview.access.log;
+    access_log /var/log/nginx/simai-preview.access.log simai_preview;
 
     location = /.simai-preview/${key} {
         add_header Set-Cookie "simai_preview_${port}=${key}; Path=/; Max-Age=${max_age}; HttpOnly; SameSite=Lax" always;
@@ -150,10 +150,38 @@ server {
 EOF
 }
 
+# The access log never holds the link key: the key path is logged masked and
+# the cookie and Referer are not logged at all (1.65.1).
+preview_include_text() {
+  cat <<EOF
+# simai-env temporary site links (site preview-link)
+map \$uri \$simai_preview_uri {
+    ~^/\.simai-preview/ "/.simai-preview/***";
+    default \$uri;
+}
+log_format simai_preview '\$remote_addr [\$time_local] "\$request_method \$simai_preview_uri" \$status \$body_bytes_sent "\$http_user_agent" port=\$server_port';
+include ${SIMAI_PREVIEW_NGINX_DIR}/*.conf;
+EOF
+}
+
 preview_include_ensure() {
-  [[ -f "$SIMAI_PREVIEW_INCLUDE" ]] && return 0
+  local want
+  want=$(preview_include_text)
+  [[ -f "$SIMAI_PREVIEW_INCLUDE" && "$(cat "$SIMAI_PREVIEW_INCLUDE")" == "$want" ]] && return 0
   install -d -m 0755 /etc/nginx/conf.d
-  printf '# simai-env temporary site links (site preview-link)\ninclude %s/*.conf;\n' "$SIMAI_PREVIEW_NGINX_DIR" >"$SIMAI_PREVIEW_INCLUDE"
+  printf '%s\n' "$want" >"$SIMAI_PREVIEW_INCLUDE"
+  preview_log_scrub
+}
+
+# Mask link keys an older log format wrote (rotated .gz copies are left alone).
+preview_log_scrub() {
+  local log
+  for log in /var/log/nginx/simai-preview.access.log /var/log/nginx/simai-preview.access.log.1 /var/log/nginx/error.log; do
+    [[ -f "$log" ]] || continue
+    grep -qE '/\.simai-preview/[0-9a-f]{32}' "$log" || continue
+    sed -i -E 's#/\.simai-preview/[0-9a-f]{32}#/.simai-preview/***#g' "$log"
+  done
+  return 0
 }
 
 preview_reload() {

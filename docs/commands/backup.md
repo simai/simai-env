@@ -105,7 +105,10 @@ its `backups`).
 `/var/backups/simai`, also of sites removed since. `--output json` answers
 `simai-backup-list/1`: `dest, count, items [{domain, site_exists, backup,
 path, created_at, size_bytes, parts, checksums, encrypted, reason,
-keep_until}]`, newest first per site. `reason` and `keep_until` are set on
+keep_until, profile, has_database, database, db_engine}]`, newest first per
+site. `profile`, `database` (null when the site had none) and `db_engine`
+(`mysql`/`pgsql`) come from the backup's manifest (1.65.1): use them for
+`site add --profile` before restoring a removed site. `reason` and `keep_until` are set on
 a last backup taken by `site remove` (`site-remove`) or `site db-drop`
 (`db-drop`): it is held 7 days, not counted toward `--keep`, and a removed
 site's held backup goes after its hold (`self status-refresh`, hourly). The

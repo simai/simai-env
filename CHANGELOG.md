@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.65.1 - 2026-11-22
+
+- Temporary links: nginx no longer writes the link key to
+  `/var/log/nginx/simai-preview.access.log`. The key path is logged as
+  `/.simai-preview/***`, the cookie and Referer are not logged, and
+  `self migrate` switches links opened by 1.65.0 to this format and masks
+  the keys already in the log.
+- `backup data-list` (and `site describe` `backups`) items carry `profile`,
+  `has_database`, `database` and `db_engine` from the backup's manifest, so
+  a removed site can be added back with its profile before the restore.
+
 ## 1.65.0 - 2026-11-20
 
 - `site preview-link --domain D [--minutes 10-1440]`: a temporary link to a

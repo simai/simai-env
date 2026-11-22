@@ -191,8 +191,10 @@ def backups(domain: str, project: str) -> dict:
 
 
 def backup_hold(d: Path) -> dict:
-    """reason and keep_until of a backup taken before a removal (manifest.txt, 1.64.0)."""
-    out = {"reason": None, "keep_until": None}
+    """What manifest.txt says about the backup: reason and keep_until of one taken
+    before a removal (1.64.0); the site's profile and database, so a removed site
+    can be added back before its data is restored (1.65.1)."""
+    out = {"reason": None, "keep_until": None, "profile": None, "database": None, "db_engine": None}
     try:
         for line in (d / "manifest.txt").read_text(errors="replace").splitlines()[:50]:
             key, _, value = line.partition("=")
@@ -200,8 +202,15 @@ def backup_hold(d: Path) -> dict:
                 out["reason"] = value
             elif key == "keep_until" and re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", value):
                 out["keep_until"] = value
+            elif key == "profile" and re.fullmatch(r"[a-z][a-z0-9-]{0,30}", value):
+                out["profile"] = value
+            elif key == "database" and value != "none" and re.fullmatch(r"[A-Za-z0-9_]{1,64}", value):
+                out["database"] = value
+            elif key == "db_engine" and value in ("mysql", "pgsql"):
+                out["db_engine"] = value
     except OSError:
         pass
+    out["has_database"] = out["database"] is not None
     return out
 
 

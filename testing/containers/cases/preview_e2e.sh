@@ -44,6 +44,19 @@ r=$(cli site preview-link --domain $D --minutes 60 --confirm yes --output json 2
 [[ "$(j 'd["data"]["renewed"]' <<<"$r")" == True && "$(j 'd["data"]["url"]' <<<"$r")" == "$url" && "$(sed -n 's/^EXPIRES=//p' /etc/simai-env/preview/$project.env)" -gt "$exp1" ]] \
   && ok 'a second call renews: same link, later deadline' || bad "renew: $r"
 systemctl list-timers --all 2>/dev/null | grep -q "simai-preview-$project" && ok 'a closing timer runs' || bad 'no timer'
+if grep -q "$key" /var/log/nginx/*.log 2>/dev/null; then bad "the key reached an nginx log"
+elif grep -qF '/.simai-preview/***' /var/log/nginx/simai-preview.access.log; then ok 'nginx logs the link visit with the key masked'
+else bad 'no masked visit line'; fi
+# A link opened by 1.65.0 (old log format, key in the log): self migrate masks both.
+printf '# simai-env temporary site links (site preview-link)\ninclude /etc/nginx/simai-preview/*.conf;\n' >/etc/nginx/conf.d/simai-preview.conf
+sed -i 's#access_log /var/log/nginx/simai-preview.access.log simai_preview;#access_log /var/log/nginx/simai-preview.access.log;#' /etc/nginx/simai-preview/$project.conf
+nginx -s reload; sleep 1; curl -s -o /dev/null "$url"; sleep 1
+grep -q "$key" /var/log/nginx/simai-preview.access.log && ok 'the 1.65.0 format writes the key (the case to migrate)' || bad 'old format did not log the key'
+cli self migrate >/tmp/pv-mig 2>&1
+sleep 1; curl -s -o /dev/null "$url"; sleep 1
+! grep -q "$key" /var/log/nginx/*.log && grep -q 'simai_preview;' /etc/nginx/simai-preview/$project.conf && grep -q 'link key is no longer' /tmp/pv-mig \
+  && ok 'self migrate switches the format and masks the old lines' || bad "migrate: $(grep -c "$key" /var/log/nginx/simai-preview.access.log) $(tail -3 /tmp/pv-mig)"
+[[ "$(curl -s -b "$J" http://127.0.0.1:$port/)" == hello-preview ]] && ok 'the link still works after the migration' || bad 'link broken after migrate'
 
 # HTTPS site: proxied over HTTPS, no redirect loop.
 C=$(mktemp -d)
