@@ -803,6 +803,10 @@ action, job). Everything else is refused.
   overwritten`); the job result carries `previous_trash_id` or `trashed` and
   `trash_ids` (30 at most); `trash_failed` means nothing was replaced. The
   `file:trash-empty` plan carries `trash {items, bytes, ids}`.
+- 1.65.1: `backup:data-list` items carry `profile`, `has_database`,
+  `database`, `db_engine` (from the backup manifest; for `site:add` before
+  a restore of a removed site). The preview link key is no longer in the
+  nginx access log.
 - 1.65.0: `site:preview-link {domain, minutes 10-1440}` (action; plan
   `preview {address, minutes, renew, mode}`; refusals `site_missing`,
   `alias`, `suspended`, `no_address`, `no_nginx`, `no_port`; the job result

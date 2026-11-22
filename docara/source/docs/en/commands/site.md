@@ -319,7 +319,9 @@ open only while the link is. Refusals: `site_missing`, `alias`,
 `simai-preview-link/1 {domain, url, address, expires_at, mode: ip_port,
 renewed}`; in a panel job the link is in the result once (`preview_url`).
 `preview-link-status` and `site describe` (`preview_link`) show
-`{url, expires_at, mode}` without the key, or null.
+`{url, expires_at, mode}` without the key, or null. The key is in no log:
+`/var/log/nginx/simai-preview.access.log` writes the key path as
+`/.simai-preview/***` and leaves out the cookie and Referer (1.65.1).
 
 ## remove
 Remove site resources (profile-driven; no fixes on target data unless confirmed).
