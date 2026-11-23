@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.65.2 - 2026-11-23
+
+- Larena Panel 0.4.8: the temporary site link and bringing a removed site
+  back (live restore) in the panel; these screens show on simai-env 1.65.0
+  and later. Its checksum is pinned here.
+
 ## 1.65.1 - 2026-11-22
 
 - Temporary links: nginx no longer writes the link key to
