@@ -725,6 +725,9 @@ install_composer() {
     info "Composer already installed"
     return
   fi
+  # A run without a login session (systemd-run, cloud-init) has no HOME, and
+  # composer-setup.php refuses to run without HOME or COMPOSER_HOME.
+  [[ -n "${HOME:-}" ]] || export HOME=/root
   local php_cmd
   php_cmd=${PHP_BIN:-$(command -v "php${PHP_VERSION}" || true)}
   php_cmd=${php_cmd:-$(command -v php || echo "/usr/bin/php")}

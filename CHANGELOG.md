@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.65.4 - 2026-11-24
+
+- Install: Composer installs when the installer runs without a login
+  session (`systemd-run`, cloud-init); `HOME` defaults to `/root` there,
+  as `composer-setup.php` refuses to run without it.
+
 ## 1.65.3 - 2026-11-23
 
 - `bitrix restore-ready`: an installed site is backed up first (database and
