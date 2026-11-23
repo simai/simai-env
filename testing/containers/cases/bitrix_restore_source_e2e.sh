@@ -102,6 +102,26 @@ mkdir -p "$root/upload/again" && mkvolumes "$root/upload/again" "$name" && chown
 r=$(cli bitrix restore-ready --domain "$D" --source upload/again --confirm yes --output json 2>/dev/null)
 [[ "$(j "d['status']" <<<"$r")" == failed && -f "$root/upload/again/$name" ]] \
   && ok 'existing volumes in the docroot are not replaced' || bad "again: ${r:0:500}"
+
+# 3b. An installed site is backed up first, without the archive volumes (1.65.3).
+p=$(cli bitrix restore-ready --domain "$D" --output json 2>/dev/null)
+[[ "$(j "str(d['data']['last_backup'])" <<<"$p")" == False ]] && ok 'plan: an empty docroot needs no backup' || bad "plan empty: ${p:0:400}"
+install -d "$doc/bitrix/modules/main"; echo '<?php' >"$doc/bitrix/modules/main/include.php"; echo mine >"$doc/mine.txt"
+chown -R "$owner" "$doc/bitrix" "$doc/mine.txt"
+p=$(cli bitrix restore-ready --domain "$D" --output json 2>/dev/null)
+[[ "$(j "str(d['data']['last_backup'])" <<<"$p")" == True ]] && ok 'plan: an installed site is backed up first' || bad "plan installed: ${p:0:400}"
+p=$(cli bitrix restore-ready --domain "$D" --last-backup no --output json 2>/dev/null)
+[[ "$(j "str(d['data']['last_backup'])" <<<"$p")" == False ]] && ok 'plan: --last-backup no skips it' || bad "plan no: ${p:0:400}"
+r=$(cli bitrix restore-ready --domain "$D" --confirm yes --output json 2>/tmp/rs-lb.err)
+lb=$(j "d['data']['last_backup'] or ''" <<<"$r"); bd=/var/backups/simai/$D/$lb
+if [[ -n "$lb" && -f "$bd/manifest.txt" ]] && grep -q '^reason=bitrix-restore$' "$bd/manifest.txt" \
+   && tar -tzf "$bd/files.tar.gz" | grep -q 'mine.txt$' && ! tar -tzf "$bd/files.tar.gz" | grep -q "$name"; then
+  ok 'confirmed: held backup with the site files, without the volumes'
+else bad "last backup: $lb ${r:0:600} $(tail -5 /tmp/rs-lb.err)"; fi
+l=$(cli backup data-list --domain "$D" --output json 2>/dev/null)
+[[ "$(j "[i['reason'] for i in d['data']['items'] if i['backup']=='$lb'][0]" <<<"$l")" == bitrix-restore ]] \
+  && ok 'backup data-list shows it with reason bitrix-restore' || bad "list: ${l:0:400}"
+rm -rf "$doc/bitrix/modules" "$doc/mine.txt"
 rm -rf "$root/upload/again"
 mkdir -p "$root/upload/enc"
 python3 -c 'import gzip,os,sys; open(sys.argv[1],"wb").write(gzip.compress(os.urandom(4096)))' "$root/upload/enc/site_20261110_full_enc.enc.gz"

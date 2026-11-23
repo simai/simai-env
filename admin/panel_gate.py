@@ -201,7 +201,8 @@ ALLOW = {
     "site:check-state": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "read"),
     "site:check-fix": ({"domain": DOMAIN, "id": CHECK_ID}, {"domain", "id"}, "action"),
     "bitrix:status": ({"domain": DOMAIN}, {"domain"}, "read"),
-    "bitrix:restore-ready": ({"domain": DOMAIN, "archive": BITRIX_ARCHIVE, "source": BITRIX_SOURCE, "url": BITRIX_URL},
+    "bitrix:restore-ready": ({"domain": DOMAIN, "archive": BITRIX_ARCHIVE, "source": BITRIX_SOURCE, "url": BITRIX_URL,
+                              "last-backup": YES_NO},
                              {"domain"}, "action"),
     "bitrix:finalize": ({"domain": DOMAIN}, {"domain"}, "action"),
     # 1.56.0: a Laravel site deployed from the panel gets its APP_KEY and baseline.

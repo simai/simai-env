@@ -75,6 +75,9 @@ backup_data_file_excludes() {
   # restore-download: a download for bitrix restore-ready --url in progress.
   printf '%s\n' './.git' './restore-archive' './restore-download' '*/node_modules' './storage/logs' './storage/framework/cache' \
     './storage/framework/sessions' './storage/framework/views'
+  # One call's own extra patterns, one per line (bitrix restore-ready leaves
+  # out the archive volumes it is about to restore from).
+  [[ -z "${BACKUP_DATA_EXTRA_EXCLUDES:-}" ]] || printf '%s\n' "$BACKUP_DATA_EXTRA_EXCLUDES"
   if [[ "$profile" == "bitrix" ]]; then
     printf '%s\n' './public/bitrix/cache' './public/bitrix/managed_cache' './public/bitrix/stack_cache' \
       './public/bitrix/backup' './public/upload/resize_cache'
@@ -359,7 +362,7 @@ backup_data_last() {
     printf '%s' "$BACKUP_DATA_DIR"
   ) || rc=$?
   if (( rc != 0 )) || [[ -z "$BACKUP_DATA_DIR" || ! -f "${BACKUP_DATA_DIR}/manifest.txt" ]]; then
-    error "backup_failed: the last backup of ${domain} failed; nothing was removed"
+    error "backup_failed: the last backup of ${domain} failed; nothing was removed or replaced"
     return 1
   fi
   echo "Last backup: ${BACKUP_DATA_DIR} (kept until $(sed -n 's/^keep_until=//p' "${BACKUP_DATA_DIR}/manifest.txt"))"
@@ -583,7 +586,7 @@ backup_data_restore_handler() {
   fi
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
-    [[ "$do_db" == yes ]] && echo "  - back up the current database ${db_name} as a new backup, then replace it with ${dir}/db.sql.gz"
+    [[ "$do_db" == yes ]] && echo "  - back up the current database ${db_name} (kept ${BACKUP_HOLD_DAYS} days), then replace it with ${dir}/db.sql.gz"
     if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
       echo "  - put the files live into the empty site directory ${SITE_META[root]} (as the site user)"
     elif [[ "$do_files" == yes ]]; then
@@ -595,11 +598,9 @@ backup_data_restore_handler() {
   ui_header "SIMAI ENV · Restore data backup"
   if [[ "$do_db" == yes ]]; then
     db_validate_db_name "$db_name" || return 1
-    # The current state becomes an ordinary backup next to the restored one,
-    # so it can be restored back the same way; nothing is pruned meanwhile.
-    info "Backing up the current database before the restore"
-    BACKUP_DATA_NO_PRUNE=1 backup_data_handler --domain "$domain" --dest "$(dirname "$(dirname "$dir")")" \
-      --db yes --files no || { error "Backup of the current state failed; nothing restored"; return 1; }
+    # The current database becomes a held backup (reason data-restore, kept
+    # BACKUP_HOLD_DAYS whatever --keep says, 1.65.3): restoring it undoes this.
+    backup_data_last "$domain" data-restore yes no || return 1
     local engine rc=0
     engine=$(site_db_engine "$domain")
     [[ "$engine" == pgsql ]] || mysql_root_detect_cli || return 1

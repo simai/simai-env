@@ -1607,9 +1607,20 @@ bitrix_restore_ready_plan_check() {
   site_plan_data_write "$(python3 -I -c '
 import json, sys
 print(json.dumps({"resources": json.loads(sys.argv[1]), "archive": json.loads(sys.argv[2]),
-                  "refusal": json.loads(sys.argv[3]), "detail": sys.argv[4] or None}))' \
-    "$(site_resources_json)" "$(bitrix_restore_found_json)" "$refusal" "${BX_RR_DETAIL:-}")"
+                  "refusal": json.loads(sys.argv[3]), "detail": sys.argv[4] or None,
+                  "last_backup": sys.argv[5] == "yes"}))' \
+    "$(site_resources_json)" "$(bitrix_restore_found_json)" "$refusal" "${BX_RR_DETAIL:-}" \
+    "$([[ "$(command_arg last-backup "$@")" != no ]] && bitrix_restore_site_installed && echo yes || echo no)")"
+  if [[ "$(command_arg last-backup "$@")" != no ]] && bitrix_restore_site_installed; then
+    info "The installed site is backed up first (database and files, kept ${BACKUP_HOLD_DAYS} days)"
+  fi
   return "$rc"
+}
+
+# An installed Bitrix site: its core is unpacked. Not .settings.php: the
+# preseed of restore-ready and installer-ready writes that one itself.
+bitrix_restore_site_installed() {
+  [[ -f "${BX_DOC_ROOT}/bitrix/modules/main/include.php" ]]
 }
 
 # The answer of restore-ready --output json (simai-bitrix-restore-ready/1).
@@ -1618,7 +1629,7 @@ bitrix_restore_ready_json() {
   python3 -I -c '
 import json, sys
 (domain, status, url, state, name, parts, detail, enc, sql, total, rows, moved, found, resources,
- restore_php, preseed, writable, refusal, refusal_detail) = sys.argv[1:20]
+ restore_php, preseed, writable, refusal, refusal_detail, last_backup) = sys.argv[1:21]
 vols = [{"name": r.rsplit(" ", 1)[0], "size": int(r.rsplit(" ", 1)[1])} for r in rows.splitlines() if r.strip()]
 print(json.dumps({
     "schema": "simai-bitrix-restore-ready/1", "domain": domain, "status": status,
@@ -1628,12 +1639,14 @@ print(json.dumps({
                 "sql_dump": {"yes": True, "no": False}.get(sql), "detail": detail},
     "moved": [m for m in moved.splitlines() if m], "found": json.loads(found),
     "resources": json.loads(resources), "restore_php": restore_php, "preseed": preseed,
-    "writable": writable, "refusal": refusal or None, "detail": refusal_detail or None}, indent=2))' \
+    "writable": writable, "refusal": refusal or None, "detail": refusal_detail or None,
+    "last_backup": last_backup or None}, indent=2))' \
     "$BX_DOMAIN" "$status" "$(site_primary_url "$BX_DOMAIN")/restore.php" "${BITRIX_RESTORE_ARCHIVE_STATE:-}" \
     "$(basename "${BITRIX_RESTORE_ARCHIVE_PATH:-}")" "${BITRIX_RESTORE_ARCHIVE_PARTS:-0}" "${BITRIX_RESTORE_ARCHIVE_DETAIL:-}" \
     "${BITRIX_RESTORE_ARCHIVE_ENCRYPTED:-no}" "${BITRIX_RESTORE_ARCHIVE_SQL:-unknown}" "${BITRIX_RESTORE_ARCHIVE_BYTES:-0}" \
     "${BITRIX_RESTORE_ARCHIVE_VOLUMES:-}" "${BX_RR_MOVED:-}" "$(bitrix_restore_found_json)" "$(site_resources_json)" \
-    "${BX_RR_RESTORE_STATE:-}" "${BX_RR_PRESEED_STATE:-}" "${BX_RR_WRITABLE_STATE:-}" "${BX_RR_REFUSAL:-}" "${BX_RR_DETAIL:-}"
+    "${BX_RR_RESTORE_STATE:-}" "${BX_RR_PRESEED_STATE:-}" "${BX_RR_WRITABLE_STATE:-}" "${BX_RR_REFUSAL:-}" "${BX_RR_DETAIL:-}" \
+    "$(basename "${BX_RR_LAST_BACKUP:-}" 2>/dev/null)"
 }
 
 bitrix_restore_ready_handler() {
@@ -1672,7 +1685,7 @@ bitrix_restore_ready_run() {
   bitrix_prepare_site "$domain" || rc=$?
   (( rc == 0 )) || return $rc
 
-  BX_RR_MOVED=""; BX_RR_RESTORE_STATE=""; BX_RR_PRESEED_STATE=""; BX_RR_WRITABLE_STATE=""
+  BX_RR_MOVED=""; BX_RR_RESTORE_STATE=""; BX_RR_PRESEED_STATE=""; BX_RR_WRITABLE_STATE=""; BX_RR_LAST_BACKUP=""
   BX_RR_SOURCE_REL_SHOWN=""; BX_RR_URL_SHOWN=""
   [[ -z "$url" ]] || BX_RR_URL_SHOWN=$(bitrix_restore_url_shown "$url")
   local inspect_rc=0
@@ -1685,6 +1698,21 @@ bitrix_restore_ready_run() {
   fi
 
   ui_header "SIMAI ENV · Bitrix restore ready"
+
+  # restore.php replaces the site: an installed one gets a held backup of its
+  # database and files first (reason bitrix-restore, 1.65.3), without the
+  # archive volumes it is restored from.
+  BX_RR_LAST_BACKUP=""
+  if [[ "${PARSED_ARGS[last-backup]:-yes}" != no ]] && bitrix_restore_site_installed; then
+    # The volumes by name wherever they are in the site (docroot or --source).
+    if ! BACKUP_DATA_EXTRA_EXCLUDES=$([[ -n "${BX_RR_FOUND_BASE:-}" ]] && printf '*/%s*' "$BX_RR_FOUND_BASE") \
+        backup_data_last "$domain" bitrix-restore yes yes; then
+      BX_RR_REFUSAL=backup_failed; BX_RR_DETAIL="The backup of the current site failed; nothing was changed"
+      bitrix_restore_ready_json refused >&3
+      return 1
+    fi
+    BX_RR_LAST_BACKUP="$BACKUP_DATA_DIR"
+  fi
 
   # Bring the volumes into the docroot first: a failure leaves restore.php
   # and the rest as they were.
@@ -2426,7 +2454,7 @@ register_cmd "bitrix" "agents-sync" "Plan/apply Bitrix agents-over-cron baseline
 register_cmd "bitrix" "cache-clear" "Clear Bitrix cache directories" "bitrix_cache_clear_handler" "domain" "" "menu:confirm"
 register_cmd "bitrix" "db-preseed" "Generate Bitrix DB config files from db.env" "bitrix_db_preseed_handler" "domain" "overwrite= short-install=" "menu:confirm"
 register_cmd "bitrix" "installer-ready" "Prepare Bitrix installer files (db preseed + setup script)" "bitrix_installer_ready_handler" "domain" "overwrite= short-install= setup-overwrite= archive= edition= archive-overwrite= unpack=" "menu:confirm"
-register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive= source= url= url-file=" "menu:confirm"
+register_cmd "bitrix" "restore-ready" "Prepare Bitrix restore.php flow" "bitrix_restore_ready_handler" "domain" "overwrite= preseed= short-install= archive= source= url= url-file= last-backup=" "menu:confirm"
 register_cmd "bitrix" "php-baseline-sync" "Apply Bitrix PHP INI baseline via site fix (single/all)" "bitrix_php_baseline_sync_handler" "" "domain= all= confirm= include-recommended=" "menu:confirm menu:bulk"
 register_cmd "bitrix" "ownership" "Check/repair Bitrix file ownership drift" "bitrix_ownership_handler" "domain" "apply= confirm="
 register_cmd "bitrix" "perf-status" "Show Bitrix optimization status" "bitrix_perf_status_handler" "domain" "" "effects:read"

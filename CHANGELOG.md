@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.65.3 - 2026-11-23
+
+- `bitrix restore-ready`: an installed site is backed up first (database and
+  files, without the archive volumes) as a held backup, `reason
+  bitrix-restore`, kept 7 days; `--last-backup no` skips it, a failed backup
+  changes nothing. Plan `last_backup`, answer `last_backup`.
+- `backup data-restore`: the current database is saved as a held backup
+  (`reason data-restore`, kept 7 days) instead of an ordinary one that the
+  next scheduled backup could prune.
+
 ## 1.65.2 - 2026-11-23
 
 - Larena Panel 0.4.8: the temporary site link and bringing a removed site

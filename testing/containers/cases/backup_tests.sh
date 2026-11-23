@@ -81,7 +81,7 @@ bash ./simai-admin.sh backup data-restore --domain $D --path "$good" >/tmp/plan 
 cli backup data-restore --domain $D --path "$good" --confirm yes >/tmp/r 2>&1 || { bad "restore rc"; cat /tmp/r; }
 [[ "$(mysql -uroot -N -e 'SELECT SUM(total) FROM shop.orders')" == 350 ]] && ok "database restored" || bad "restored data wrong"
 pre=$(ls -1d /var/backups/simai/$D/2* | tail -1)
-[[ "$pre" != "$good" && -s "$pre/db.sql.gz" && ! -e "$pre/files.tar.gz" ]] && zcat "$pre/db.sql.gz" | grep -q "(9,9)" && ok "state before the restore kept as a new backup" || bad "no backup of the state before the restore"
+[[ "$pre" != "$good" && -s "$pre/db.sql.gz" && ! -e "$pre/files.tar.gz" ]] && zcat "$pre/db.sql.gz" | grep -q "(9,9)" && grep -q '^reason=data-restore$' "$pre/manifest.txt" && grep -q '^keep_until=' "$pre/manifest.txt" && ok "state before the restore kept as a held backup (data-restore)" || bad "no backup of the state before the restore"
 [[ -d "$good" ]] && ok "the restored backup was not pruned" || bad "restored backup pruned"
 ls -d "$root".restore-* >/dev/null 2>&1 && ok "files staged for review" || bad "files not staged"
 
