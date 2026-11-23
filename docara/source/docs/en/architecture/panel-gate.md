@@ -803,6 +803,10 @@ action, job). Everything else is refused.
   overwritten`); the job result carries `previous_trash_id` or `trashed` and
   `trash_ids` (30 at most); `trash_failed` means nothing was replaced. The
   `file:trash-empty` plan carries `trash {items, bytes, ids}`.
+- 1.65.3: `bitrix:restore-ready` takes `last-backup: yes|no`; the plan has
+  `last_backup`, the job answer the held backup's name (`reason
+  bitrix-restore`). `backup:data-restore` keeps the current database as a
+  held backup (`reason data-restore`).
 - 1.65.1: `backup:data-list` items carry `profile`, `has_database`,
   `database`, `db_engine` (from the backup manifest; for `site:add` before
   a restore of a removed site). The preview link key is no longer in the

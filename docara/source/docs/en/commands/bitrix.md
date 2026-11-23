@@ -185,6 +185,12 @@ Notes:
 - With the default `--archive auto`, run the command again after uploading all archive volumes. If no archive is present, it prints upload and validation steps instead of inviting the operator to open the wizard.
 - A missing or corrupt volume fails closed and names the first bad file. `--archive <filename>` selects one base archive when several are present. `--archive none` is an explicit advanced bypass.
 - After the browser restore wizard finishes, run `bitrix finalize --domain <domain> --confirm yes`.
+- An installed site (`bitrix/modules/main/include.php` in the docroot) is
+  backed up first, database and files, as a held backup (`reason
+  bitrix-restore`, kept 7 days, listed by `backup data-list`), leaving out
+  the archive volumes (1.65.3). A failed backup changes nothing
+  (`backup_failed`). `--last-backup no` skips it. The plan has
+  `last_backup: true|false`, the answer the backup's name.
 
 ### Archive already on the server (1.56.0)
 

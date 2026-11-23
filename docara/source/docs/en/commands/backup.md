@@ -157,8 +157,9 @@ sudo /root/simai-env/simai-admin.sh backup data-restore --domain example.com --p
 sudo /root/simai-env/simai-admin.sh backup data-restore --domain example.com --path <backup-dir> --confirm yes
 ```
 Without `--confirm yes` it only prints the plan. With it, the backup is
-verified, the current database is dumped next to the backups
-(`pre-restore-<timestamp>.sql.gz`), and the dump is imported. Files are
+verified, the current database is saved as a held backup (`reason
+data-restore`, kept 7 days whatever `--keep` says, 1.65.3; restoring it
+undoes the restore), and the dump is imported. Files are
 extracted to `<project>.restore-<timestamp>` for review; swap directories
 yourself during a maintenance window. Encrypted backups must be decrypted
 with `age -d` first.
