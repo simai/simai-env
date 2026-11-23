@@ -48,6 +48,15 @@ cli site name-add --domain $D --name shop.$D --check-dns no >/tmp/n4 2>&1 && bad
   && ok "names reads the certificate's names (HTTPS only once the site serves 443)" || bad "cert in names: $(names $D | head -c 500)"
 rm -rf /etc/letsencrypt/live/$D /etc/letsencrypt/renewal/$D.conf
 
+# The first certificate covers the names added before it, and one name that
+# fails does not cost the main domain (1.65.5). certbot is a stub here.
+printf '#!/bin/sh\necho "$*" >>/tmp/certbot.args\nexit 1\n' >/usr/local/bin/certbot; chmod +x /usr/local/bin/certbot; rm -f /tmp/certbot.args
+cli ssl letsencrypt --domain $D --email t@example.com --confirm yes >/tmp/n5 2>&1
+first=$(sed -n 1p /tmp/certbot.args); second=$(sed -n 2p /tmp/certbot.args)
+[[ "$first" == *"-d $D "*"-d www.$D -d alt.$D --expand"* ]] && ok "the first certificate asks for the extra names too" || bad "first certbot: $first | $(tail -3 /tmp/n5)"
+[[ "$second" == *"-d $D "* && "$second" != *"www.$D"* ]] && grep -q "trying $D alone" /tmp/n5 && ok "a failure retries the main domain alone" || bad "retry: $second | $(tail -3 /tmp/n5)"
+rm -f /usr/local/bin/certbot /tmp/certbot.args
+
 cli site name-remove --domain $D --name alt.$D >/dev/null 2>&1 && grep -q "server_name $D;" $C && ok "name-remove takes a serve name out of nginx" || bad "remove alt: $(grep server_name $C)"
 cli site name-remove --domain $D --name www.$D >/dev/null 2>&1 && [[ ! -f $X ]] && ! grep -rq "www\.$D" /etc/nginx/ && ok "the last redirect name takes its nginx file with it" || bad "remove www: $(ls $X 2>&1; grep -rl "www\.$D" /etc/nginx/)"
 cli site name-remove --domain $D --name www.$D >/dev/null 2>&1 && bad "removing a name twice" || ok "removing a name that is not there is refused"

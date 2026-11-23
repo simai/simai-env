@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.65.5 - 2026-11-24
+
+- `ssl letsencrypt`: the first certificate also covers the site's extra
+  names added before it (`site name-add`, wildcards left out); if one of
+  them fails, the main domain is issued alone with a warning. `ssl renew`
+  keeps the extra names the certificate already has.
+
 ## 1.65.4 - 2026-11-24
 
 - Install: Composer installs when the installer runs without a login

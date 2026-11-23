@@ -474,6 +474,17 @@ ssl_apply_nginx() {
   return 0
 }
 
+# Extra names of a site (site name-add), wildcards left out: the webroot
+# challenge cannot prove them.
+ssl_site_extra_names() {
+  local domain="$1" name mode
+  [[ -f "/etc/simai-env/sites/${domain}/names.json" ]] || return 0
+  while read -r name mode; do
+    [[ -n "$name" && "$name" != \** && "$name" != "$domain" ]] && printf '%s\n' "$name"
+  done < <(python3 -I "${SIMAI_ENV_ROOT}/lib/site_names.py" list "$domain" 2>/dev/null)
+  return 0
+}
+
 ssl_issue_handler() {
   parse_kv_args "$@"
   ui_header "SIMAI ENV · Issue Let's Encrypt certificate"
@@ -645,7 +656,7 @@ ssl_issue_handler() {
   mkdir -p "$webroot"
   progress_step "Preparing ACME webroot at ${webroot}"
 
-  local -a cmd=() names=(-d "$domain")
+  local -a cmd=() names=(-d "$domain") extra_names=()
   [[ "$wildcard" == yes ]] && names+=(-d "$wildcard_domain")
   if [[ "$challenge" == "dns" ]]; then
     if [[ "$dns_provider" == "manual" ]]; then
@@ -663,6 +674,14 @@ ssl_issue_handler() {
     fi
   else
     cmd=(certbot certonly --cert-name "$domain" --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+    # Extra names added before the first certificate (site name-add) go into
+    # it too (1.65.5); they answer ACME through the site's names file.
+    mapfile -t extra_names < <(ssl_site_extra_names "$domain")
+    if (( ${#extra_names[@]} > 0 )); then
+      local extra
+      for extra in "${extra_names[@]}"; do cmd+=(-d "$extra"); done
+      cmd+=(--expand)
+    fi
   fi
   [[ "$staging" == "yes" ]] && cmd+=(--staging)
   progress_step "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})"
@@ -676,8 +695,19 @@ ssl_issue_handler() {
     fi
   else
     if ! run_long "Requesting certificate from Let's Encrypt (staging=${staging}, wildcard=${wildcard})" "${cmd[@]}"; then
-      error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
-      return 1
+      if (( ${#extra_names[@]} == 0 )); then
+        error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
+        return 1
+      fi
+      # One extra name that does not point here must not cost the main one.
+      warn "The certificate for ${domain} with ${extra_names[*]} failed; trying ${domain} alone"
+      cmd=(certbot certonly --cert-name "$domain" --webroot -w "$webroot" -d "$domain" --non-interactive --agree-tos -m "$email" --keep-until-expiring)
+      [[ "$staging" == "yes" ]] && cmd+=(--staging)
+      if ! run_long "Requesting certificate for ${domain} alone" "${cmd[@]}"; then
+        error "Certbot failed. Check: simai-admin.sh logs letsencrypt"
+        return 1
+      fi
+      warn "Not covered: ${extra_names[*]}; once they point here: simai-admin.sh site name-remove/name-add"
     fi
   fi
   local cert="/etc/letsencrypt/live/${domain}/fullchain.pem"
@@ -929,6 +959,11 @@ ssl_renew_handler() {
     renew_cmd=(certbot certonly --cert-name "$domain" "$plugin_flag" "$credentials_flag" "$dns_credentials" --keep-until-expiring --force-renewal --non-interactive --agree-tos -m "$le_email" "${names[@]}")
   else
     renew_cmd=(certbot certonly --cert-name "$domain" --keep-until-expiring --force-renewal --non-interactive --agree-tos --webroot -w "$webroot" -d "$domain")
+    # Keep the extra names the certificate already has (site name-add).
+    local covered
+    for covered in $(python3 -I "${SIMAI_ENV_ROOT}/lib/site_names.py" cert-names "$domain" 2>/dev/null); do
+      [[ "$covered" == "$domain" ]] || renew_cmd+=(-d "$covered")
+    done
   fi
   if ! run_long "Renewing certificate for ${domain}" "${renew_cmd[@]}"; then
     ssl_record_renewal "$domain" false || true
