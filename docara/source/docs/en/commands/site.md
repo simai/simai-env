@@ -163,7 +163,9 @@ sudo /root/simai-env/simai-admin.sh site name-remove --domain D --name www.D --c
 - The name must point to this server (`--check-dns no` skips the check), must
   not belong to another site or to the panel, and a site has at most 20.
 - A site with a Let's Encrypt certificate gets one certificate for all its
-  names (`certbot --expand`, renewed with them). If the certificate cannot be
+  names (`certbot --expand`, renewed with them). Names added before the
+  first certificate go into it when `ssl letsencrypt` runs (1.65.5); if one
+  of them fails, the main domain is issued alone. If the certificate cannot be
   extended, the new name is taken back and nothing is left of it. Removing a
   name reissues the certificate without it; if that fails the old one stays.
 - The list is kept in `/etc/simai-env/sites/D/names.json`. `site names
