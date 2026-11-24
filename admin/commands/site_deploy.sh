@@ -132,8 +132,18 @@ deploy_init_layout() {
 
 deploy_link_shared() {
   local root="$1" release="$2" user="$3" group="$4" d
-  for d in storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs; do
-    install -d -m 0775 -o "$user" -g "$group" "${root}/${d}"
+  # Every level belongs to the site user: install -d alone leaves the
+  # intermediate ones (storage/app, storage/framework) to root.
+  for d in storage storage/app storage/app/public storage/framework storage/framework/cache storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs; do
+    if [[ -L "${root}/${d}" ]]; then
+      continue
+    elif [[ -d "${root}/${d}" ]]; then
+      if [[ "$(stat -c %U "${root}/${d}")" == root ]]; then
+        chown "${user}:${group}" "${root}/${d}"; chmod 0775 "${root}/${d}"
+      fi
+    else
+      install -d -m 0775 -o "$user" -g "$group" "${root}/${d}"
+    fi
   done
   rm -rf --one-file-system -- "${release}/storage"
   ln -sfn ../../storage "${release}/storage"

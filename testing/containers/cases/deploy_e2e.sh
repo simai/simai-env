@@ -130,6 +130,7 @@ grep -qx 'FIN_MARK=from-example' $FP/.env && ok ".env.example names added" || ba
 [[ -L $FP/current/.env ]] && ok "current/.env still a link" || bad "current/.env replaced"
 [[ "$(stat -c '%a %U:%G' $FP/.env)" == "$fmode" ]] && ok ".env mode kept by finalize" || bad ".env $(stat -c '%a %U:%G' $FP/.env) was $fmode"
 [[ "$(curl -s -H "Host: $F" http://127.0.0.1/)" == release-v9 ]] && ok "$F serves the release" || { bad "$F page: $(curl -s -o /dev/null -w "%{http_code}" -H "Host: $F" http://127.0.0.1/)"; tail -c 800 $FP/storage/logs/laravel.log; }
+[[ -z "$(find $FP/storage -maxdepth 3 -type d -user root)" ]] && ok "shared storage levels belong to the site user" || bad "root-owned: $(find $FP/storage -maxdepth 3 -type d -user root)"
 mv $FP/current/resources/views /root/fin-views
 cli laravel finalize --domain $F --confirm yes >/tmp/ff2 2>&1 && ok "finalize without resources/views (API-only)" || { bad "finalize API-only"; grep -i error /tmp/ff2 | tail -3; }
 mv /root/fin-views $FP/current/resources/views

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.66.3 - 2026-11-24
+
+- `site deploy`: every level of the shared `storage/` (`storage/app`,
+  `storage/framework`, `storage/framework/cache`) belongs to the site user;
+  before, the first deploy left them to root and the application could not
+  create folders under `storage/app`. The next deploy repairs them.
+
 ## 1.66.2 - 2026-11-24
 
 - `laravel finalize` and `laravel perf-apply` skip `view:cache` for
