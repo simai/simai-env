@@ -444,7 +444,8 @@ laravel_finalize_handler() {
 
   local optimize_status="ok"
   laravel_finalize_run_artisan "config:cache" || optimize_status="failed"
-  if [[ "$optimize_status" == "ok" ]]; then
+  # API-only applications have no resources/views to compile.
+  if [[ "$optimize_status" == "ok" && -d "${LARAVEL_PERF_CODE}/resources/views" ]]; then
     laravel_finalize_run_artisan "view:cache" || optimize_status="failed"
   fi
   if [[ "$optimize_status" == "failed" ]]; then
@@ -530,7 +531,8 @@ laravel_perf_apply_handler() {
   if [[ "$LARAVEL_PERF_REAL_APP" == "yes" && -f "$LARAVEL_PERF_ARTISAN" && -n "$LARAVEL_PERF_PHP_BIN" ]]; then
     optimize_status="ok"
     laravel_perf_run_artisan "config:cache" || optimize_status="failed"
-    if [[ "$optimize_status" == "ok" ]]; then
+    # API-only applications have no resources/views to compile.
+    if [[ "$optimize_status" == "ok" && -d "${LARAVEL_PERF_CODE}/resources/views" ]]; then
       laravel_perf_run_artisan "view:cache" || optimize_status="failed"
     fi
     if [[ "$optimize_status" == "failed" ]]; then

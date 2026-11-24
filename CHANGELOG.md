@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.66.2 - 2026-11-24
+
+- `laravel finalize` and `laravel perf-apply` skip `view:cache` for
+  applications without `resources/views` (API-only), instead of failing.
+
 ## 1.66.1 - 2026-11-24
 
 - `laravel finalize` and `laravel status` work on sites deployed as
