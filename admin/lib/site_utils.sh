@@ -2825,10 +2825,10 @@ laravel_app_key_state() {
 }
 
 laravel_prepare_env_file() {
-  local domain="$1" root="$2"
+  local domain="$1" root="$2" code="${3:-$2}"
   local env_file env_example
   env_file=$(laravel_env_file_path "$root")
-  env_example=$(laravel_env_example_file_path "$root")
+  env_example=$(laravel_env_example_file_path "$code")
   if [[ -L "$env_file" || -L "$env_example" ]]; then
     error "Refusing to prepare ${env_file}: .env or .env.example is a symbolic link"
     return 1
@@ -2844,6 +2844,35 @@ laravel_prepare_env_file() {
     chmod 0640 "$tmp"
     chown "${SIMAI_USER}:${SIMAI_WEB_GROUP}" "$tmp" 2>/dev/null || true
     mv -fT "$tmp" "$env_file" || { rm -f "$tmp"; return 1; }
+  elif [[ -f "$env_file" && -f "$env_example" ]] && [[ -z "$(laravel_env_get "$env_file" APP_KEY 2>/dev/null || true)" ]]; then
+    # Not set up yet (site add wrote only the database): names from
+    # .env.example the file does not have yet are added; existing ones stay.
+    python3 -I - "$env_file" "$env_example" <<'PY' || return 1
+import os, re, sys
+path, example = sys.argv[1], sys.argv[2]
+have = set()
+lines = open(path, encoding="utf-8").read().splitlines()
+for line in lines:
+    m = re.match(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=", line)
+    if m: have.add(m.group(1))
+fd = os.open(example, os.O_RDONLY | os.O_NOFOLLOW)
+with os.fdopen(fd, encoding="utf-8") as f: ex = f.read().splitlines()
+add = []
+for line in ex:
+    m = re.match(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=", line)
+    if m and m.group(1) not in have:
+        add.append(line); have.add(m.group(1))
+if "APP_KEY" not in have: add.append("APP_KEY=")
+if add:
+    st = os.stat(path)
+    tmp = path + ".simai-tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f: f.write("\n".join(lines + add) + "\n")
+    os.chown(tmp, st.st_uid, st.st_gid); os.chmod(tmp, st.st_mode & 0o777); os.replace(tmp, path)
+PY
+  fi
+  if [[ -f "$env_file" ]] && ! grep -q '^APP_KEY=' "$env_file"; then
+    printf 'APP_KEY=\n' >>"$env_file"
   fi
 
   env_set_kv "$env_file" "APP_ENV" "production" || return 1

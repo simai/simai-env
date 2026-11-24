@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.66.1 - 2026-11-24
+
+- `laravel finalize` and `laravel status` work on sites deployed as
+  releases (`site deploy`): the application is read from `current`, the
+  shared `.env` stays in the site root. A `.env` that `site add` wrote with
+  the database only gets the names from the release's `.env.example` it
+  does not have yet, then `APP_KEY` is generated; existing values stay.
+
 ## 1.66.0 - 2026-11-24
 
 - Deploy keys: `site deploy-key-allow --key-id ID --artisan a,b

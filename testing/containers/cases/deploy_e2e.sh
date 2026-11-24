@@ -114,4 +114,20 @@ grep -q 'env-set app.test LARENA_SERVER_TOKEN' /var/log/simai-deploy-gate.log &&
 cli site deploy-key-allow --key-id "$kid" --artisan "" >/dev/null 2>&1
 rc=0; ci "artisan gate:echo" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && grep -q '^ENV_PREFIX=LARENA_SERVER_' /etc/simai-env/deploy-keys/$kid && ok "empty --artisan clears, prefix kept" || bad "clear rc=$rc"
 cli site deploy-key-remove --key-id "$kid" --confirm yes >/dev/null 2>&1
+# New laravel site, first deploy, then laravel finalize (1.66.0): the code is
+# found in current, the shared .env gets .env.example names and an APP_KEY.
+F=fin.test; FP=/home/simai/www/$F
+fphp=$(./simai-admin.sh site describe --domain $D --output json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("data", d)["php"])')
+cli site add --domain $F --profile laravel --php "$fphp" --create-db yes --db-engine pgsql >/tmp/fa 2>&1 && ok "site add $F" || { bad "site add $F"; tail /tmp/fa; }
+mk_src v9; rm -rf /root/src-v9/.simai; cp -a /root/laravel-src/vendor /root/src-v9/  # ships vendor/, like Larena
+[[ -f /root/src-v9/.env.example ]] || printf 'APP_NAME=Laravel\nAPP_KEY=\nLOG_CHANNEL=stack\n' >/root/src-v9/.env.example
+echo 'FIN_MARK=from-example' >>/root/src-v9/.env.example
+cli site deploy --domain $F --from /root/src-v9 --confirm yes >/tmp/fd 2>&1 && ok "first deploy of $F" || { bad "first deploy $F"; tail /tmp/fd; grep -v "^\s*$" /var/log/simai-admin.log | tail -25 | cut -c1-300; }
+fmode=$(stat -c '%a %U:%G' $FP/.env)
+cli laravel finalize --domain $F --migrate yes --confirm yes >/tmp/ff 2>&1 && ok "laravel finalize on a release layout" || { bad "finalize"; grep -v '^\s*$' /tmp/ff | tail -12; }
+grep -q '^APP_KEY=base64:' $FP/.env && ok "APP_KEY generated in the shared .env" || bad "no APP_KEY"
+grep -qx 'FIN_MARK=from-example' $FP/.env && ok ".env.example names added" || bad "example names missing"
+[[ -L $FP/current/.env ]] && ok "current/.env still a link" || bad "current/.env replaced"
+[[ "$(stat -c '%a %U:%G' $FP/.env)" == "$fmode" ]] && ok ".env mode kept by finalize" || bad ".env $(stat -c '%a %U:%G' $FP/.env) was $fmode"
+[[ "$(curl -s -H "Host: $F" http://127.0.0.1/)" == release-v9 ]] && ok "$F serves the release" || { bad "$F page: $(curl -s -o /dev/null -w "%{http_code}" -H "Host: $F" http://127.0.0.1/)"; tail -c 800 $FP/storage/logs/laravel.log; }
 echo "failures=$fails"; exit $fails

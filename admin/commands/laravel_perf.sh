@@ -53,31 +53,36 @@ laravel_perf_prepare_site() {
   if [[ -n "$php_version" && "$php_version" != "none" ]]; then
     php_bin=$(resolve_php_bin "$php_version")
   fi
+  # Release layout (site deploy): the code lives in <root>/current, the
+  # shared .env and storage stay in <root>.
+  local code="$root"
+  [[ -L "${root}/current" && -f "${root}/current/artisan" ]] && code="${root}/current"
   LARAVEL_PERF_DOMAIN="$domain"
   LARAVEL_PERF_ROOT="$root"
+  LARAVEL_PERF_CODE="$code"
   LARAVEL_PERF_DOC_ROOT="$doc_root"
   LARAVEL_PERF_PROJECT="$project"
   LARAVEL_PERF_SLUG="$slug"
   LARAVEL_PERF_PHP_VERSION="$php_version"
   LARAVEL_PERF_PHP_BIN="$php_bin"
-  LARAVEL_PERF_ARTISAN="${root}/artisan"
+  LARAVEL_PERF_ARTISAN="${code}/artisan"
   LARAVEL_PERF_CRON_FILE="/etc/cron.d/${slug}"
-  LARAVEL_PERF_CONFIG_CACHE="${root}/bootstrap/cache/config.php"
-  LARAVEL_PERF_EVENT_CACHE="${root}/bootstrap/cache/events.php"
+  LARAVEL_PERF_CONFIG_CACHE="${code}/bootstrap/cache/config.php"
+  LARAVEL_PERF_EVENT_CACHE="${code}/bootstrap/cache/events.php"
   LARAVEL_PERF_VIEWS_DIR="${root}/storage/framework/views"
   LARAVEL_PERF_REAL_APP="no"
-  if laravel_queue_has_real_app "$root"; then
+  if laravel_queue_has_real_app "$code"; then
     LARAVEL_PERF_REAL_APP="yes"
   fi
   local route_cache=""
-  route_cache=$(find "${root}/bootstrap/cache" -maxdepth 1 -type f -name 'routes*.php' 2>/dev/null | head -n1 || true)
+  route_cache=$(find "${code}/bootstrap/cache" -maxdepth 1 -type f -name 'routes*.php' 2>/dev/null | head -n1 || true)
   LARAVEL_PERF_ROUTE_CACHE="${route_cache:-}"
 }
 
 laravel_state_summary() {
   LARAVEL_DB_STATE=$(laravel_db_state_probe "$LARAVEL_PERF_DOMAIN")
-  LARAVEL_WEB_STATE=$(laravel_web_state_probe "$LARAVEL_PERF_DOMAIN" "$LARAVEL_PERF_ROOT")
-  LARAVEL_APP_STATE=$(laravel_app_state "$LARAVEL_PERF_ROOT")
+  LARAVEL_WEB_STATE=$(laravel_web_state_probe "$LARAVEL_PERF_DOMAIN" "$LARAVEL_PERF_CODE")
+  LARAVEL_APP_STATE=$(laravel_app_state "$LARAVEL_PERF_CODE")
   LARAVEL_APP_KEY_STATE=$(laravel_app_key_state "$LARAVEL_PERF_ROOT")
   LARAVEL_SETUP_STAGE=$(laravel_setup_stage "$LARAVEL_APP_STATE" "$LARAVEL_WEB_STATE" "$LARAVEL_APP_KEY_STATE")
   LARAVEL_ENV_FILE="$(laravel_env_file_path "$LARAVEL_PERF_ROOT")"
@@ -104,7 +109,7 @@ laravel_queue_status_summary() {
 }
 
 laravel_prepare_runtime_env() {
-  laravel_prepare_env_file "$LARAVEL_PERF_DOMAIN" "$LARAVEL_PERF_ROOT"
+  laravel_prepare_env_file "$LARAVEL_PERF_DOMAIN" "$LARAVEL_PERF_ROOT" "$LARAVEL_PERF_CODE"
   return 0
 }
 
@@ -138,7 +143,7 @@ laravel_bootstrap_project() {
 laravel_finalize_run_artisan() {
   local action="$1"
   local cmd
-  cmd="cd $(printf '%q' "$LARAVEL_PERF_ROOT") && $(printf '%q' "$LARAVEL_PERF_PHP_BIN") artisan ${action}"
+  cmd="cd $(printf '%q' "$LARAVEL_PERF_CODE") && $(printf '%q' "$LARAVEL_PERF_PHP_BIN") artisan ${action}"
   run_long "artisan ${action}" sudo -u "${SIMAI_USER:-simai}" -H bash -lc "$cmd"
 }
 
@@ -266,7 +271,7 @@ laravel_perf_apply_site_mode() {
 laravel_perf_run_artisan() {
   local action="$1"
   local cmd
-  cmd="cd $(printf '%q' "$LARAVEL_PERF_ROOT") && $(printf '%q' "$LARAVEL_PERF_PHP_BIN") artisan ${action}"
+  cmd="cd $(printf '%q' "$LARAVEL_PERF_CODE") && $(printf '%q' "$LARAVEL_PERF_PHP_BIN") artisan ${action}"
   run_long "artisan ${action}" sudo -u "${SIMAI_USER:-simai}" -H bash -lc "$cmd"
 }
 
