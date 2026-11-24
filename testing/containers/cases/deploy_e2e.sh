@@ -73,4 +73,45 @@ n=$(ls $P/releases | wc -l); [[ "$n" -le 4 ]] && ok "retention keeps a bounded n
 cli backup data --domain $D --keep 1 >/dev/null 2>&1 && ok "backup data on release layout" || bad backup
 b=$(ls -1d /var/backups/simai/$D/2* | tail -1)
 [[ "$(tar -tzf $b/files.tar.gz | grep -o '^\./releases/[^/]\+' | sort -u | wc -l)" == 1 ]] && ok "backup contains only the live release" || bad "backup releases"
+# Deploy key extras (1.66.0): allowed artisan commands and env-set over SSH.
+mk_src v8
+cat >> /root/src-v8/routes/console.php <<'PHP'
+
+Illuminate\Support\Facades\Artisan::command('gate:echo {words?*}', function () {
+    $this->line('args=' . implode(',', $this->argument('words')) . ' stdin=' . trim((string) stream_get_contents(STDIN)) . ' user=:' . getenv('USER'));
+});
+Illuminate\Support\Facades\Artisan::command('gate:other', fn () => $this->line('other'));
+PHP
+cli site deploy --domain $D --from /root/src-v8 --confirm yes >/tmp/d8 2>&1 && ok "deploy v8" || { bad "deploy v8"; tail /tmp/d8; }
+command -v sshd >/dev/null || { apt-get update -qq >/dev/null; apt-get install -y -qq openssh-server >/dev/null 2>&1; }
+systemctl start ssh
+ssh-keygen -q -t ed25519 -N '' -f /root/ci
+cli site deploy-key-add --domain $D --pubkey-file /root/ci.pub --host 127.0.0.1 --confirm yes >/tmp/k 2>&1 && ok "deploy-key-add" || { bad "deploy-key-add"; tail -8 /tmp/k; }
+sed -n '/SIMAI_DEPLOY_KNOWN_HOSTS/,$p' /tmp/k | grep '^127.0.0.1 ' >/root/ci_known_hosts
+ci() { ssh -i /root/ci -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/root/ci_known_hosts simai-deploy@127.0.0.1 "$@"; }
+kid=$(ls /etc/simai-env/deploy-keys | head -1)
+rc=0; ci "artisan gate:echo a" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan refused before deploy-key-allow" || bad "artisan without allow rc=$rc"
+cli site deploy-key-allow --key-id "$kid" --artisan tinker >/dev/null 2>&1 && bad "tinker accepted" || ok "dangerous artisan names refused"
+cli site deploy-key-allow --key-id "$kid" --env-prefix APP_ >/dev/null 2>&1 && bad "APP_ prefix accepted" || ok "application prefixes refused"
+cli site deploy-key-allow --key-id "$kid" --artisan gate:echo --env-prefix LARENA_SERVER_ >/tmp/ka 2>&1 && ok "deploy-key-allow" || { bad "deploy-key-allow"; tail /tmp/ka; }
+out=$(printf 'from-stdin\n' | ci "artisan gate:echo one two=2 /p/x" 2>&1)
+[[ "$out" == *"args=one,two=2,/p/x stdin=from-stdin"* ]] && ok "allowed artisan runs with args and stdin" || bad "artisan out: $out"
+[[ "$out" == *":$(stat -c %U $P/.env)"* ]] && ok "artisan runs as the site user" || bad "artisan user: $out"
+rc=0; ci "artisan gate:other" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "unlisted artisan refused" || bad "unlisted rc=$rc"
+rc=0; ci "artisan gate:echo --env=testing" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan --env refused" || bad "--env rc=$rc"
+rc=0; ci "artisan gate:echo a;id" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan shell characters refused" || bad "injection rc=$rc"
+mode0=$(stat -c '%a %U:%G' $P/.env)
+printf 'tok-SECRET-123 with space\n' | ci "env-set LARENA_SERVER_TOKEN" >/tmp/es 2>&1 && ok "env-set" || { bad "env-set"; cat /tmp/es; }
+grep -qx 'LARENA_SERVER_TOKEN="tok-SECRET-123 with space"' $P/.env && ok "value written quoted" || bad "env line: $(grep LARENA_SERVER_TOKEN $P/.env)"
+printf 'second\n' | ci "env-set LARENA_SERVER_TOKEN" >/dev/null 2>&1
+[[ "$(grep -c '^LARENA_SERVER_TOKEN=' $P/.env)" == 1 ]] && grep -qx 'LARENA_SERVER_TOKEN=second' $P/.env && ok "env-set replaces the old value" || bad "replace"
+[[ "$(stat -c '%a %U:%G' $P/.env)" == "$mode0" ]] && ok ".env mode and owner kept" || bad ".env now $(stat -c '%a %U:%G' $P/.env), was $mode0"
+[[ "$(grep '^APP_KEY=' $P/.env)" == "$key0" ]] && ok "APP_KEY untouched by env-set" || bad "APP_KEY changed"
+rc=0; printf 'x\n' | ci "env-set APP_KEY" >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "env-set outside the prefix refused" || bad "APP_KEY rc=$rc"
+rc=0; printf 'a\nb\n' | ci "env-set LARENA_SERVER_X" >/dev/null 2>&1 || rc=$?; [[ $rc -ne 0 ]] && ok "multi-line value refused" || bad "multi-line accepted"
+grep -q 'SECRET' /var/log/simai-deploy-gate.log && bad "value leaked into the gate log" || ok "value not in the gate log"
+grep -q 'env-set app.test LARENA_SERVER_TOKEN' /var/log/simai-deploy-gate.log && ok "env-set logged by name" || bad "env-set not logged"
+cli site deploy-key-allow --key-id "$kid" --artisan "" >/dev/null 2>&1
+rc=0; ci "artisan gate:echo" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && grep -q '^ENV_PREFIX=LARENA_SERVER_' /etc/simai-env/deploy-keys/$kid && ok "empty --artisan clears, prefix kept" || bad "clear rc=$rc"
+cli site deploy-key-remove --key-id "$kid" --confirm yes >/dev/null 2>&1
 echo "failures=$fails"; exit $fails

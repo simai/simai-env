@@ -139,6 +139,13 @@ Static sites behave like GitHub Pages (`/dir/`, `name.html`, `404.html`,
 `200.html` for single-page apps). Deploy keys, the gate and the workflow
 step: `docs/operations/ci-deploy.md`.
 
+A deploy key can also run listed artisan commands and set `.env` names with
+one prefix (1.66.0):
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy-key-allow --key-id ID --artisan app:sync --env-prefix MYAPP_ --confirm yes
+```
+
 ### Extra names (www, other domains) (1.53.0)
 
 ```bash

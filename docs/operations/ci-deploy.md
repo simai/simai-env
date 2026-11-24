@@ -35,10 +35,41 @@ the deploy gate, which accepts exactly:
 | `deploy-git <40-hex commit>` | keys added with `--git`: deploy that commit of the fixed repository |
 | `status` | `site deploy-status` |
 | `rollback` | `site deploy-rollback` |
+| `artisan <name> [args]` | Laravel sites: only the names the key was given (below); runs as the site user from `current`, stdin reaches the command |
+| `env-set <NAME>` | value on stdin into the site's shared `.env`; only names starting with the key's prefix |
 
 Everything else is refused with exit code 126 and logged in
 `/var/log/simai-deploy-gate.log`. The key has no shell, no TTY and no
 forwarding.
+
+## Artisan commands and secrets (1.66.0)
+
+A key can be given a short list of artisan commands and one `.env` prefix:
+
+```bash
+sudo /root/simai-env/simai-admin.sh site deploy-key-allow --key-id ID --artisan app:sync,app:report --env-prefix MYAPP_ --confirm yes
+```
+
+- `--artisan` replaces the list; `--artisan ""` clears it. Commands that
+  open a shell, touch the database directly or bring the site down are never
+  allowed: `tinker`, `db`, `db:*`, `down`, `up`, `env`, `key:generate`,
+  `migrate:fresh`, `migrate:reset`, `migrate:rollback`, `schedule:run`,
+  `queue:work`, `serve`.
+- `--env-prefix` is upper case and ends with `_`; the application's own
+  prefixes (`APP_`, `DB_`, `MAIL_`, `REDIS_`, `AWS_`, `SESSION_`, `CACHE_`,
+  `QUEUE_`, `LOG_`) are refused. `--env-prefix ""` clears it.
+- Arguments are plain words: up to 20, letters, digits and `._:=@/+,-`; no
+  quotes or shell characters, and `--env` is refused.
+- The gate log records the command name and the number of arguments, and for
+  `env-set` only the name; values never reach a command line or the log.
+- `env-set` takes one line, up to 8192 bytes; values with other characters
+  are written in double quotes. The `.env` keeps its owner and mode, and
+  `config:clear` runs afterwards.
+
+```bash
+ssh simai-deploy@HOST "artisan app:sync --force" </dev/null
+printf %s "$TOKEN" | ssh simai-deploy@HOST "env-set MYAPP_TOKEN"
+```
 
 ## The release
 

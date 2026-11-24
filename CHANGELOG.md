@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.66.0 - 2026-11-24
+
+- Deploy keys: `site deploy-key-allow --key-id ID --artisan a,b
+  --env-prefix NAME_` lets CI run the listed artisan commands as the site
+  user (`ssh ... "artisan a args"`, stdin passed through) and write secrets
+  into the shared `.env` (`printf %s "$V" | ssh ... "env-set NAME_X"`).
+  Shell-like and destructive artisan commands and the application's own
+  prefixes are refused; values never reach the log.
+
 ## 1.65.5 - 2026-11-24
 
 - `ssl letsencrypt`: the first certificate also covers the site's extra

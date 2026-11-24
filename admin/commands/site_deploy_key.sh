@@ -124,6 +124,35 @@ site_deploy_key_list_handler() {
   ui_result_table "${rows[@]}"
 }
 
+# Extra gate commands of one key (1.66.0): artisan <name> for the listed
+# names, env-set <NAME> for names starting with the prefix. Empty clears.
+site_deploy_key_allow_handler() {
+  parse_kv_args "$@"
+  local id="${PARSED_ARGS[key-id]:-}" artisan="${PARSED_ARGS[artisan]-__keep__}" prefix="${PARSED_ARGS[env-prefix]-__keep__}"
+  require_args "key-id" || return 1
+  [[ "$id" =~ ^[a-f0-9]{12}$ && -f "${SIMAI_DEPLOY_REGISTRY}/${id}" ]] || { error "Unknown deploy key ${id}"; return 1; }
+  [[ "$artisan" == __keep__ ]] && artisan=$(deploy_key_registry_get "$id" ARTISAN)
+  [[ "$prefix" == __keep__ ]] && prefix=$(deploy_key_registry_get "$id" ENV_PREFIX)
+  artisan="${artisan// /}"
+  [[ -z "$artisan" || "$artisan" =~ ^[a-z0-9:_-]+(,[a-z0-9:_-]+){0,49}$ ]] || { error "--artisan is a comma list of artisan command names"; return 1; }
+  local name
+  for name in ${artisan//,/ }; do
+    case "$name" in
+      tinker|db|db:*|down|up|env|key:generate|migrate:fresh|migrate:reset|migrate:rollback|schedule:run|queue:work|serve)
+        error "artisan ${name} cannot be given to a deploy key"; return 1 ;;
+    esac
+  done
+  [[ -z "$prefix" || "$prefix" =~ ^[A-Z][A-Z0-9]*_([A-Z0-9]+_)*$ ]] || { error "--env-prefix is like LARENA_SERVER_ (upper case, ends with _)"; return 1; }
+  case "$prefix" in APP_|DB_|MAIL_|REDIS_|AWS_|SESSION_|CACHE_|QUEUE_|LOG_) error "--env-prefix ${prefix} would reach the application's own settings"; return 1 ;; esac
+  local f="${SIMAI_DEPLOY_REGISTRY}/${id}" tmp
+  tmp=$(mktemp) || return 1
+  grep -v '^\(ARTISAN\|ENV_PREFIX\)=' "$f" >"$tmp" || true
+  [[ -n "$artisan" ]] && printf 'ARTISAN=%s\n' "$artisan" >>"$tmp"
+  [[ -n "$prefix" ]] && printf 'ENV_PREFIX=%s\n' "$prefix" >>"$tmp"
+  install -m 0600 -o root -g root "$tmp" "$f" && rm -f "$tmp" || return 1
+  ui_result_table "Key id|${id}" "Domain|$(deploy_key_registry_get "$id" DOMAIN)" "Artisan|${artisan:-none}" "Env prefix|${prefix:-none}"
+}
+
 site_deploy_key_remove_handler() {
   parse_kv_args "$@"
   local id="${PARSED_ARGS[key-id]:-}" keys tmp
@@ -140,5 +169,6 @@ site_deploy_key_remove_handler() {
 }
 
 register_cmd "site" "deploy-key-add" "Add a CI deploy key that can only deploy this site (artifact, or --git commit)" "site_deploy_key_add_handler" "domain pubkey-file" "git= host=" "tier:advanced"
+register_cmd "site" "deploy-key-allow" "Let a deploy key run named artisan commands and set .env names with a prefix (replaces the lists)" "site_deploy_key_allow_handler" "key-id" "artisan= env-prefix=" "tier:advanced"
 register_cmd "site" "deploy-key-list" "List CI deploy keys" "site_deploy_key_list_handler" "" "domain=" "effects:read"
 register_cmd "site" "deploy-key-remove" "Revoke a CI deploy key" "site_deploy_key_remove_handler" "key-id" "" "tier:advanced"
