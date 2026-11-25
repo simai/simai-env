@@ -135,6 +135,19 @@ address and the one-time first sign-in link (see below).
   fails. A release that does not answer its health path is rolled back; the
   database is not, which is what the backup is for (`backup data-restore`).
   `.env`, the database and the storage directory survive an update.
+- **Self-update** (1.67.0): the panel updates itself through `larena/update`
+  and proves each copy with `larena/backup`. `panel update-setup
+  --trusted-keys <id>=<base64 public key>[,...] [--drill-db yes|no]` gives
+  it what that needs. `--trusted-keys` writes `LARENA_UPDATE_TRUSTED_KEYS` to
+  the panel's `.env` (no key is built into a release): each id is
+  `[A-Za-z0-9._-]`, at most 64 characters, unique, and each key is a 32-byte
+  public key in base64. A cached configuration is cached again.
+  `--drill-db yes` lets the panel's database user create, use and drop the
+  trial databases `larena_drill_*` where `larena/backup` restores a copy to
+  check it. With MySQL it is a grant on the pattern `larena\_drill\_%`. With
+  PostgreSQL, which has no pattern grants, the role gets `CREATEDB`: it owns
+  the databases it creates and still reads no one else's. `--drill-db no`
+  takes the right back. Both survive `panel update`.
 - `panel remove` takes away the gateway access, then removes the panel site
   with its files and database; other sites are not touched. `panel status`
   shows domain, source, account, install time and release.
