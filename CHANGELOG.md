@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.67.0 - 2026-11-25
+
+- `panel update-setup --trusted-keys <id>=<key>[,...] [--drill-db yes|no]`:
+  what Larena Panel needs to update itself through `larena/update`. The keys
+  of the trusted update servers go to the panel's `.env` as
+  `LARENA_UPDATE_TRUSTED_KEYS` (checked: unique ids, 32-byte base64 public
+  keys). `--drill-db yes` lets the panel's database user create and drop the
+  trial databases `larena_drill_*` where `larena/backup` test-restores a copy
+  (MySQL: a grant on that name pattern; PostgreSQL: `CREATEDB`).
+
 ## 1.66.3 - 2026-11-24
 
 - `site deploy`: every level of the shared `storage/` (`storage/app`,

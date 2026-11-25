@@ -573,8 +573,85 @@ panel_status_handler() {
     "Scheduler|$([[ -f "/etc/cron.d/$(project_slug_from_domain "$domain")" ]] && echo "every minute" || echo "off (set \"scheduler\": true in the build's .simai/app.json)")"
 }
 
+# The panel updates itself through larena/update: it trusts only the update
+# servers whose public keys it is given (no key is built into a release), and
+# larena/backup proves each copy by restoring it into a trial database named
+# larena_drill_<...>. This gives the panel both; nothing else changes.
+SIMAI_PANEL_DRILL_PATTERN='larena\_drill\_%'
+
+panel_update_setup_handler() {
+  parse_kv_args "$@"
+  local keys="${PARSED_ARGS[trusted-keys]:-}" drill="${PARSED_ARGS[drill-db]:-}"
+  local domain user
+  domain=$(panel_state_get PANEL_DOMAIN); user=$(panel_state_get PANEL_USER)
+  [[ -n "$domain" && -n "$user" ]] || { error "The panel is not installed (panel install)"; return 1; }
+  [[ "$(panel_state_get SOURCE)" == build ]] || { error "The placeholder does not update itself; install a build first"; return 1; }
+  [[ -n "$keys$drill" ]] || { error "Give --trusted-keys, --drill-db yes|no, or both"; return 1; }
+  [[ -z "$drill" || "$drill" == yes || "$drill" == no ]] || { error "--drill-db takes yes or no"; return 1; }
+  if [[ -n "$keys" ]]; then
+    python3 -I - "$keys" <<'PY' || return 1
+import base64, binascii, re, sys
+seen = set()
+for item in sys.argv[1].split(","):
+    key_id, sep, value = item.partition("=")
+    if not sep or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", key_id) or key_id in seen:
+        sys.exit(f"--trusted-keys: each entry is <id>=<base64 public key>, ids unique ([A-Za-z0-9._-]); bad entry: {key_id or item[:20]}")
+    seen.add(key_id)
+    try:
+        raw = base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError):
+        raw = b""
+    if len(raw) != 32:
+        sys.exit(f"--trusted-keys: the key of {key_id} is not a base64 32-byte public key")
+PY
+  fi
+  local -A db=()
+  local k v
+  while IFS='|' read -r k v; do db["$k"]="$v"; done < <(read_site_db_env "$domain" || true)
+  if [[ -n "$drill" ]]; then
+    [[ -n "${db[DB_USER]:-}" ]] || { error "The panel site has no database of its own (db.env)"; return 1; }
+    [[ "${db[DB_USER]}" =~ ^[A-Za-z0-9_]+$ ]] || { error "Unexpected database user name of the panel"; return 1; }
+  fi
+  local engine
+  engine=$(site_db_engine "$domain")
+  if [[ -n "$keys" ]]; then
+    panel_env_set "$domain" LARENA_UPDATE_TRUSTED_KEYS "$keys" || { error "Could not write the panel's .env"; return 1; }
+  fi
+  local drill_result="unchanged"
+  if [[ "$drill" == yes && "$engine" == pgsql ]]; then
+    # PostgreSQL has no grant by name pattern: the role may create databases
+    # (it owns what it creates and still reads no one else's).
+    pgsql_exec "ALTER ROLE \"${db[DB_USER]}\" CREATEDB" || { error "Could not let the panel role create databases"; return 1; }
+    drill_result="CREATEDB for role ${db[DB_USER]}"
+  elif [[ "$drill" == no && "$engine" == pgsql ]]; then
+    pgsql_exec "ALTER ROLE \"${db[DB_USER]}\" NOCREATEDB" || { error "Could not take CREATEDB from the panel role"; return 1; }
+    drill_result="CREATEDB taken from role ${db[DB_USER]}"
+  elif [[ "$drill" == yes ]]; then
+    mysql_root_exec_stdin "GRANT ALL PRIVILEGES ON \`${SIMAI_PANEL_DRILL_PATTERN}\`.* TO '${db[DB_USER]}'@'localhost'; FLUSH PRIVILEGES" \
+      || { error "Could not grant the trial databases to the panel user; see ${LOG_FILE}"; return 1; }
+    drill_result="databases ${SIMAI_PANEL_DRILL_PATTERN} granted to ${db[DB_USER]}"
+  elif [[ "$drill" == no ]]; then
+    mysql_root_exec_stdin "REVOKE ALL PRIVILEGES ON \`${SIMAI_PANEL_DRILL_PATTERN}\`.* FROM '${db[DB_USER]}'@'localhost'; FLUSH PRIVILEGES" || true
+    drill_result="databases ${SIMAI_PANEL_DRILL_PATTERN} no longer granted"
+  fi
+  # A cached configuration does not see the new .env until it is cached again.
+  local code php_bin keys_result="unchanged"
+  code="$(panel_site_root "$domain")/current"
+  if [[ -n "$keys" ]]; then
+    keys_result="$(tr ',' '\n' <<<"$keys" | cut -d= -f1 | paste -sd, -) (LARENA_UPDATE_TRUSTED_KEYS)"
+    if [[ -f "${code}/bootstrap/cache/config.php" ]]; then
+      read_site_metadata "$domain"
+      php_bin=$(resolve_php_bin "${SITE_META[php]}")
+      (cd "$code" && sudo -u "$user" -H "$php_bin" artisan config:cache) >>"$LOG_FILE" 2>&1 \
+        || warn "Could not cache the panel's configuration again; see ${LOG_FILE}"
+    fi
+  fi
+  ui_result_table "Panel|${domain}" "Trusted update keys|${keys_result}" "Trial databases|${drill_result}"
+}
+
 register_cmd "panel" "install" "Install Larena Panel as its own site: the pinned build, or --version, --git, --archive, --placeholder yes" "panel_install_handler" "" "domain= port= version= git= ref= archive= sha256= placeholder= php= db-engine= ssl-email=" "tier:advanced lock:none"
 register_cmd "panel" "update" "Update the panel build: data backup, deploy, health check, rollback on failure" "panel_update_handler" "" "version= git= ref= archive= sha256=" "tier:advanced lock:none"
+register_cmd "panel" "update-setup" "Let the panel update itself: trusted update-server keys and trial databases for its backup checks" "panel_update_setup_handler" "" "trusted-keys= drill-db=" "tier:advanced"
 register_cmd "panel" "reset-password" "Reset a panel password from the server console (asks the new password in the terminal)" "panel_reset_password_handler" "" "email=" "tier:advanced"
 register_cmd "panel" "remove" "Remove the panel site and its gateway access (other sites are not touched)" "panel_remove_handler" "" "" "tier:advanced lock:none"
 register_cmd "panel" "status" "Show the installed panel" "panel_status_handler" "" "" "effects:read"

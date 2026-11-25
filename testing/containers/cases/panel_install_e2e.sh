@@ -154,6 +154,22 @@ cli panel update --archive /root/build-v2.tgz --sha256 "$s3" --confirm yes >/tmp
 [[ -n "$(ls -A /var/backups/simai/$P 2>/dev/null)" ]] && ok "update backs up the panel data first" || bad "no backup before the update"
 grep -q '^APP_KEY=base64:' $env && grep -q '^SIMAI_PANEL_SETUP_TOKEN=' $env && ok "the update keeps .env" || bad ".env changed by the update"
 [[ "$(grep -c "^client_max_body_size" /etc/nginx/simai-custom/${project}.conf)" == 1 ]] && ok "the update keeps one upload limit" || bad "upload limit after update: $(cat /etc/nginx/simai-custom/${project}.conf)"
+# panel update-setup: trusted update-server keys in .env, trial databases for larena/backup.
+k1=$(python3 -c 'import base64; print(base64.b64encode(bytes(range(32))).decode())')
+cli panel update-setup --trusted-keys "upd1=${k1}" >/dev/null 2>&1; ! grep -q '^LARENA_UPDATE_TRUSTED_KEYS=' $env && ok "update-setup without confirm changes nothing" || bad "update-setup ran without confirm"
+cli panel update-setup --trusted-keys "upd1=c2hvcnQ=" --confirm yes >/dev/null 2>&1 && bad "a short key accepted" || ok "a key that is not 32 bytes is refused"
+cli panel update-setup --trusted-keys "bad id=${k1}" --confirm yes >/dev/null 2>&1 && bad "a bad key id accepted" || ok "a bad key id is refused"
+cli panel update-setup --trusted-keys "upd1=${k1},upd1=${k1}" --confirm yes >/dev/null 2>&1 && bad "a repeated key id accepted" || ok "a repeated key id is refused"
+emode=$(stat -c '%a %U' $env)
+cli panel update-setup --trusted-keys "upd1=${k1},upd2=${k1}" --drill-db yes --confirm yes >/tmp/pus 2>&1 && ok "panel update-setup" || { bad "update-setup"; tail -8 /tmp/pus; }
+[[ "$(grep -c "^LARENA_UPDATE_TRUSTED_KEYS=upd1=${k1},upd2=${k1}\$" $env)" == 1 ]] && ok "the keys are in the panel's .env" || bad "keys in .env: $(grep -c LARENA_UPDATE $env)"
+[[ "$(stat -c '%a %U' $env)" == "$emode" ]] && ok ".env keeps its owner and mode" || bad ".env mode $(stat -c '%a %U' $env), was $emode"
+pdb=$(sed -n 's/^DB_USER=//p' /etc/simai-env/sites/$P/db.env)
+mysql -N -e "SHOW GRANTS FOR '${pdb}'@'localhost'" 2>/dev/null | grep -E 'larena.+_drill.+_%' >/dev/null && ok "the panel user may use larena_drill_ databases" || bad "drill grant: $(mysql -N -e "SHOW GRANTS FOR '${pdb}'@'localhost'" 2>&1 | head -5)"
+MYSQL_PWD=$(sed -n 's/^DB_PASS=//p' /etc/simai-env/sites/$P/db.env) mysql -u "$pdb" -e 'CREATE DATABASE larena_drill_t1; DROP DATABASE larena_drill_t1' 2>/dev/null && ok "and creates and drops one" || bad "the panel user cannot create a trial database"
+MYSQL_PWD=$(sed -n 's/^DB_PASS=//p' /etc/simai-env/sites/$P/db.env) mysql -u "$pdb" -e 'CREATE DATABASE larenaxdrill_t1' 2>/dev/null && bad "the panel user created another database" || ok "but no other database"
+cli panel update-setup --drill-db no --confirm yes >/dev/null 2>&1; ! mysql -N -e "SHOW GRANTS FOR '${pdb}'@'localhost'" 2>/dev/null | grep -E 'larena.+_drill.+_%' >/dev/null \
+  && grep -q '^LARENA_UPDATE_TRUSTED_KEYS=upd1=' $env && ok "--drill-db no takes the grant back and keeps the keys" || bad "drill revoke"
 # A rollback before the broken update: the newest other release is then not
 # the one that was serving.
 cli site deploy-rollback --domain $P --confirm yes >/dev/null 2>&1
