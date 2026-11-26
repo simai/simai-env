@@ -25,6 +25,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CLI = str(ROOT / "simai-admin.sh")
+sys.path.insert(0, str(ROOT / "lib"))
+import php_support  # noqa: E402  PHP versions marked outdated (1.69.0)
 LOG = os.environ.get("SIMAI_PANEL_GATE_LOG", "/var/log/simai-panel-gate.log")
 JOBS = Path(os.environ.get("SIMAI_PANEL_JOBS", "/var/lib/simai-env/panel-jobs"))
 MAX_REQUEST = 64 * 1024
@@ -675,6 +677,10 @@ def plan_words(command, args, effects, lang):
     display = [{"key": k, "label": labels.get(k, k), "value": v,
                 "words": values.get(k, {}).get(v) or values.get("*", {}).get(v) or v}
                for k, v in args.items()]
+    for row in display:
+        # An outdated PHP version is allowed but marked (1.69.0).
+        if row["key"] == "php":
+            row["outdated"] = php_support.outdated(row["value"])
     out = {"display": display, "title": job_title(command, args, lang),
            "effects_words": w.get("effects", {}).get(effects or "", effects),
            "consequence": w.get("consequences", {}).get(command)}

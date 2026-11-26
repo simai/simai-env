@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.69.0 - 2026-11-26
+
+- Outdated PHP: sites may use PHP 7.4 and 8.0 again. The generic and
+  wordpress profiles accept 7.4 and newer (laravel stays at 8.1, bitrix at
+  8.2). These versions no longer get security fixes, so simai-env marks them
+  `outdated` from one list (`SIMAI_PHP_OUTDATED` in `admin/lib/php_utils.sh`,
+  read by `lib/php_support.py`): `php list` rows and its `outdated` list,
+  `self describe` and `self profiles` (`php_outdated`, per profile
+  `php.outdated`), `site describe` (`php_outdated`), and the `php` row of
+  panel gateway plans (`outdated`, Russian words in `lib/i18n/ru.json`).
+  Human output shows "(outdated, insecure)".
+- Plans of `site add`, `site set-php` and `php install` with an outdated
+  version carry the note "PHP 7.4 is outdated and no longer gets security
+  fixes"; the plans of `site add` and `site set-php` now also refuse a
+  version the site's profile does not allow.
+- PHP older than 7.4 (5.6 and the like) is refused by `php install`,
+  `site add`, `site set-php` and `site adopt`, and left out of the
+  installable versions.
+- A profile's PHP bound held again: a version below it (laravel with 7.4,
+  bitrix with 8.1) passed the profile check and failed later only when it
+  was not installed (an empty match read as one allowed version).
+- `php install` refuses a version the Ubuntu release has no packages for
+  (after the apt indexes are updated, before installing), instead of failing
+  in apt-get.
+
 ## 1.68.2 - 2026-11-26
 
 - Panel gateway with `lang: ru`: refusals carry `message`, the reason in

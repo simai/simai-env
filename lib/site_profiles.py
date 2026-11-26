@@ -25,6 +25,9 @@ import shlex
 import sys
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import php_support  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 PROFILES = Path(os.environ.get("SIMAI_PROFILES_DIR", ROOT / "profiles"))
 ENABLED = Path("/etc/simai-env/profiles.enabled")
@@ -133,7 +136,8 @@ def describe(pid, meta, installed, pgsql):
         allowed = [v for v in meta.get("ALLOWED_PHP_VERSIONS") or [] if v]
         low = meta.get("ALLOWED_PHP_MIN_VERSION") or ""
         versions = [v for v in installed if (not allowed or v in allowed) and (not low or key(v) >= key(low))]
-        php = {"versions": versions, "min": low or None, "default": versions[-1] if versions else None}
+        php = {"versions": versions, "min": low or None, "default": versions[-1] if versions else None,
+               "outdated": [v for v in versions if php_support.outdated(v)]}
         args.append({"name": "php", "required": False, "values": versions, "default": php["default"]})
     db_mode = meta.get("REQUIRES_DB") or "no"
     if db_mode in ("optional", "required"):
@@ -168,7 +172,8 @@ def main():
             # Bundled but switched off: the panel offers profile:enable (1.57.5).
             disabled.append({"id": pid, "title": meta.get("TITLE") or pid})
     if mode == "json":
-        print(json.dumps({"schema": "simai-site-profiles/1", "php_installed": installed, "profiles": profiles,
+        print(json.dumps({"schema": "simai-site-profiles/1", "php_installed": installed,
+                          "php_outdated": php_support.OUTDATED, "profiles": profiles,
                           "disabled": disabled}, ensure_ascii=False))
         return
     for p in profiles:

@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import apt_cache  # noqa: E402
+import php_support  # noqa: E402
 
 ETC_PHP = Path("/etc/php")
 NGINX = Path("/etc/nginx/sites-available")
@@ -83,6 +84,7 @@ def cli_default():
 def installable(have):
     out = apt_cache.run("apt-cache", "pkgnames")
     found = {m.group(1) for m in (re.match(r"^php([0-9]+\.[0-9]+)-fpm$", l) for l in out.splitlines()) if m}
+    found = {v for v in found if php_support.supported(v)}
     return sorted(found - set(have), key=lambda v: tuple(map(int, v.split("."))))
 
 
@@ -98,21 +100,23 @@ def main(argv):
         cand = candidates(sorted(pkgs))
         updates = sorted(p for p, have in pkgs.items() if cand.get(p) not in (None, "(none)", have))
         rows.append({"version": v, "fpm_active": active(f"php{v}-fpm"), "sites": sites.get(v, []),
-                     "native": v == native, "cli_default": v == cli,
+                     "native": v == native, "cli_default": v == cli, "outdated": php_support.outdated(v),
                      "package_version": pkgs.get(f"php{v}-fpm"), "updates": updates,
                      "removable": not sites.get(v) and v != native and v != cli})
     data = {"schema": "simai-php/1", "native": native or None, "versions": rows,
-            "installable": installable([r["version"] for r in rows])}
+            "installable": installable([r["version"] for r in rows]), "outdated": php_support.OUTDATED}
     if output == "json":
         print(json.dumps(data))
         return
     print(f"{'Version':<9}{'FPM':<10}{'Sites':<7}{'Updates':<9}Notes")
     for r in rows:
-        notes = ", ".join(n for n, on in (("system", r["native"]), ("php command", r["cli_default"])) if on)
+        notes = ", ".join(n for n, on in (("system", r["native"]), ("php command", r["cli_default"]),
+                                          ("outdated, insecure", r["outdated"])) if on)
         print(f"{r['version']:<9}{'active' if r['fpm_active'] else 'inactive':<10}{len(r['sites']):<7}"
               f"{len(r['updates']):<9}{notes}")
     if data["installable"]:
-        print(f"Can install: {', '.join(data['installable'])}")
+        print("Can install: " + ", ".join(v + (" (outdated, insecure)" if php_support.outdated(v) else "")
+                                          for v in data["installable"]))
 
 
 if __name__ == "__main__":

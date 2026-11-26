@@ -97,7 +97,30 @@ site_add_plan_check() {
   [[ -n "$profile" ]] || profile=generic
   is_profile_known "$profile" || return 0
   site_add_require_enabled_profile "$profile" || return 1
+  site_php_plan_check "$profile" "$(command_arg php "$@")" || return 1
   site_add_resources_check "$profile"
+}
+
+# PHP of a plan (site add, site set-php): a version the profile refuses stops
+# it, an outdated one is a note. Whether it is installed is the handler's.
+site_php_plan_check() {
+  local profile="$1" php="$2"
+  [[ -n "$php" && "$php" != none ]] || return 0
+  load_profile "$profile" || return 1
+  [[ "${PROFILE_REQUIRES_PHP:-yes}" != no && "${PROFILE_IS_ALIAS:-no}" != yes ]] || return 0
+  php_profile_allows_version "$php" || return 1
+  php_outdated_note "$php"
+}
+
+site_set_php_plan_check() {
+  local domain php
+  domain=$(command_arg domain "$@")
+  php=$(command_arg php "$@")
+  [[ -n "$domain" && -n "$php" ]] || return 0
+  validate_domain "$domain" || return 1
+  require_site_exists "$domain" || return 1
+  read_site_metadata "$domain" || return 0
+  site_php_plan_check "${SITE_META[profile]:-generic}" "$php"
 }
 
 # Memory against the profile's need and free disk where sites live: below

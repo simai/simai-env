@@ -21,6 +21,35 @@ l=$(cli php list --output json 2>/dev/null | python3 -c 'import json,sys; print(
 [[ "$(js '[v["removable"] for v in d["versions"] if v["version"]==d["native"]][0]' <<<"$l")" == False ]] && ok "the system version is not removable" || bad "native removable"
 cli php remove --php "$native" --confirm yes >/tmp/r 2>&1 && bad "removed the system version" || ok "php remove refuses the system version"
 
+# Outdated PHP (1.69.0): 7.4 and 8.0 are allowed where the profile allows
+# them, with a note; older versions are refused; JSON marks them outdated.
+plan() { cli "$@" --output json 2>/dev/null; }
+note='PHP 7.4 is outdated and no longer gets security fixes'
+p=$(plan site add --domain old.test --profile generic --php 7.4 --create-db no)
+[[ "$(js 'd["status"] == "planned" and any("'"$note"'" in n for n in d["plan_checks"]["notes"])' <<<"$p")" == True ]] && ok "generic with PHP 7.4: planned with the outdated note" || bad "generic 7.4 plan: ${p:0:400}"
+p=$(plan site add --domain old.test --profile wordpress --php 8.0 --create-db yes)
+[[ "$(js 'd["status"] == "planned" and any("PHP 8.0 is outdated" in n for n in d["plan_checks"]["notes"])' <<<"$p")" == True ]] && ok "wordpress with PHP 8.0: planned with the note" || bad "wordpress 8.0 plan: ${p:0:400}"
+p=$(plan site add --domain old.test --profile generic --php 5.6 --create-db no)
+[[ "$(js 'd["status"] == "failed" and any("PHP 5.6 is not supported" in n for n in d["plan_checks"]["blockers"])' <<<"$p")" == True ]] && ok "PHP 5.6 is refused in the plan" || bad "5.6 plan: ${p:0:400}"
+p=$(plan site add --domain old.test --profile laravel --php 7.4 --create-db yes)
+[[ "$(js 'd["status"] == "failed" and any("not allowed for profile laravel" in n for n in d["plan_checks"]["blockers"])' <<<"$p")" == True ]] && ok "laravel with PHP 7.4 is refused in the plan" || bad "laravel 7.4 plan: ${p:0:400}"
+p=$(plan site add --domain old.test --profile generic --php "$native" --create-db no)
+[[ "$(js 'd["status"] == "planned" and not any("outdated" in n for n in d["plan_checks"]["notes"])' <<<"$p")" == True ]] && ok "a current version has no outdated note" || bad "native plan: ${p:0:400}"
+p=$(plan site set-php --domain php.test --php 7.4)
+[[ "$(js 'd["status"] == "planned" and any("'"$note"'" in n for n in d["plan_checks"]["notes"])' <<<"$p")" == True ]] && ok "set-php to 7.4: planned with the note" || bad "set-php 7.4 plan: ${p:0:400}"
+p=$(plan site set-php --domain php.test --php 5.6)
+[[ "$(js 'd["status"] == "failed"' <<<"$p")" == True ]] && ok "set-php to 5.6 is refused in the plan" || bad "set-php 5.6 plan: ${p:0:400}"
+p=$(plan php install --php 7.4)
+[[ "$(js 'd["status"] == "planned" and any("'"$note"'" in n for n in d["plan_checks"]["notes"])' <<<"$p")" == True ]] && ok "php install 7.4: planned with the note" || bad "php install 7.4 plan: ${p:0:400}"
+cli php install --php 5.6 --confirm yes >/tmp/i56 2>&1 && bad "php install 5.6 ran" || { grep -q 'PHP 5.6 is not supported' /tmp/i56 && ! dpkg -l php5.6-fpm 2>/dev/null | grep -q '^ii' && ok "php install 5.6 is refused before apt" || bad "5.6 install: $(tail -2 /tmp/i56)"; }
+[[ "$(js 'd["outdated"] == ["7.4", "8.0"] and all(v["outdated"] == (v["version"] in ("7.4", "8.0")) for v in d["versions"]) and "5.6" not in d["installable"]' <<<"$l")" == True ]] && ok "php list marks outdated versions" || bad "php list outdated: ${l:0:400}"
+cli php list >/tmp/pl 2>&1; ! grep -q 'outdated' /tmp/pl && ok "php list has no outdated note for current versions" || bad "human list: $(cat /tmp/pl)"
+h=$(cli self describe 2>/dev/null)
+[[ "$(js '"php_outdated" in d and all(v in d["php_versions"] for v in d["php_outdated"])' <<<"$h")" == True ]] && ok "self describe lists php_outdated" || bad "self describe: ${h:0:300}"
+[[ "$(cli site describe --domain php.test 2>/dev/null | js 'd["php_outdated"]')" == False ]] && ok "site describe carries php_outdated" || bad "site describe php_outdated"
+pr=$(cli self profiles --output json 2>/dev/null)
+[[ "$(js 'd["data"]["php_outdated"] == ["7.4", "8.0"] and {p["id"]: p["php"]["min"] for p in d["data"]["profiles"] if p["php"]} == {"bitrix": "8.2", "generic": "7.4", "laravel": "8.1", "wordpress": "7.4"} and all("outdated" in p["php"] for p in d["data"]["profiles"] if p["php"])' <<<"$pr")" == True ]] && ok "self profiles: bounds 7.4/8.1/8.2 and php_outdated" || bad "self profiles: ${pr:0:600}"
+
 # Extensions: an included one off and on, and one that needs its package.
 cli php extension --php "$native" --name calendar --enabled no --confirm yes >/tmp/e 2>&1 && ! "php-fpm${native}" -m | grep -qx calendar && ok "an extension turns off" || { bad "extension off"; tail -3 /tmp/e; }
 cli php extension --php "$native" --name calendar --enabled yes --confirm yes >/tmp/e 2>&1 && "php-fpm${native}" -m | grep -qx calendar && ok "and on again" || { bad "extension on"; tail -3 /tmp/e; }
@@ -50,6 +79,27 @@ if [[ -n "$extra" ]]; then
   cli php remove --php "$extra" --confirm yes >/tmp/r 2>&1 && [[ ! -d "/etc/php/${extra}/fpm" ]] && ! dpkg -l "php${extra}-fpm" 2>/dev/null | grep -q '^ii' && ok "php remove ${extra}" || { bad "remove ${extra}"; tail -5 /tmp/r; }
 else
   ok "no other PHP version in the apt index of this release; install and remove not run"
+fi
+
+# PHP 7.4 for real where ondrej/php provides it: installs, a generic site
+# switches to it, and the JSON marks it outdated.
+if [[ -n "$extra" ]] && bash -c 'source lib/platform.sh; platform_detect_os; platform_ondrej_php_available'; then
+  if cli php install --php 7.4 --confirm yes >/tmp/i74 2>&1; then
+    grep -q "$note" /tmp/i74 && [[ -x /usr/sbin/php-fpm7.4 ]] && ok "php install 7.4 with the note" || bad "install 7.4 note: $(tail -3 /tmp/i74)"
+    [[ "$(cli php list --output json 2>/dev/null | js "[v['outdated'] for v in d['data']['versions'] if v['version']=='7.4']")" == "[True]" ]] && ok "php list marks 7.4 outdated" || bad "7.4 row"
+    cli php list 2>/dev/null | grep -q '^7\.4 .*outdated, insecure' && ok "human php list says outdated, insecure" || bad "human 7.4 row: $(cli php list 2>&1 | grep '^7.4')"
+    cli site set-php --domain php.test --php 7.4 --confirm yes >/tmp/s74 2>&1 && ok "set-php to 7.4" || bad "set-php 7.4: $(tail -3 /tmp/s74)"
+    grep -q "$note" /tmp/s74 && ok "set-php to 7.4 names the outdated version" || bad "set-php 7.4 note: $(grep -c . /tmp/s74) lines, $(grep -i 'warn' /tmp/s74 | tail -2)"
+    [[ -S /run/php/php7.4-fpm-php-test.sock || -n "$(ls /run/php/php7.4-fpm-*.sock 2>/dev/null)" ]] && systemctl is-active --quiet php7.4-fpm && ok "php7.4-fpm serves the site's pool" || bad "7.4 pool: $(ls /run/php/ 2>&1)"
+    [[ "$(cli site describe --domain php.test 2>/dev/null | js 'd["php"] + " " + str(d["php_outdated"])')" == "7.4 True" ]] && ok "site describe: php_outdated true" || bad "site describe 7.4"
+    [[ "$(cli self describe 2>/dev/null | js 'd["php_outdated"]')" == "['7.4']" ]] && ok "self describe: php_outdated [7.4]" || bad "self describe 7.4"
+    cli site set-php --domain php.test --php "$native" --confirm yes >/dev/null 2>&1
+    cli php remove --php 7.4 --confirm yes >/dev/null 2>&1 && ok "php remove 7.4" || bad "remove 7.4"
+  elif grep -q 'is not available on' /tmp/i74; then
+    ok "PHP 7.4 is not provided for this release; refused with a clear message"
+  else
+    bad "install 7.4: $(tail -5 /tmp/i74)"
+  fi
 fi
 
 # Reloads let busy workers finish: process_control_timeout in [global] (before
@@ -112,6 +162,13 @@ for _ in {1..60}; do s=$(gate "$(req null job:status "{\"job_id\":\"$j\"}")" | j
 [[ "$s" == succeeded ]] && ! "php-fpm${native}" -m | grep -qx calendar && ok "php:extension job" || bad "extension job: $s"
 cli php extension --php "$native" --name calendar --enabled yes --confirm yes >/dev/null 2>&1
 
+# Outdated PHP in gateway plans: the php row is marked, the note is there.
+a=$(gate '{"schema":"simai-panel-request/1","request_id":"r2","lang":"ru","actor":{"user":"admin@x","owner":null},"command":"site:set-php","args":{"domain":"php.test","php":"7.4"}}')
+[[ "$(js '[r["outdated"] for r in d["data"]["display"] if r["key"] == "php"] == [True] and [r["words"] for r in d["data"]["display"] if r["key"] == "php"] == ["7.4 (устаревшая, небезопасная)"] and any("'"$note"'" in n for n in d["data"]["checks"]["notes"])' <<<"$a")" == True ]] && ok "gateway set-php plan marks PHP 7.4 outdated" || bad "gate set-php 7.4: ${a:0:600}"
+a=$(gate "$(req null site:set-php "{\"domain\":\"php.test\",\"php\":\"${native}\"}")")
+[[ "$(js '[r["outdated"] for r in d["data"]["display"] if r["key"] == "php"]' <<<"$a")" == "[False]" ]] && ok "a current version is not marked" || bad "gate set-php native: ${a:0:400}"
+a=$(gate "$(req null site:add '{"domain":"old.test","profile":"generic","php":"5.6","create-db":"no"}')")
+[[ "$(js 'd.get("kind") != "plan" or bool((d.get("data") or {}).get("failed"))' <<<"$a")" == True ]] && ok "gateway site:add with PHP 5.6 is not a plan" || bad "gate 5.6: ${a:0:400}"
 cli panel gate-disable --confirm yes >/dev/null 2>&1
 cli owner remove --name acme --confirm yes >/dev/null 2>&1
 cli site remove --domain php.test --remove-files yes --confirm yes >/dev/null 2>&1

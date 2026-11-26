@@ -75,6 +75,8 @@ command_plan_check() {
   shift
   case "$key" in
     site:add) site_add_plan_check "$@" || return 1 ;;
+    site:set-php) site_set_php_plan_check "$@" || return 1 ;;
+    php:install) php_install_plan_check "$@" || return 1 ;;
     site:check-fix) site_check_fix_plan_check "$@" || return 1 ;;
     site:cache-clear) site_cache_plan_check "$@" || return 1 ;;
     site:transfer) site_transfer_plan_check "$@" || return 1 ;;

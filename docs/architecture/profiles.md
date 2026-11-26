@@ -2,12 +2,12 @@
 
 Profiles describe site types in a single registry (`profiles/*.profile.sh`) and are interpreted by simai-admin. Current profiles:
 
-- **generic**: PHP site with placeholder `<project-root>/public/index.php`; optional DB; recommended extensions include intl/gd/opcache; healthcheck enabled.
-- **laravel**: PHP app with `artisan` and `bootstrap/app.php`; requires DB; cron/queue supported; healthcheck enabled; recommends the Redis PHP extension for cache/session/queue setups.
+- **generic**: PHP site with placeholder `<project-root>/public/index.php`; optional DB; recommended extensions include intl/gd/opcache; healthcheck enabled; PHP 7.4 or newer (7.4 and 8.0 are marked outdated).
+- **laravel**: PHP app with `artisan` and `bootstrap/app.php`; PHP 8.1 or newer; requires DB; cron/queue supported; healthcheck enabled; recommends the Redis PHP extension for cache/session/queue setups.
 - **static**: No PHP/DB; serves `<project-root>/public/index.html`; no cron/queue; healthcheck served directly by nginx at `/healthcheck` (local-only).
 - **alias**: Points to an existing site; no PHP/DB resources of its own; allows aliasing to another root/target.
-- **wordpress**: PHP WordPress site; DB required; cron supported (`wp-cron.php`); healthcheck enabled.
-- **bitrix**: PHP 1C-Bitrix site; DB required; cron supported (`cron_events.php`); healthcheck enabled.
+- **wordpress**: PHP WordPress site; PHP 7.4 or newer (7.4 and 8.0 are marked outdated); DB required; cron supported (`wp-cron.php`); healthcheck enabled.
+- **bitrix**: PHP 1C-Bitrix site; PHP 8.2 or newer; DB required; cron supported (`cron_events.php`); healthcheck enabled.
 - **node**: long-running service behind nginx (`simai-app-<project>.service` on a local port from `/etc/simai-env/sites/<domain>/service.env`); no PHP; the release manifest describes the service and, optionally, a static root with routes to it (`docs/architecture/app-manifest.md`); `public/` stays outside releases for ACME challenges.
 - **redirect**: whole-domain redirect to another origin (`--redirect-to`, `--redirect-code`, `--redirect-path`); answers ACME challenges.
 

@@ -75,6 +75,21 @@ ensure_profile_required_markers() {
   return 0
 }
 
+# Refuse a PHP version the loaded profile (or simai-env) does not allow.
+# Used by site add and site set-php and by their plans.
+php_profile_allows_version() {
+  local desired="$1" allowed_csv="${PROFILE_ALLOWED_PHP_VERSIONS[*]}"
+  local min_allowed="${PROFILE_ALLOWED_PHP_MIN_VERSION:-}" max_allowed="${PROFILE_ALLOWED_PHP_MAX_VERSION:-}"
+  php_version_supported "$desired" || return 1
+  local desired_allowed=()
+  mapfile -t desired_allowed < <(php_filter_versions "$allowed_csv" "$min_allowed" "$max_allowed" "$desired")
+  if [[ ${#desired_allowed[@]} -eq 0 ]]; then
+    error "PHP ${desired} is not allowed for profile ${PROFILE_ID:-unknown}. Allowed: $(php_describe_constraints "$allowed_csv" "$min_allowed" "$max_allowed")"
+    return 1
+  fi
+  return 0
+}
+
 select_php_version_for_profile() {
   local desired="$1"
   local cancel_message="${2:-}"
@@ -87,12 +102,8 @@ select_php_version_for_profile() {
   allowed_desc=$(php_describe_constraints "$allowed_csv" "$min_allowed" "$max_allowed")
 
   if [[ -n "$desired" ]]; then
-    local desired_allowed=()
-    mapfile -t desired_allowed < <(php_filter_versions "$allowed_csv" "$min_allowed" "$max_allowed" "$desired")
-    if [[ ${#desired_allowed[@]} -eq 0 ]]; then
-      error "PHP ${desired} is not allowed for profile ${PROFILE_ID:-unknown}. Allowed: ${allowed_desc}"
-      return 1
-    fi
+    php_profile_allows_version "$desired" || return 1
+    php_outdated_note "$desired"
     if ! is_php_version_installed "$desired"; then
       if [[ "${SIMAI_ADMIN_MENU:-0}" == "1" ]]; then
         local choice
@@ -139,6 +150,7 @@ select_php_version_for_profile() {
       command_cancelled "${cancel_message:-Cancelled.}"
       return $?
     fi
+    php_outdated_note "$selected"
     echo "$selected"
     return 0
   fi
@@ -159,7 +171,7 @@ select_php_version_for_profile() {
   fi
 
   selected=$(php_pick_preferred_version "${choices[@]}")
-
+  php_outdated_note "$selected"
   echo "$selected"
 }
 

@@ -18,6 +18,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import php_support  # noqa: E402
+
 NGINX = Path("/etc/nginx/sites-available")
 STATE = Path("/etc/simai-env")
 UNITS = Path("/etc/systemd/system")
@@ -330,6 +333,7 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "domain": domain,
         "profile": meta.get("profile"),
         "php": meta.get("php"),
+        "php_outdated": php_support.outdated(meta.get("php")),
         "root": str(root),
         "public_dir": meta.get("public-dir"),
         "ssl": meta.get("ssl"),
@@ -464,6 +468,7 @@ def describe_host(root: str) -> dict:
         "os": {"id": os_release.get("ID", "").strip('"'), "version": os_release.get("VERSION_ID", "").strip('"')},
         "services": services,
         "php_versions": php_versions,
+        "php_outdated": [v for v in php_versions if php_support.outdated(v)],
         "isolation": {"new_sites": "own user unless SIMAI_SITE_ISOLATION=no", "owners": owners},
         "sites": sites,
         "next": {

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
 SIMAI_DEFAULT_PHP_VERSION=${SIMAI_DEFAULT_PHP_VERSION:-8.2}
+# The one list of PHP versions sites may still use although PHP no longer
+# fixes them (no security fixes): plans and JSON mark them "outdated". The
+# Python readers (lib/php_support.py) take these two lines from this file.
+# shellcheck disable=SC2034 # read by lib/php_support.py too
+SIMAI_PHP_OUTDATED="7.4 8.0"
+# Older versions are refused everywhere (php install, site add, set-php).
+SIMAI_PHP_MIN_SUPPORTED="7.4"
 
 php_default_version() {
   echo "$SIMAI_DEFAULT_PHP_VERSION"
@@ -13,6 +20,27 @@ validate_php_version_syntax() {
   fi
   error "Invalid PHP version '${ver}'. Use format X.Y, for example 8.2."
   return 1
+}
+
+# Whether simai-env marks this PHP version outdated (SIMAI_PHP_OUTDATED).
+php_version_outdated() {
+  [[ " ${SIMAI_PHP_OUTDATED} " == *" ${1:-} "* ]]
+}
+
+# Refuse a version older than SIMAI_PHP_MIN_SUPPORTED.
+php_version_supported() {
+  local ver="$1"
+  validate_php_version_syntax "$ver" || return 1
+  php_version_gte "$ver" "$SIMAI_PHP_MIN_SUPPORTED" && return 0
+  error "PHP ${ver} is not supported: the oldest PHP simai-env runs is ${SIMAI_PHP_MIN_SUPPORTED}"
+  return 1
+}
+
+# The note plans and commands carry for an outdated version (a warning, so a
+# plan lists it under plan_checks.notes).
+php_outdated_note() {
+  php_version_outdated "${1:-}" || return 0
+  warn "PHP ${1} is outdated and no longer gets security fixes"
 }
 
 php_pick_preferred_version() {
@@ -50,7 +78,10 @@ php_list_available_install_versions() {
   if [[ ${#versions[@]} -eq 0 ]]; then
     return 0
   fi
-  printf "%s\n" "${versions[@]}" | sort -V -u
+  local v
+  for v in "${versions[@]}"; do
+    if php_version_gte "$v" "$SIMAI_PHP_MIN_SUPPORTED"; then printf "%s\n" "$v"; fi
+  done | sort -V -u
 }
 
 php_version_gte() {
@@ -97,6 +128,8 @@ php_filter_versions() {
     fi
     [[ $allowed -eq 1 ]] && filtered+=("$ver")
   done
+  # Nothing allowed prints nothing: an empty line would read as one version.
+  (( ${#filtered[@]} )) || return 0
   printf "%s\n" "${filtered[@]}"
 }
 

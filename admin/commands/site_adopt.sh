@@ -84,7 +84,8 @@ site_adopt_handler() {
     series=$(app_php_series "$APP_PHP_MIN") || series=$(php_default_version)
     php=$(adopt_php_for_series "$series")
   fi
-  validate_php_version_syntax "$php" || return 1
+  php_version_supported "$php" || return 1
+  php_outdated_note "$php"
 
   local -a missing_pkgs=() ext_pkgs=()
   mapfile -t missing_pkgs < <(app_missing_packages "${APP_PACKAGES[@]}")

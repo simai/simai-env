@@ -153,6 +153,25 @@ php_reload_handler() {
   os_svc_reload_or_restart "$svc"
 }
 
+# Plan of php install: a version older than simai-env runs stops it, an
+# outdated one is a note (command_plan_check).
+php_install_plan_check() {
+  local v
+  v=$(command_arg php "$@")
+  [[ -n "$v" ]] || return 0
+  php_version_supported "$v" || return 1
+  php_outdated_note "$v"
+}
+
+# After the apt indexes are fresh: refuse a version this Ubuntu release has
+# no packages for, before apt-get fails midway.
+php_install_available_or_fail() {
+  local v="$1"
+  [[ -n "$(apt-cache policy "php${v}-fpm" 2>/dev/null | awk '/Candidate:/{print $2; exit}' | grep -vx '(none)')" ]] && return 0
+  error "PHP ${v} is not available on ${PLATFORM_OS_PRETTY:-this Ubuntu release}: no php${v}-fpm package in the configured repositories (ondrej/php does not provide it for ${PLATFORM_OS_CODENAME:-this release})"
+  return 1
+}
+
 php_install_handler() {
   parse_kv_args "$@"
   local php_version="${PARSED_ARGS[php]:-}"
@@ -196,9 +215,10 @@ php_install_handler() {
     fi
   fi
 
-  if ! validate_php_version "$php_version"; then
+  if ! php_version_supported "$php_version"; then
     return 1
   fi
+  php_outdated_note "$php_version"
 
   local missing_pkgs=()
   mapfile -t missing_pkgs < <(detect_missing_php_packages "$php_version" "$include_common")
@@ -223,6 +243,7 @@ php_install_handler() {
     if ! run_long "Updating apt indexes" "${OS_CMD[@]}"; then
       return 1
     fi
+    php_install_available_or_fail "$php_version" || return 1
 
     progress_step "Installing PHP ${php_version} packages"
     # A newer version would take over the php command (cron, CLI scripts);
