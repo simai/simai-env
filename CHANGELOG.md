@@ -1069,6 +1069,10 @@ Found by installing on a fresh cloud server (Ubuntu 24.04, 2 CPU, 2 GB):
 - Docs: `cron:job-runs` fields are `started_at` and `finished_at`.
 - Recorded panel answers: set 11.
 
+- Container cases with node sites (`node_e2e`, `profile_e2e`, `app_e2e`) pass
+  on Ubuntu 22.04: where the distribution ships Node.js older than 18, they
+  install Node.js from the pinned NodeSource repository as bootstrap does.
+
 ## 1.34.0 - 2026-11-02
 
 - New site cron jobs: `cron list`, `cron job-add --domain D --schedule

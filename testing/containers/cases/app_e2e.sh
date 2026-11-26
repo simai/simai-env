@@ -9,7 +9,8 @@ cd /root/simai-env
 id simai >/dev/null 2>&1 || useradd -m simai
 fails=0; ok() { echo "PASS $*"; }; bad() { echo "FAIL $*"; fails=$((fails+1)); }
 cli() { ./simai-admin.sh "$@"; }
-command -v npm >/dev/null 2>&1 || apt-get install -y -qq nodejs npm >/dev/null 2>&1
+source testing/containers/node_runtime.sh
+e2e_ensure_node 18 || { echo "FAIL nodejs install"; exit 1; }
 D=play.test; P=/home/simai/www/$D
 hdr() { curl -s -D - -o /dev/null --max-time 5 -H "Host: $D" "${@:2}" "http://127.0.0.1$1" | tr -d '\r'; }
 get() { curl -s --max-time 5 -H "Host: $D" "http://127.0.0.1$1"; }
