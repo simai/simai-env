@@ -7,6 +7,9 @@
 #   status | rollback
 #   artisan <name> [args]      only names the key allows (site deploy-key-allow),
 #                              as the site user; stdin reaches the command
+#   artisan-args <name> <b64>  the same, the arguments a base64url JSON list of
+#                              strings: spaces and any language, no control
+#                              characters; never parsed by a shell
 #   env-set <NAME>             value on stdin into the site's shared .env, only
 #                              names with the key's allowed prefix
 set -euo pipefail
@@ -38,6 +41,26 @@ if [[ "$request" =~ ^artisan\ [a-z0-9:_-]+(\ [A-Za-z0-9._:=@/+,-]{1,200}){0,20}$
   verb=artisan
   read -r -a words <<<"${request#artisan }"
   arg="${words[0]}"
+elif [[ "$request" =~ ^artisan-args\ ([a-z0-9:_-]+)\ ([A-Za-z0-9_-]{1,12000}={0,2})$ ]]; then
+  verb=artisan
+  arg="${BASH_REMATCH[1]}"
+  words=("$arg")
+  args_file=$(mktemp)
+  trap 'rm -f -- "$args_file"' EXIT
+  err=$(python3 -I -c '
+import base64, json, sys
+try:
+    items = json.loads(base64.urlsafe_b64decode(sys.argv[1] + "=" * (-len(sys.argv[1]) % 4)).decode("utf-8"))
+except Exception:
+    sys.exit("the arguments are not a base64url JSON list")
+if not isinstance(items, list) or len(items) > 20:
+    sys.exit("the arguments are a list of at most 20 strings")
+for item in items:
+    if not isinstance(item, str) or not 1 <= len(item) <= 1000 or any(ord(c) < 32 or ord(c) == 127 for c in item):
+        sys.exit("each argument is a string of 1-1000 characters without control characters")
+open(sys.argv[2], "w", encoding="utf-8").write("".join(item + "\0" for item in items))' "${BASH_REMATCH[2]}" "$args_file" 2>&1) || deny "${err}"
+  while IFS= read -r -d '' w; do words+=("$w"); done <"$args_file"
+  rm -f -- "$args_file"
 else
   [[ "$request" =~ ^[a-z-]+( [A-Za-z0-9_]+)?$ ]] || deny "unsupported command"
   verb="${request%% *}"

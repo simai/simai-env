@@ -36,6 +36,7 @@ the deploy gate, which accepts exactly:
 | `status` | `site deploy-status` |
 | `rollback` | `site deploy-rollback` |
 | `artisan <name> [args]` | Laravel sites: only the names the key was given (below); runs as the site user from `current`, stdin reaches the command |
+| `artisan-args <name> <list>` | the same, with arguments that have spaces or other languages: a base64url JSON list (1.68.0) |
 | `env-set <NAME>` | value on stdin into the site's shared `.env`; only names starting with the key's prefix |
 
 Everything else is refused with exit code 126 and logged in
@@ -60,6 +61,16 @@ sudo /root/simai-env/simai-admin.sh site deploy-key-allow --key-id ID --artisan 
   `QUEUE_`, `LOG_`) are refused. `--env-prefix ""` clears it.
 - Arguments are plain words: up to 20, letters, digits and `._:=@/+,-`; no
   quotes or shell characters, and `--env` is refused.
+- Arguments with spaces or in any language (1.68.0): `artisan-args <name>
+  <list>`, where `<list>` is a JSON list of up to 20 strings in base64url
+  (padding optional). Each string is 1–1000 characters with no control
+  characters (no line breaks). The strings reach artisan as they are; no
+  shell reads them. The allowlist and the `--env` refusal are the same.
+
+  ```bash
+  args=$(python3 -c 'import base64,json,sys; print(base64.urlsafe_b64encode(json.dumps(sys.argv[1:]).encode()).decode())' "Хранение файлов" --limit=10)
+  ssh simai-deploy@server "artisan-args larena:registration:capability-set ${args}"
+  ```
 - The gate log records the command name and the number of arguments, and for
   `env-set` only the name; values never reach a command line or the log.
 - `env-set` takes one line, up to 8192 bytes; values with other characters

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.68.0 - 2026-11-26
+
+- Deploy keys: `artisan-args <name> <list>` runs an allowed artisan command
+  with arguments that have spaces or are in any language. `<list>` is a
+  base64url JSON list of up to 20 strings of 1–1000 characters without
+  control characters. No shell reads them; the allowlist and the `--env`
+  refusal are unchanged.
+
 ## 1.67.0 - 2026-11-25
 
 - `panel update-setup --trusted-keys <id>=<key>[,...] [--drill-db yes|no]`:

@@ -100,6 +100,13 @@ out=$(printf 'from-stdin\n' | ci "artisan gate:echo one two=2 /p/x" 2>&1)
 rc=0; ci "artisan gate:other" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "unlisted artisan refused" || bad "unlisted rc=$rc"
 rc=0; ci "artisan gate:echo --env=testing" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan --env refused" || bad "--env rc=$rc"
 rc=0; ci "artisan gate:echo a;id" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan shell characters refused" || bad "injection rc=$rc"
+b64a() { python3 -c 'import base64,json,sys; print(base64.urlsafe_b64encode(json.dumps(sys.argv[1:]).encode()).decode().rstrip("="))' "$@"; }
+out=$(ci "artisan-args gate:echo $(b64a 'Хранение файлов' 'Резервные копии; id' 'a$(id)b')" </dev/null 2>&1)
+[[ "$out" == *'args=Хранение файлов,Резервные копии; id,a$(id)b stdin='* ]] && ok "artisan-args: spaces, Cyrillic and shell characters arrive as plain text" || bad "artisan-args out: $out"
+rc=0; ci "artisan-args gate:other $(b64a x)" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan-args keeps the allowlist" || bad "artisan-args unlisted rc=$rc"
+rc=0; ci "artisan-args gate:echo $(b64a '--env=testing')" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan-args refuses --env" || bad "artisan-args --env rc=$rc"
+rc=0; ci "artisan-args gate:echo $(b64a $'two\nlines')" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan-args refuses control characters" || bad "artisan-args newline rc=$rc"
+rc=0; ci "artisan-args gate:echo bm90LWpzb24" </dev/null >/dev/null 2>&1 || rc=$?; [[ $rc -eq 126 ]] && ok "artisan-args refuses what is not a JSON list" || bad "artisan-args not json rc=$rc"
 mode0=$(stat -c '%a %U:%G' $P/.env)
 printf 'tok-SECRET-123 with space\n' | ci "env-set LARENA_SERVER_TOKEN" >/tmp/es 2>&1 && ok "env-set" || { bad "env-set"; cat /tmp/es; }
 grep -qx 'LARENA_SERVER_TOKEN="tok-SECRET-123 with space"' $P/.env && ok "value written quoted" || bad "env line: $(grep LARENA_SERVER_TOKEN $P/.env)"
