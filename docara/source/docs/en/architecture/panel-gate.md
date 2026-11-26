@@ -197,7 +197,12 @@ gateway, modelled on the deploy gate (`admin/deploy_gate.sh`).
 - `lang` (1.60.0, optional): `ru` or `en` (the default). With `ru`, plan
   labels and values, job titles, step names, states and outcomes come in
   Russian from `lib/i18n/ru.json`; codes stay as they are. Any other value is
-  refused `bad_request`.
+  refused `bad_request`. Since 1.68.2, with `ru`: a refusal also carries
+  `message`, the reason in Russian (`refusals` in `ru.json`); a plan carries
+  `untranslated`, the codes `ru.json` does not know yet (`commands.<name>`,
+  `args.<name>`, `effects.<name>`), empty when all are known; a refusal whose
+  code is unknown carries `untranslated: ["refusals.<code>"]` instead of
+  `message`. `data.detail` stays as the command wrote it (English).
 - `actor.kind` (1.60.0, optional): `person` (the default), `schedule` or
   `server`, for the History page; anything else is refused `bad_actor`.
 
