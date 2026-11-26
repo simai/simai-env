@@ -499,6 +499,23 @@ site_db_rotate_handler() {
 
 # Refusals the plan can name: a Bitrix or WordPress configuration that does
 # not hold the db.env password (command_plan_check).
+# The plan already sees a site whose profile has no database (a static or a
+# redirect site): the gateway answers it as the refusal profile_no_database.
+site_db_create_plan_check() {
+  local domain
+  domain=$(command_arg domain "$@")
+  [[ -n "$domain" ]] || return 0
+  validate_domain "$domain" allow || return 1
+  require_site_exists "$domain" || return 1
+  read_site_metadata "$domain" || return 1
+  load_profile "${SITE_META[profile]:-}" || return 1
+  [[ "${PROFILE_REQUIRES_DB:-no}" == "no" ]] || return 0
+  error "Profile ${SITE_META[profile]:-} does not require DB; creation blocked."
+  site_plan_data_write "$(python3 -I -c 'import json,sys; print(json.dumps({"refusal": "profile_no_database", "detail": sys.argv[1]}))' \
+    "Sites of profile ${SITE_META[profile]:-} have no database")"
+  return 1
+}
+
 site_db_rotate_plan_check() {
   local domain entry pass=""
   domain=$(command_arg domain "$@")

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.68.2 - 2026-11-26
+
+- Panel gateway with `lang: ru`: refusals carry `message`, the reason in
+  Russian (new `refusals` section of `lib/i18n/ru.json`, 66 codes); plans
+  carry `untranslated`, the codes the Russian words do not know yet, and a
+  refusal with an unknown code names it there instead.
+- `site db-create` for a site whose profile has no database (static,
+  redirect, alias) is refused already in the plan: `profile_no_database`.
+- `site remove` as a panel job shows its own five steps again; the last
+  backup it takes first no longer adds the backup's steps (since 1.64.0).
+
 ## 1.68.1 - 2026-11-26
 
 - Deploy gate: every call took over 1 GB of memory since 1.68.0 (a large

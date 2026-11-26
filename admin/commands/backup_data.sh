@@ -354,8 +354,11 @@ backup_data_last() {
   local domain="$1" reason="$2" db="$3" files="$4" rc=0
   BACKUP_DATA_DIR=""
   info "Taking the last backup of ${domain} (kept ${BACKUP_HOLD_DAYS} days)"
-  # A subshell: the backup parses its own arguments over the caller's.
+  # A subshell: the backup parses its own arguments over the caller's. Its
+  # own steps stay out of the caller's panel job (SIMAI_JOB_STEPS_FILE).
   BACKUP_DATA_DIR=$(
+    # shellcheck disable=SC2034 # read by progress_record in core.sh
+    SIMAI_JOB_STEPS_FILE=""
     BACKUP_DATA_NO_PRUNE=1 BACKUP_DATA_REASON="$reason" BACKUP_DATA_HOLD_DAYS="$BACKUP_HOLD_DAYS" \
       SIMAI_BACKUP_OFFSITE="" backup_data_handler --domain "$domain" --dest "$BACKUP_DATA_DEFAULT_DEST" \
       --db "$db" --files "$files" --storage none >/dev/null || exit 1

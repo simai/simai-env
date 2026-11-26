@@ -441,6 +441,7 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "profile_unsupported",  # site:cache-clear of an alias, redirect or proxy site
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
                  "engine_unsupported",
+                 "profile_no_database",  # site:db-create of a static, redirect or alias site (1.68.2)
                  "no_address", "no_nginx", "no_port",  # site:preview-link (with site_missing, alias, suspended)
                  "root_not_empty", "no_files_archive",  # backup:data-restore files-live (with root_missing, releases)
                  "critical",  # service:stop
@@ -450,7 +451,7 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "symlink", "not_file", "files_is_dump", "archive_kind", "dump_kind", "database_unreadable",
                  "database_not_empty", "files_present"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
 PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "site:preview-link", "backup:data-restore", "service:stop", "owner:create",
-                                   "site:restore-ready", "file:trash-empty"}  # plans that name their refusal
+                                   "site:restore-ready", "file:trash-empty", "site:db-create"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"
@@ -674,9 +675,27 @@ def plan_words(command, args, effects, lang):
     display = [{"key": k, "label": labels.get(k, k), "value": v,
                 "words": values.get(k, {}).get(v) or values.get("*", {}).get(v) or v}
                for k, v in args.items()]
-    return {"display": display, "title": job_title(command, args, lang),
-            "effects_words": w.get("effects", {}).get(effects or "", effects),
-            "consequence": w.get("consequences", {}).get(command)}
+    out = {"display": display, "title": job_title(command, args, lang),
+           "effects_words": w.get("effects", {}).get(effects or "", effects),
+           "consequence": w.get("consequences", {}).get(command)}
+    if lang != "en":
+        # Codes these words do not know yet, so the panel can show what to add
+        # to lib/i18n (1.68.2); the answer still carries the code itself.
+        missing = [f"commands.{command}"] if command not in w.get("commands", {}) else []
+        missing += [f"args.{k}" for k in args if k not in labels]
+        if effects and effects not in w.get("effects", {}):
+            missing.append(f"effects.{effects}")
+        out["untranslated"] = missing
+    return out
+
+
+def refusal_words(reason, lang):
+    """The refusal in the person's language (1.68.2): `message` when lib/i18n
+    knows the code, `untranslated` naming it when it does not."""
+    if lang == "en":
+        return {}
+    text_ = words_for(lang).get("refusals", {}).get(reason)
+    return {"message": text_} if text_ else {"untranslated": [f"refusals.{reason}"]}
 
 
 def plan_checks(result):
@@ -1303,6 +1322,7 @@ def main():
 
 def handle(raw, stream, started, reads_only=False):
     answer = {"schema": "simai-panel-answer/1", "request_id": None}
+    lang = "en"
     entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "caller": os.environ.get("SUDO_USER", "")}
     try:
@@ -1314,6 +1334,7 @@ def handle(raw, stream, started, reads_only=False):
                 entry.update(request_id=one["request_id"], command=str(one.get("command"))[:64])
                 raise Refused("not_allowed")
         req, command, args, owner = parse(raw)
+        lang = req.get("lang", "en")
         answer["request_id"] = req["request_id"]
         entry.update(request_id=req["request_id"], user=req["actor"]["user"], owner=owner,
                      impersonated_by=req["actor"].get("impersonated_by"), command=command,
@@ -1414,6 +1435,7 @@ def handle(raw, stream, started, reads_only=False):
         answer.update(status="refused", reason=str(refusal))
         if refusal.data:
             answer["data"] = refusal.data
+        answer.update(refusal_words(str(refusal), lang))
     entry.update(status=answer["status"], reason=answer.get("reason"),
                  operation_id=answer.get("operation_id"), ms=int((time.time() - started) * 1000))
     log(entry)

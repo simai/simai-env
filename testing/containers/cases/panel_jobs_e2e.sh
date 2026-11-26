@@ -42,6 +42,23 @@ p=$(gate "$(req site:add "{\"domain\":\"$D\",\"profile\":\"generic\",\"php\":\"8
 [[ "$(gate "$(printf '{"schema":"simai-panel-request/1","request_id":"r1","actor":{"user":"a"},"command":"site:add","args":{"domain":"%s","profile":"generic","php":"8.3"}}' $D)" | j "d['data']['display'][0]['label']")" == domain ]] \
   && ok 'without lang: English keys' || bad 'default lang'
 [[ "$(gate "$(req job:list '{}' | sed 's/"lang":"ru"/"lang":"de"/')" | j "d['status']")" == refused ]] && ok 'an unknown lang is refused' || bad 'lang de'
+[[ "$(j "d['data'].get('untranslated')" <<<"$(gate "$(req site:add "{\"domain\":\"$D\",\"profile\":\"generic\",\"php\":\"8.3\"}")")")" == "[]" ]] \
+  && ok 'a known plan has nothing untranslated' || bad 'untranslated in a known plan'
+r=$(gate "$(req job:status '{"job_id":"000000000000000000000000"}')")
+[[ "$(j "d['reason']" <<<"$r")" == unknown_job && "$(j "d['message']" <<<"$r")" == "Такого действия нет." ]] && ok 'a refusal in Russian (message)' || bad "refusal words: $(head -c 300 <<<"$r")"
+r=$(gate "$(req job:status '{"job_id":"000000000000000000000000"}' | sed 's/"lang":"ru",//')")
+[[ "$(j "'message' in d or 'untranslated' in d" <<<"$r")" == False ]] && ok 'without lang: no message' || bad "en refusal: $(head -c 300 <<<"$r")"
+cp lib/i18n/ru.json /root/ru.json.saved
+python3 -c 'import json; d=json.load(open("lib/i18n/ru.json")); d["refusals"].pop("unknown_job"); json.dump(d, open("lib/i18n/ru.json","w"), ensure_ascii=False)'
+r=$(gate "$(req job:status '{"job_id":"000000000000000000000000"}')")
+cp /root/ru.json.saved lib/i18n/ru.json
+[[ "$(j "d.get('untranslated')" <<<"$r")" == "['refusals.unknown_job']" && "$(j "'message' in d" <<<"$r")" == False ]] && ok 'an unknown refusal code is listed as untranslated' || bad "untranslated refusal: $(head -c 300 <<<"$r")"
+is_profile_enabled() { grep -qx "$1" /etc/simai-env/profiles.enabled 2>/dev/null; }
+is_profile_enabled static || cli profile enable --id static --confirm yes >/dev/null 2>&1
+cli site add --domain st-db.test --profile static --confirm yes >/dev/null 2>&1
+r=$(gate "$(req site:db-create '{"domain":"st-db.test"}')")
+[[ "$(j "d['reason']" <<<"$r")" == profile_no_database && "$(j "d['message']" <<<"$r")" == "У сайтов этого вида нет базы данных." ]] && ok 'db-create of a static site is refused in the plan' || bad "static db-create: $(head -c 400 <<<"$r")"
+cli site remove --domain st-db.test --remove-files yes --confirm yes >/dev/null 2>&1
 
 # A job: steps, times, outcome.
 job=$(gate "$(req site:add "{\"domain\":\"$D\",\"profile\":\"generic\",\"php\":\"8.3\",\"create-db\":\"yes\"}" ',"confirm":true')" | j "d.get('job_id','')")
