@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.68.1 - 2026-11-26
+
+- Deploy gate: every call took over 1 GB of memory since 1.68.0 (a large
+  bounded repeat in the `artisan-args` pattern, which glibc's regex engine
+  expands), so on a small server the kernel killed the gate ("Killed"). The
+  patterns no longer use large bounds; lengths are checked apart. Plain
+  `artisan` arguments keep their limits (20 words, 200 characters each).
+  `artisan-args` also refuses strings that are not valid UTF-8.
+
 ## 1.68.0 - 2026-11-26
 
 - Deploy keys: `artisan-args <name> <list>` runs an allowed artisan command

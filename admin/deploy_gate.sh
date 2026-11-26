@@ -37,11 +37,16 @@ git_url=$(get GIT_URL)
 
 # One verb and at most one argument; nothing else is ever interpreted.
 # artisan alone takes up to 20 plain words (no quotes, no shell characters).
-if [[ "$request" =~ ^artisan\ [a-z0-9:_-]+(\ [A-Za-z0-9._:=@/+,-]{1,200}){0,20}$ ]]; then
+# No large {m,n} bounds in these patterns: glibc's regex engine expands them,
+# and {1,12000} took over a gigabyte for every call (1.68.0); lengths are
+# checked apart.
+if [[ "$request" =~ ^artisan\ [a-z0-9:_-]+(\ [A-Za-z0-9._:=@/+,-]+)*$ ]]; then
   verb=artisan
   read -r -a words <<<"${request#artisan }"
   arg="${words[0]}"
-elif [[ "$request" =~ ^artisan-args\ ([a-z0-9:_-]+)\ ([A-Za-z0-9_-]{1,12000}={0,2})$ ]]; then
+  (( ${#words[@]} <= 21 )) || deny "artisan takes at most 20 arguments"
+  for w in "${words[@]}"; do (( ${#w} <= 200 )) || deny "an artisan argument is longer than 200 characters"; done
+elif (( ${#request} <= 12100 )) && [[ "$request" =~ ^artisan-args\ ([a-z0-9:_-]+)\ ([A-Za-z0-9_-]+=?=?)$ ]]; then
   verb=artisan
   arg="${BASH_REMATCH[1]}"
   words=("$arg")
@@ -56,8 +61,8 @@ except Exception:
 if not isinstance(items, list) or len(items) > 20:
     sys.exit("the arguments are a list of at most 20 strings")
 for item in items:
-    if not isinstance(item, str) or not 1 <= len(item) <= 1000 or any(ord(c) < 32 or ord(c) == 127 for c in item):
-        sys.exit("each argument is a string of 1-1000 characters without control characters")
+    if not isinstance(item, str) or not 1 <= len(item) <= 1000 or any(ord(c) < 32 or ord(c) == 127 or 0xD800 <= ord(c) <= 0xDFFF for c in item):
+        sys.exit("each argument is 1-1000 characters of valid UTF-8 without control characters")
 open(sys.argv[2], "w", encoding="utf-8").write("".join(item + "\0" for item in items))' "${BASH_REMATCH[2]}" "$args_file" 2>&1) || deny "${err}"
   while IFS= read -r -d '' w; do words+=("$w"); done <"$args_file"
   rm -f -- "$args_file"
