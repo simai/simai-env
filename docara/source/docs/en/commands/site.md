@@ -415,7 +415,8 @@ Options:
 
 Behavior:
 - Loads the profile from nginx metadata; refuses when `PROFILE_REQUIRES_PHP=no`, `PROFILE_IS_ALIAS=yes`, or `PROFILE_ALLOW_PHP_SWITCH=no`.
-- Enforces profile PHP constraints when set: explicit `PROFILE_ALLOWED_PHP_VERSIONS` or dynamic `PROFILE_ALLOWED_PHP_MIN_VERSION` / `PROFILE_ALLOWED_PHP_MAX_VERSION`.
+- Enforces profile PHP constraints when set: explicit `PROFILE_ALLOWED_PHP_VERSIONS` or dynamic `PROFILE_ALLOWED_PHP_MIN_VERSION` / `PROFILE_ALLOWED_PHP_MAX_VERSION`. The plan (without `--confirm yes`) already refuses a version the profile does not allow, and versions older than 7.4.
+- An outdated version (7.4, 8.0; see `docs/commands/php.md`) is allowed where the profile allows it; the plan and the run carry the note "PHP 7.4 is outdated and no longer gets security fixes".
 - Recreates PHP-FPM pool for the target version, patches nginx upstream sockets in-place, validates with `nginx -t`, then reloads nginx/php-fpm. Socket/pool naming uses a safe fallback slug when metadata is invalid.
 - Laravel/queue profiles keep their cron/unit wiring; `--keep-old-pool=yes` preserves the previous pool, otherwise it is removed.
 

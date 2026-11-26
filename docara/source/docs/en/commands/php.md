@@ -12,6 +12,18 @@ remove versions, turn extensions on and off, install package updates, reload
 PHP-FPM. Versions live side by side; a site moves to another one with
 `site set-php`.
 
+## Outdated versions
+
+PHP 7.4 and 8.0 still run sites but no longer get security fixes: simai-env
+marks them `outdated` (one list, `SIMAI_PHP_OUTDATED` in
+`admin/lib/php_utils.sh`). They can be installed and chosen; plans of
+`php install`, `site add` and `site set-php` with one of them carry the note
+"PHP 7.4 is outdated and no longer gets security fixes" (`plan_checks.notes`
+in JSON plans), and human output shows "(outdated, insecure)". Versions older
+than 7.4 (`SIMAI_PHP_MIN_SUPPORTED`), such as 5.6, are refused. Profiles set
+their own lower bound: generic and wordpress accept 7.4, laravel 8.1,
+bitrix 8.2.
+
 ## list
 List installed PHP versions: FPM state, the sites on each, waiting package
 updates, and which versions apt can install. The apt index is as fresh as the
@@ -19,9 +31,10 @@ last `apt-get update` (`php update` refreshes it).
 
 `--output json` answers `simai-php/1`: `native` (the version of this Ubuntu
 release), `versions [{version, fpm_active, sites, native, cli_default,
-package_version, updates, removable}]`, `installable [versions]`. A version
+package_version, updates, removable, outdated}]`, `installable [versions]`,
+`outdated [versions]` (the versions simai-env marks outdated). A version
 is `removable` when no site uses it and it is neither the system version nor
-the `php` command.
+the `php` command. `installable` leaves out versions older than 7.4.
 
 Typical use:
 ```bash
@@ -106,6 +119,11 @@ A new version is installed next to the old one (`php install`), sites move one
 by one (`site set-php`), and the old version is removed when it is free.
 
 Notes:
+- `php install` refuses versions older than 7.4. After the apt indexes are
+  updated it refuses a version this Ubuntu release has no `php<version>-fpm`
+  package for (ondrej/php does not cover every version on every release)
+  before installing anything. An outdated version (7.4, 8.0) installs with a
+  note in the plan and the log.
 - `site add` and `site set-php` can offer to install a missing version from the menu flow.
 - The install picker is dynamic: it reads installable PHP versions from current apt metadata instead of a hardcoded version list.
 - This section is intentionally small; per-site PHP behavior is handled by `site set-php`, `site fix`, and `site php-ini-*`.

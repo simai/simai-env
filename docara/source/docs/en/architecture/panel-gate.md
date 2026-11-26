@@ -481,8 +481,9 @@ Host services and site profiles (1.33.0):
   the host. nginx and PHP-FPM test their configuration first; a failed test
   fails the job and the service keeps running. A failed restart ends the job
   log with the unit's last journal lines.
-- `self:profiles` (`simai-site-profiles/1`), for owners too: `php_installed`
-  and `profiles [{id, title, php {versions, min, default} | null, db:
+- `self:profiles` (`simai-site-profiles/1`), for owners too: `php_installed`,
+  `php_outdated` (versions marked outdated, 1.69.0)
+  and `profiles [{id, title, php {versions, min, default, outdated} | null, db:
   no|optional|required, cron, queue, alias, args [{name, required, values |
   pattern, default, description}]}]`. Only the profiles `site:add` accepts
   through the gateway (no `alias`). Build the site wizard from it. Since
@@ -642,7 +643,17 @@ Server software (1.38.0), administrator only:
 PHP as software of the host (1.37.0), administrator only:
 
 - `php:list` (`simai-php/1`): `native, versions [{version, fpm_active, sites,
-  native, cli_default, package_version, updates, removable}], installable`.
+  native, cli_default, package_version, updates, removable, outdated}],
+  installable, outdated`.
+- Outdated PHP (1.69.0): 7.4 and 8.0 are allowed but get no security fixes.
+  `php:list` rows carry `outdated: true`, `self:describe` lists
+  `php_outdated`, `site:describe` carries `php_outdated`, `self:profiles`
+  carries `php_outdated` and `php.outdated` per profile. Plans of
+  `site:add`, `site:set-php` and `php:install` with such a version carry the
+  note in `checks.notes`, and the plan's `display` row for `php` carries
+  `outdated: true` (with `lang: ru` its words read "7.4 (устаревшая,
+  небезопасная)"). Versions older than 7.4 are refused in the plan
+  (`checks.blockers`).
 - Actions: `php:install {php, include-common}`, `php:remove {php}` (fails
   while a site uses the version, and for the system and `php` command
   versions), `php:extension {php, name, enabled}` (turning on installs the

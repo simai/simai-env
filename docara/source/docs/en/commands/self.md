@@ -606,6 +606,11 @@ sudo /root/simai-env/simai-admin.sh self describe
 sudo /root/simai-env/simai-admin.sh self commands
 ```
 
+`self describe` lists `php_versions` and `php_outdated` (the installed ones
+that no longer get security fixes, 7.4 and 8.0); `site describe` carries
+`php_outdated` next to the site's `php`. `self profiles` carries
+`php_outdated` and, per profile, `php.outdated` (see `docs/commands/php.md`).
+
 `self migrate` links `/root/AGENTS.md` to the agent guide shipped with
 simai-env unless that file already exists.
 
