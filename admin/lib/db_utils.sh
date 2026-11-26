@@ -152,6 +152,10 @@ write_site_db_env() {
   dir="$(site_sites_config_dir)/${domain}"
   mkdir -p "$dir"
   local file="${dir}/db.env"
+  # The site's extra databases (DB_EXTRA, 1.70.0) stay recorded across a
+  # password rotation or a rewrite of the main database's entry.
+  local extra
+  extra=$(site_db_extra_list_raw "$domain")
   local tmp
   tmp="$(mktemp)"
   cat >"$tmp" <<EOF
@@ -164,9 +168,147 @@ DB_PORT=${port}
 DB_CHARSET=${db_charset}
 DB_COLLATION=${db_collation}
 EOF
+  [[ -z "$extra" ]] || printf 'DB_EXTRA=%s\n' "$extra" >>"$tmp"
   mv "$tmp" "$file"
   chmod 0640 "$file"
   chown root:root "$file" 2>/dev/null || true
+}
+
+# Extra databases of a site (1.70.0): <main database>_<name>, on the site's
+# engine, owned by / granted to the site's own database user (no other user,
+# no other password). db.env records the names as DB_EXTRA=name1,name2 (not
+# a secret).
+SITE_DB_EXTRA_NAME_RE='^[a-z0-9_]{1,16}$'
+
+site_db_extra_list_raw() {
+  local entry value=""
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == DB_EXTRA ]] && value="${entry#*|}"
+  done < <(read_site_db_env "$1" 2>/dev/null || true)
+  printf '%s' "$value"
+}
+
+# The recorded names, one per line; malformed entries are left out.
+site_db_extra_names() {
+  local raw name
+  raw=$(site_db_extra_list_raw "$1")
+  [[ -n "$raw" ]] || return 0
+  local -a names=()
+  IFS=',' read -r -a names <<<"$raw"
+  for name in "${names[@]}"; do
+    [[ "$name" =~ $SITE_DB_EXTRA_NAME_RE ]] && printf '%s\n' "$name"
+  done
+  return 0
+}
+
+# Rewrites only the DB_EXTRA line of db.env; an empty list removes it.
+site_db_extra_set() {
+  local domain="$1" list="$2" file tmp
+  file=$(site_db_env_file "$domain")
+  [[ -f "$file" ]] || { error "db.env not found for ${domain}"; return 1; }
+  tmp=$(mktemp) || return 1
+  grep -v '^[[:space:]]*DB_EXTRA=' "$file" >"$tmp" || true
+  [[ -z "$list" ]] || printf 'DB_EXTRA=%s\n' "$list" >>"$tmp"
+  chmod 0640 "$tmp"
+  chown root:root "$tmp" 2>/dev/null || true
+  mv "$tmp" "$file"
+}
+
+# Adds a name to the record or removes it (action add|remove).
+site_db_extra_record() {
+  local domain="$1" action="$2" name="$3" n out=""
+  while IFS= read -r n; do
+    [[ -n "$n" && "$n" != "$name" ]] && out+="${out:+,}${n}"
+  done < <(site_db_extra_names "$domain")
+  [[ "$action" == add ]] && out+="${out:+,}${name}"
+  site_db_extra_set "$domain" "$out"
+}
+
+# MySQL names are up to 64 characters, PostgreSQL ones up to 63.
+site_db_extra_max_len() {
+  [[ "$1" == pgsql ]] && echo 63 || echo 64
+}
+
+site_db_extra_exists() {
+  local engine="$1" full="$2"
+  if [[ "$engine" == pgsql ]]; then
+    pgsql_db_exists "$full"
+  else
+    db_exists "$full"
+  fi
+}
+
+# Creates <full> for the site's user: PostgreSQL owner (PUBLIC without
+# CONNECT, like the main database), MySQL grants of the profile.
+site_db_extra_create() {
+  local engine="$1" full="$2" db_user="$3" charset="${4:-utf8mb4}" coll="${5:-utf8mb4_unicode_ci}"
+  shift 5
+  if [[ "$engine" == pgsql ]]; then
+    pgsql_require || return 1
+    pgsql_exec "CREATE DATABASE \"${full}\" OWNER \"${db_user}\" ENCODING 'UTF8' TEMPLATE template0" || {
+      error "Failed to create database ${full}"
+      return 1
+    }
+    if ! pgsql_exec "REVOKE ALL ON DATABASE \"${full}\" FROM PUBLIC" \
+      || ! pgsql_exec "ALTER SCHEMA public OWNER TO \"${db_user}\"" "$full"; then
+      error "Failed to hand database ${full} to ${db_user}"
+      pgsql_exec "DROP DATABASE IF EXISTS \"${full}\" WITH (FORCE)" || true
+      return 1
+    fi
+    return 0
+  fi
+  local -a privs=("$@")
+  (( ${#privs[@]} )) || mapfile -t privs < <(db_default_privileges)
+  local priv_str
+  priv_str=$(printf "%s, " "${privs[@]}"); priv_str="${priv_str%, }"
+  [[ "$charset" =~ ^[A-Za-z0-9_]+$ ]] || charset=utf8mb4
+  [[ "$coll" =~ ^[A-Za-z0-9_]+$ ]] || coll=utf8mb4_unicode_ci
+  mysql_root_detect_cli || return 1
+  mysql_root_exec_stdin "CREATE DATABASE \`${full}\` DEFAULT CHARACTER SET ${charset} COLLATE ${coll}" || {
+    error "Failed to create database ${full}"
+    return 1
+  }
+  if ! mysql_root_exec_stdin "GRANT ${priv_str} ON \`${full}\`.* TO '${db_user}'@'localhost'" \
+    || ! mysql_root_exec_stdin "FLUSH PRIVILEGES"; then
+    error "Failed to grant ${db_user} privileges on ${full}"
+    mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${full}\`" || true
+    return 1
+  fi
+}
+
+site_db_extra_drop_one() {
+  local engine="$1" full="$2" db_user="$3"
+  if [[ "$engine" == pgsql ]]; then
+    pgsql_require || return 1
+    pgsql_exec "DROP DATABASE IF EXISTS \"${full}\" WITH (FORCE)" || { error "Failed to drop database ${full}"; return 1; }
+    return 0
+  fi
+  mysql_root_detect_cli || return 1
+  mysql_root_exec_stdin "DROP DATABASE IF EXISTS \`${full}\`" || { error "Failed to drop database ${full}"; return 1; }
+  # Grants on a dropped database stay in mysql.db; they go with it.
+  if [[ -n "$db_user" ]] && db_user_exists "$db_user"; then
+    mysql_root_exec_stdin "REVOKE ALL PRIVILEGES ON \`${full}\`.* FROM '${db_user}'@'localhost'" || true
+    mysql_root_exec_stdin "FLUSH PRIVILEGES" || true
+  fi
+  return 0
+}
+
+# All extra databases of a site whose main database is <main>, then their
+# record.
+site_db_extra_drop_all() {
+  local domain="$1" main="$2" db_user="$3" engine n entry recorded=""
+  while IFS= read -r entry; do
+    [[ "${entry%%|*}" == DB_NAME ]] && recorded="${entry#*|}"
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  # Only with the site's own main database (not another --db-name).
+  [[ -n "$recorded" && "$recorded" == "$main" ]] || return 0
+  engine=$(site_db_engine "$domain")
+  while IFS= read -r n; do
+    [[ -n "$n" ]] || continue
+    info "Dropping extra database ${main}_${n}"
+    site_db_extra_drop_one "$engine" "${main}_${n}" "$db_user" || return 1
+  done < <(site_db_extra_names "$domain")
+  [[ -z "$(site_db_extra_list_raw "$domain")" ]] || site_db_extra_set "$domain" ""
 }
 
 site_db_export_to_env() {
@@ -312,6 +454,11 @@ site_db_apply_create() {
 site_db_apply_drop() {
   local domain="$1" db_name="$2" db_user="$3" remove_env="${4:-no}"
   local failed=0
+  # Extra databases go with the main one (before the PostgreSQL role, which
+  # owns them).
+  if [[ -n "$db_name" ]]; then
+    site_db_extra_drop_all "$domain" "$db_name" "$db_user" || return 1
+  fi
   if [[ "$(site_db_engine "$domain")" == pgsql ]]; then
     pgsql_site_drop "$db_name" "$db_user" || return 1
     [[ "${remove_env,,}" == "yes" ]] && rm -f "$(site_db_env_file "$domain")"

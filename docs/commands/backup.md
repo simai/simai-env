@@ -18,6 +18,14 @@ and managed config into `/var/backups/simai/<domain>/<timestamp>/`
 backup that `bitrix finalize` moves out of the docroot after a restore) are
 excluded. Older backups beyond `--keep` are removed.
 
+Extra databases of the site (`site db-extra-add`, 1.70.0) are dumped too,
+one `db-extra-<name>.sql.gz` each, listed in `manifest.txt` as
+`db_extra=name1,name2`; `data-verify` checks each (and imports each into a
+scratch database with `--restore-test yes`), `data-restore` restores them
+into `<main db>_<name>`, creating a missing one for the site's user. An
+extra database that is recorded but missing on the server is left out with
+a warning. Backups without extras verify and restore as before.
+
 The heavy work (database dump and its compression, file archiving,
 encryption, checksums, and the checks of `data-verify`) runs at low priority:
 `nice -n 10` and, when `ionice` (util-linux) is available, the idle I/O class

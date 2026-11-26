@@ -1596,10 +1596,17 @@ site_remove_handler() {
       echo "- DB ${db_name} : skipped"
       echo "- User ${db_user} : skipped"
     else
+      local xdb
       if [[ $drop_db -eq 1 ]]; then
         echo "- DB ${db_name} : would drop"
+        while IFS= read -r xdb; do
+          [[ -n "$xdb" ]] && echo "- Extra DB ${db_name}_${xdb} : would drop"
+        done < <(site_db_extra_names "$domain")
       else
         echo "- DB ${db_name} : would keep"
+        while IFS= read -r xdb; do
+          [[ -n "$xdb" ]] && echo "- Extra DB ${db_name}_${xdb} : would keep"
+        done < <(site_db_extra_names "$domain")
       fi
       if [[ $drop_user -eq 1 ]]; then
         echo "- User ${db_user} : would drop"

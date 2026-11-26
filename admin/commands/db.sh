@@ -258,14 +258,26 @@ db_list_json() {
     else
       size=$(mysql_root_query_stdin "SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema='${name}';" 2>/dev/null || true)
     fi
-    printf '%s\t%s\t%s\t%s\t%s\n' "$domain" "$name" "$engine" "$user" "${size//[^0-9]/}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$domain" "$name" "$engine" "$user" "${size//[^0-9]/}" main
+    # Extra databases of the site (1.70.0), same user.
+    local xn full
+    while IFS= read -r xn; do
+      [[ -n "$xn" ]] || continue
+      full="${name}_${xn}"
+      if [[ "$engine" == pgsql ]]; then
+        size=$(pgsql_query "SELECT pg_database_size('${full}')" 2>/dev/null || true)
+      else
+        size=$(mysql_root_query_stdin "SELECT COALESCE(SUM(data_length + index_length), 0) FROM information_schema.tables WHERE table_schema='${full}';" 2>/dev/null || true)
+      fi
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$domain" "$full" "$engine" "$user" "${size//[^0-9]/}" extra
+    done < <(site_db_extra_names "$domain")
   done | python3 -c '
 import json, sys
 rows = []
 for line in sys.stdin:
-    site, name, engine, user, size = line.rstrip("\n").split("\t")
+    site, name, engine, user, size, kind = line.rstrip("\n").split("\t")
     rows.append({"name": name, "engine": engine, "site": site, "size_bytes": int(size) if size else None,
-                 "users": [user] if user else []})
+                 "users": [user] if user else [], "kind": kind})
 json.dump({"schema": "simai-databases/1", "databases": rows}, sys.stdout)
 print()'
 }

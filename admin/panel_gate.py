@@ -62,6 +62,7 @@ KIND = re.compile(r"^(access|error)$")
 PHP = re.compile(r"^[5-9]\.[0-9]$")
 PROFILE = re.compile(r"^(static|generic|laravel|wordpress|node|redirect|proxy|bitrix)$")
 ENGINE = re.compile(r"^(mysql|pgsql)$")
+DB_EXTRA_NAME = re.compile(r"^[a-z0-9_]{1,16}$")  # site:db-extra-* (1.70.0)
 ORIGIN = re.compile(r"^https?://[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$")
 CODE = re.compile(r"^30[1278]$")
 KEEP_DROP = re.compile(r"^(keep|drop)$")
@@ -250,6 +251,10 @@ ALLOW = {
     "site:db-credentials": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-create": ({"domain": DOMAIN}, {"domain"}, "action"),
     "site:db-drop": ({"domain": DOMAIN}, {"domain"}, "action"),
+    # 1.70.0: extra databases of a site (<main>_<name>, the site's own user).
+    "site:db-extra-add": ({"domain": DOMAIN, "name": DB_EXTRA_NAME}, {"domain", "name"}, "action"),
+    "site:db-extra-drop": ({"domain": DOMAIN, "name": DB_EXTRA_NAME}, {"domain", "name"}, "action"),
+    "site:db-extra-list": ({"domain": DOMAIN}, {"domain"}, "read"),
     "cron:add": ({"domain": DOMAIN}, {"domain"}, "action"),
     "cron:remove": ({"domain": DOMAIN}, {"domain"}, "action"),
     "ssl:remove": ({"domain": DOMAIN, "delete-cert": YES_NO}, {"domain"}, "action"),
@@ -444,6 +449,8 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "no_database", "no_php", "no_https", "alias", "suspended", "no_driver",  # site:db-browser
                  "engine_unsupported",
                  "profile_no_database",  # site:db-create of a static, redirect or alias site (1.68.2)
+                 # site:db-extra-add/drop (1.70.0), with profile_no_database, no_database, site_missing
+                 "name_invalid", "name_too_long", "name_taken", "name_unknown", "database_exists",
                  "no_address", "no_nginx", "no_port",  # site:preview-link (with site_missing, alias, suspended)
                  "root_not_empty", "no_files_archive",  # backup:data-restore files-live (with root_missing, releases)
                  "critical",  # service:stop
@@ -453,7 +460,8 @@ PLAN_REFUSALS = {"not_enough_disk", "not_enough_ram", "source_invalid", "url_inv
                  "symlink", "not_file", "files_is_dump", "archive_kind", "dump_kind", "database_unreadable",
                  "database_not_empty", "files_present"}  # owner:create sites (with alias, panel_site, owner_blocked) of nginx, PHP-FPM or a database server
 PLAN_CHECKED = RESOURCE_CHECKED | {"site:transfer", "site:cache-clear", "site:db-browser", "site:preview-link", "backup:data-restore", "service:stop", "owner:create",
-                                   "site:restore-ready", "file:trash-empty", "site:db-create"}  # plans that name their refusal
+                                   "site:restore-ready", "file:trash-empty", "site:db-create",
+                                   "site:db-extra-add", "site:db-extra-drop"}  # plans that name their refusal
 BULK_ARGS = {"content"}  # shown by size only, written as given, and their file goes when the job ends
 MAX_DOWNLOAD = 1 << 30
 ALERTS = Path(os.environ.get("SIMAI_WATCH_DIR", "/var/lib/simai-env")) / "alerts.json"

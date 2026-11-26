@@ -25,6 +25,12 @@ NGINX = Path("/etc/nginx/sites-available")
 STATE = Path("/etc/simai-env")
 UNITS = Path("/etc/systemd/system")
 DB_KEYS = {"DB_ENGINE", "DB_NAME", "DB_USER", "DB_HOST", "DB_PORT"}
+EXTRA_NAME = re.compile(r"[a-z0-9_]{1,16}")
+
+
+def extra_names(value: str | None) -> list[str]:
+    """DB_EXTRA of db.env (1.70.0): names of a site's extra databases, not secret."""
+    return [n for n in (value or "").split(",") if EXTRA_NAME.fullmatch(n)]
 STATUS = Path(os.environ.get("SIMAI_SITE_STATUS", "/var/lib/simai-env/site-status.json"))
 BLOCKS = STATE / "owner-blocks"
 
@@ -197,7 +203,8 @@ def backup_hold(d: Path) -> dict:
     """What manifest.txt says about the backup: reason and keep_until of one taken
     before a removal (1.64.0); the site's profile and database, so a removed site
     can be added back before its data is restored (1.65.1)."""
-    out = {"reason": None, "keep_until": None, "profile": None, "database": None, "db_engine": None}
+    out = {"reason": None, "keep_until": None, "profile": None, "database": None, "db_engine": None,
+           "extra_databases": []}
     try:
         for line in (d / "manifest.txt").read_text(errors="replace").splitlines()[:50]:
             key, _, value = line.partition("=")
@@ -211,6 +218,9 @@ def backup_hold(d: Path) -> dict:
                 out["database"] = value
             elif key == "db_engine" and value in ("mysql", "pgsql"):
                 out["db_engine"] = value
+            elif key == "db_extra":
+                # Extra databases of the site in the backup (1.70.0).
+                out["extra_databases"] = extra_names(value)
     except OSError:
         pass
     out["has_database"] = out["database"] is not None
@@ -343,7 +353,11 @@ def describe_site(domain: str, detailed: bool, status: dict | None = None) -> di
         "runs_as": runs_as or "simai (shared, not isolated)",
         "owner": owner,
         "database": {"engine": db.get("DB_ENGINE"), "name": db.get("DB_NAME"), "user": db.get("DB_USER"),
-                     "host": db.get("DB_HOST"), "port": db.get("DB_PORT")} if db else None,
+                     "host": db.get("DB_HOST"), "port": db.get("DB_PORT"),
+                     # Extra databases (1.70.0): same user and password as the main one.
+                     "extra": [f"{db.get('DB_NAME')}_{n}" for n in extra_names(
+                         kv_file(STATE / "sites" / domain / "db.env", {"DB_EXTRA"}).get("DB_EXTRA"))]
+                     if db.get("DB_NAME") else []} if db else None,
         "layout": layout,
         "release": {"current": deploy.get("CURRENT"), "previous": deploy.get("PREVIOUS"),
                     "deployed_at": deploy.get("DEPLOYED_AT"), "source": deploy.get("SOURCE")} if deploy else None,

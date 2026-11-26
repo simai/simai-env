@@ -721,7 +721,12 @@ action, job). Everything else is refused.
   wildcards are not counted, changing the mode of a listed name is) and,
   for removal, `name_unknown`. A name that does not point to the server or
   a certificate Let's Encrypt refuses fails the job; its log says why;
-  `site:db-create`, `site:db-drop`; `cron:add`, `cron:remove` (the Laravel
+  `site:db-create`, `site:db-drop`; `site:db-extra-add {domain, name}`,
+  `site:db-extra-drop {domain, name}` (name `^[a-z0-9_]{1,16}$`; the plan
+  refuses `name_invalid`, `name_taken`, `name_too_long`, `database_exists`,
+  `name_unknown`, `no_database`, `profile_no_database`) and
+  `site:db-extra-list {domain}` (read, `simai-db-extra/1`; 1.70.0, details
+  in docs/commands/db.md); `cron:add`, `cron:remove` (the Laravel
   scheduler entry); `ssl:remove {domain, delete-cert}`; `owner:create {name,
   pubkey}`, `owner:add-key`, `owner:remove`;
 - stage 8 (1.27.0): `owner:block {name}`, `owner:unblock {name}`. Blocking

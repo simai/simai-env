@@ -91,6 +91,8 @@ command_plan_check() {
     backup:data-restore) backup_data_restore_plan_check "$@" || return 1 ;;
     site:db-rotate) site_db_rotate_plan_check "$@" || return 1 ;;
     site:db-create) site_db_create_plan_check "$@" || return 1 ;;
+    site:db-extra-add) site_db_extra_add_plan_check "$@" || return 1 ;;
+    site:db-extra-drop) site_db_extra_drop_plan_check "$@" || return 1 ;;
     file:copy) file_copy_plan_check "$@" || return 1 ;;
     service:stop) service_stop_plan_check "$@" || return 1 ;;
     owner:create) owner_create_plan_check "$@" || return 1 ;;

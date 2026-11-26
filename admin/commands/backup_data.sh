@@ -3,6 +3,8 @@
 # Site data backups: database dump + project files + site config, with
 # retention, integrity checks, optional age encryption and rsync off-site copy.
 # Layout: <dest>/<domain>/<YYYYmmdd-HHMMSS>/{db.sql.gz,files.tar.gz,config.tar.gz,manifest.txt,SHA256SUMS}
+# plus db-extra-<name>.sql.gz for each extra database of the site (1.70.0,
+# listed in manifest.txt as db_extra=name1,name2).
 
 BACKUP_DATA_DEFAULT_DEST="${SIMAI_BACKUP_DEST:-/var/backups/simai}"
 BACKUP_DATA_LOG="/var/log/simai-backup.log"
@@ -151,11 +153,33 @@ backup_data_prune() {
 backup_data_encrypt() {
   local dir="$1" recipient="$2" f
   command -v age >/dev/null 2>&1 || { error "age is not installed (apt-get install age)"; return 1; }
-  for f in db.sql.gz files.tar.gz config.tar.gz; do
+  for f in db.sql.gz files.tar.gz config.tar.gz $(backup_data_extra_files "$dir"); do
     [[ -f "${dir}/${f}" ]] || continue
     backup_lowprio age -r "$recipient" -o "${dir}/${f}.age" "${dir}/${f}" || return 1
     rm -f -- "${dir:?}/${f}"
   done
+}
+
+# The extra database dumps present in a backup directory (file names).
+backup_data_extra_files() {
+  local f
+  for f in "$1"/db-extra-*.sql.gz; do
+    [[ -f "$f" ]] && basename "$f"
+  done
+  return 0
+}
+
+# The extra database names a backup's manifest lists (db_extra=), one per line.
+backup_data_manifest_extras() {
+  local raw name
+  raw=$(sed -n 's/^db_extra=//p' "$1/manifest.txt" 2>/dev/null | head -n1)
+  [[ -n "$raw" ]] || return 0
+  local -a names=()
+  IFS=',' read -r -a names <<<"$raw"
+  for name in "${names[@]}"; do
+    [[ "$name" =~ ^[a-z0-9_]{1,16}$ ]] && printf '%s\n' "$name"
+  done
+  return 0
 }
 
 backup_data_write_checksums() {
@@ -280,9 +304,25 @@ backup_data_run() {
   backup_data_lowprio_init
   ui_header "SIMAI ENV · Data backup"
   local failed=""
+  local -a extra_done=()
   if [[ -n "$db_name" ]]; then
     info "Dumping database ${db_name}"
     backup_data_dump_db "$db_name" "${dir}/db.sql.gz" "$(site_db_engine "$domain")" || failed="database dump"
+    # Extra databases (1.70.0): one dump each; one missing on the server is
+    # left out with a warning (and not listed in the manifest).
+    local xengine xn
+    xengine=$(site_db_engine "$domain")
+    while IFS= read -r xn; do
+      [[ -n "$xn" && -z "$failed" ]] || continue
+      if ! site_db_extra_exists "$xengine" "${db_name}_${xn}"; then
+        warn "Extra database ${db_name}_${xn} is missing on the server; it is not in this backup"
+        continue
+      fi
+      info "Dumping extra database ${db_name}_${xn}"
+      backup_data_dump_db "${db_name}_${xn}" "${dir}/db-extra-${xn}.sql.gz" "$xengine" \
+        || failed="extra database dump (${db_name}_${xn})"
+      extra_done+=("$xn")
+    done < <(site_db_extra_names "$domain")
   fi
   if [[ -z "$failed" && "${with_files,,}" == "yes" ]]; then
     info "Archiving ${root}"
@@ -296,6 +336,7 @@ backup_data_run() {
         "$domain" "$profile" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${db_name:-none}" "$root" \
         "$(cat "${SIMAI_ENV_ROOT}/VERSION" 2>/dev/null || echo unknown)"
       printf 'db_engine=%s\n' "$([[ -n "$db_name" ]] && site_db_engine "$domain" || echo none)"
+      (( ${#extra_done[@]} == 0 )) || printf 'db_extra=%s\n' "$(IFS=,; echo "${extra_done[*]}")"
       printf 'encrypted=%s\n' "$([[ -n "$encrypt_to" ]] && echo age || echo no)"
       if [[ -n "${BACKUP_DATA_REASON:-}" ]]; then
         printf 'reason=%s\nkeep_until=%s\n' "$BACKUP_DATA_REASON" \
@@ -332,7 +373,7 @@ backup_data_run() {
   ui_result_table \
     "Domain|${domain}" \
     "Backup|${dir}" \
-    "Database|${db_name:-skipped}" \
+    "Database|${db_name:-skipped}${extra_done[0]:+ (+ extra: $(IFS=,; echo "${extra_done[*]}"))}" \
     "Files|${with_files}" \
     "Size|$(du -sh "$dir" | awk '{print $1}')" \
     "Kept|last ${keep}" \
@@ -443,41 +484,65 @@ backup_data_verify_dir() {
     backup_lowprio tar -tzf "${dir}/files.tar.gz" >/dev/null || { error "files.tar.gz is corrupt"; return 1; }
     echo "PASS files.tar.gz integrity"
   fi
+  # Extra databases (1.70.0): every one the manifest lists has its dump
+  # (plain or encrypted); backups without extras have none to check.
+  local xn
+  while IFS= read -r xn; do
+    [[ -n "$xn" ]] || continue
+    if [[ -f "${dir}/db-extra-${xn}.sql.gz" ]]; then
+      backup_lowprio gzip -t "${dir}/db-extra-${xn}.sql.gz" || { error "db-extra-${xn}.sql.gz is corrupt"; return 1; }
+      echo "PASS db-extra-${xn}.sql.gz integrity"
+    elif [[ ! -f "${dir}/db-extra-${xn}.sql.gz.age" ]]; then
+      error "The manifest lists the extra database ${xn}, but db-extra-${xn}.sql.gz is missing"
+      return 1
+    fi
+  done < <(backup_data_manifest_extras "$dir")
   [[ "${restore_test,,}" == auto && -f "${dir}/db.sql.gz" ]] && restore_test=yes
   if [[ "${restore_test,,}" == "yes" ]]; then
     [[ -f "${dir}/db.sql.gz" ]] || { error "No plain db.sql.gz to test (encrypted or files-only backup)"; return 1; }
-    local scratch engine
-    scratch="simai_restore_check_$(date +%s)_$$"
+    local engine
     engine=$(sed -n 's/^db_engine=//p' "${dir}/manifest.txt" 2>/dev/null | head -n1)
-    if [[ "$engine" == pgsql ]]; then
-      pgsql_require || return 1
-      pgsql_create_scratch "$scratch" || { error "Cannot create scratch database"; return 1; }
-      local prc=0 ptables=0
-      pgsql_restore_gz "$scratch" "${dir}/db.sql.gz" || prc=$?
-      ptables=$(pgsql_table_count "$scratch" || echo 0)
-      pgsql_drop_scratch "$scratch" || warn "Drop scratch database ${scratch} manually"
-      if (( prc != 0 )); then
-        error "Restore test failed: the dump does not import cleanly"
-        return 1
-      fi
-      echo "PASS restore test (${ptables} tables imported into a scratch database)"
-      return 0
-    fi
-    mysql_root_exec_stdin "CREATE DATABASE \`${scratch}\` CHARACTER SET utf8mb4;" || { error "Cannot create scratch database"; return 1; }
-    local rc=0 tables=0
-    if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
-      backup_lowprio gzip -dc "${dir}/db.sql.gz" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
-    else
-      backup_lowprio gzip -dc "${dir}/db.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
-    fi
-    tables=$(mysql_root_query_stdin "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${scratch}'" || echo 0)
-    mysql_root_exec_stdin "DROP DATABASE \`${scratch}\`;" || warn "Drop scratch database ${scratch} manually"
-    if (( rc != 0 )); then
-      error "Restore test failed: the dump does not import cleanly"
+    backup_data_restore_test_one "${dir}/db.sql.gz" "$engine" "" || return 1
+    while IFS= read -r xn; do
+      [[ -n "$xn" && -f "${dir}/db-extra-${xn}.sql.gz" ]] || continue
+      backup_data_restore_test_one "${dir}/db-extra-${xn}.sql.gz" "$engine" " of extra database ${xn}" || return 1
+    done < <(backup_data_manifest_extras "$dir")
+  fi
+  return 0
+}
+
+# Imports one dump into a scratch database and drops it again.
+backup_data_restore_test_one() {
+  local file="$1" engine="$2" label="$3" scratch
+  scratch="simai_restore_check_$(date +%s)_$$"
+  if [[ "$engine" == pgsql ]]; then
+    pgsql_require || return 1
+    pgsql_create_scratch "$scratch" || { error "Cannot create scratch database"; return 1; }
+    local prc=0 ptables=0
+    pgsql_restore_gz "$scratch" "$file" || prc=$?
+    ptables=$(pgsql_table_count "$scratch" || echo 0)
+    pgsql_drop_scratch "$scratch" || warn "Drop scratch database ${scratch} manually"
+    if (( prc != 0 )); then
+      error "Restore test${label} failed: the dump does not import cleanly"
       return 1
     fi
-    echo "PASS restore test (${tables} tables imported into a scratch database)"
+    echo "PASS restore test${label} (${ptables} tables imported into a scratch database)"
+    return 0
   fi
+  mysql_root_exec_stdin "CREATE DATABASE \`${scratch}\` CHARACTER SET utf8mb4;" || { error "Cannot create scratch database"; return 1; }
+  local rc=0 tables=0
+  if [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
+    backup_lowprio gzip -dc "$file" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
+  else
+    backup_lowprio gzip -dc "$file" | "${MYSQL_ROOT_CLI[@]}" "$scratch" 2>>"$LOG_FILE" || rc=$?
+  fi
+  tables=$(mysql_root_query_stdin "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${scratch}'" || echo 0)
+  mysql_root_exec_stdin "DROP DATABASE \`${scratch}\`;" || warn "Drop scratch database ${scratch} manually"
+  if (( rc != 0 )); then
+    error "Restore test${label} failed: the dump does not import cleanly"
+    return 1
+  fi
+  echo "PASS restore test${label} (${tables} tables imported into a scratch database)"
 }
 
 backup_data_schedule_handler() {
@@ -555,6 +620,51 @@ backup_data_restore_plan_check() {
   fi
 }
 
+# The extra databases of a backup (1.70.0) go into <main>_<name> of the
+# site: created for the site's user when missing and recorded in db.env.
+backup_data_restore_extras() {
+  local domain="$1" dir="$2" main="$3" engine="$4" xn full user="" entry charset="utf8mb4" coll="utf8mb4_unicode_ci" rc
+  while IFS= read -r entry; do
+    case "${entry%%|*}" in
+      DB_USER) user="${entry#*|}" ;;
+      DB_CHARSET) [[ -n "${entry#*|}" ]] && charset="${entry#*|}" ;;
+      DB_COLLATION) [[ -n "${entry#*|}" ]] && coll="${entry#*|}" ;;
+    esac
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  while IFS= read -r xn; do
+    [[ -n "$xn" && -f "${dir}/db-extra-${xn}.sql.gz" ]] || continue
+    full="${main}_${xn}"
+    if (( ${#full} > $(site_db_extra_max_len "$engine") )) || ! db_validate_db_name "$full"; then
+      error "Extra database ${xn} does not fit the site's database name ${main}; not restored"
+      return 1
+    fi
+    if ! site_db_extra_exists "$engine" "$full"; then
+      [[ -n "$user" ]] || { error "db.env has no DB_USER for ${domain}"; return 1; }
+      local -a privs=()
+      if [[ -n "${PROFILE_DB_REQUIRED_PRIVILEGES+x}" && ${#PROFILE_DB_REQUIRED_PRIVILEGES[@]} -gt 0 ]]; then
+        privs=("${PROFILE_DB_REQUIRED_PRIVILEGES[@]}")
+      fi
+      info "Creating the extra database ${full}"
+      site_db_extra_create "$engine" "$full" "$user" "$charset" "$coll" ${privs[@]+"${privs[@]}"} || return 1
+    fi
+    site_db_extra_names "$domain" | grep -qx -- "$xn" || site_db_extra_record "$domain" add "$xn" || return 1
+    rc=0
+    if [[ "$engine" == pgsql ]]; then
+      pgsql_restore_gz "$full" "${dir}/db-extra-${xn}.sql.gz" || rc=$?
+    elif [[ -n "${MYSQL_ROOT_PWD:-}" ]]; then
+      gzip -dc "${dir}/db-extra-${xn}.sql.gz" | MYSQL_PWD="$MYSQL_ROOT_PWD" "${MYSQL_ROOT_CLI[@]}" "$full" 2>>"$LOG_FILE" || rc=$?
+    else
+      gzip -dc "${dir}/db-extra-${xn}.sql.gz" | "${MYSQL_ROOT_CLI[@]}" "$full" 2>>"$LOG_FILE" || rc=$?
+    fi
+    if (( rc != 0 )); then
+      error "Import of the extra database ${full} failed. Restore the backup taken just before it to return to the previous state."
+      return 1
+    fi
+    echo "Extra database ${full} restored from $(basename "$dir")"
+  done < <(backup_data_manifest_extras "$dir")
+  return 0
+}
+
 backup_data_restore_handler() {
   parse_kv_args "$@"
   local live="${PARSED_ARGS[files-live]:-no}"
@@ -589,7 +699,14 @@ backup_data_restore_handler() {
   fi
   if [[ "${confirm,,}" != "yes" ]]; then
     echo "Plan for ${domain}:"
-    [[ "$do_db" == yes ]] && echo "  - back up the current database ${db_name} (kept ${BACKUP_HOLD_DAYS} days), then replace it with ${dir}/db.sql.gz"
+    if [[ "$do_db" == yes ]]; then
+      echo "  - back up the current database ${db_name} (kept ${BACKUP_HOLD_DAYS} days), then replace it with ${dir}/db.sql.gz"
+      local pxn
+      while IFS= read -r pxn; do
+        [[ -n "$pxn" && -f "${dir}/db-extra-${pxn}.sql.gz" ]] || continue
+        echo "  - replace the extra database ${db_name}_${pxn} with ${dir}/db-extra-${pxn}.sql.gz (created if missing)"
+      done < <(backup_data_manifest_extras "$dir")
+    fi
     if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
       echo "  - put the files live into the empty site directory ${SITE_META[root]} (as the site user)"
     elif [[ "$do_files" == yes ]]; then
@@ -619,6 +736,7 @@ backup_data_restore_handler() {
       return 1
     fi
     echo "Database ${db_name} restored from $(basename "$dir")"
+    backup_data_restore_extras "$domain" "$dir" "$db_name" "$engine" || return 1
   fi
   if [[ "$do_files" == yes && "${live,,}" == yes ]]; then
     local root="${SITE_META[root]}" user project f

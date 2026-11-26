@@ -39,6 +39,9 @@ site_db_status_handler() {
     echo "DB_NAME   : ${db_name}"
     echo "DB_USER   : ${db_user}"
     echo "DB_ENGINE : $(site_db_engine "$domain")"
+    local extra_names
+    extra_names=$(site_db_extra_names "$domain" | sed "s/^/${db_name}_/" | paste -sd, - || true)
+    [[ -z "$extra_names" ]] || echo "DB_EXTRA  : ${extra_names//,/, }"
     if [[ "$(site_db_engine "$domain")" == mysql ]]; then
       echo "DB_HOST   : localhost"
       echo "DB_CHARSET: ${db_charset:-utf8mb4}"
@@ -557,19 +560,208 @@ site_db_credentials_handler() {
   engine=$(site_db_engine "$domain")
   [[ -n "$host" ]] || host=localhost
   [[ -n "$port" ]] || port=$(db_engine_default_port "$engine")
+  # Extra databases (1.70.0) use the same user and password.
+  local extra="" n
+  while IFS= read -r n; do
+    [[ -n "$n" ]] && extra+="${extra:+,}${name}_${n}"
+  done < <(site_db_extra_names "$domain")
   info "Database credentials of ${domain} handed out (${SUDO_USER:-${USER:-root}}${SIMAI_JOB_RESULT:+, panel job})"
   if [[ -n "${SIMAI_JOB_RESULT:-}" ]]; then
     python3 -I -c 'import json, sys
 keys = ("engine", "host", "port", "database", "user", "db_password")
-print(json.dumps(dict(zip(keys, sys.stdin.read().split("\n")[:6]))))' <<<"$(printf '%s\n%s\n%s\n%s\n%s\n%s' "$engine" "$host" "$port" "$name" "$user" "$pass")" >"$SIMAI_JOB_RESULT"
-    ui_result_table "Domain|${domain}" "Database|${name} (${engine})" "User|${user}" "Password|(handed to the panel once)"
+out = dict(zip(keys, sys.stdin.read().split("\n")[:6]))
+out["extra_databases"] = [x for x in sys.argv[1].split(",") if x]
+print(json.dumps(out))' "$extra" <<<"$(printf '%s\n%s\n%s\n%s\n%s\n%s' "$engine" "$host" "$port" "$name" "$user" "$pass")" >"$SIMAI_JOB_RESULT"
+    ui_result_table "Domain|${domain}" "Database|${name} (${engine})" ${extra:+"Extra databases|${extra//,/, } (same user and password)"} "User|${user}" "Password|(handed to the panel once)"
     return 0
   fi
   ui_header "SIMAI ENV · Database credentials"
-  ui_result_table "Domain|${domain}" "Engine|${engine}" "Host|${host}" "Port|${port}" "Database|${name}" "User|${user}" "Password|${pass}"
+  ui_result_table "Domain|${domain}" "Engine|${engine}" "Host|${host}" "Port|${port}" "Database|${name}" \
+    ${extra:+"Extra databases|${extra//,/, } (same user and password)"} "User|${user}" "Password|${pass}"
   echo "Keep the password secret. Change it with: simai-admin.sh site db-rotate --domain ${domain} --confirm yes"
 }
 
+# Extra databases of a site (1.70.0): <main database>_<name> on the site's
+# engine, for the site's own database user. Checks shared by the handlers
+# and their plans (command_plan_check); they set XDB_* and, on refusal,
+# XDB_REFUSAL (profile_no_database, no_database, name_invalid, name_too_long,
+# name_taken, database_exists, name_unknown).
+site_db_extra_context() {
+  local domain="$1" action="$2" name="$3" entry
+  XDB_REFUSAL="" XDB_MAIN="" XDB_USER="" XDB_CHARSET="utf8mb4" XDB_COLLATION="utf8mb4_unicode_ci" XDB_FULL=""
+  validate_domain "$domain" allow || return 1
+  require_site_exists "$domain" || { XDB_REFUSAL=site_missing; return 1; }
+  read_site_metadata "$domain" || return 1
+  load_profile "${SITE_META[profile]:-}" >/dev/null 2>&1 || true
+  if [[ "${PROFILE_REQUIRES_DB:-no}" == "no" ]]; then
+    XDB_REFUSAL=profile_no_database
+    error "Profile ${SITE_META[profile]:-} has no database; extra databases are not available"
+    return 1
+  fi
+  while IFS= read -r entry; do
+    case "${entry%%|*}" in
+      DB_NAME) XDB_MAIN="${entry#*|}" ;;
+      DB_USER) XDB_USER="${entry#*|}" ;;
+      DB_CHARSET) [[ -n "${entry#*|}" ]] && XDB_CHARSET="${entry#*|}" ;;
+      DB_COLLATION) [[ -n "${entry#*|}" ]] && XDB_COLLATION="${entry#*|}" ;;
+    esac
+  done < <(read_site_db_env "$domain" 2>/dev/null || true)
+  if [[ -z "$XDB_MAIN" || -z "$XDB_USER" ]] || ! db_validate_db_name "$XDB_MAIN" 2>/dev/null \
+    || ! db_validate_db_user "$XDB_USER" 2>/dev/null; then
+    XDB_REFUSAL=no_database
+    error "${domain} has no database of its own (site db-create --domain ${domain} creates one)"
+    return 1
+  fi
+  XDB_ENGINE=$(site_db_engine "$domain")
+  [[ "$action" == list ]] && return 0
+  if [[ ! "$name" =~ $SITE_DB_EXTRA_NAME_RE ]]; then
+    XDB_REFUSAL=name_invalid
+    error "--name must be 1-16 characters: lowercase letters, digits, underscore"
+    return 1
+  fi
+  XDB_FULL="${XDB_MAIN}_${name}"
+  local listed=no max n
+  while IFS= read -r n; do
+    [[ "$n" == "$name" ]] && listed=yes
+  done < <(site_db_extra_names "$domain")
+  max=$(site_db_extra_max_len "$XDB_ENGINE")
+  if [[ "$action" == add ]]; then
+    if (( ${#XDB_FULL} > max )); then
+      XDB_REFUSAL=name_too_long
+      error "Database name ${XDB_FULL} would be ${#XDB_FULL} characters; ${XDB_ENGINE} allows ${max}. Choose a shorter --name"
+      return 1
+    fi
+    if [[ "$listed" == yes ]]; then
+      XDB_REFUSAL=name_taken
+      error "${domain} already has the extra database ${XDB_FULL}"
+      return 1
+    fi
+    [[ "$XDB_ENGINE" == pgsql ]] && { pgsql_require || return 1; }
+    if site_db_extra_exists "$XDB_ENGINE" "$XDB_FULL"; then
+      XDB_REFUSAL=database_exists
+      error "A database named ${XDB_FULL} already exists on this server and is not an extra database of ${domain}"
+      return 1
+    fi
+    return 0
+  fi
+  if [[ "$listed" != yes ]]; then
+    XDB_REFUSAL=name_unknown
+    error "${domain} has no extra database named ${name} (site db-extra-list --domain ${domain})"
+    return 1
+  fi
+  return 0
+}
+
+site_db_extra_plan_refusal() {
+  [[ -n "${XDB_REFUSAL:-}" ]] || return 0
+  site_plan_data_write "{\"refusal\": \"${XDB_REFUSAL}\"}"
+}
+
+site_db_extra_add_plan_check() {
+  local domain
+  domain=$(command_arg domain "$@")
+  [[ -n "$domain" ]] || return 0
+  site_db_extra_context "$domain" add "$(command_arg name "$@")" || { site_db_extra_plan_refusal; return 1; }
+}
+
+site_db_extra_drop_plan_check() {
+  local domain
+  domain=$(command_arg domain "$@")
+  [[ -n "$domain" ]] || return 0
+  site_db_extra_context "$domain" drop "$(command_arg name "$@")" || { site_db_extra_plan_refusal; return 1; }
+}
+
+site_db_extra_add_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[name]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
+  require_args "domain name" || return 1
+  site_db_extra_context "$domain" add "$name" || return 1
+  echo "Plan for ${domain}:"
+  echo "- Create database ${XDB_FULL} (${XDB_ENGINE})"
+  if [[ "$XDB_ENGINE" == pgsql ]]; then
+    echo "- Owner: ${XDB_USER} (the site's database user; same password)"
+  else
+    echo "- Grant ${XDB_USER}@localhost (the site's database user; same password); charset ${XDB_CHARSET}"
+  fi
+  echo "- Record it in db.env (DB_EXTRA); backups include it"
+  if [[ "${confirm,,}" != yes ]]; then
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  local -a privs=()
+  if [[ -n "${PROFILE_DB_REQUIRED_PRIVILEGES+x}" && ${#PROFILE_DB_REQUIRED_PRIVILEGES[@]} -gt 0 ]]; then
+    privs=("${PROFILE_DB_REQUIRED_PRIVILEGES[@]}")
+  fi
+  site_db_extra_create "$XDB_ENGINE" "$XDB_FULL" "$XDB_USER" "$XDB_CHARSET" "$XDB_COLLATION" ${privs[@]+"${privs[@]}"} || return 1
+  if ! site_db_extra_record "$domain" add "$name"; then
+    site_db_extra_drop_one "$XDB_ENGINE" "$XDB_FULL" "$XDB_USER" || true
+    error "Could not record ${XDB_FULL} in db.env; the database was dropped again"
+    return 1
+  fi
+  ui_result_table "Domain|${domain}" "Database|${XDB_FULL} (${XDB_ENGINE})" "User|${XDB_USER} (same password as the main database)"
+}
+
+site_db_extra_drop_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}" name="${PARSED_ARGS[name]:-}" confirm="${PARSED_ARGS[confirm]:-no}"
+  local last_backup="${PARSED_ARGS[last-backup]:-yes}"
+  require_args "domain name" || return 1
+  [[ "$last_backup" == yes || "$last_backup" == no ]] || { error "--last-backup must be yes or no"; return 1; }
+  site_db_extra_context "$domain" drop "$name" || return 1
+  echo "Plan for ${domain}:"
+  [[ "$last_backup" == yes ]] \
+    && echo "- First: last backup of the site's databases, kept ${BACKUP_HOLD_DAYS:-7} days (backup data-list, backup data-restore)"
+  echo "- Drop database ${XDB_FULL} (${XDB_ENGINE}); the main database and its user stay"
+  echo "- Remove it from db.env (DB_EXTRA)"
+  if [[ "${confirm,,}" != yes ]]; then
+    echo "Rerun with --confirm yes to apply."
+    return 0
+  fi
+  if [[ "$last_backup" == yes ]]; then
+    backup_data_last "$domain" db-extra-drop yes no || return 1
+  fi
+  site_db_extra_drop_one "$XDB_ENGINE" "$XDB_FULL" "$XDB_USER" || return 1
+  site_db_extra_record "$domain" remove "$name" || return 1
+  ui_result_table "Domain|${domain}" "Dropped|${XDB_FULL}" "Last backup|${BACKUP_DATA_DIR:-skipped}"
+}
+
+site_db_extra_list_handler() {
+  parse_kv_args "$@"
+  local domain="${PARSED_ARGS[domain]:-}" n
+  require_args "domain" || return 1
+  site_db_extra_context "$domain" list "" || return 1
+  local -a rows=()
+  while IFS= read -r n; do
+    [[ -n "$n" ]] || continue
+    rows+=("${n}"$'\t'"${XDB_MAIN}_${n}"$'\t'"$(site_db_extra_exists "$XDB_ENGINE" "${XDB_MAIN}_${n}" && echo yes || echo no)")
+  done < <(site_db_extra_names "$domain")
+  if [[ "${SIMAI_COMMAND_OUTPUT:-human}" == json ]]; then
+    printf '%s\n' ${rows[@]+"${rows[@]}"} | python3 -I -c '
+import json, sys
+items = []
+for line in sys.stdin:
+    parts = line.rstrip("\n").split("\t")
+    if len(parts) == 3:
+        items.append({"name": parts[0], "database": parts[1], "exists": parts[2] == "yes"})
+print(json.dumps({"schema": "simai-db-extra/1", "domain": sys.argv[1], "engine": sys.argv[2], "main": sys.argv[3],
+                  "user": sys.argv[4], "items": items, "count": len(items)}))' "$domain" "$XDB_ENGINE" "$XDB_MAIN" "$XDB_USER"
+    return 0
+  fi
+  echo "Site: ${domain} (${XDB_ENGINE}, main database ${XDB_MAIN}, user ${XDB_USER})"
+  if (( ${#rows[@]} == 0 )); then
+    echo "No extra databases (site db-extra-add --domain ${domain} --name <name>)"
+    return 0
+  fi
+  local row full exists
+  for row in "${rows[@]}"; do
+    IFS=$'\t' read -r n full exists <<<"$row"
+    printf '%-18s %-66s %s\n' "$n" "$full" "$([[ "$exists" == yes ]] && echo present || echo MISSING)"
+  done
+}
+
+register_cmd "site" "db-extra-add" "Add an extra database to a site (<main db>_<name>, the site's own DB user)" "site_db_extra_add_handler" "domain name" "confirm=" "tier:advanced plan:handler"
+register_cmd "site" "db-extra-drop" "Drop an extra database of a site (a last backup first)" "site_db_extra_drop_handler" "domain name" "confirm= last-backup=" "tier:advanced plan:handler effects:delete"
+register_cmd "site" "db-extra-list" "List a site's extra databases" "site_db_extra_list_handler" "domain" "" "tier:advanced effects:read"
 register_cmd "site" "db-credentials" "Show the connection details of a site's database, password included" "site_db_credentials_handler" "domain" "" "menu:confirm"
 register_cmd "site" "db-status" "Show DB status for a site" "site_db_status_handler" "" "domain=" "tier:advanced effects:read"
 register_cmd "site" "db-create" "Create DB + user for a site" "site_db_create_handler" "" "domain= dry_run= confirm=" "tier:advanced"

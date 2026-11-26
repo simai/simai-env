@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.70.0 - 2026-11-26
+
+- Extra databases of a site: `site db-extra-add --domain D --name N`,
+  `site db-extra-drop --domain D --name N` and `site db-extra-list --domain D`
+  (`simai-db-extra/1`). The database is `<main db>_<N>` (N: 1-16 of
+  `a-z0-9_`) on the site's engine, for the site's own database user (MySQL
+  grants, PostgreSQL owner with `PUBLIC` shut out): no new user or password.
+  `db.env` records the names as `DB_EXTRA=` (kept by `site db-rotate`).
+  Plans refuse a bad name, a name the site has, a full name over the
+  engine's limit (64/63), a foreign database of that name, and the drop of a
+  name the site does not have (`name_invalid`, `name_taken`,
+  `name_too_long`, `database_exists`, `name_unknown`).
+- `site db-extra-drop` takes a last backup first (`reason=db-extra-drop`,
+  kept 7 days; `--last-backup no` in the console); `site db-drop` and
+  `site remove --drop-db yes` drop the extras with the main database.
+- `backup data` dumps each extra database (`db-extra-<N>.sql.gz`,
+  `db_extra=` in `manifest.txt`, `extra_databases` in `backup data-list`);
+  `backup data-verify` checks and, with `--restore-test yes`, test-imports
+  them; `backup data-restore` restores them, creating a missing one. Old
+  backups without extras verify and restore unchanged.
+- `site describe` / `self describe` (`database.extra`), `site db-status`,
+  `site db-credentials` (`extra_databases` in the panel job result) and
+  `db list --output json` (rows with `kind: main|extra`) show the names,
+  never credentials.
+- Panel gateway: `site:db-extra-add`, `site:db-extra-drop` (name checked
+  `^[a-z0-9_]{1,16}$`; refusals named in the plan) and `site:db-extra-list`;
+  Russian words in `lib/i18n/ru.json`.
+
 ## 1.69.0 - 2026-11-26
 
 - Outdated PHP: sites may use PHP 7.4 and 8.0 again. The generic and
