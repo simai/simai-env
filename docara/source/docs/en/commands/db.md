@@ -82,6 +82,43 @@ Notes:
   `user` and `db_password`; `job:status` hands `db_password` out once, and
   neither the job log nor the admin log contains it.
 
+## db-extra-add / db-extra-drop / db-extra-list (1.70.0)
+```bash
+sudo /root/simai-env/simai-admin.sh site db-extra-add --domain D --name logs                 # plan
+sudo /root/simai-env/simai-admin.sh site db-extra-add --domain D --name logs --confirm yes
+sudo /root/simai-env/simai-admin.sh site db-extra-list --domain D --output json
+sudo /root/simai-env/simai-admin.sh site db-extra-drop --domain D --name logs --confirm yes   # [--last-backup no]
+```
+- A site may have extra databases next to its main one: `<main db>_<name>`
+  (`--name`: 1-16 of `a-z`, `0-9`, `_`) on the site's engine. The site's own
+  database user gets them (MySQL grants of the profile, PostgreSQL owner;
+  `PUBLIC` cannot connect): no other user, no other password.
+- Refused, already in the plan: a bad name (`name_invalid`), a name the site
+  already has (`name_taken`), a full name over the engine's limit (MySQL 64,
+  PostgreSQL 63 characters: `name_too_long`), a database of that name that
+  exists on the server but is not the site's (`database_exists`), a site
+  without a database (`no_database`, `profile_no_database`); drop of a name
+  the site does not have: `name_unknown`.
+- `db.env` records the names as `DB_EXTRA=logs,cache` (not a secret; kept
+  by `site db-rotate`).
+- `db-extra-drop` first takes a last backup of the site's databases, kept 7
+  days (`reason=db-extra-drop`), like `site db-drop`; `--last-backup no`
+  (console only) skips it. The main database and its user stay.
+- `site db-drop` and `site remove --drop-db yes` drop the extras too.
+- `backup data` dumps each extra database to `db-extra-<name>.sql.gz`
+  (listed as `db_extra=` in `manifest.txt`; `backup data-list` shows
+  `extra_databases`), `backup data-verify` checks them (with
+  `--restore-test yes` each is imported into a scratch database), and
+  `backup data-restore` restores them into `<main db>_<name>`, creating a
+  missing one for the site's user. Backups without extras verify and restore
+  as before.
+- `site describe` / `self describe` (`database.extra`), `site db-status`,
+  `site db-credentials` (`extra_databases` in the panel job result) and
+  `db list --output json` (`kind: extra`) show the names, never a password.
+- Panel gateway: `site:db-extra-add {domain, name}`,
+  `site:db-extra-drop {domain, name}` (actions), `site:db-extra-list {domain}`
+  (read, `simai-db-extra/1`).
+
 ## db-export
 `simai-admin.sh site db-export --domain <domain> [--target .env] [--confirm yes]`
 - Writes DB_HOST/DB_DATABASE/DB_USERNAME/DB_PASSWORD into the target file under the project directory (default `.env`), idempotently updating keys.
